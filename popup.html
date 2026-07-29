@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: sans-serif; width: 320px; padding: 10px; }
+    button { width: 100%; padding: 8px; margin-bottom: 8px; cursor: pointer; }
+    #status { font-size: 12px; color: #444; margin-top: 6px; }
+    input[type=file] { margin-bottom: 8px; width: 100%; }
+  </style>
+</head>
+<body>
+  <h3 style="margin-top:0;">ExtMover</h3>
+
+  <button id="exportBtn">Export my extensions</button>
+
+  <hr>
+
+  <label for="importFile">Import a list (open store pages):</label>
+  <input type="file" id="importFile" accept="application/json">
+  <button id="importBtn">Open all in tabs</button>
+
+  <div id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
