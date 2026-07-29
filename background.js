@@ -1,11 +1,5 @@
 browser.browserAction.onClicked.addListener(() => {
-  browser.tabs.create({ url: browser.runtime.getURL('popup.html') });
-});
-
-browser.runtime.onMessage.addListener((message) => {
-  if (message.type === 'export') {
-    return doExport();
-  }
+  doExport();
 });
 
 async function findAmoPage(name) {
@@ -110,10 +104,13 @@ async function doExport() {
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
 
+  // saveAs: false = behaves like a normal browser download: saves straight
+  // to the Downloads folder, or asks where to save if the browser is set
+  // to always ask (Settings > General > Downloads).
   await browser.downloads.download({
     url,
     filename: 'my-extensions.html',
-    saveAs: true
+    saveAs: false
   });
 
   setTimeout(() => URL.revokeObjectURL(url), 30000);

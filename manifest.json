@@ -2,11 +2,10 @@
   "manifest_version": 2,
   "name": "ExtMover",
   "version": "1.0",
-  "description": "Export your installed extensions as a list, and re-open them on another Firefox-based browser to reinstall in one click.",
+  "description": "One click to export your installed extensions as a printable HTML report with real store links.",
   "permissions": [
     "management",
     "downloads",
-    "storage",
     "https://addons.mozilla.org/*"
   ],
   "browser_specific_settings": {
@@ -18,6 +17,6 @@
     "scripts": ["background.js"]
   },
   "browser_action": {
-    "default_title": "Open ExtMover"
+    "default_title": "Export my extensions"
   }
 }
