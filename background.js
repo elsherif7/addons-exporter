@@ -5,21 +5,37 @@ browser.browserAction.onClicked.addListener(async () => {
   });
 });
 
-async function findAmoPage(name) {
+// Look up the extension's real AMO (addons.mozilla.org) listing page.
+// Try by exact ID/GUID first (most reliable), then fall back to a name search.
+async function findAmoPage(id, name) {
+  // 1. Exact lookup by addon ID/GUID
+  try {
+    const res = await fetch(
+      `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(id)}/`
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url) return data.url;
+    }
+  } catch (e) {
+    // fall through
+  }
+
+  // 2. Fuzzy search by name
   try {
     const res = await fetch(
       `https://addons.mozilla.org/api/v5/addons/search/?q=${encodeURIComponent(name)}&app=firefox`
     );
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.results && data.results.length > 0) {
-      const top = data.results[0];
-      if (top.url) return top.url;
-      if (top.slug) return `https://addons.mozilla.org/en-US/firefox/addon/${top.slug}/`;
+    if (res.ok) {
+      const data = await res.json();
+      if (data.results && data.results.length > 0 && data.results[0].url) {
+        return data.results[0].url;
+      }
     }
   } catch (e) {
-    // ignore, fall back below
+    // fall through
   }
+
   return null;
 }
 
@@ -91,14 +107,12 @@ async function doExport() {
   const extensions = all.filter(a => a.type === 'extension' && a.id !== browser.runtime.id);
 
   const list = await Promise.all(extensions.map(async (a) => {
-    let link;
-    if (a.homepageUrl && a.homepageUrl.startsWith('http')) {
+    let link = await findAmoPage(a.id, a.name);
+    if (!link && a.homepageUrl && a.homepageUrl.startsWith('http')) {
       link = a.homepageUrl;
-    } else {
-      link = await findAmoPage(a.name);
-      if (!link) {
-        link = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
-      }
+    }
+    if (!link) {
+      link = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
     }
     return { name: a.name, version: a.version, enabled: a.enabled, link };
   }));
