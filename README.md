@@ -67,4 +67,4 @@ reload it each session unless it's packaged and signed (see Roadmap).
 
 ## License
 
-Unlicense (public domain) — do whatever you want with it.
+GNU General Public License v3.0 — see the [LICENSE](./LICENSE) file for details.
