@@ -1,3 +1,7 @@
+browser.browserAction.onClicked.addListener(() => {
+  browser.tabs.create({ url: browser.runtime.getURL('popup.html') });
+});
+
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'export') {
     return doExport();
