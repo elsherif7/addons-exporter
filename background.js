@@ -70,7 +70,7 @@ function buildHtmlReport(list) {
 <html>
 <head>
 <meta charset="utf-8">
-<title>My Extensions - ExtMover Export</title>
+<title>My Add-ons - Add-ons Exporter Export</title>
 <style>
   body { font-family: sans-serif; max-width: 900px; margin: 30px auto; padding: 0 15px; }
   table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
