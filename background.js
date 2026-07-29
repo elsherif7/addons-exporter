@@ -1,5 +1,8 @@
-browser.browserAction.onClicked.addListener(() => {
-  doExport();
+browser.browserAction.onClicked.addListener(async () => {
+  const result = await doExport();
+  browser.tabs.create({
+    url: browser.runtime.getURL('confirmation.html') + '?count=' + result.count
+  });
 });
 
 async function findAmoPage(name) {
