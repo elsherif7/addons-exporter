@@ -3,7 +3,12 @@
   "name": "ExtMover",
   "version": "1.0",
   "description": "Export your installed extensions as a list, and re-open them on another Firefox-based browser to reinstall in one click.",
-  "permissions": ["management", "downloads", "storage"],
+  "permissions": [
+    "management",
+    "downloads",
+    "storage",
+    "https://addons.mozilla.org/*"
+  ],
   "browser_specific_settings": {
     "gecko": {
       "id": "extmover@local"
