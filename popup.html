@@ -3,22 +3,17 @@
 <head>
   <meta charset="utf-8">
   <style>
-    body { font-family: sans-serif; width: 320px; padding: 10px; }
-    button { width: 100%; padding: 8px; margin-bottom: 8px; cursor: pointer; }
-    #status { font-size: 12px; color: #444; margin-top: 6px; }
-    input[type=file] { margin-bottom: 8px; width: 100%; }
+    body { font-family: sans-serif; width: 360px; padding: 20px; }
+    button { width: 100%; padding: 10px; margin-bottom: 8px; cursor: pointer; font-size: 14px; }
+    #status { font-size: 13px; color: #444; margin-top: 8px; }
+    p { font-size: 13px; color: #555; }
   </style>
 </head>
 <body>
-  <h3 style="margin-top:0;">ExtMover</h3>
+  <h2 style="margin-top:0;">ExtMover</h2>
+  <p>Export a clean HTML page listing all your installed extensions with their real store links. Open that file in another browser and click each link to reinstall.</p>
 
   <button id="exportBtn">Export my extensions</button>
-
-  <hr>
-
-  <label for="importFile">Import a list (open store pages):</label>
-  <input type="file" id="importFile" accept="application/json">
-  <button id="importBtn">Open all in tabs</button>
 
   <div id="status"></div>
   <script src="popup.js"></script>
