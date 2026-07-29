@@ -49,14 +49,18 @@ function buildHtmlReport(list) {
   const enabled = list.filter(a => a.enabled);
   const disabled = list.filter(a => !a.enabled);
 
-  const row = (a) =>
-    `<tr><td>${escapeHtml(a.name)}</td><td>${escapeHtml(a.version)}</td>` +
-    `<td><a href="${a.link}" target="_blank" rel="noopener">${a.link}</a></td></tr>`;
+  const row = (a, idx) =>
+    `<tr>
+      <td><input type="checkbox" class="pick" data-link="${a.link}" checked></td>
+      <td>${escapeHtml(a.name)}</td>
+      <td>${escapeHtml(a.version)}</td>
+      <td><a href="${a.link}" target="_blank" rel="noopener">${a.link}</a></td>
+    </tr>`;
 
   const section = (title, items) => items.length ? `
     <h2>${title} (${items.length})</h2>
     <table>
-      <tr><th>Name</th><th>Version</th><th>Link</th></tr>
+      <tr><th></th><th>Name</th><th>Version</th><th>Link</th></tr>
       ${items.map(row).join('\n')}
     </table>` : '';
 
@@ -73,8 +77,9 @@ function buildHtmlReport(list) {
   th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
   th { background: #f0f0f0; }
   button { padding: 8px 14px; margin-right: 10px; margin-bottom: 20px; cursor: pointer; }
-  #copyStatus { font-size: 13px; color: #444; margin-left: 8px; }
-  @media print { button, #copyStatus { display: none; } }
+  #copyStatus, #openStatus { font-size: 13px; color: #444; margin-left: 8px; }
+  label.selectAll { font-size: 13px; margin-left: 10px; }
+  @media print { button, #copyStatus, #openStatus, .pick, label.selectAll { display: none; } }
 </style>
 </head>
 <body>
@@ -84,6 +89,10 @@ function buildHtmlReport(list) {
   <button onclick="window.print()">Print</button>
   <button id="copyBtn">Copy list as text</button>
   <span id="copyStatus"></span>
+  <br>
+  <button id="openBtn">Open checked in new tabs</button>
+  <label class="selectAll"><input type="checkbox" id="selectAll" checked> Select/deselect all</label>
+  <span id="openStatus"></span>
 
   ${section('Enabled', enabled)}
   ${section('Disabled', disabled)}
@@ -96,6 +105,21 @@ function buildHtmlReport(list) {
       }).catch(() => {
         document.getElementById('copyStatus').textContent = 'Copy failed - select text manually.';
       });
+    });
+
+    document.getElementById('selectAll').addEventListener('change', (e) => {
+      document.querySelectorAll('.pick').forEach(cb => cb.checked = e.target.checked);
+    });
+
+    document.getElementById('openBtn').addEventListener('click', () => {
+      const checked = Array.from(document.querySelectorAll('.pick:checked'));
+      if (checked.length === 0) {
+        document.getElementById('openStatus').textContent = 'Nothing selected.';
+        return;
+      }
+      checked.forEach(cb => window.open(cb.dataset.link, '_blank'));
+      document.getElementById('openStatus').textContent =
+        'Opened ' + checked.length + ' tabs. (If your browser blocked some, allow pop-ups for this page and try again.)';
     });
   </script>
 </body>
