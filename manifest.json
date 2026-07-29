@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
-  "name": "ExtMover",
+  "name": "Add-ons Exporter",
   "version": "1.0",
-  "description": "One click to export your installed extensions as a printable HTML report with real store links.",
+  "description": "One click to export your installed add-ons as a printable HTML report with real store links.",
   "permissions": [
     "management",
     "downloads",
@@ -10,7 +10,7 @@
   ],
   "browser_specific_settings": {
     "gecko": {
-      "id": "extmover@local"
+      "id": "addons-exporter@local"
     }
   },
   "icons": {
@@ -24,7 +24,7 @@
     "scripts": ["background.js"]
   },
   "browser_action": {
-    "default_title": "Export my extensions",
+    "default_title": "Export my add-ons",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
