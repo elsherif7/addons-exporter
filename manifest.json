@@ -9,6 +9,9 @@
       "id": "extmover@local"
     }
   },
+  "background": {
+    "scripts": ["background.js"]
+  },
   "browser_action": {
     "default_popup": "popup.html",
     "default_title": "Export/Import Extensions"
