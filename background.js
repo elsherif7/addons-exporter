@@ -45,6 +45,15 @@ function escapeHtml(str) {
   }[c]));
 }
 
+function formatExportDate(d) {
+  const months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  const day = d.getDate();
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+  return `${month} ${day}, ${year}`;
+}
+
 function buildHtmlReport(list) {
   const enabled = list.filter(a => a.enabled);
   const disabled = list.filter(a => !a.enabled);
@@ -64,8 +73,6 @@ function buildHtmlReport(list) {
       ${items.map(row).join('\n')}
     </table>` : '';
 
-  const plainText = list.map(a => `${a.name} - ${a.link}`).join('\n');
-
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -77,38 +84,36 @@ function buildHtmlReport(list) {
   th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
   th { background: #f0f0f0; }
   button { padding: 8px 14px; margin-right: 10px; margin-bottom: 20px; cursor: pointer; }
-  #copyStatus, #openStatus { font-size: 13px; color: #444; margin-left: 8px; }
+  #openStatus { font-size: 13px; color: #444; margin-left: 8px; }
   label.selectAll { font-size: 13px; margin-left: 10px; }
-  @media print { button, #copyStatus, #openStatus, .pick, label.selectAll { display: none; } }
+  @media print { button, #openStatus, .pick, label.selectAll { display: none; } }
 </style>
 </head>
 <body>
   <h1>My Installed Add-ons</h1>
-  <p>Exported on ${new Date().toLocaleString()} — ${list.length} total.</p>
+  <p>Exported on ${formatExportDate(new Date())} — ${list.length} total.</p>
 
-  <button onclick="window.print()">Print</button>
-  <button id="copyBtn">Copy list as text</button>
-  <span id="copyStatus"></span>
-  <br>
   <button id="openBtn">Open checked in new tabs</button>
-  <label class="selectAll"><input type="checkbox" id="selectAll" checked> Select/deselect all</label>
+  <label class="selectAll"><input type="checkbox" id="selectAll" checked> Select all.</label>
   <span id="openStatus"></span>
 
   ${section('Enabled', enabled)}
   ${section('Disabled', disabled)}
 
   <script>
-    const plain = ${JSON.stringify(plainText)};
-    document.getElementById('copyBtn').addEventListener('click', () => {
-      navigator.clipboard.writeText(plain).then(() => {
-        document.getElementById('copyStatus').textContent = 'Copied!';
-      }).catch(() => {
-        document.getElementById('copyStatus').textContent = 'Copy failed - select text manually.';
-      });
-    });
-
     document.getElementById('selectAll').addEventListener('change', (e) => {
       document.querySelectorAll('.pick').forEach(cb => cb.checked = e.target.checked);
+    });
+
+    // Keep "select all" in sync when individual boxes are toggled
+    document.querySelectorAll('.pick').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const all = document.querySelectorAll('.pick');
+        const checkedCount = document.querySelectorAll('.pick:checked').length;
+        const selectAll = document.getElementById('selectAll');
+        selectAll.checked = checkedCount === all.length;
+        selectAll.indeterminate = checkedCount > 0 && checkedCount < all.length;
+      });
     });
 
     document.getElementById('openBtn').addEventListener('click', () => {
@@ -119,7 +124,7 @@ function buildHtmlReport(list) {
       }
       checked.forEach(cb => window.open(cb.dataset.link, '_blank'));
       document.getElementById('openStatus').textContent =
-        'Opened ' + checked.length + ' tabs. (If your browser blocked some, allow pop-ups for this page and try again.)';
+        'Opened ' + checked.length + ' tabs (if your browser blocked some, allow pop-ups for this page and try again).';
     });
   </script>
 </body>
