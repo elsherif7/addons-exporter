@@ -1,8 +1,8 @@
-# ExtMover
+# Add-ons Exporter
 
-A small Firefox (WebExtension) tool that exports your installed extensions
+A small Firefox (WebExtension) tool that exports your installed add-ons
 into a clean, printable HTML report with real store links — so you can
-move your extension list to another Gecko-based browser (Firefox, Zen,
+move your add-ons list to another Gecko-based browser (Firefox, Zen,
 LibreWolf, Waterfox, Pale Moon, SeaMonkey) and reinstall everything fast.
 
 ## Why
@@ -11,11 +11,11 @@ Browsers don't allow one extension to grab the actual code of another
 (security restriction), so this tool doesn't copy `.xpi` files directly.
 Instead it:
 
-1. Reads your installed extensions via `browser.management.getAll()`
+1. Reads your installed add-ons via `browser.management.getAll()`
 2. Looks up each one's real page on addons.mozilla.org (AMO) — first by
    exact extension ID, then by name search, falling back to the
    developer's homepage if it isn't listed on AMO at all
-3. Downloads a single `my-extensions.html` report, split into
+3. Downloads a single `my-addons.html` report, split into
    **Enabled** / **Disabled** sections
 4. On the new browser, open that HTML file and either click links one by
    one, or check the ones you want and click **"Open checked in new
@@ -38,7 +38,7 @@ Instead it:
 1. Clone or download this repo
 2. Go to `about:debugging#/runtime/this-firefox` in your browser
 3. Click **"Load Temporary Add-on"** and select `manifest.json`
-4. Click the ExtMover icon in the toolbar to export
+4. Click the Add-ons Exporter icon in the toolbar to export
 
 Note: temporary add-ons are removed when the browser restarts, so you'll
 reload it each session unless it's packaged and signed (see Roadmap).

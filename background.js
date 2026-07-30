@@ -49,12 +49,12 @@ function buildHtmlReport(list) {
   const enabled = list.filter(a => a.enabled);
   const disabled = list.filter(a => !a.enabled);
 
-  const row = (a, idx) =>
+  const row = (a) =>
     `<tr>
-      <td><input type="checkbox" class="pick" data-link="${a.link}" checked></td>
+      <td><input type="checkbox" class="pick" data-link="${escapeHtml(a.link)}" checked></td>
       <td>${escapeHtml(a.name)}</td>
       <td>${escapeHtml(a.version)}</td>
-      <td><a href="${a.link}" target="_blank" rel="noopener">${a.link}</a></td>
+      <td><a href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.link)}</a></td>
     </tr>`;
 
   const section = (title, items) => items.length ? `
@@ -83,7 +83,7 @@ function buildHtmlReport(list) {
 </style>
 </head>
 <body>
-  <h1>My Installed Extensions</h1>
+  <h1>My Installed Add-ons</h1>
   <p>Exported on ${new Date().toLocaleString()} — ${list.length} total.</p>
 
   <button onclick="window.print()">Print</button>
@@ -150,7 +150,7 @@ async function doExport() {
   // to always ask (Settings > General > Downloads).
   await browser.downloads.download({
     url,
-    filename: 'my-extensions.html',
+    filename: 'my-addons.html',
     saveAs: false
   });
 
