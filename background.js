@@ -5,6 +5,18 @@ browser.browserAction.onClicked.addListener(async () => {
   });
 });
 
+browser.contextMenus.create({
+  id: 'import-addons',
+  title: 'Import add-ons list...',
+  contexts: ['browser_action']
+});
+
+browser.contextMenus.onClicked.addListener((info) => {
+  if (info.menuItemId === 'import-addons') {
+    browser.tabs.create({ url: browser.runtime.getURL('import.html') });
+  }
+});
+
 // Look up the extension's real AMO (addons.mozilla.org) listing page.
 // Try by exact ID/GUID first (most reliable), then fall back to a name search.
 async function findAmoPage(id, name) {
@@ -96,9 +108,12 @@ function buildHtmlReport(list) {
   <button id="openBtn">Open checked in new tabs</button>
   <label class="selectAll"><input type="checkbox" id="selectAll" checked> Select all.</label>
   <span id="openStatus"></span>
+  <p><em>Tip: if you have Add-ons Exporter installed in this browser, use its "Import add-ons list..." option (right-click the toolbar icon) instead — it opens all tabs at once without being blocked as pop-ups.</em></p>
 
   ${section('Enabled', enabled)}
   ${section('Disabled', disabled)}
+
+  <script type="application/json" id="addons-exporter-data">${JSON.stringify(list)}</script>
 
   <script>
     document.getElementById('selectAll').addEventListener('change', (e) => {

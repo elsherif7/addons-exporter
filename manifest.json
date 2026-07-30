@@ -6,6 +6,7 @@
   "permissions": [
     "management",
     "downloads",
+    "contextMenus",
     "https://addons.mozilla.org/*"
   ],
   "browser_specific_settings": {

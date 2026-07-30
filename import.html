@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Import Add-ons - Add-ons Exporter</title>
+<style>
+  body { font-family: sans-serif; max-width: 600px; margin: 60px auto; padding: 0 15px; }
+  button, input[type=file] { padding: 8px 14px; cursor: pointer; }
+  #status { font-size: 14px; color: #444; margin-top: 14px; }
+  ul { font-size: 14px; }
+</style>
+</head>
+<body>
+  <h1>Import Add-ons List</h1>
+  <p>Pick a <code>my-addons.html</code> file exported earlier by Add-ons Exporter. This opens every add-on's page as a real browser tab (not a pop-up), so nothing gets blocked.</p>
+
+  <input type="file" id="fileInput" accept=".html">
+  <button id="openAllBtn">Open all in tabs</button>
+  <div id="status"></div>
+
+  <script src="import.js"></script>
+</body>
+</html>
