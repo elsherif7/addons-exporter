@@ -5,7 +5,7 @@ function setStatus(msg) {
 }
 
 document.getElementById('exportBtn').addEventListener('click', async () => {
-  setStatus('Exporting...');
+  setStatus('Exporting your add-ons, please wait...');
   try {
     const result = await browser.runtime.sendMessage({ type: 'export' });
     await browser.tabs.create({

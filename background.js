@@ -157,8 +157,8 @@ async function doExport() {
   // to always ask (Settings > General > Downloads).
   await browser.downloads.download({
     url,
-    filename: 'my-addons.html',
-    saveAs: false
+    filename: 'Firefox-Addons.html',
+    saveAs: true
   });
 
   setTimeout(() => URL.revokeObjectURL(url), 30000);

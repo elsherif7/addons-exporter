@@ -15,7 +15,7 @@ Instead it:
 2. Looks up each one's real page on addons.mozilla.org (AMO) — first by
    exact extension ID, then by name search, falling back to the
    developer's homepage if it isn't listed on AMO at all
-3. Downloads a single `my-addons.html` report, split into
+3. Downloads a single `Firefox-Addons.html` report, split into
    **Enabled** / **Disabled** sections
 4. On the new browser, open that HTML file and either click links one by
    one, or check the ones you want and click **"Open checked in new

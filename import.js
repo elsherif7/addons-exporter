@@ -8,7 +8,7 @@ document.getElementById('openAllBtn').addEventListener('click', () => {
   const fileInput = document.getElementById('fileInput');
   const file = fileInput.files[0];
   if (!file) {
-    setStatus('Pick a my-addons.html file first.');
+    setStatus('Pick a Firefox-Addons.html file first.');
     return;
   }
 
