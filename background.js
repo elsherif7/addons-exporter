@@ -59,7 +59,6 @@ function buildHtmlReport(list) {
 
   const row = (a) =>
     `<tr>
-      <td><input type="checkbox" class="pick" data-link="${escapeHtml(a.link)}" checked></td>
       <td>${escapeHtml(a.name)}</td>
       <td>${escapeHtml(a.version)}</td>
       <td><a href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.link)}</a></td>
@@ -68,7 +67,7 @@ function buildHtmlReport(list) {
   const section = (title, items) => items.length ? `
     <h2>${title} (${items.length})</h2>
     <table>
-      <tr><th></th><th>Name</th><th>Version</th><th>Link</th></tr>
+      <tr><th>Name</th><th>Version</th><th>Link</th></tr>
       ${items.map(row).join('\n')}
     </table>` : '';
 
@@ -82,53 +81,17 @@ function buildHtmlReport(list) {
   table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
   th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
   th { background: #f0f0f0; }
-  button { padding: 8px 14px; margin-right: 10px; margin-bottom: 20px; cursor: pointer; }
-  #openStatus { font-size: 13px; color: #444; margin-left: 8px; }
-  label.selectAll { font-size: 13px; margin-left: 10px; }
-  @media print { button, #openStatus, .pick, label.selectAll { display: none; } }
 </style>
 </head>
 <body>
   <h1>My Installed Add-ons</h1>
-  <p>Exported on ${formatExportDate(new Date())} — ${list.length} total.</p>
-
-  <button id="openBtn">Open checked in new tabs</button>
-  <label class="selectAll"><input type="checkbox" id="selectAll" checked> Select all.</label>
-  <span id="openStatus"></span>
-  <p><em>Tip: if you have Add-ons Exporter installed in this browser, use its "Import add-ons list..." option (right-click the toolbar icon) instead — it opens all tabs at once without being blocked as pop-ups.</em></p>
+  <p>Exported on ${formatExportDate(new Date())}. Found ${list.length} add-ons in total.</p>
+  <p><em>Tip: on another browser with Add-ons Exporter installed, click its toolbar icon and choose "Import Add-ons" to open every link below as a tab automatically.</em></p>
 
   ${section('Enabled', enabled)}
   ${section('Disabled', disabled)}
 
   <script type="application/json" id="addons-exporter-data">${JSON.stringify(list)}</script>
-
-  <script>
-    document.getElementById('selectAll').addEventListener('change', (e) => {
-      document.querySelectorAll('.pick').forEach(cb => cb.checked = e.target.checked);
-    });
-
-    // Keep "select all" in sync when individual boxes are toggled
-    document.querySelectorAll('.pick').forEach(cb => {
-      cb.addEventListener('change', () => {
-        const all = document.querySelectorAll('.pick');
-        const checkedCount = document.querySelectorAll('.pick:checked').length;
-        const selectAll = document.getElementById('selectAll');
-        selectAll.checked = checkedCount === all.length;
-        selectAll.indeterminate = checkedCount > 0 && checkedCount < all.length;
-      });
-    });
-
-    document.getElementById('openBtn').addEventListener('click', () => {
-      const checked = Array.from(document.querySelectorAll('.pick:checked'));
-      if (checked.length === 0) {
-        document.getElementById('openStatus').textContent = 'Nothing selected.';
-        return;
-      }
-      checked.forEach(cb => window.open(cb.dataset.link, '_blank'));
-      document.getElementById('openStatus').textContent =
-        'Opened ' + checked.length + ' tabs (if your browser blocked some, allow pop-ups for this page and try again).';
-    });
-  </script>
 </body>
 </html>`;
 }
