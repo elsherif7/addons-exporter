@@ -1,19 +1,6 @@
-browser.browserAction.onClicked.addListener(async () => {
-  const result = await doExport();
-  browser.tabs.create({
-    url: browser.runtime.getURL('confirmation.html') + '?count=' + result.count
-  });
-});
-
-browser.contextMenus.create({
-  id: 'import-addons',
-  title: 'Import add-ons list...',
-  contexts: ['browser_action']
-});
-
-browser.contextMenus.onClicked.addListener((info) => {
-  if (info.menuItemId === 'import-addons') {
-    browser.tabs.create({ url: browser.runtime.getURL('import.html') });
+browser.runtime.onMessage.addListener((message) => {
+  if (message.type === 'export') {
+    return doExport();
   }
 });
 
