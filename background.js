@@ -1,6 +1,15 @@
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'export') {
-    return doExport();
+    return doExport().then((result) => {
+      // Open the confirmation tab from here (the background script),
+      // not from the popup - the popup can close early when the native
+      // "Save As" dialog steals focus, which would otherwise stop this
+      // step from ever running.
+      browser.tabs.create({
+        url: browser.runtime.getURL('confirmation.html') + '?count=' + result.count
+      });
+      return result;
+    });
   }
 });
 
@@ -115,9 +124,8 @@ async function doExport() {
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
 
-  // saveAs: false = behaves like a normal browser download: saves straight
-  // to the Downloads folder, or asks where to save if the browser is set
-  // to always ask (Settings > General > Downloads).
+  // saveAs: true = always show the native "Save As" dialog, letting the
+  // user pick the folder and filename themselves.
   await browser.downloads.download({
     url,
     filename: 'Firefox-Addons.html',
