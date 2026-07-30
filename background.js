@@ -78,7 +78,7 @@ function buildHtmlReport(list) {
 <meta charset="utf-8">
 <title>My Add-ons - Add-ons Exporter Export</title>
 <style>
-  body { font-family: sans-serif; max-width: 900px; margin: 30px auto; padding: 0 15px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 15px; }
   table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
   th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
   th { background: #f0f0f0; }
