@@ -15,11 +15,14 @@ browser.runtime.onMessage.addListener((message) => {
 
 // Look up the extension's real AMO (addons.mozilla.org) listing page.
 // Try by exact ID/GUID first (most reliable), then fall back to a name search.
+// Each request has a short timeout so one slow response can't stall the
+// whole export - it just falls back to the next option faster instead.
 async function findAmoPage(id, name) {
   // 1. Exact lookup by addon ID/GUID
   try {
     const res = await fetch(
-      `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(id)}/`
+      `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(id)}/`,
+      { signal: AbortSignal.timeout(2500) }
     );
     if (res.ok) {
       const data = await res.json();
@@ -32,7 +35,8 @@ async function findAmoPage(id, name) {
   // 2. Fuzzy search by name
   try {
     const res = await fetch(
-      `https://addons.mozilla.org/api/v5/addons/search/?q=${encodeURIComponent(name)}&app=firefox`
+      `https://addons.mozilla.org/api/v5/addons/search/?q=${encodeURIComponent(name)}&app=firefox`,
+      { signal: AbortSignal.timeout(2500) }
     );
     if (res.ok) {
       const data = await res.json();
@@ -87,6 +91,9 @@ function buildHtmlReport(list) {
 <title>My Add-ons - Add-ons Exporter Export</title>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 15px; }
+  h1 { font-size: 28px; }
+  h2 { font-size: 18px; }
+  p { font-size: 16px; color: #444; line-height: 1.7; }
   table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
   th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
   th { background: #f0f0f0; }
