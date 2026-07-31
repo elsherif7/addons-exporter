@@ -6,7 +6,7 @@ browser.runtime.onMessage.addListener((message) => {
       // "Save As" dialog steals focus, which would otherwise stop this
       // step from ever running.
       browser.tabs.create({
-        url: browser.runtime.getURL('confirmation.html') + '?count=' + result.count
+        url: browser.runtime.getURL('confirmation.html')
       });
       return result;
     });
@@ -28,7 +28,7 @@ async function findAmoPage(id, name) {
       const data = await res.json();
       if (data.url) return data.url;
     }
-  } catch (e) {
+  } catch {
     // fall through
   }
 
@@ -44,7 +44,7 @@ async function findAmoPage(id, name) {
         return data.results[0].url;
       }
     }
-  } catch (e) {
+  } catch {
     // fall through
   }
 
