@@ -7,13 +7,22 @@
 <style>
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    max-width: 600px;
-    margin: 80px auto;
-    text-align: center;
+    background: #f4f5f7;
+    margin: 0;
+    padding: 60px 20px;
     color: #222;
   }
-  h1 { font-size: 28px; margin-bottom: 30px; }
-  p { font-size: 16px; color: #444; line-height: 1.7; }
+  .card {
+    max-width: 560px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    padding: 40px;
+    text-align: center;
+  }
+  h1 { font-size: 28px; margin: 0 0 16px; }
+  p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   a { color: #1a73e8; text-decoration: none; display: block; margin: 18px 0; }
   a:hover { text-decoration: underline; }
   code {
@@ -22,15 +31,17 @@
     border-radius: 4px;
     font-size: 14px;
   }
-</style>
+  .filename { white-space: nowrap; }</style>
 </head>
 <body>
-  <h1>Add-ons Exporter</h1>
-  <p id="message">Thanks for using <strong>Add-ons Exporter!</strong> Your add-ons list has been exported as <strong>Firefox-Addons.html</strong> to the location you chose. Use "Import Add-ons" on another browser to open them all.</p>
+  <div class="card">
+    <h1>Add-ons Exporter</h1>
+    <p id="message">Thanks for using <strong>Add-ons Exporter!</strong> Your add-ons list has been exported as <strong class="filename">Firefox-Addons.html</strong> to the location you chose. Use "Import Add-ons" on another browser to open them all.</p>
 
-  <a href="https://addons.mozilla.org/en-US/firefox/addon/addons-exporter/" target="_blank" rel="noopener">Rate this extension on Firefox Add-ons</a>
-  <a href="https://github.com/elsherif7/addons-exporter/issues" target="_blank" rel="noopener">Report bugs or request a new feature</a>
-  <a href="https://github.com/elsherif7/addons-exporter" target="_blank" rel="noopener">GitHub repository</a>
+    <a href="https://addons.mozilla.org/en-US/firefox/addon/addons-exporter/" target="_blank" rel="noopener">Rate this extension on Firefox Add-ons</a>
+    <a href="https://github.com/elsherif7/addons-exporter/issues" target="_blank" rel="noopener">Report bugs or request a new feature</a>
+    <a href="https://github.com/elsherif7/addons-exporter" target="_blank" rel="noopener">GitHub repository</a>
+  </div>
 
   <script src="confirmation.js"></script>
 </body>

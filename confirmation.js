@@ -1,6 +1,1 @@
-const params = new URLSearchParams(window.location.search);
-const count = params.get('count');
-if (count) {
-  document.getElementById('message').innerHTML =
-    `Thanks for using <strong>Add-ons Exporter!</strong> Exported ${count} add-ons as <strong>Firefox-Addons.html</strong> to the location you chose. Use "Import Add-ons" on another browser to open them all.`;
-}
+// No dynamic message needed - the static text in confirmation.html is used as-is.
