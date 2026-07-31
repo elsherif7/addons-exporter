@@ -3,21 +3,77 @@
 <head>
 <meta charset="utf-8">
 <link rel="icon" href="icons/icon48.png">
-<title>Import Add-ons - Add-ons Exporter</title>
+<title>Add-ons Importer</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 60px auto; padding: 0 15px; }
-  button, input[type=file] { padding: 8px 14px; cursor: pointer; }
-  #status { font-size: 14px; color: #444; margin-top: 14px; }
-  ul { font-size: 14px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #f4f5f7;
+    margin: 0;
+    padding: 60px 20px;
+    color: #222;
+  }
+  .card {
+    max-width: 560px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    padding: 40px;
+    text-align: center;
+  }
+  h1 { font-size: 26px; margin: 0 0 16px; }
+  p { font-size: 15px; color: #555; line-height: 1.6; margin: 0 0 28px; }
+  code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .picker {
+    display: inline-block;
+    text-align: left;
+  }
+  button {
+    width: 200px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background: #f0f0f0;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { background: #e6e6e6; }
+  #chooseFileBtn { display: inline-block; vertical-align: middle; }
+  #fileName { display: inline-block; vertical-align: middle; font-size: 14px; color: #555; margin-left: 12px; }
+  #openAllBtn { display: inline-block; vertical-align: middle; margin-top: 16px; }
+  #status {
+    display: inline-block;
+    vertical-align: middle;
+    font-size: 14px;
+    color: #555;
+    margin-left: 12px;
+    margin-top: 16px;
+    min-height: 18px;
+  }
 </style>
 </head>
 <body>
-  <h1>Import Add-ons List</h1>
-  <p>Pick a <code>Firefox-Addons.html</code> file exported earlier by Add-ons Exporter. This opens every add-on's page as a real browser tab (not a pop-up), so nothing gets blocked.</p>
+  <div class="card">
+    <h1>Add-ons Importer</h1>
+    <p>Pick a <strong>Firefox-Addons.html</strong> file exported earlier by Add-ons Exporter to open every add-on's page automatically.</p>
+    <p>Note: Firefox's own security policy doesn't allow any extension, including this one, to automatically download and install other add-ons. This tool can only open each add-on's page as a tab for you — you'll still need to click "Add to Firefox" yourself on each one.</p>
 
-  <input type="file" id="fileInput" accept=".html">
-  <button id="openAllBtn">Open all in tabs</button>
-  <div id="status"></div>
+    <div class="picker">
+      <button id="chooseFileBtn">Choose file</button>
+      <strong id="fileName">No file selected</strong>
+      <br>
+      <button id="openAllBtn">Open all in tabs</button>
+      <strong id="status"></strong>
+    </div>
+
+    <input type="file" id="fileInput" accept=".html" style="display:none">
+  </div>
 
   <script src="import.js"></script>
 </body>

@@ -1,14 +1,24 @@
 const statusEl = document.getElementById('status');
+const fileNameEl = document.getElementById('fileName');
+const fileInput = document.getElementById('fileInput');
 
 function setStatus(msg) {
   statusEl.textContent = msg;
 }
 
+document.getElementById('chooseFileBtn').addEventListener('click', () => {
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', () => {
+  fileNameEl.textContent = fileInput.files[0] ? fileInput.files[0].name : 'No file selected';
+  setStatus('');
+});
+
 document.getElementById('openAllBtn').addEventListener('click', () => {
-  const fileInput = document.getElementById('fileInput');
   const file = fileInput.files[0];
   if (!file) {
-    setStatus('Pick a Firefox-Addons.html file first.');
+    setStatus('Pick a Firefox-Addons.html file first');
     return;
   }
 
@@ -20,12 +30,12 @@ document.getElementById('openAllBtn').addEventListener('click', () => {
         /<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/
       );
       if (!match) {
-        setStatus('This file doesn\'t look like an Add-ons Exporter export (no embedded data found).');
+        setStatus('This file doesn\'t look like an Add-ons Exporter export (no embedded data found)');
         return;
       }
       const list = JSON.parse(match[1]);
       if (!Array.isArray(list) || list.length === 0) {
-        setStatus('No add-ons found in that file.');
+        setStatus('No add-ons found in that file');
         return;
       }
 
@@ -35,7 +45,7 @@ document.getElementById('openAllBtn').addEventListener('click', () => {
       for (const item of list) {
         await browser.tabs.create({ url: item.link, active: false });
       }
-      setStatus(`Opened ${list.length} tabs.`);
+      setStatus(`Opened ${list.length} tabs`);
     } catch (err) {
       setStatus('Error reading file: ' + err.message);
     }
