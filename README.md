@@ -1,75 +1,125 @@
-# Add-ons Exporter
+# addons-exporter
 
-A small Firefox (WebExtension) tool that exports your installed add-ons
-into an HTML report with real store links, and can automatically open
-every add-on's page as a tab on another Gecko-based browser (Firefox,
-Zen, LibreWolf, Waterfox, Pale Moon, SeaMonkey) so you can reinstall
-everything fast.
+A personal Firefox WebExtension that exports my installed add-ons to an HTML report, so I can quickly reinstall them all on another Gecko-based browser (Firefox, Zen, LibreWolf, Waterfox, etc.) instead of hunting them down one by one.
 
-## Why
+Firefox doesn't allow any extension to install other extensions automatically — that's a deliberate security restriction, not a limitation of this tool. This just makes the manual reinstall process as fast as possible: one click to export, one click to open every add-on's real page as a tab on the new browser.
 
-Browsers don't allow one extension to grab the actual code of another
-(security restriction), so this tool doesn't copy `.xpi` files directly,
-and no extension can auto-install another add-on for you. Instead:
+---
 
-1. Reads your installed add-ons via `browser.management.getAll()`
-2. Looks up each one's real page on addons.mozilla.org (AMO) — first by
-   exact extension ID, then by name search, falling back to the
-   developer's homepage if it isn't listed on AMO at all
-3. Downloads a `Firefox-Addons.html` report (you choose where to save
-   it), split into **Enabled** / **Disabled** sections, with the raw
-   data embedded inside for the Import feature to read back later
-4. On the other browser: if Add-ons Exporter is installed there too,
-   click its icon → **Import Add-ons** → pick that file → every add-on's
-   page opens as a real tab (not a pop-up, since it uses the extension's
-   own tab API) → click "Add to Firefox" on each one yourself
+## Structure
 
-## Features
+```
+addons-exporter/
+├── manifest.json        # Extension config, permissions, background script
+├── background.js        # Export logic, AMO lookups, HTML report generation
+├── popup.html            # Toolbar popup UI
+├── popup.js              # Popup logic (Export / Import buttons)
+├── confirmation.html     # Tab shown after export completes
+├── import.html           # Page to pick an exported file and open its tabs
+├── import.js             # Import logic (reads file, opens tabs)
+└── icons/                # Toolbar and extension icons (16/32/48/96/128px)
+```
 
-- Popup with two clear actions: **Export Add-ons** and **Import Add-ons**
-- Export always asks where to save (native "Save As" dialog)
-- Confirmation tab shown after export completes, with links to rate,
-  report bugs, or view the source
-- AMO lookups have a short timeout so one slow response can't stall
-  the whole export
-- Import page opens every add-on's page as a real tab — bypasses the
-  browser's pop-up blocker entirely, unlike a plain downloaded page
+---
 
-## Installation (temporary, for personal use)
+## Installation
 
-1. Clone or download this repo
-2. Go to `about:debugging#/runtime/this-firefox` in your browser
-3. Click **"Load Temporary Add-on"** and select `manifest.json`
-4. Click the Add-ons Exporter icon in the toolbar
+**01. Install from Firefox Add-ons (recommended)**
 
-Note: temporary add-ons are removed when the browser restarts, so you'll
-reload it each session unless it's packaged and signed (see Roadmap).
+> Install directly from [addons.mozilla.org](https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/) — the signed, permanent version.
+
+**02. Or load a local copy for development**
+
+```
+git clone https://github.com/elsherif7/addons-exporter
+```
+
+> Go to `about:debugging#/runtime/this-firefox`, click **"Load Temporary Add-on"**, and select `manifest.json`.
+>
+> A temporarily-loaded add-on is removed when the browser restarts — use the AMO install above for a permanent copy.
+
+---
 
 ## Files
 
-| File                  | Purpose                                                    |
-|-----------------------|-------------------------------------------------------------|
-| `manifest.json`       | Extension config, permissions, background script            |
-| `background.js`       | Export logic, AMO lookups, HTML report generation            |
-| `popup.html/js`       | Toolbar popup with Export/Import buttons                      |
-| `confirmation.html`  | Tab shown after export completes                              |
-| `import.html/js`      | Page to pick a previously exported file and open its tabs     |
-| `icons/`              | Toolbar and extension icons (16/32/48/96/128px)                |
+### background.js — Export logic & AMO lookups
 
-## Roadmap
+#### 01. What it does
 
-- [x] Phase 1 — Project setup
-- [x] Phase 2 — MVP export/import
-- [x] Phase 3 — Accurate AMO links via API (by ID, then name)
-- [x] Phase 3.5 — Switch export to an HTML report
-- [x] Phase 3.6 — One-click export + confirmation tab
-- [x] Phase 3.7 — Import feature using the extension's own tabs API to
-      avoid pop-up blocking entirely
-- [x] Phase 3.8 — Custom icons, consistent styling/wording across pages
-- [ ] Phase 4 — Package + sign with `web-ext` for permanent install
-- [ ] Phase 5 — Test across Firefox / Zen / LibreWolf / Waterfox
-- [ ] Phase 6 — Push to GitHub
-- [ ] Phase 7 (optional) — Publish to addons.mozilla.org
+Runs persistently in the background. Listens for the popup's export message, reads all installed add-ons, looks up each one's real store page, and builds the downloadable HTML report.
+
+| Function | Purpose |
+|---|---|
+| `findAmoPage(id, name)` | Looks up an add-on's real AMO page — first by exact ID, then by name search, then falls back to its own homepage |
+| `escapeHtml(str)` | Escapes HTML special characters before inserting text/links into the report |
+| `formatExportDate(d)` | Formats the export date as e.g. "July 30, 2026" (no time, full month name) |
+| `buildHtmlReport(list)` | Builds the full HTML report, split into Enabled/Disabled sections, with the raw data embedded for the Import page to read back |
+| `doExport()` | Orchestrates the whole export: reads add-ons, resolves links, builds the report, triggers the download |
+
+> No timeout is set on the AMO fetch calls — an accurate link is worth waiting for over a fast but wrong fallback.
+
+
+---
+
+### popup.html / popup.js — Toolbar Popup
+
+#### 01. Buttons
+
+| Button | Action |
+|---|---|
+| `Export Add-ons` | Sends an export message to `background.js`, then opens the confirmation tab |
+| `Import Add-ons` | Opens `import.html` in a new tab |
+
+> Export logic runs in the background script, not the popup itself — this avoids a bug where the popup closes early when the native "Save As" dialog steals focus, which would otherwise skip the confirmation step.
+
+
+---
+
+### import.html / import.js — Import Page
+
+#### 01. Flow
+
+Pick a previously exported `Firefox-Addons.html` file, and every add-on link inside it opens as a real browser tab.
+
+| Function | Purpose |
+|---|---|
+| `setStatus(msg)` | Updates the status text under the buttons |
+| File picker | Reads the chosen file, regex-extracts the embedded JSON data, opens each link via `browser.tabs.create` |
+
+> Uses the extension's own Tabs API rather than a plain webpage's `window.open()` — so nothing gets blocked as a pop-up.
+
+
+---
+
+### confirmation.html — Post-Export Tab
+
+Static page shown automatically after export completes. Confirms the file was saved, and links to rate the extension, report bugs, or view the source on GitHub.
+
+
+---
+
+### manifest.json — Extension Configuration
+
+| Permission | Why it's needed |
+|---|---|
+| `management` | To read the list of installed add-ons |
+| `downloads` | To save the exported HTML report |
+| `https://addons.mozilla.org/*` | To look up each add-on's real AMO page |
+
+> Manifest V2 — Firefox has committed to supporting it indefinitely, and none of MV3's changes (which mainly affect network-blocking extensions) apply to what this tool does.
+>
+> Declares `data_collection_permissions: { required: ["none"] }` — this extension collects zero personal data.
+
+
+---
+
+## Privacy
+
+This extension does not collect, store, or transmit any personal data. The only network requests it makes are to `addons.mozilla.org`'s public API, to look up each installed add-on's official listing page.
+
+## Contributing
+
+Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/elsherif7/addons-exporter/issues).
 
 ## License
 
