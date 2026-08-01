@@ -15,14 +15,13 @@ browser.runtime.onMessage.addListener((message) => {
 
 // Look up the extension's real AMO (addons.mozilla.org) listing page.
 // Try by exact ID/GUID first (most reliable), then fall back to a name search.
-// Each request has a short timeout so one slow response can't stall the
-// whole export - it just falls back to the next option faster instead.
+// No artificial timeout here - waiting longer for an accurate AMO match is
+// worth it over falling back to a GitHub/homepage link too early.
 async function findAmoPage(id, name) {
   // 1. Exact lookup by addon ID/GUID
   try {
     const res = await fetch(
-      `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(id)}/`,
-      { signal: AbortSignal.timeout(2500) }
+      `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(id)}/`
     );
     if (res.ok) {
       const data = await res.json();
@@ -35,8 +34,7 @@ async function findAmoPage(id, name) {
   // 2. Fuzzy search by name
   try {
     const res = await fetch(
-      `https://addons.mozilla.org/api/v5/addons/search/?q=${encodeURIComponent(name)}&app=firefox`,
-      { signal: AbortSignal.timeout(2500) }
+      `https://addons.mozilla.org/api/v5/addons/search/?q=${encodeURIComponent(name)}&app=firefox`
     );
     if (res.ok) {
       const data = await res.json();
