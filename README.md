@@ -1,6 +1,6 @@
 # addons-exporter
 
-A personal Firefox WebExtension that exports my installed add-ons to an HTML report, so I can quickly reinstall them all on another Gecko-based browser (Firefox, Zen, LibreWolf, Waterfox, etc.) instead of hunting them down one by one.
+A Firefox WebExtension that exports your installed add-ons to an HTML report, so you can quickly reinstall them all on another Gecko-based browser (Firefox, Zen, LibreWolf, Waterfox, etc.) instead of hunting them down one by one.
 
 Firefox doesn't allow any extension to install other extensions automatically — that's a deliberate security restriction, not a limitation of this tool. This just makes the manual reinstall process as fast as possible: one click to export, one click to open every add-on's real page as a tab on the new browser.
 
@@ -120,6 +120,10 @@ This extension does not collect, store, or transmit any personal data. The only 
 ## Contributing
 
 Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/elsherif7/addons-exporter/issues).
+
+## Credits
+
+[Extension](https://icons8.com/icon/80736/puzzle) icon by [Icons8](https://icons8.com).
 
 ## License
 
