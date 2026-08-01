@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Add-ons Exporter",
-  "version": "1.0",
+  "version": "1.0.0",
   "description": "Export or import your installed add-ons as an HTML report with real store links.",
   "permissions": [
     "management",
