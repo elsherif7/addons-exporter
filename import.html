@@ -27,27 +27,48 @@
     display: inline-block;
     text-align: left;
   }
-  button {
-    width: 200px;
-    padding: 8px 14px;
+  .picker {
+    border: 2px dashed #d0d3d9;
+    border-radius: 10px;
+    padding: 24px;
+    margin-bottom: 20px;
+    text-align: center;
+    background: #fafbfc;
+  }
+  #chooseFileBtn {
+    padding: 9px 20px;
     border-radius: 6px;
     border: 1px solid #ccc;
-    background: #f0f0f0;
+    background: #fff;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
   }
-  button:hover { background: #e6e6e6; }
-  #chooseFileBtn { display: inline-block; vertical-align: middle; }
-  #fileName { display: inline-block; vertical-align: middle; font-size: 16px; color: #444; margin-left: 12px; }
-  #openAllBtn { display: inline-block; vertical-align: middle; margin-top: 16px; }
+  #chooseFileBtn:hover { background: #f0f0f0; }
+  #fileName {
+    display: block;
+    font-size: 14px;
+    color: #666;
+    margin-top: 12px;
+  }
+  #openAllBtn {
+    width: 100%;
+    max-width: 560px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: none;
+    background: #1f2937;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #openAllBtn:hover { background: #111827; }
   #status {
-    display: inline-block;
-    vertical-align: middle;
-    font-size: 16px;
+    display: block;
+    font-size: 14px;
     color: #444;
-    margin-left: 12px;
-    margin-top: 16px;
+    margin-top: 14px;
     min-height: 18px;
   }
 </style>
@@ -61,10 +82,10 @@
     <div class="picker">
       <button id="chooseFileBtn">Choose file</button>
       <strong id="fileName">No file selected</strong>
-      <br>
-      <button id="openAllBtn">Open all in tabs</button>
-      <strong id="status"></strong>
     </div>
+
+    <button id="openAllBtn">Open all in tabs</button>
+    <span id="status"></span>
 
     <input type="file" id="fileInput" accept=".html" style="display:none">
   </div>
