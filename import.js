@@ -78,7 +78,9 @@ document.getElementById('openAllBtn').addEventListener('click', () => {
         setStatus('This file doesn\'t look like an Add-ons Exporter export (no embedded data found)');
         return;
       }
-      const list = JSON.parse(match[1]);
+      const parsed = JSON.parse(match[1]);
+      const list = parsed && Array.isArray(parsed.addons) ? parsed.addons : null;
+
       if (!Array.isArray(list) || list.length === 0) {
         setStatus('No add-ons found in that file');
         return;
