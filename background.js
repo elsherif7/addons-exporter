@@ -118,7 +118,9 @@ function buildHtmlReport(list) {
 
 async function doExport() {
   const all = await browser.management.getAll();
-  const extensions = all.filter(a => a.type === 'extension' || a.type === 'theme');
+  const extensions = all.filter(a =>
+    (a.type === 'extension' || a.type === 'theme') && !a.id.endsWith('@mozilla.org')
+  );
 
   const list = await Promise.all(extensions.map(async (a) => {
     let link = await findAmoPage(a.id, a.name);
