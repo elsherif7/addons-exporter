@@ -101,12 +101,13 @@ function buildHtmlReport(list) {
   table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
   th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
   th { background: #f0f0f0; }
+  .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }
 </style>
 </head>
 <body>
   <h1>My Installed Add-ons</h1>
   <p>Exported on ${formatExportDate(new Date())}. Found ${list.length} add-ons in total.</p>
-  <p><em>Tip: on another browser with Add-ons Exporter installed, click its toolbar icon and choose "Import Add-ons" to open every link below as a tab automatically.</em></p>
+  <p><em>Tip: on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Exporter</a> installed, click its toolbar icon and choose "Import Add-ons" to open every link below as a tab automatically. Don't have it yet? Install it from the link above first.</em></p>
 
   ${group('Extensions', extensions)}
   ${group('Themes', themes)}
