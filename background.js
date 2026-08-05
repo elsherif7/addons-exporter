@@ -64,6 +64,13 @@ function formatExportDate(d) {
   return `${month} ${day}, ${year}`;
 }
 
+function formatFilenameTimestamp(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const time = `${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+  return `${date}_${time}`;
+}
+
 function buildHtmlReport(list) {
   const extensions = list.filter(a => a.type === 'extension');
   const themes = list.filter(a => a.type === 'theme');
@@ -142,7 +149,7 @@ async function doExport() {
   // user pick the folder and filename themselves.
   await browser.downloads.download({
     url,
-    filename: 'Firefox-Addons.html',
+    filename: `Firefox-Addons (${formatFilenameTimestamp(new Date())}).html`,
     saveAs: true
   });
 
