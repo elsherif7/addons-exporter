@@ -52,11 +52,14 @@ Runs persistently in the background. Listens for the popup's export message, rea
 |---|---|
 | `findAmoPage(id, name)` | Looks up an add-on's real AMO page — first by exact ID, then by name search, then falls back to its own homepage |
 | `escapeHtml(str)` | Escapes HTML special characters before inserting text/links into the report |
-| `formatExportDate(d)` | Formats the export date as e.g. "July 30, 2026" (no time, full month name) |
-| `buildHtmlReport(list)` | Builds the full HTML report, split into Enabled/Disabled sections, with the raw data embedded for the Import page to read back |
-| `doExport()` | Orchestrates the whole export: reads add-ons, resolves links, builds the report, triggers the download |
+| `formatExportDate(d)` | Formats the export date shown inside the report, e.g. "July 30, 2026" (no time, full month name) |
+| `formatFilenameTimestamp(d)` | Formats a filename-safe date/time (e.g. `2026-08-05_21-30-15`) used in the downloaded file's name |
+| `buildHtmlReport(list)` | Builds the full HTML report, grouped into Extensions and Themes, each split into Enabled/Disabled tables, with the raw data embedded for the Import page to read back |
+| `doExport()` | Orchestrates the whole export: reads all installed extensions and themes (excluding Firefox's own bundled built-ins), resolves links, builds the report, triggers the download with a timestamped filename |
 
 > No timeout is set on the AMO fetch calls — an accurate link is worth waiting for over a fast but wrong fallback.
+>
+> Firefox ships some of its own internal features (like the New Tab page and default themes) as hidden built-in extensions, exposed through the same `management` API this tool reads. These are excluded by filtering out ids ending in `@mozilla.org`, since they aren't real installed add-ons and have no matching AMO listing.
 
 
 ---
@@ -79,7 +82,7 @@ Runs persistently in the background. Listens for the popup's export message, rea
 
 #### 01. Flow
 
-Pick a previously exported `Firefox-Addons.html` file, and every add-on link inside it opens as a real browser tab.
+Pick a previously exported HTML report, and every add-on link inside it opens as a real browser tab.
 
 | Function | Purpose |
 |---|---|
