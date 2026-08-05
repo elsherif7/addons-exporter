@@ -18,7 +18,7 @@ fileInput.addEventListener('change', () => {
 document.getElementById('openAllBtn').addEventListener('click', () => {
   const file = fileInput.files[0];
   if (!file) {
-    setStatus('Pick a Firefox-Addons.html file first');
+    setStatus('Pick an exported HTML file first');
     return;
   }
 
