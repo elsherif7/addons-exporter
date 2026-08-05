@@ -65,8 +65,8 @@ function formatExportDate(d) {
 }
 
 function buildHtmlReport(list) {
-  const enabled = list.filter(a => a.enabled);
-  const disabled = list.filter(a => !a.enabled);
+  const extensions = list.filter(a => a.type === 'extension');
+  const themes = list.filter(a => a.type === 'theme');
 
   const row = (a) =>
     `<tr>
@@ -82,6 +82,11 @@ function buildHtmlReport(list) {
       ${items.map(row).join('\n')}
     </table>` : '';
 
+  const group = (title, items) => items.length ? `
+    <h1 class="group-title">${title}</h1>
+    ${section('Enabled', items.filter(a => a.enabled))}
+    ${section('Disabled', items.filter(a => !a.enabled))}` : '';
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -90,6 +95,7 @@ function buildHtmlReport(list) {
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 15px; }
   h1 { font-size: 28px; }
+  h1.group-title { font-size: 20px; margin-top: 40px; }
   h2 { font-size: 18px; }
   p { font-size: 16px; color: #444; line-height: 1.7; }
   table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
@@ -102,8 +108,8 @@ function buildHtmlReport(list) {
   <p>Exported on ${formatExportDate(new Date())}. Found ${list.length} add-ons in total.</p>
   <p><em>Tip: on another browser with Add-ons Exporter installed, click its toolbar icon and choose "Import Add-ons" to open every link below as a tab automatically.</em></p>
 
-  ${section('Enabled', enabled)}
-  ${section('Disabled', disabled)}
+  ${group('Extensions', extensions)}
+  ${group('Themes', themes)}
 
   <script type="application/json" id="addons-exporter-data">${JSON.stringify(list)}</script>
 </body>
@@ -112,7 +118,7 @@ function buildHtmlReport(list) {
 
 async function doExport() {
   const all = await browser.management.getAll();
-  const extensions = all.filter(a => a.type === 'extension');
+  const extensions = all.filter(a => a.type === 'extension' || a.type === 'theme');
 
   const list = await Promise.all(extensions.map(async (a) => {
     let link = await findAmoPage(a.id, a.name);
@@ -122,7 +128,7 @@ async function doExport() {
     if (!link) {
       link = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
     }
-    return { name: a.name, version: a.version, enabled: a.enabled, link };
+    return { name: a.name, version: a.version, enabled: a.enabled, type: a.type, link };
   }));
 
   const html = buildHtmlReport(list);
