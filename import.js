@@ -1,22 +1,67 @@
 const statusEl = document.getElementById('status');
 const fileNameEl = document.getElementById('fileName');
+const fileNameRow = document.getElementById('fileNameRow');
+const noFileText = document.getElementById('noFileText');
 const fileInput = document.getElementById('fileInput');
+const picker = document.getElementById('picker');
+const removeFileBtn = document.getElementById('removeFileBtn');
+
+let selectedFile = null;
 
 function setStatus(msg) {
   statusEl.textContent = msg;
 }
+
+function setSelectedFile(file) {
+  selectedFile = file;
+  if (file) {
+    fileNameEl.textContent = file.name;
+    fileNameRow.style.display = 'flex';
+    fileNameRow.style.alignItems = 'center';
+    fileNameRow.style.justifyContent = 'center';
+    fileNameRow.style.gap = '8px';
+    noFileText.style.display = 'none';
+  } else {
+    fileInput.value = '';
+    fileNameRow.style.display = 'none';
+    noFileText.style.display = 'block';
+  }
+  setStatus('');
+}
+
+removeFileBtn.addEventListener('click', () => setSelectedFile(null));
 
 document.getElementById('chooseFileBtn').addEventListener('click', () => {
   fileInput.click();
 });
 
 fileInput.addEventListener('change', () => {
-  fileNameEl.textContent = fileInput.files[0] ? fileInput.files[0].name : 'No file selected';
-  setStatus('');
+  setSelectedFile(fileInput.files[0] || null);
+});
+
+// Drag and drop: dropping a file directly onto the picker box works the
+// same as clicking "Choose file", without needing the native file dialog.
+['dragenter', 'dragover'].forEach((eventName) => {
+  picker.addEventListener(eventName, (e) => {
+    e.preventDefault();
+    picker.classList.add('dragover');
+  });
+});
+
+['dragleave', 'drop'].forEach((eventName) => {
+  picker.addEventListener(eventName, (e) => {
+    e.preventDefault();
+    picker.classList.remove('dragover');
+  });
+});
+
+picker.addEventListener('drop', (e) => {
+  const file = e.dataTransfer.files[0];
+  if (file) setSelectedFile(file);
 });
 
 document.getElementById('openAllBtn').addEventListener('click', () => {
-  const file = fileInput.files[0];
+  const file = selectedFile;
   if (!file) {
     setStatus('Pick an exported HTML file first');
     return;

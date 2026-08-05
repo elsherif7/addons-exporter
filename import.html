@@ -30,6 +30,11 @@
     margin-bottom: 20px;
     text-align: center;
     background: #fafbfc;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .picker.dragover {
+    border-color: #1f2937;
+    background: #eef0f3;
   }
   #chooseFileBtn {
     padding: 9px 20px;
@@ -42,6 +47,42 @@
   }
   #chooseFileBtn:hover { background: #f0f0f0; }
   #fileName {
+    display: block;
+    font-size: 14px;
+    color: #666;
+  }
+  #removeFileBtn {
+    position: relative;
+    border: none;
+    background: none;
+    color: #999;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+  }
+  #removeFileBtn:hover { color: #c0392b; }
+  #removeFileBtn::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 130%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1f2937;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 9px;
+    border-radius: 5px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s;
+  }
+  #removeFileBtn:hover::after {
+    opacity: 1;
+  }
+  #noFileText {
     display: block;
     font-size: 14px;
     color: #666;
@@ -75,9 +116,13 @@
     <p>Pick an <strong>HTML report</strong> exported earlier by Add-ons Exporter to open every add-on's page automatically.</p>
     <p>Note: Firefox's own security policy doesn't allow any extension, including this one, to automatically download and install other add-ons. This tool can only open each add-on's page as a tab for you — you'll still need to click "Add to Firefox" yourself on each one.</p>
 
-    <div class="picker">
+    <div class="picker" id="picker">
       <button id="chooseFileBtn">Choose file</button>
-      <strong id="fileName">No file selected</strong>
+      <div id="fileNameRow" style="display:none; margin-top: 12px;">
+        <strong id="fileName"></strong>
+        <button id="removeFileBtn" data-tooltip="Remove file">&times;</button>
+      </div>
+      <strong id="noFileText">No file selected</strong>
     </div>
 
     <button id="openAllBtn">Open all in tabs</button>
