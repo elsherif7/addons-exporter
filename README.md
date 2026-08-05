@@ -48,6 +48,8 @@ git clone https://github.com/elsherif7/addons-exporter
 
 Runs persistently in the background. Listens for the popup's export message, reads all installed add-ons, looks up each one's real store page, and builds the downloadable HTML report.
 
+Each export embeds its add-on data as `{ formatVersion, addons }` (see `EXPORT_FORMAT_VERSION`), so future changes to that data's shape can be detected by the Import page instead of breaking silently.
+
 | Function | Purpose |
 |---|---|
 | `findAmoPage(id, name)` | Looks up an add-on's real AMO page — first by exact ID, then by name search, then falls back to its own homepage |
@@ -82,12 +84,17 @@ Runs persistently in the background. Listens for the popup's export message, rea
 
 #### 01. Flow
 
-Pick a previously exported HTML report, and every add-on link inside it opens as a real browser tab.
+Pick a previously exported HTML report — either via the "Choose file" button or by dragging and dropping the file directly onto the picker box — and every add-on link inside it opens as a real browser tab.
+
+Once a file is selected, its name is shown with a small **×** button to clear the selection and go back to the empty state. Hovering that button shows a custom-styled tooltip instead of the browser's native one.
+
+If any individual link fails to open (a bad or missing URL), that one entry is skipped and counted — the rest of the import still completes. The final status message reports both counts, e.g. "Opened 27 tabs, 1 failed to open".
 
 | Function | Purpose |
 |---|---|
 | `setStatus(msg)` | Updates the status text under the buttons |
-| File picker | Reads the chosen file, regex-extracts the embedded JSON data, opens each link via `browser.tabs.create` |
+| `setSelectedFile(file)` | Shared state update used by both the file picker and drag-and-drop, so the UI (filename, remove button, empty state) always stays in sync |
+| File picker / drag-and-drop | Reads the chosen or dropped file, extracts the embedded `{ formatVersion, addons }` JSON, opens each link via `browser.tabs.create` — skipping and counting any individual failures instead of stopping the whole import |
 
 > Uses the extension's own Tabs API rather than a plain webpage's `window.open()` — so nothing gets blocked as a pop-up.
 
