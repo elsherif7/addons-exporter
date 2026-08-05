@@ -112,7 +112,7 @@ function buildHtmlReport(list) {
 
 async function doExport() {
   const all = await browser.management.getAll();
-  const extensions = all.filter(a => a.type === 'extension' && a.id !== browser.runtime.id);
+  const extensions = all.filter(a => a.type === 'extension');
 
   const list = await Promise.all(extensions.map(async (a) => {
     let link = await findAmoPage(a.id, a.name);
