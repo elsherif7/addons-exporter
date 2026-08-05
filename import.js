@@ -87,10 +87,21 @@ document.getElementById('openAllBtn').addEventListener('click', () => {
       setStatus(`Opening ${list.length} tabs...`);
       // browser.tabs.create is an extension API call, not window.open() from
       // a web page, so it is never treated as pop-up spam by the browser.
+      let opened = 0;
+      let failed = 0;
       for (const item of list) {
-        await browser.tabs.create({ url: item.link, active: false });
+        try {
+          await browser.tabs.create({ url: item.link, active: false });
+          opened++;
+        } catch {
+          // A single bad/missing link shouldn't stop the rest of the
+          // import - skip it and keep going.
+          failed++;
+        }
       }
-      setStatus(`Opened ${list.length} tabs`);
+      setStatus(failed > 0
+        ? `Opened ${opened} tabs, ${failed} failed to open`
+        : `Opened ${opened} tabs`);
     } catch (err) {
       setStatus('Error reading file: ' + err.message);
     }
