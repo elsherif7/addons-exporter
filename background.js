@@ -5,7 +5,7 @@ const EXPORT_FORMAT_VERSION = 1;
 
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'export') {
-    return doExport().then((result) => {
+    return doExport().then(() => {
       // Open the confirmation tab from here (the background script),
       // not from the popup - the popup can close early when the native
       // "Save As" dialog steals focus, which would otherwise stop this
@@ -13,7 +13,6 @@ browser.runtime.onMessage.addListener((message) => {
       browser.tabs.create({
         url: browser.runtime.getURL('confirmation.html')
       });
-      return result;
     });
   }
 });
@@ -159,6 +158,4 @@ async function doExport() {
   });
 
   setTimeout(() => URL.revokeObjectURL(url), 30000);
-
-  return { count: list.length };
 }
