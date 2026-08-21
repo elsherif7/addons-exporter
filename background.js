@@ -102,6 +102,8 @@ function buildHtmlReport(list) {
       <td><a href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.link)}</a></td>
     </tr>`;
 
+  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+
   const section = (title, items) => items.length ? `
     <h2>${title} (${items.length})</h2>
     <table>
@@ -111,8 +113,8 @@ function buildHtmlReport(list) {
 
   const group = (title, items) => items.length ? `
     <h1 class="group-title">${title}</h1>
-    ${section('Enabled', items.filter(a => a.enabled))}
-    ${section('Disabled', items.filter(a => !a.enabled))}` : '';
+    ${section('Enabled', items.filter(a => a.enabled).sort(byName))}
+    ${section('Disabled', items.filter(a => !a.enabled).sort(byName))}` : '';
 
   return `<!DOCTYPE html>
 <html>
