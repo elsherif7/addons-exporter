@@ -71,32 +71,12 @@
     color: #666;
     margin-top: 12px;
   }
-  #openAllBtn {
-    width: 100%;
-    max-width: 560px;
-    padding: 12px 20px;
-    border-radius: 8px;
-    border: none;
-    background: #1f2937;
-    color: #fff;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  #openAllBtn:hover { background: #111827; }
-  #status {
-    display: block;
-    font-size: 14px;
-    color: #444;
-    margin-top: 14px;
-    min-height: 18px;
-  }
 </style>
 </head>
 <body>
   <div class="card">
     <h1>Add-ons Importer</h1>
-    <p>Pick an <strong>HTML report</strong> exported earlier by Add-ons Exporter to open every add-on's page automatically.</p>
+    <p>Pick an <strong>HTML report</strong> exported earlier by Add-ons Exporter, choose which add-ons to open, and this opens each one's real page automatically.</p>
     <p>Note: Firefox's own security policy doesn't allow any extension, including this one, to automatically download and install other add-ons. This tool can only open each add-on's page as a tab for you — you'll still need to click "Add to Firefox" yourself on each one.</p>
 
     <div class="picker" id="picker">
@@ -108,7 +88,17 @@
       <strong id="noFileText">No file selected</strong>
     </div>
 
-    <button id="openAllBtn">Open all in tabs</button>
+    <div class="list-controls" id="listControls" style="display:none;">
+      <span id="selectionCount"></span>
+      <span>
+        <button id="selectAllBtn" type="button">Select all</button>
+        <button id="deselectAllBtn" type="button">Deselect all</button>
+      </span>
+    </div>
+
+    <div id="addonList" style="display:none;"></div>
+
+    <button id="openSelectedBtn" class="primary-btn" disabled>Open Selected in Tabs</button>
     <span id="status"></span>
 
     <input type="file" id="fileInput" accept=".html" style="display:none">

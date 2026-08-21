@@ -7,94 +7,6 @@
 <title>Add-ons Exporter</title>
 <style>
   .card { max-width: 640px; }
-  .list-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-  }
-  #selectionCount {
-    font-size: 13px;
-    color: #666;
-  }
-  .list-controls button {
-    background: none;
-    border: none;
-    color: #1a73e8;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 4px 8px;
-  }
-  .list-controls button:hover { text-decoration: underline; }
-  #addonList {
-    text-align: left;
-    max-height: 360px;
-    overflow-y: auto;
-    border: 1px solid #e2e4e8;
-    border-radius: 8px;
-    padding: 4px 0;
-    margin-bottom: 20px;
-  }
-  .placeholder-text {
-    padding: 20px;
-    color: #666;
-    font-size: 14px;
-    margin: 0;
-  }
-  .placeholder-text.error { color: #c0392b; }
-  .group-heading {
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #888;
-    padding: 10px 14px 4px;
-  }
-  .addon-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 14px;
-  }
-  .addon-row:hover { background: #fafbfc; }
-  .addon-row label {
-    flex: 1;
-    text-align: left;
-    font-size: 14px;
-    cursor: pointer;
-  }
-  .addon-version {
-    color: #888;
-    font-size: 12px;
-  }
-  .addon-disabled-tag {
-    color: #999;
-    font-size: 11px;
-    font-style: italic;
-    margin-left: 6px;
-  }
-  #exportSelectedBtn {
-    width: 100%;
-    max-width: 560px;
-    padding: 12px 20px;
-    border-radius: 8px;
-    border: none;
-    background: #1f2937;
-    color: #fff;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  #exportSelectedBtn:hover:not(:disabled) { background: #111827; }
-  #exportSelectedBtn:disabled { background: #9ca3af; cursor: not-allowed; }
-  #status {
-    display: block;
-    font-size: 14px;
-    color: #444;
-    margin-top: 14px;
-    min-height: 18px;
-  }
 </style>
 </head>
 <body>
@@ -114,7 +26,7 @@
       <p class="placeholder-text" id="loadingText">Loading installed add-ons...</p>
     </div>
 
-    <button id="exportSelectedBtn" disabled>Export Selected</button>
+    <button id="exportSelectedBtn" class="primary-btn" disabled>Export Selected</button>
     <span id="status"></span>
   </div>
 

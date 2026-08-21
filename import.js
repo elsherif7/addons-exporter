@@ -13,6 +13,12 @@ const TAB_OPEN_DELAY_MS = 150;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
 const statusEl = document.getElementById('status');
 const fileNameEl = document.getElementById('fileName');
 const fileNameRow = document.getElementById('fileNameRow');
@@ -20,11 +26,114 @@ const noFileText = document.getElementById('noFileText');
 const fileInput = document.getElementById('fileInput');
 const picker = document.getElementById('picker');
 const removeFileBtn = document.getElementById('removeFileBtn');
+const listControls = document.getElementById('listControls');
+const addonListEl = document.getElementById('addonList');
+const selectAllBtn = document.getElementById('selectAllBtn');
+const deselectAllBtn = document.getElementById('deselectAllBtn');
+const selectionCountEl = document.getElementById('selectionCount');
+const openSelectedBtn = document.getElementById('openSelectedBtn');
 
 let selectedFile = null;
+// Add-ons from the parsed file, in the exact order they're rendered
+// (extensions then themes, each alphabetized) - each checkbox's data-idx
+// indexes directly into this array so a display-order click always maps
+// back to the right item, regardless of how the file itself ordered them.
+let displayItems = [];
 
 function setStatus(msg) {
   statusEl.textContent = msg;
+}
+
+function checkboxes() {
+  return addonListEl.querySelectorAll('input[type="checkbox"]');
+}
+
+function updateSelectionCount() {
+  const boxes = checkboxes();
+  const checked = addonListEl.querySelectorAll('input[type="checkbox"]:checked').length;
+  selectionCountEl.textContent = boxes.length ? `${checked} of ${boxes.length} selected` : '';
+  openSelectedBtn.disabled = checked === 0;
+}
+
+function clearAddonList() {
+  displayItems = [];
+  addonListEl.innerHTML = '';
+  addonListEl.style.display = 'none';
+  listControls.style.display = 'none';
+  openSelectedBtn.disabled = true;
+  selectionCountEl.textContent = '';
+}
+
+function renderAddonList(addons) {
+  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  const extensions = addons.filter(a => a.type === 'extension').sort(byName);
+  const themes = addons.filter(a => a.type === 'theme').sort(byName);
+  displayItems = [...extensions, ...themes];
+
+  const rowHtml = (a, i) => `<div class="addon-row">
+      <input type="checkbox" id="icb-${i}" data-idx="${i}" checked>
+      <label for="icb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span>${a.enabled === false ? '<span class="addon-disabled-tag">disabled</span>' : ''}</label>
+    </div>`;
+
+  const groupHtml = (title, items, offset) => items.length
+    ? `<div class="group-heading">${title} (${items.length})</div>${items.map((a, i) => rowHtml(a, offset + i)).join('')}`
+    : '';
+
+  addonListEl.innerHTML = groupHtml('Extensions', extensions, 0) + groupHtml('Themes', themes, extensions.length);
+  addonListEl.style.display = 'block';
+  listControls.style.display = 'flex';
+
+  checkboxes().forEach((cb) => {
+    cb.addEventListener('change', updateSelectionCount);
+  });
+  updateSelectionCount();
+}
+
+// Reads, validates, and parses the picked file, then renders the checklist.
+// Runs automatically as soon as a file is selected/dropped, rather than
+// waiting for a separate button click.
+async function loadFile(file) {
+  clearAddonList();
+  setStatus('Reading file...');
+  try {
+    const html = await file.text();
+    // Parsed as 'text/html' via DOMParser rather than matched with a
+    // regex - more robust to whitespace/attribute changes in the export
+    // format, and DOMParser never executes scripts in the parsed
+    // document, so this is safe even for an untrusted file.
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const dataEl = doc.getElementById('addons-exporter-data');
+    if (!dataEl) {
+      setStatus('This file doesn\'t look like an Add-ons Exporter export (no embedded data found)');
+      return;
+    }
+    const parsed = JSON.parse(dataEl.textContent);
+    const list = parsed && Array.isArray(parsed.addons) ? parsed.addons : null;
+
+    if (!Array.isArray(list) || list.length === 0) {
+      setStatus('No add-ons found in that file');
+      return;
+    }
+
+    // Only accept files that explicitly declare a formatVersion we
+    // understand. A missing formatVersion means the file predates
+    // versioning (or isn't a real export) and we can't safely assume its
+    // data shape - reject it rather than guessing.
+    const formatVersion = parsed.formatVersion;
+    if (typeof formatVersion !== 'number') {
+      setStatus('This file is missing its export format version and can\'t be imported.');
+      return;
+    }
+    if (formatVersion > SUPPORTED_FORMAT_VERSION) {
+      setStatus('This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.');
+      return;
+    }
+
+    setStatus('');
+    renderAddonList(list);
+  } catch (err) {
+    setStatus('Error reading file: ' + err.message);
+  }
 }
 
 function setSelectedFile(file) {
@@ -36,12 +145,14 @@ function setSelectedFile(file) {
     fileNameRow.style.justifyContent = 'center';
     fileNameRow.style.gap = '8px';
     noFileText.style.display = 'none';
+    loadFile(file);
   } else {
     fileInput.value = '';
     fileNameRow.style.display = 'none';
     noFileText.style.display = 'block';
+    clearAddonList();
+    setStatus('');
   }
-  setStatus('');
 }
 
 removeFileBtn.addEventListener('click', () => setSelectedFile(null));
@@ -75,73 +186,47 @@ picker.addEventListener('drop', (e) => {
   if (file) setSelectedFile(file);
 });
 
-document.getElementById('openAllBtn').addEventListener('click', () => {
-  const file = selectedFile;
-  if (!file) {
-    setStatus('Pick an exported HTML file first');
+selectAllBtn.addEventListener('click', () => {
+  checkboxes().forEach((cb) => { cb.checked = true; });
+  updateSelectionCount();
+});
+
+deselectAllBtn.addEventListener('click', () => {
+  checkboxes().forEach((cb) => { cb.checked = false; });
+  updateSelectionCount();
+});
+
+openSelectedBtn.addEventListener('click', async () => {
+  const selected = Array.from(checkboxes())
+    .filter((cb) => cb.checked)
+    .map((cb) => displayItems[Number(cb.dataset.idx)]);
+
+  if (selected.length === 0) {
+    setStatus('Select at least one add-on to open');
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = async (e) => {
+  openSelectedBtn.disabled = true;
+  setStatus(`Opening ${selected.length} tabs...`);
+  // browser.tabs.create is an extension API call, not window.open() from
+  // a web page, so it is never treated as pop-up spam by the browser.
+  let opened = 0;
+  let failed = 0;
+  for (let i = 0; i < selected.length; i++) {
     try {
-      const html = e.target.result;
-      // Parsed as 'text/html' via DOMParser rather than matched with a
-      // regex - more robust to whitespace/attribute changes in the export
-      // format, and DOMParser never executes scripts in the parsed
-      // document, so this is safe even for an untrusted file.
-      const doc = new DOMParser().parseFromString(html, 'text/html');
-      const dataEl = doc.getElementById('addons-exporter-data');
-      if (!dataEl) {
-        setStatus('This file doesn\'t look like an Add-ons Exporter export (no embedded data found)');
-        return;
-      }
-      const parsed = JSON.parse(dataEl.textContent);
-      const list = parsed && Array.isArray(parsed.addons) ? parsed.addons : null;
-
-      if (!Array.isArray(list) || list.length === 0) {
-        setStatus('No add-ons found in that file');
-        return;
-      }
-
-      // Only accept files that explicitly declare a formatVersion we
-      // understand. A missing formatVersion means the file predates
-      // versioning (or isn't a real export) and we can't safely assume its
-      // data shape - reject it rather than guessing.
-      const formatVersion = parsed.formatVersion;
-      if (typeof formatVersion !== 'number') {
-        setStatus('This file is missing its export format version and can\'t be imported.');
-        return;
-      }
-      if (formatVersion > SUPPORTED_FORMAT_VERSION) {
-        setStatus('This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.');
-        return;
-      }
-
-      setStatus(`Opening ${list.length} tabs...`);
-      // browser.tabs.create is an extension API call, not window.open() from
-      // a web page, so it is never treated as pop-up spam by the browser.
-      let opened = 0;
-      let failed = 0;
-      for (let i = 0; i < list.length; i++) {
-        try {
-          await browser.tabs.create({ url: list[i].link, active: false });
-          opened++;
-        } catch {
-          // A single bad/missing link shouldn't stop the rest of the
-          // import - skip it and keep going.
-          failed++;
-        }
-        if (i < list.length - 1) {
-          await delay(TAB_OPEN_DELAY_MS);
-        }
-      }
-      setStatus(failed > 0
-        ? `Opened ${opened} tabs, ${failed} failed to open`
-        : `Opened ${opened} tabs`);
-    } catch (err) {
-      setStatus('Error reading file: ' + err.message);
+      await browser.tabs.create({ url: selected[i].link, active: false });
+      opened++;
+    } catch {
+      // A single bad/missing link shouldn't stop the rest of the
+      // import - skip it and keep going.
+      failed++;
     }
-  };
-  reader.readAsText(file);
+    if (i < selected.length - 1) {
+      await delay(TAB_OPEN_DELAY_MS);
+    }
+  }
+  setStatus(failed > 0
+    ? `Opened ${opened} tabs, ${failed} failed to open`
+    : `Opened ${opened} tabs`);
+  openSelectedBtn.disabled = false;
 });
