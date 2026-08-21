@@ -78,14 +78,17 @@ document.getElementById('openAllBtn').addEventListener('click', () => {
   reader.onload = async (e) => {
     try {
       const html = e.target.result;
-      const match = html.match(
-        /<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/
-      );
-      if (!match) {
+      // Parsed as 'text/html' via DOMParser rather than matched with a
+      // regex - more robust to whitespace/attribute changes in the export
+      // format, and DOMParser never executes scripts in the parsed
+      // document, so this is safe even for an untrusted file.
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const dataEl = doc.getElementById('addons-exporter-data');
+      if (!dataEl) {
         setStatus('This file doesn\'t look like an Add-ons Exporter export (no embedded data found)');
         return;
       }
-      const parsed = JSON.parse(match[1]);
+      const parsed = JSON.parse(dataEl.textContent);
       const list = parsed && Array.isArray(parsed.addons) ? parsed.addons : null;
 
       if (!Array.isArray(list) || list.length === 0) {
