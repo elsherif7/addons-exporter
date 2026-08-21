@@ -144,13 +144,38 @@ function buildHtmlReport(list) {
 </html>`;
 }
 
+// Max number of AMO lookups (findAmoPage calls) allowed to run at once
+// during export. Unbounded concurrency (one fetch pair per installed
+// add-on, all at once) risks tripping AMO's rate limiting for users with
+// large add-on collections - this keeps lookups running in parallel for
+// speed, but caps how many are in flight at a time.
+const AMO_LOOKUP_CONCURRENCY = 5;
+
+// Runs fn(item) over items with at most `limit` calls in flight at once,
+// returning results in the same order as items.
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const i = nextIndex++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
+  await Promise.all(workers);
+  return results;
+}
+
 async function doExport() {
   const all = await browser.management.getAll();
   const extensions = all.filter(a =>
     (a.type === 'extension' || a.type === 'theme') && !a.id.endsWith('@mozilla.org')
   );
 
-  const list = await Promise.all(extensions.map(async (a) => {
+  const list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
     let link = await findAmoPage(a.id, a.name);
     if (!link && a.homepageUrl && a.homepageUrl.startsWith('http')) {
       link = a.homepageUrl;
@@ -159,7 +184,7 @@ async function doExport() {
       link = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
     }
     return { name: a.name, version: a.version, enabled: a.enabled, type: a.type, link };
-  }));
+  });
 
   const html = buildHtmlReport(list);
   const blob = new Blob([html], { type: 'text/html' });
