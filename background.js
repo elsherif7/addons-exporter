@@ -17,15 +17,30 @@ browser.runtime.onMessage.addListener((message) => {
   }
 });
 
+// Milliseconds to wait for a single AMO API request before giving up on it
+// and falling through to the next lookup step. Generous, since an accurate
+// AMO match is worth waiting for - but bounded, so a slow/unreachable AMO
+// endpoint can't stall the whole export indefinitely.
+const AMO_FETCH_TIMEOUT_MS = 15000;
+
+async function fetchWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Look up the extension's real AMO (addons.mozilla.org) listing page.
 // Try by exact ID/GUID first (most reliable), then fall back to a name search.
-// No artificial timeout here - waiting longer for an accurate AMO match is
-// worth it over falling back to a GitHub/homepage link too early.
 async function findAmoPage(id, name) {
   // 1. Exact lookup by addon ID/GUID
   try {
-    const res = await fetch(
-      `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(id)}/`
+    const res = await fetchWithTimeout(
+      `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(id)}/`,
+      AMO_FETCH_TIMEOUT_MS
     );
     if (res.ok) {
       const data = await res.json();
@@ -37,8 +52,9 @@ async function findAmoPage(id, name) {
 
   // 2. Fuzzy search by name
   try {
-    const res = await fetch(
-      `https://addons.mozilla.org/api/v5/addons/search/?q=${encodeURIComponent(name)}&app=firefox`
+    const res = await fetchWithTimeout(
+      `https://addons.mozilla.org/api/v5/addons/search/?q=${encodeURIComponent(name)}&app=firefox`,
+      AMO_FETCH_TIMEOUT_MS
     );
     if (res.ok) {
       const data = await res.json();
