@@ -1,3 +1,10 @@
+// Highest exported-data format version this copy of the extension knows how
+// to read. Mirrors EXPORT_FORMAT_VERSION in background.js. A file whose
+// embedded formatVersion is higher than this was made by a newer version of
+// the extension - its data shape may not match what we expect here, so we
+// refuse to guess rather than risk opening bad links.
+const SUPPORTED_FORMAT_VERSION = 1;
+
 const statusEl = document.getElementById('status');
 const fileNameEl = document.getElementById('fileName');
 const fileNameRow = document.getElementById('fileNameRow');
@@ -83,6 +90,20 @@ document.getElementById('openAllBtn').addEventListener('click', () => {
 
       if (!Array.isArray(list) || list.length === 0) {
         setStatus('No add-ons found in that file');
+        return;
+      }
+
+      // Only accept files that explicitly declare a formatVersion we
+      // understand. A missing formatVersion means the file predates
+      // versioning (or isn't a real export) and we can't safely assume its
+      // data shape - reject it rather than guessing.
+      const formatVersion = parsed.formatVersion;
+      if (typeof formatVersion !== 'number') {
+        setStatus('This file is missing its export format version and can\'t be imported.');
+        return;
+      }
+      if (formatVersion > SUPPORTED_FORMAT_VERSION) {
+        setStatus('This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.');
         return;
       }
 
