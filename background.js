@@ -170,7 +170,16 @@ async function mapWithConcurrency(items, limit, fn) {
 }
 
 async function doExport() {
-  const all = await browser.management.getAll();
+  let all;
+  try {
+    all = await browser.management.getAll();
+  } catch {
+    // Surfaces as "Error: <message>" in the popup (see popup.js) - give it
+    // something actionable instead of whatever raw message crosses the
+    // runtime messaging boundary.
+    throw new Error('Could not read your installed add-ons. Try reloading the extension, or check that it still has permission to manage add-ons.');
+  }
+
   // browser.management can also report 'dictionary' and 'locale' items
   // (spell-check dictionaries, language packs). Deliberately excluded here:
   // buildHtmlReport() only has Extensions/Themes sections, so including
