@@ -146,10 +146,13 @@ function buildHtmlReport(list) {
   h1.group-title { font-size: 20px; margin-top: 40px; }
   h2 { font-size: 18px; }
   p { font-size: 16px; color: #444; line-height: 1.7; }
-  table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
-  th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 30px; table-layout: fixed; }
+  th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; overflow-wrap: break-word; }
   th { background: #f0f0f0; }
-  th:nth-child(4), td:nth-child(4) { white-space: nowrap; }
+  th:nth-child(1), td:nth-child(1) { width: 28%; }
+  th:nth-child(2), td:nth-child(2) { width: 10%; }
+  th:nth-child(3), td:nth-child(3) { width: 47%; }
+  th:nth-child(4), td:nth-child(4) { width: 15%; white-space: nowrap; }
   .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }
   .match-uncertain { color: #b45309; font-style: italic; }
 </style>
