@@ -5,6 +5,14 @@
 // refuse to guess rather than risk opening bad links.
 const SUPPORTED_FORMAT_VERSION = 1;
 
+// Milliseconds to wait between opening each tab during import. Opening
+// dozens of tabs back-to-back with zero delay bursts a lot of sudden load
+// on the browser at once - a small stagger smooths that out without
+// meaningfully slowing down the import.
+const TAB_OPEN_DELAY_MS = 150;
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const statusEl = document.getElementById('status');
 const fileNameEl = document.getElementById('fileName');
 const fileNameRow = document.getElementById('fileNameRow');
@@ -115,14 +123,17 @@ document.getElementById('openAllBtn').addEventListener('click', () => {
       // a web page, so it is never treated as pop-up spam by the browser.
       let opened = 0;
       let failed = 0;
-      for (const item of list) {
+      for (let i = 0; i < list.length; i++) {
         try {
-          await browser.tabs.create({ url: item.link, active: false });
+          await browser.tabs.create({ url: list[i].link, active: false });
           opened++;
         } catch {
           // A single bad/missing link shouldn't stop the rest of the
           // import - skip it and keep going.
           failed++;
+        }
+        if (i < list.length - 1) {
+          await delay(TAB_OPEN_DELAY_MS);
         }
       }
       setStatus(failed > 0
