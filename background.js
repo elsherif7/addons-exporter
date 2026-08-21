@@ -35,6 +35,9 @@ async function fetchWithTimeout(url, timeoutMs) {
 
 // Look up the extension's real AMO (addons.mozilla.org) listing page.
 // Try by exact ID/GUID first (most reliable), then fall back to a name search.
+// Returns { url, matchType } - matchType lets the report show how confident
+// each link is, since a fuzzy name search can genuinely point to the wrong
+// add-on - or null if neither lookup found anything.
 async function findAmoPage(id, name) {
   // 1. Exact lookup by addon ID/GUID
   try {
@@ -44,7 +47,7 @@ async function findAmoPage(id, name) {
     );
     if (res.ok) {
       const data = await res.json();
-      if (data.url) return data.url;
+      if (data.url) return { url: data.url, matchType: 'amo-exact' };
     }
   } catch {
     // fall through
@@ -59,7 +62,7 @@ async function findAmoPage(id, name) {
     if (res.ok) {
       const data = await res.json();
       if (data.results && data.results.length > 0 && data.results[0].url) {
-        return data.results[0].url;
+        return { url: data.results[0].url, matchType: 'amo-search' };
       }
     }
   } catch {
@@ -95,19 +98,35 @@ function buildHtmlReport(list) {
   const extensions = list.filter(a => a.type === 'extension');
   const themes = list.filter(a => a.type === 'theme');
 
-  const row = (a) =>
-    `<tr>
+  // Human-readable labels for how each link was resolved (see linkType,
+  // set in doExport). Fuzzy/fallback matches are flagged with the
+  // .match-uncertain style below since they can genuinely point to the
+  // wrong add-on and are worth a second look.
+  const linkTypeLabels = {
+    'amo-exact': 'Exact match',
+    'amo-search': 'Possible match',
+    'homepage': 'Homepage',
+    'amo-search-fallback': 'Search results',
+  };
+  const uncertainLinkTypes = new Set(['amo-search', 'amo-search-fallback']);
+
+  const row = (a) => {
+    const matchLabel = linkTypeLabels[a.linkType] || '';
+    const matchClass = uncertainLinkTypes.has(a.linkType) ? ' class="match-uncertain"' : '';
+    return `<tr>
       <td>${escapeHtml(a.name)}</td>
       <td>${escapeHtml(a.version)}</td>
       <td><a href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.link)}</a></td>
+      <td${matchClass}>${escapeHtml(matchLabel)}</td>
     </tr>`;
+  };
 
   const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 
   const section = (title, items) => items.length ? `
     <h2>${title} (${items.length})</h2>
     <table>
-      <tr><th>Name</th><th>Version</th><th>Link</th></tr>
+      <tr><th>Name</th><th>Version</th><th>Link</th><th>Match</th></tr>
       ${items.map(row).join('\n')}
     </table>` : '';
 
@@ -131,6 +150,7 @@ function buildHtmlReport(list) {
   th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
   th { background: #f0f0f0; }
   .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }
+  .match-uncertain { color: #b45309; font-style: italic; }
 </style>
 </head>
 <body>
@@ -193,14 +213,20 @@ async function doExport() {
   );
 
   const list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
-    let link = await findAmoPage(a.id, a.name);
-    if (!link && a.homepageUrl && a.homepageUrl.startsWith('http')) {
+    const amoMatch = await findAmoPage(a.id, a.name);
+    let link;
+    let linkType;
+    if (amoMatch) {
+      link = amoMatch.url;
+      linkType = amoMatch.matchType;
+    } else if (a.homepageUrl && a.homepageUrl.startsWith('http')) {
       link = a.homepageUrl;
-    }
-    if (!link) {
+      linkType = 'homepage';
+    } else {
       link = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
+      linkType = 'amo-search-fallback';
     }
-    return { name: a.name, version: a.version, enabled: a.enabled, type: a.type, link };
+    return { name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
   });
 
   const html = buildHtmlReport(list);
