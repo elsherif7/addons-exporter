@@ -4,8 +4,11 @@
 const EXPORT_FORMAT_VERSION = 1;
 
 browser.runtime.onMessage.addListener((message) => {
+  if (message.type === 'listAddons') {
+    return listInstalledAddons();
+  }
   if (message.type === 'export') {
-    return doExport().then(() => {
+    return doExport(message.ids).then(() => {
       // Open the confirmation tab from here (the background script),
       // not from the popup - the popup can close early when the native
       // "Save As" dialog steals focus, which would otherwise stop this
@@ -195,12 +198,16 @@ async function mapWithConcurrency(items, limit, fn) {
   return results;
 }
 
-async function doExport() {
+// Reads installed add-ons and filters down to the ones this extension can
+// export (extensions/themes, excluding Firefox's own built-ins). Shared by
+// listInstalledAddons() (export.html's picker) and doExport() (the actual
+// export), so both always agree on exactly which add-ons are eligible.
+async function getExportableAddons() {
   let all;
   try {
     all = await browser.management.getAll();
   } catch {
-    // Surfaces as "Error: <message>" in the popup (see popup.js) - give it
+    // Surfaces as "Error: <message>" in the popup/export page - give it
     // something actionable instead of whatever raw message crosses the
     // runtime messaging boundary.
     throw new Error('Could not read your installed add-ons. Try reloading the extension, or check that it still has permission to manage add-ons.');
@@ -212,9 +219,34 @@ async function doExport() {
   // them would silently drop them from the report body while still
   // counting them in the "Found N add-ons" total - worse than leaving
   // them out. Revisit if dictionaries/locales ever get their own section.
-  const extensions = all.filter(a =>
+  return all.filter(a =>
     (a.type === 'extension' || a.type === 'theme') && !a.id.endsWith('@mozilla.org')
   );
+}
+
+// Lightweight listing for export.html's picker - just the fields needed to
+// render checkboxes. No AMO lookups here; those only run for whatever the
+// user actually selects, in doExport().
+async function listInstalledAddons() {
+  const extensions = await getExportableAddons();
+  return extensions.map(a => ({
+    id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type
+  }));
+}
+
+async function doExport(ids) {
+  let extensions = await getExportableAddons();
+
+  // ids comes from export.html's checkbox selection. If provided, export
+  // only those add-ons instead of everything eligible.
+  if (Array.isArray(ids)) {
+    const idSet = new Set(ids);
+    extensions = extensions.filter(a => idSet.has(a.id));
+  }
+
+  if (extensions.length === 0) {
+    throw new Error('No add-ons selected to export.');
+  }
 
   const list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
     const amoMatch = await findAmoPage(a.id, a.name);
