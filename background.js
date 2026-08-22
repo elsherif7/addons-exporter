@@ -269,7 +269,7 @@ async function doExport(ids) {
       link = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
       linkType = 'amo-search-fallback';
     }
-    return { name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
+    return { id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
   });
 
   const html = buildHtmlReport(list);

@@ -40,7 +40,7 @@ function renderList(addons) {
     const i = idx++;
     return `<div class="addon-row">
       <input type="checkbox" id="cb-${i}" data-id="${escapeHtml(a.id)}" checked>
-      <label for="cb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span>${a.enabled === false ? '<span class="addon-disabled-tag">disabled</span>' : ''}</label>
+      <label for="cb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span>${a.enabled === false ? '<span class="addon-tag">disabled</span>' : ''}</label>
     </div>`;
   };
 

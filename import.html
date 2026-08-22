@@ -76,7 +76,7 @@
 <body>
   <div class="card">
     <h1>Add-ons Importer</h1>
-    <p>Pick an <strong>HTML report</strong> exported earlier by Add-ons Exporter, choose which add-ons to open, and this opens each one's real page automatically.</p>
+    <p>Pick an <strong>HTML report</strong> exported earlier by Add-ons Exporter. Add-ons you don't already have are pre-selected; ones you've already installed are shown too, in case you want to revisit them.</p>
     <p>Note: Firefox's own security policy doesn't allow any extension, including this one, to automatically download and install other add-ons. This tool can only open each add-on's page as a tab for you — you'll still need to click "Add to Firefox" yourself on each one.</p>
 
     <div class="picker" id="picker">
@@ -87,6 +87,8 @@
       </div>
       <strong id="noFileText">No file selected</strong>
     </div>
+
+    <span id="compareNote"></span>
 
     <div class="list-controls" id="listControls" style="display:none;">
       <span id="selectionCount"></span>

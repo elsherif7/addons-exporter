@@ -91,7 +91,7 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   color: #888;
   font-size: 12px;
 }
-.addon-disabled-tag {
+.addon-tag {
   color: #999;
   font-size: 11px;
   font-style: italic;
@@ -127,5 +127,11 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   color: #444;
   margin-top: 14px;
   min-height: 18px;
+}
+#compareNote {
+  display: block;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 10px;
 }
 

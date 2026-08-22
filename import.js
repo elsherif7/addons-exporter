@@ -26,6 +26,28 @@ function isSafeUrl(link) {
   }
 }
 
+// Indexes currently-installed add-ons by both id and lowercased name, so an
+// imported item can be matched against what's already installed either way.
+function buildInstalledIndex(installed) {
+  const byId = new Map();
+  const byName = new Map();
+  for (const a of installed) {
+    byId.set(a.id, a);
+    byName.set(a.name.toLowerCase(), a);
+  }
+  return { byId, byName };
+}
+
+// Matches an imported item against the installed index. Prefers id (added
+// to exports going forward) but falls back to a case-insensitive name match
+// for older export files that predate the id field.
+function findInstalledMatch(item, index) {
+  if (item.id && index.byId.has(item.id)) {
+    return index.byId.get(item.id);
+  }
+  return index.byName.get(item.name.toLowerCase()) || null;
+}
+
 const statusEl = document.getElementById('status');
 const fileNameEl = document.getElementById('fileName');
 const fileNameRow = document.getElementById('fileNameRow');
@@ -40,11 +62,12 @@ const selectAllBtn = document.getElementById('selectAllBtn');
 const deselectAllBtn = document.getElementById('deselectAllBtn');
 const selectionCountEl = document.getElementById('selectionCount');
 const openSelectedBtn = document.getElementById('openSelectedBtn');
+const compareNoteEl = document.getElementById('compareNote');
 
 // Add-ons from the parsed file, in the exact order they're rendered
-// (extensions then themes, each alphabetized) - each checkbox's data-idx
-// indexes directly into this array so a display-order click always maps
-// back to the right item, regardless of how the file itself ordered them.
+// (Not Installed Yet then Already Installed, each alphabetized) - each
+// checkbox's data-idx indexes directly into this array so a display-order
+// click always maps back to the right item, regardless of file ordering.
 let displayItems = [];
 
 function setStatus(msg) {
@@ -69,31 +92,65 @@ function clearAddonList() {
   listControls.style.display = 'none';
   openSelectedBtn.disabled = true;
   selectionCountEl.textContent = '';
+  compareNoteEl.textContent = '';
 }
 
-function renderAddonList(addons) {
-  const extensions = addons.filter(a => a.type === 'extension').sort(byName);
-  const themes = addons.filter(a => a.type === 'theme').sort(byName);
-  displayItems = [...extensions, ...themes];
+function renderAddonList(addons, installed) {
+  const index = buildInstalledIndex(installed);
+  const matchedInstalledIds = new Set();
+  const notInstalled = [];
+  const alreadyInstalled = [];
 
-  const rowHtml = (a, i) => {
+  for (const a of addons) {
+    const match = findInstalledMatch(a, index);
+    if (match) {
+      matchedInstalledIds.add(match.id);
+      alreadyInstalled.push(a);
+    } else {
+      notInstalled.push(a);
+    }
+  }
+  notInstalled.sort(byName);
+  alreadyInstalled.sort(byName);
+  displayItems = [...notInstalled, ...alreadyInstalled];
+
+  const rowHtml = (a, i, isInstalled) => {
     const safe = isSafeUrl(a.link);
     const linkPreview = safe
       ? `<span class="addon-link-preview">${escapeHtml(new URL(a.link).hostname)}</span>`
       : `<span class="addon-link-preview unsafe">invalid or unsafe link - skipped</span>`;
+    const typeTag = a.type === 'theme' ? '<span class="addon-tag">Theme</span>' : '';
+    const disabledTag = a.enabled === false ? '<span class="addon-tag">disabled</span>' : '';
+    // Already-installed items default unchecked - nothing to open for
+    // something you already have, though you can still pick them.
+    const checkedAttr = safe && !isInstalled ? 'checked' : '';
     return `<div class="addon-row">
-      <input type="checkbox" id="icb-${i}" data-idx="${i}" ${safe ? 'checked' : ''}>
-      <label for="icb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span>${a.enabled === false ? '<span class="addon-disabled-tag">disabled</span>' : ''}<br>${linkPreview}</label>
+      <input type="checkbox" id="icb-${i}" data-idx="${i}" ${checkedAttr}>
+      <label for="icb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span>${typeTag}${disabledTag}<br>${linkPreview}</label>
     </div>`;
   };
 
-  const groupHtml = (title, items, offset) => items.length
-    ? `<div class="group-heading">${title} (${items.length})</div>${items.map((a, i) => rowHtml(a, offset + i)).join('')}`
+  const groupHtml = (title, items, offset, isInstalled) => items.length
+    ? `<div class="group-heading">${title} (${items.length})</div>${items.map((a, i) => rowHtml(a, offset + i, isInstalled)).join('')}`
     : '';
 
-  addonListEl.innerHTML = groupHtml('Extensions', extensions, 0) + groupHtml('Themes', themes, extensions.length);
+  addonListEl.innerHTML =
+    groupHtml('Not Installed Yet', notInstalled, 0, false) +
+    groupHtml('Already Installed', alreadyInstalled, notInstalled.length, true);
   addonListEl.style.display = 'block';
   listControls.style.display = 'flex';
+
+  // Installed add-ons this file doesn't mention at all - informational
+  // only, nothing to check or open for these.
+  const newSinceExport = installed.filter(a => !matchedInstalledIds.has(a.id));
+  const notes = [];
+  if (notInstalled.length === 0 && alreadyInstalled.length > 0) {
+    notes.push('You already have every add-on from this export installed.');
+  }
+  if (newSinceExport.length > 0) {
+    notes.push(`${newSinceExport.length} add-on${newSinceExport.length === 1 ? '' : 's'} installed now ${newSinceExport.length === 1 ? "wasn't" : "weren't"} in this export.`);
+  }
+  compareNoteEl.textContent = notes.join(' ');
 
   checkboxes().forEach((cb) => {
     cb.addEventListener('change', updateSelectionCount);
@@ -151,8 +208,22 @@ async function loadFile(file) {
       return;
     }
 
+    // Compare against what's currently installed, so items already present
+    // aren't pre-checked. If this fails for any reason, degrade gracefully
+    // instead of blocking the import - treat everything as not-installed,
+    // same as before this comparison existed.
+    let installed = [];
+    try {
+      installed = await browser.runtime.sendMessage({ type: 'listAddons' });
+      if (myGeneration !== loadGeneration) return;
+      if (!Array.isArray(installed)) installed = [];
+    } catch {
+      if (myGeneration !== loadGeneration) return;
+      installed = [];
+    }
+
     setStatus('');
-    renderAddonList(list);
+    renderAddonList(list, installed);
   } catch (err) {
     if (myGeneration !== loadGeneration) return;
     setStatus('Error reading file: ' + err.message);

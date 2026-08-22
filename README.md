@@ -17,6 +17,7 @@ Firefox doesn't allow any extension to install other extensions automatically �
 ```
 addons-exporter/
 ├── manifest.json        # Extension config, permissions, background script
+├── common.js             # Shared helpers (escapeHtml, byName) for background.js / export.js / import.js
 ├── background.js        # Export logic, AMO lookups, HTML report generation
 ├── shared.css            # Shared styles for export.html / import.html / confirmation.html
 ├── popup.html            # Toolbar popup UI
@@ -54,13 +55,15 @@ addons-exporter/
 
 **Export** — click the toolbar icon → **Export Add-ons** to open a checklist of every installed extension and theme (grouped, alphabetized, disabled ones tagged). Pick which ones to include, or use Select all / Deselect all, then click **Export Selected**. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage as a last resort), and the result is saved as a single HTML report — human-readable on its own, with the underlying data embedded for the Import page to read back. The report's Match column shows how confident each link is, since a fuzzy match can occasionally point to the wrong add-on.
 
-**Import** — click **Import Add-ons**, then choose or drag in a previously exported report. It's read and validated automatically as soon as it's selected, and only accepted if its embedded format version is one this copy of the extension understands — anything missing or newer is rejected with a clear message rather than guessed at. A valid file renders the same kind of checklist as Export; pick what to open and click **Open Selected in Tabs**. Tabs open one at a time with a short stagger between each, rather than all at once.
+**Import** — click **Import Add-ons**, then choose or drag in a previously exported report. It's read and validated automatically as soon as it's selected, and only accepted if its embedded format version is one this copy of the extension understands — anything missing or newer is rejected with a clear message rather than guessed at. It's automatically compared against what's currently installed (matched by add-on ID, falling back to name for older exports), so the checklist splits into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference, not pre-selected) — no need to reopen things you already have. Pick what to open and click **Open Selected in Tabs**; tabs open one at a time with a short stagger between each, rather than all at once.
 
 A few other things worth knowing:
 
 - The confirmation tab opens from the background script itself once a download starts, not from the popup — so it still appears even if the popup's own tab has already closed.
 - AMO lookups are capped at 15 seconds each and 5 in flight at once, so a slow AMO response can't stall an export, and a large add-on collection can't trip AMO's rate limiting.
 - Firefox's own bundled built-ins (New Tab page, default themes) and spell-check dictionaries/language packs are excluded, since they aren't real installed add-ons and have no matching store listing.
+- Import only ever opens http/https links; anything else is flagged and left unselected, since an export file's data isn't inherently trusted.
+- If any currently-installed add-ons aren't mentioned in the file at all, Import shows a short note about it — informational only, since there's nothing to open for something you already have.
 
 ---
 
