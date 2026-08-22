@@ -33,6 +33,7 @@ const noFileText = document.getElementById('noFileText');
 const fileInput = document.getElementById('fileInput');
 const picker = document.getElementById('picker');
 const removeFileBtn = document.getElementById('removeFileBtn');
+const chooseFileBtn = document.getElementById('chooseFileBtn');
 const listControls = document.getElementById('listControls');
 const addonListEl = document.getElementById('addonList');
 const selectAllBtn = document.getElementById('selectAllBtn');
@@ -178,7 +179,7 @@ function setSelectedFile(file) {
 
 removeFileBtn.addEventListener('click', () => setSelectedFile(null));
 
-document.getElementById('chooseFileBtn').addEventListener('click', () => {
+chooseFileBtn.addEventListener('click', () => {
   fileInput.click();
 });
 
