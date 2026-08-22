@@ -97,6 +97,21 @@ function formatFilenameTimestamp(d) {
   return `${date}_${time}`;
 }
 
+// JSON.stringify never escapes "/", so a string value containing the
+// literal text "</script>" - like an add-on's name, which is completely
+// attacker-controlled for any sideloaded/unlisted extension - would
+// prematurely close this embedding <script> tag when a real browser
+// parses the exported file (opening the report directly is the file's
+// whole purpose, not just importing it back through this extension).
+// That lets a maliciously-named add-on inject and execute a genuine new
+// <script> tag in the report. Escaping "</" as "<\/" is a lossless,
+// standard fix - "\/" is a valid JSON escape for "/", so JSON.parse
+// reads it back identically, but the browser's HTML tokenizer no longer
+// sees a closing tag.
+function safeJsonForScriptTag(value) {
+  return JSON.stringify(value).replace(/<\//g, '<\\/');
+}
+
 function buildHtmlReport(list) {
   const extensions = list.filter(a => a.type === 'extension');
   const themes = list.filter(a => a.type === 'theme');
@@ -168,7 +183,7 @@ function buildHtmlReport(list) {
   ${group('Extensions', extensions)}
   ${group('Themes', themes)}
 
-  <script type="application/json" id="addons-exporter-data">${JSON.stringify({ formatVersion: EXPORT_FORMAT_VERSION, addons: list })}</script>
+  <script type="application/json" id="addons-exporter-data">${safeJsonForScriptTag({ formatVersion: EXPORT_FORMAT_VERSION, addons: list })}</script>
 </body>
 </html>`;
 }
