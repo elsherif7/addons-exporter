@@ -1,9 +1,3 @@
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
-
 const listEl = document.getElementById('addonList');
 const selectAllBtn = document.getElementById('selectAllBtn');
 const deselectAllBtn = document.getElementById('deselectAllBtn');
@@ -35,7 +29,6 @@ function renderList(addons) {
     return;
   }
 
-  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
   const extensions = addons.filter(a => a.type === 'extension').sort(byName);
   const themes = addons.filter(a => a.type === 'theme').sort(byName);
 

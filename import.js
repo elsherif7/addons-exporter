@@ -26,12 +26,6 @@ function isSafeUrl(link) {
   }
 }
 
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
-
 const statusEl = document.getElementById('status');
 const fileNameEl = document.getElementById('fileName');
 const fileNameRow = document.getElementById('fileNameRow');
@@ -77,7 +71,6 @@ function clearAddonList() {
 }
 
 function renderAddonList(addons) {
-  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
   const extensions = addons.filter(a => a.type === 'extension').sort(byName);
   const themes = addons.filter(a => a.type === 'theme').sort(byName);
   displayItems = [...extensions, ...themes];

@@ -75,12 +75,6 @@ async function findAmoPage(id, name) {
   return null;
 }
 
-function escapeHtml(str) {
-  return str.replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
-
 function formatExportDate(d) {
   const months = ['January','February','March','April','May','June',
                   'July','August','September','October','November','December'];
@@ -138,8 +132,6 @@ function buildHtmlReport(list) {
       <td${matchClass}>${escapeHtml(matchLabel)}</td>
     </tr>`;
   };
-
-  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 
   const section = (title, items) => items.length ? `
     <h2>${title} (${items.length})</h2>
