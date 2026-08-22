@@ -6,7 +6,7 @@ Firefox doesn't allow any extension to install other extensions automatically â€
 
 **ðŸ¦Š Get it on Firefox Add-ons:** [addons.mozilla.org/en-US/firefox/addon/add-ons-exporter](https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/)
 
-> New updates are published on the 7th of every month.
+> New updates are published on the 7th of odd-numbered months (January, March, May, July, September, November).
 >
 > Security issues or broken/critical bugs are fixed and released immediately, outside that schedule.
 
