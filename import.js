@@ -13,6 +13,19 @@ const TAB_OPEN_DELAY_MS = 150;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Only http/https links are ever opened. An imported file's data isn't
+// trusted - it could come from someone else, or be hand-edited - so a
+// link claiming to be, say, "uBlock Origin" is still just a string until
+// checked. This also guards against non-navigable schemes generally.
+function isSafeUrl(link) {
+  try {
+    const u = new URL(link);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -69,10 +82,16 @@ function renderAddonList(addons) {
   const themes = addons.filter(a => a.type === 'theme').sort(byName);
   displayItems = [...extensions, ...themes];
 
-  const rowHtml = (a, i) => `<div class="addon-row">
-      <input type="checkbox" id="icb-${i}" data-idx="${i}" checked>
-      <label for="icb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span>${a.enabled === false ? '<span class="addon-disabled-tag">disabled</span>' : ''}</label>
+  const rowHtml = (a, i) => {
+    const safe = isSafeUrl(a.link);
+    const linkPreview = safe
+      ? `<span class="addon-link-preview">${escapeHtml(new URL(a.link).hostname)}</span>`
+      : `<span class="addon-link-preview unsafe">invalid or unsafe link - skipped</span>`;
+    return `<div class="addon-row">
+      <input type="checkbox" id="icb-${i}" data-idx="${i}" ${safe ? 'checked' : ''}>
+      <label for="icb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span>${a.enabled === false ? '<span class="addon-disabled-tag">disabled</span>' : ''}<br>${linkPreview}</label>
     </div>`;
+  };
 
   const groupHtml = (title, items, offset) => items.length
     ? `<div class="group-heading">${title} (${items.length})</div>${items.map((a, i) => rowHtml(a, offset + i)).join('')}`
@@ -88,14 +107,24 @@ function renderAddonList(addons) {
   updateSelectionCount();
 }
 
+// Bumped every time a new file load starts. loadFile() captures its own
+// value and checks it again after the only await point (file.text()) -
+// if a newer file was selected in the meantime, this call's result is
+// stale and gets silently discarded instead of overwriting what the user
+// is now looking at.
+let loadGeneration = 0;
+
 // Reads, validates, and parses the picked file, then renders the checklist.
 // Runs automatically as soon as a file is selected/dropped, rather than
 // waiting for a separate button click.
 async function loadFile(file) {
+  const myGeneration = ++loadGeneration;
   clearAddonList();
   setStatus('Reading file...');
   try {
     const html = await file.text();
+    if (myGeneration !== loadGeneration) return;
+
     // Parsed as 'text/html' via DOMParser rather than matched with a
     // regex - more robust to whitespace/attribute changes in the export
     // format, and DOMParser never executes scripts in the parsed
@@ -131,6 +160,7 @@ async function loadFile(file) {
     setStatus('');
     renderAddonList(list);
   } catch (err) {
+    if (myGeneration !== loadGeneration) return;
     setStatus('Error reading file: ' + err.message);
   }
 }
@@ -212,10 +242,16 @@ openSelectedBtn.addEventListener('click', async () => {
   let failed = 0;
   for (let i = 0; i < selected.length; i++) {
     try {
+      // Re-validated here regardless of checkbox state - the preview
+      // already unchecks unsafe links by default, but this is the actual
+      // gate: nothing but http/https ever reaches browser.tabs.create.
+      if (!isSafeUrl(selected[i].link)) {
+        throw new Error('unsafe link');
+      }
       await browser.tabs.create({ url: selected[i].link, active: false });
       opened++;
     } catch {
-      // A single bad/missing link shouldn't stop the rest of the
+      // A single bad/missing/unsafe link shouldn't stop the rest of the
       // import - skip it and keep going.
       failed++;
     }
