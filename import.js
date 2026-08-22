@@ -33,7 +33,6 @@ const deselectAllBtn = document.getElementById('deselectAllBtn');
 const selectionCountEl = document.getElementById('selectionCount');
 const openSelectedBtn = document.getElementById('openSelectedBtn');
 
-let selectedFile = null;
 // Add-ons from the parsed file, in the exact order they're rendered
 // (extensions then themes, each alphabetized) - each checkbox's data-idx
 // indexes directly into this array so a display-order click always maps
@@ -137,7 +136,6 @@ async function loadFile(file) {
 }
 
 function setSelectedFile(file) {
-  selectedFile = file;
   if (file) {
     fileNameEl.textContent = file.name;
     fileNameRow.style.display = 'flex';
