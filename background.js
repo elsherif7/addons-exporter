@@ -161,7 +161,7 @@ function buildHtmlReport(list) {
 </style>
 </head>
 <body>
-  <h1>My Installed Add-ons</h1>
+  <h1>Add-ons Exporter</h1>
   <p>Exported on ${formatExportDate(new Date())}. Found ${list.length} add-ons in total.</p>
   <p><em>Tip: on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Exporter</a> installed, click its toolbar icon and choose "Import Add-ons" to open every link below as a tab automatically. Don't have it yet? Install it from the link above first.</em></p>
 
