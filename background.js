@@ -246,6 +246,16 @@ async function doExport(ids) {
     throw new Error('No add-ons selected to export.');
   }
 
+  const total = extensions.length;
+  let done = 0;
+  // Broadcasts to any listening extension page (export.html). If nothing
+  // is listening - the export tab was closed, or export was triggered
+  // some other way - sendMessage rejects; that's fine, just ignore it.
+  const reportProgress = () => {
+    done++;
+    browser.runtime.sendMessage({ type: 'exportProgress', done, total }).catch(() => {});
+  };
+
   const list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
     const amoMatch = await findAmoPage(a.id, a.name);
     let link;
@@ -260,6 +270,7 @@ async function doExport(ids) {
       link = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
       linkType = 'amo-search-fallback';
     }
+    reportProgress();
     return { id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
   });
 

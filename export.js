@@ -92,3 +92,12 @@ exportBtn.addEventListener('click', async () => {
     exportBtn.disabled = false;
   }
 });
+
+// background.js broadcasts progress as each add-on's link is resolved -
+// this replaces the static "please wait" message with a live count once
+// the first update arrives.
+browser.runtime.onMessage.addListener((message) => {
+  if (message.type === 'exportProgress') {
+    setStatus(`Resolved ${message.done} of ${message.total} add-ons...`);
+  }
+});
