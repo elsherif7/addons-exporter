@@ -158,10 +158,10 @@ function renderAddonList(addons, installed) {
 }
 
 // Bumped every time a new file load starts. loadFile() captures its own
-// value and checks it again after the only await point (file.text()) -
-// if a newer file was selected in the meantime, this call's result is
-// stale and gets silently discarded instead of overwriting what the user
-// is now looking at.
+// value and checks it again after each await point (file.text(), then the
+// listAddons fetch) - if a newer file was selected in the meantime, this
+// call's result is stale and gets silently discarded instead of
+// overwriting what the user is now looking at.
 let loadGeneration = 0;
 
 // Reads, validates, and parses the picked file, then renders the checklist.

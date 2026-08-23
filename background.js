@@ -198,8 +198,9 @@ async function mapWithConcurrency(items, limit, fn) {
 
 // Reads installed add-ons and filters down to the ones this extension can
 // export (extensions/themes, excluding Firefox's own built-ins). Shared by
-// listInstalledAddons() (export.html's picker) and doExport() (the actual
-// export), so both always agree on exactly which add-ons are eligible.
+// listInstalledAddons() (export.html's picker, and import.html's compare
+// against what's installed) and doExport() (the actual export), so all of
+// them always agree on exactly which add-ons are eligible.
 async function getExportableAddons() {
   let all;
   try {
@@ -222,9 +223,11 @@ async function getExportableAddons() {
   );
 }
 
-// Lightweight listing for export.html's picker - just the fields needed to
-// render checkboxes. No AMO lookups here; those only run for whatever the
-// user actually selects, in doExport().
+// Lightweight listing (no AMO lookups) requested via the 'listAddons'
+// message - used by export.html's picker to render checkboxes, and by
+// import.html to compare an imported file against what's currently
+// installed. AMO lookups only run for whatever the user actually selects
+// to export, in doExport().
 async function listInstalledAddons() {
   const extensions = await getExportableAddons();
   return extensions.map(a => ({
