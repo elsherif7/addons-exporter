@@ -116,17 +116,16 @@ function renderAddonList(addons, installed) {
 
   const rowHtml = (a, i, isInstalled) => {
     const safe = isSafeUrl(a.link);
-    const linkPreview = safe
-      ? `<span class="addon-link-preview">${escapeHtml(new URL(a.link).hostname)}</span>`
-      : `<span class="addon-link-preview unsafe">invalid or unsafe link - skipped</span>`;
-    const typeTag = a.type === 'theme' ? '<span class="addon-tag">Theme</span>' : '';
-    const disabledTag = a.enabled === false ? '<span class="addon-tag">disabled</span>' : '';
+    // Only surface something when there's an actual problem - a normal
+    // safe link stays quiet instead of showing its hostname on every
+    // single row, which was mostly noise for the common case.
+    const warning = safe ? '' : '<br><span class="addon-link-preview unsafe">invalid or unsafe link - skipped</span>';
     // Already-installed items default unchecked - nothing to open for
     // something you already have, though you can still pick them.
     const checkedAttr = safe && !isInstalled ? 'checked' : '';
     return `<div class="addon-row">
       <input type="checkbox" id="icb-${i}" data-idx="${i}" ${checkedAttr}>
-      <label for="icb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span>${typeTag}${disabledTag}<br>${linkPreview}</label>
+      <label for="icb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span>${warning}</label>
     </div>`;
   };
 
