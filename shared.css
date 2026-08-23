@@ -91,12 +91,6 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   color: #888;
   font-size: 12px;
 }
-.addon-tag {
-  color: #999;
-  font-size: 11px;
-  font-style: italic;
-  margin-left: 6px;
-}
 .addon-link-preview {
   display: block;
   font-size: 11px;
