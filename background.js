@@ -213,7 +213,7 @@ async function getExportableAddons() {
 
   // browser.management can also report 'dictionary' and 'locale' items
   // (spell-check dictionaries, language packs). Deliberately excluded here:
-  // buildHtmlReport() only has Extensions/Themes sections, so including
+  // buildHtmlReport() only has Enabled/Disabled sections, so including
   // them would silently drop them from the report body while still
   // counting them in the "Found N add-ons" total - worse than leaving
   // them out. Revisit if dictionaries/locales ever get their own section.
