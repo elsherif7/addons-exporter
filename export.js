@@ -29,18 +29,19 @@ function renderList(addons) {
     return;
   }
 
-  const extensions = addons.filter(a => a.type === 'extension').sort(byName);
-  const themes = addons.filter(a => a.type === 'theme').sort(byName);
+  const enabled = addons.filter(a => a.enabled).sort(byName);
+  const disabled = addons.filter(a => !a.enabled).sort(byName);
 
   // A single counter across both groups keeps every checkbox/label id
-  // attribute unique, even though extensions and themes are rendered as
+  // attribute unique, even though enabled and disabled are rendered as
   // two separate mapped lists.
   let idx = 0;
   const rowHtml = (a) => {
     const i = idx++;
+    const typeTag = a.type === 'theme' ? '<span class="addon-tag">Theme</span>' : '';
     return `<div class="addon-row">
       <input type="checkbox" id="cb-${i}" data-id="${escapeHtml(a.id)}" checked>
-      <label for="cb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span>${a.enabled === false ? '<span class="addon-tag">disabled</span>' : ''}</label>
+      <label for="cb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span>${typeTag}</label>
     </div>`;
   };
 
@@ -48,7 +49,7 @@ function renderList(addons) {
     ? `<div class="group-heading">${title} (${items.length})</div>${items.map(rowHtml).join('')}`
     : '';
 
-  listEl.innerHTML = groupHtml('Extensions', extensions) + groupHtml('Themes', themes);
+  listEl.innerHTML = groupHtml('Enabled', enabled) + groupHtml('Disabled', disabled);
 
   checkboxes().forEach((cb) => {
     cb.addEventListener('change', updateSelectionCount);

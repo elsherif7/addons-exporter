@@ -107,9 +107,6 @@ function safeJsonForScriptTag(value) {
 }
 
 function buildHtmlReport(list) {
-  const extensions = list.filter(a => a.type === 'extension');
-  const themes = list.filter(a => a.type === 'theme');
-
   // Human-readable labels for how each link was resolved (see linkType,
   // set in doExport). Fuzzy/fallback matches are flagged with the
   // .match-uncertain style below since they can genuinely point to the
@@ -125,8 +122,9 @@ function buildHtmlReport(list) {
   const row = (a) => {
     const matchLabel = linkTypeLabels[a.linkType] || '';
     const matchClass = uncertainLinkTypes.has(a.linkType) ? ' class="match-uncertain"' : '';
+    const typeTag = a.type === 'theme' ? ' <span class="type-tag">Theme</span>' : '';
     return `<tr>
-      <td>${escapeHtml(a.name)}</td>
+      <td>${escapeHtml(a.name)}${typeTag}</td>
       <td>${escapeHtml(a.version)}</td>
       <td><a href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.link)}</a></td>
       <td${matchClass}>${escapeHtml(matchLabel)}</td>
@@ -134,16 +132,11 @@ function buildHtmlReport(list) {
   };
 
   const section = (title, items) => items.length ? `
-    <h2>${title} (${items.length})</h2>
+    <h1 class="group-title">${title} (${items.length})</h1>
     <table>
       <tr><th>Name</th><th>Version</th><th>Link</th><th>Match</th></tr>
       ${items.map(row).join('\n')}
     </table>` : '';
-
-  const group = (title, items) => items.length ? `
-    <h1 class="group-title">${title}</h1>
-    ${section('Enabled', items.filter(a => a.enabled).sort(byName))}
-    ${section('Disabled', items.filter(a => !a.enabled).sort(byName))}` : '';
 
   return `<!DOCTYPE html>
 <html>
@@ -154,7 +147,6 @@ function buildHtmlReport(list) {
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 15px; }
   h1 { font-size: 28px; }
   h1.group-title { font-size: 20px; margin-top: 40px; }
-  h2 { font-size: 18px; }
   p { font-size: 16px; color: #444; line-height: 1.7; }
   table { border-collapse: collapse; width: 100%; margin-bottom: 30px; table-layout: fixed; }
   th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; overflow-wrap: break-word; }
@@ -165,6 +157,7 @@ function buildHtmlReport(list) {
   th:nth-child(4), td:nth-child(4) { width: 15%; white-space: nowrap; }
   .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }
   .match-uncertain { color: #b45309; font-style: italic; }
+  .type-tag { font-size: 11px; font-style: italic; color: #888; }
 </style>
 </head>
 <body>
@@ -172,8 +165,8 @@ function buildHtmlReport(list) {
   <p>Exported on ${formatExportDate(new Date())}. Found ${list.length} add-ons in total.</p>
   <p><em>Tip: on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Exporter</a> installed, click its toolbar icon and choose "Import Add-ons" to open every link below as a tab automatically. Don't have it yet? Install it from the link above first.</em></p>
 
-  ${group('Extensions', extensions)}
-  ${group('Themes', themes)}
+  ${section('Enabled', list.filter(a => a.enabled).sort(byName))}
+  ${section('Disabled', list.filter(a => !a.enabled).sort(byName))}
 
   <script type="application/json" id="addons-exporter-data">${safeJsonForScriptTag({ formatVersion: EXPORT_FORMAT_VERSION, addons: list })}</script>
 </body>
