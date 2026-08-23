@@ -45,6 +45,9 @@
     padding: 0 4px;
   }
   #removeFileBtn:hover { color: #c0392b; }
+  /* Custom tooltip via content: attr(data-tooltip) instead of a native
+     title="" attribute - browsers vary a lot in native tooltip delay and
+     styling, so this gives consistent, immediate, on-brand styling. */
   #removeFileBtn::after {
     content: attr(data-tooltip);
     position: absolute;
