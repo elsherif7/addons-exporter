@@ -38,10 +38,9 @@ function renderList(addons) {
   let idx = 0;
   const rowHtml = (a) => {
     const i = idx++;
-    const typeTag = a.type === 'theme' ? '<span class="addon-tag">Theme</span>' : '';
     return `<div class="addon-row">
       <input type="checkbox" id="cb-${i}" data-id="${escapeHtml(a.id)}" checked>
-      <label for="cb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span>${typeTag}</label>
+      <label for="cb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span></label>
     </div>`;
   };
 

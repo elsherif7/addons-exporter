@@ -122,9 +122,8 @@ function buildHtmlReport(list) {
   const row = (a) => {
     const matchLabel = linkTypeLabels[a.linkType] || '';
     const matchClass = uncertainLinkTypes.has(a.linkType) ? ' class="match-uncertain"' : '';
-    const typeTag = a.type === 'theme' ? ' <span class="type-tag">Theme</span>' : '';
     return `<tr>
-      <td>${escapeHtml(a.name)}${typeTag}</td>
+      <td>${escapeHtml(a.name)}</td>
       <td>${escapeHtml(a.version)}</td>
       <td><a href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.link)}</a></td>
       <td${matchClass}>${escapeHtml(matchLabel)}</td>
@@ -157,7 +156,6 @@ function buildHtmlReport(list) {
   th:nth-child(4), td:nth-child(4) { width: 15%; white-space: nowrap; }
   .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }
   .match-uncertain { color: #b45309; font-style: italic; }
-  .type-tag { font-size: 11px; font-style: italic; color: #888; }
 </style>
 </head>
 <body>
