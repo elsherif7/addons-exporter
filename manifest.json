@@ -1,16 +1,19 @@
 {
-  "manifest_version": 2,
+  "manifest_version": 3,
   "name": "Add-ons Exporter",
   "version": "1.2.0",
   "description": "Export or import your installed add-ons as an HTML report with real store links.",
   "permissions": [
     "management",
-    "downloads",
+    "downloads"
+  ],
+  "host_permissions": [
     "https://addons.mozilla.org/*"
   ],
   "browser_specific_settings": {
     "gecko": {
       "id": "addons-exporter@local",
+      "strict_min_version": "109.0",
       "data_collection_permissions": {
         "required": ["none"]
       }
@@ -26,7 +29,7 @@
   "background": {
     "scripts": ["common.js", "background.js"]
   },
-  "browser_action": {
+  "action": {
     "default_title": "Add-ons Exporter",
     "default_popup": "popup.html",
     "default_icon": {
