@@ -235,59 +235,79 @@ async function listInstalledAddons() {
   }));
 }
 
+// MV3's non-persistent background page can be terminated by Firefox if it
+// looks idle - and doExport() can run for a while (multiple AMO round
+// trips, even with concurrency limits and timeouts). A pending fetch()
+// isn't reliably enough to keep it alive on its own, so this pings a
+// harmless WebExtension API on an interval shorter than Firefox's idle
+// timeout for the whole duration of an export. Returns a function that
+// stops the pings - always call it via finally, so a failed export
+// doesn't leave the interval running forever.
+function startExportKeepAlive() {
+  const id = setInterval(() => {
+    browser.runtime.getPlatformInfo().catch(() => {});
+  }, 20000);
+  return () => clearInterval(id);
+}
+
 async function doExport(ids) {
-  let extensions = await getExportableAddons();
+  const stopKeepAlive = startExportKeepAlive();
+  try {
+    let extensions = await getExportableAddons();
 
-  // ids comes from export.html's checkbox selection. If provided, export
-  // only those add-ons instead of everything eligible.
-  if (Array.isArray(ids)) {
-    const idSet = new Set(ids);
-    extensions = extensions.filter(a => idSet.has(a.id));
-  }
-
-  if (extensions.length === 0) {
-    throw new Error('No add-ons selected to export.');
-  }
-
-  const total = extensions.length;
-  let done = 0;
-  // Broadcasts to any listening extension page (export.html). If nothing
-  // is listening - the export tab was closed, or export was triggered
-  // some other way - sendMessage rejects; that's fine, just ignore it.
-  const reportProgress = () => {
-    done++;
-    browser.runtime.sendMessage({ type: 'exportProgress', done, total }).catch(() => {});
-  };
-
-  const list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
-    const amoMatch = await findAmoPage(a.id, a.name);
-    let link;
-    let linkType;
-    if (amoMatch) {
-      link = amoMatch.url;
-      linkType = amoMatch.matchType;
-    } else if (a.homepageUrl && a.homepageUrl.startsWith('http')) {
-      link = a.homepageUrl;
-      linkType = 'homepage';
-    } else {
-      link = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
-      linkType = 'amo-search-fallback';
+    // ids comes from export.html's checkbox selection. If provided, export
+    // only those add-ons instead of everything eligible.
+    if (Array.isArray(ids)) {
+      const idSet = new Set(ids);
+      extensions = extensions.filter(a => idSet.has(a.id));
     }
-    reportProgress();
-    return { id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
-  });
 
-  const html = buildHtmlReport(list);
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
+    if (extensions.length === 0) {
+      throw new Error('No add-ons selected to export.');
+    }
 
-  // saveAs: true = always show the native "Save As" dialog, letting the
-  // user pick the folder and filename themselves.
-  await browser.downloads.download({
-    url,
-    filename: `Firefox-Addons (${formatFilenameTimestamp(new Date())}).html`,
-    saveAs: true
-  });
+    const total = extensions.length;
+    let done = 0;
+    // Broadcasts to any listening extension page (export.html). If nothing
+    // is listening - the export tab was closed, or export was triggered
+    // some other way - sendMessage rejects; that's fine, just ignore it.
+    const reportProgress = () => {
+      done++;
+      browser.runtime.sendMessage({ type: 'exportProgress', done, total }).catch(() => {});
+    };
 
-  setTimeout(() => URL.revokeObjectURL(url), 30000);
+    const list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
+      const amoMatch = await findAmoPage(a.id, a.name);
+      let link;
+      let linkType;
+      if (amoMatch) {
+        link = amoMatch.url;
+        linkType = amoMatch.matchType;
+      } else if (a.homepageUrl && a.homepageUrl.startsWith('http')) {
+        link = a.homepageUrl;
+        linkType = 'homepage';
+      } else {
+        link = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
+        linkType = 'amo-search-fallback';
+      }
+      reportProgress();
+      return { id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
+    });
+
+    const html = buildHtmlReport(list);
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+
+    // saveAs: true = always show the native "Save As" dialog, letting the
+    // user pick the folder and filename themselves.
+    await browser.downloads.download({
+      url,
+      filename: `Firefox-Addons (${formatFilenameTimestamp(new Date())}).html`,
+      saveAs: true
+    });
+
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  } finally {
+    stopKeepAlive();
+  }
 }
