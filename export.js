@@ -86,7 +86,7 @@ exportBtn.addEventListener('click', async () => {
     await browser.runtime.sendMessage({ type: 'export', ids });
     // background.js opens the confirmation tab itself once the download
     // starts, so this tab just reports success and stays open for review.
-    setStatus('Export complete - check your downloads.');
+    setStatus('Export complete. Your report has been saved to the folder you picked.');
   } catch (e) {
     setStatus('Error: ' + e.message);
     exportBtn.disabled = false;
