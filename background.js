@@ -30,7 +30,14 @@ async function fetchWithTimeout(url, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { signal: controller.signal });
+    // credentials: 'omit' - explicit per Mozilla's own MV3 migration
+    // guidance for background-script cross-origin fetches. Also reinforces
+    // this extension's own zero-data-collection stance: without this, any
+    // ambient addons.mozilla.org cookies in the user's browser (e.g. from
+    // being logged into an AMO account) could otherwise ride along on
+    // every lookup, identifying the user to AMO for what's meant to be an
+    // anonymous public listing lookup.
+    return await fetch(url, { signal: controller.signal, credentials: 'omit' });
   } finally {
     clearTimeout(timer);
   }
