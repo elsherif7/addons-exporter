@@ -75,7 +75,7 @@ A few other things worth knowing:
 | `downloads` | To save the exported HTML report |
 | `https://addons.mozilla.org/*` | To look up each add-on's real AMO page |
 
-> Manifest V2 — Firefox has committed to supporting it indefinitely, and none of MV3's changes (which mainly affect network-blocking extensions) apply to what this tool does.
+> Manifest V3, requiring Firefox 109 or newer (the first release with MV3 support). Migrated from Manifest V2.
 >
 > Declares `data_collection_permissions: { required: ["none"] }` — this extension collects zero personal data.
 
