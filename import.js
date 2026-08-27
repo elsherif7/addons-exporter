@@ -51,9 +51,8 @@ const selectionCountEl = document.getElementById('selectionCount');
 const openSelectedBtn = document.getElementById('openSelectedBtn');
 const compareNoteEl = document.getElementById('compareNote');
 
-// Rendered in display order (Not Installed Yet then Already Installed) -
-// each checkbox's data-idx indexes into this array, so a click always
-// maps back to the right item regardless of file ordering.
+// Rendered order (Not Installed Yet, then Already Installed) - each
+// checkbox's data-idx indexes into this array to find the right item.
 let displayItems = [];
 
 function setStatus(msg) {
@@ -138,9 +137,8 @@ function renderAddonList(addons, installed) {
   updateSelectionCount();
 }
 
-// Bumped each time a new file load starts. loadFile() checks its own
-// value after every await - if a newer file was picked in the meantime,
-// the older call's result is discarded instead of overwriting the screen.
+// Bumped each time a new file load starts, so an older load in flight
+// can tell it's stale and not overwrite a newer one.
 let loadGeneration = 0;
 
 async function loadFile(file) {

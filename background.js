@@ -86,10 +86,9 @@ function formatFilenameTimestamp(d) {
   return `${date}_${time}`;
 }
 
-// An attacker-controlled add-on name containing "</script>" would
-// otherwise close this tag early when the report is opened directly.
-// Escaping "</" as "<\/" is a safe JSON escape that JSON.parse reads back
-// identically, so it can't do that.
+// An add-on name (attacker-controlled) containing "</script>" would
+// close this tag early when the report is opened directly. Escaping
+// "</" as "<\/" stops that - JSON.parse reads it back the same either way.
 function safeJsonForScriptTag(value) {
   return JSON.stringify(value).replace(/<\//g, '<\\/');
 }
