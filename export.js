@@ -4,6 +4,7 @@ const deselectAllBtn = document.getElementById('deselectAllBtn');
 const exportBtn = document.getElementById('exportSelectedBtn');
 const statusEl = document.getElementById('status');
 const selectionCountEl = document.getElementById('selectionCount');
+const searchInput = document.getElementById('searchInput');
 
 function setStatus(msg) {
   statusEl.textContent = msg;
@@ -72,6 +73,10 @@ selectAllBtn.addEventListener('click', () => {
 deselectAllBtn.addEventListener('click', () => {
   checkboxes().forEach((cb) => { cb.checked = false; });
   updateSelectionCount();
+});
+
+searchInput.addEventListener('input', () => {
+  filterAddonRows(listEl, searchInput.value);
 });
 
 exportBtn.addEventListener('click', async () => {

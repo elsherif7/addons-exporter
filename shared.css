@@ -20,6 +20,21 @@ h1 { font-size: 28px; margin: 0 0 16px; }
 p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
 
 /* Add-on checklist, shared by export.html and import.html. */
+.search-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border: 1px solid #d0d3d9;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.search-input:focus {
+  outline: none;
+  border-color: #1f2937;
+}
 .list-controls {
   display: flex;
   justify-content: space-between;

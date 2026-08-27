@@ -50,6 +50,7 @@ const deselectAllBtn = document.getElementById('deselectAllBtn');
 const selectionCountEl = document.getElementById('selectionCount');
 const openSelectedBtn = document.getElementById('openSelectedBtn');
 const compareNoteEl = document.getElementById('compareNote');
+const searchInput = document.getElementById('searchInput');
 
 // Rendered order (Not Installed Yet, then Already Installed) - each
 // checkbox's data-idx indexes into this array to find the right item.
@@ -78,6 +79,8 @@ function clearAddonList() {
   openSelectedBtn.disabled = true;
   selectionCountEl.textContent = '';
   compareNoteEl.textContent = '';
+  searchInput.style.display = 'none';
+  searchInput.value = '';
 }
 
 function renderAddonList(addons, installed) {
@@ -119,6 +122,7 @@ function renderAddonList(addons, installed) {
     groupHtml('Already Installed', alreadyInstalled, notInstalled.length, true);
   addonListEl.style.display = 'block';
   listControls.style.display = 'flex';
+  searchInput.style.display = 'block';
 
   // Installed add-ons this file doesn't mention at all.
   const newSinceExport = installed.filter(a => !matchedInstalledIds.has(a.id));
@@ -261,6 +265,10 @@ selectAllBtn.addEventListener('click', () => {
 deselectAllBtn.addEventListener('click', () => {
   checkboxes().forEach((cb) => { cb.checked = false; });
   updateSelectionCount();
+});
+
+searchInput.addEventListener('input', () => {
+  filterAddonRows(addonListEl, searchInput.value);
 });
 
 openSelectedBtn.addEventListener('click', async () => {
