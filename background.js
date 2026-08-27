@@ -58,9 +58,19 @@ async function findAmoPage(id, name) {
     if (res.ok) {
       const data = await res.json();
       if (data.url) return { url: data.url, matchType: 'amo-exact' };
+      // 200 but no url field - AMO's response shape may have changed.
+      console.warn(`[Add-ons Exporter] AMO exact lookup for "${name}" (${id}) returned no url field`, data);
+    } else {
+      // Distinguishes a real AMO problem (rate limit, outage, API change)
+      // from "this add-on just isn't on AMO" (typically a 404, which is
+      // expected and not logged as a warning).
+      if (res.status !== 404) {
+        console.warn(`[Add-ons Exporter] AMO exact lookup for "${name}" (${id}) failed: HTTP ${res.status}`);
+      }
     }
-  } catch {
-    // fall through
+  } catch (err) {
+    // Network error, timeout (AbortError), or bad JSON.
+    console.warn(`[Add-ons Exporter] AMO exact lookup for "${name}" (${id}) threw:`, err);
   }
 
   // 2. Fuzzy search by name
@@ -74,9 +84,15 @@ async function findAmoPage(id, name) {
       if (data.results && data.results.length > 0 && data.results[0].url) {
         return { url: data.results[0].url, matchType: 'amo-search' };
       }
+      // 200 but no usable results - could be a genuine "not found" or a
+      // response shape change; log at debug level since an empty result
+      // set is a normal, expected outcome for obscure/unlisted add-ons.
+      console.debug(`[Add-ons Exporter] AMO name search for "${name}" (${id}) returned no usable results`, data);
+    } else {
+      console.warn(`[Add-ons Exporter] AMO name search for "${name}" (${id}) failed: HTTP ${res.status}`);
     }
-  } catch {
-    // fall through
+  } catch (err) {
+    console.warn(`[Add-ons Exporter] AMO name search for "${name}" (${id}) threw:`, err);
   }
 
   return null;
