@@ -129,9 +129,12 @@ function renderAddonList(addons, installed) {
     // Already-installed items default unchecked - nothing to open for
     // something you already have, though you can still pick them.
     const checkedAttr = safe && !isInstalled ? 'checked' : '';
+    // version is optional in the data - blank rather than the literal
+    // word "undefined" if a hand-edited/older file leaves it out.
+    const version = typeof a.version === 'string' ? a.version : '';
     return `<div class="addon-row">
       <input type="checkbox" id="icb-${i}" data-idx="${i}" ${checkedAttr}>
-      <label for="icb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span>${warning}</label>
+      <label for="icb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(version)}</span>${warning}</label>
     </div>`;
   };
 
@@ -199,6 +202,20 @@ async function loadFile(file) {
       return;
     }
 
+    // The file itself isn't trusted (hand-edited, corrupted, or from an
+    // older/different tool entirely), so don't assume every entry has the
+    // fields the rest of this page expects. A name is the one thing every
+    // row needs to be usable at all - entries without one are dropped
+    // rather than letting one bad row fail the whole import. Missing
+    // version/link/id are fine on their own: version just prints blank
+    // and a missing/invalid link already shows the existing "unsafe link"
+    // warning in renderAddonList().
+    const validList = list.filter((a) => a && typeof a.name === 'string' && a.name.trim() !== '');
+    if (validList.length === 0) {
+      setStatus('No valid add-ons found in that file');
+      return;
+    }
+
     // Only accept files that explicitly declare a formatVersion we
     // understand. A missing formatVersion means the file predates
     // versioning (or isn't a real export) and we can't safely assume its
@@ -212,7 +229,7 @@ async function loadFile(file) {
       setStatus('This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.');
       return;
     }
-    const migratedList = migrateAddonsData(list, formatVersion);
+    const migratedList = migrateAddonsData(validList, formatVersion);
 
     // Compare against what's currently installed, so items already present
     // aren't pre-checked. If this fails for any reason, degrade gracefully
