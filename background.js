@@ -1,8 +1,3 @@
-// Version of the JSON data embedded in exported reports. Bump this if the
-// shape of that data ever changes, so import.js can detect old exports
-// and handle them gracefully instead of breaking silently.
-const EXPORT_FORMAT_VERSION = 1;
-
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'listAddons') {
     return listInstalledAddons();

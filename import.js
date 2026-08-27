@@ -1,9 +1,15 @@
 // Highest exported-data format version this copy of the extension knows how
-// to read. Mirrors EXPORT_FORMAT_VERSION in background.js. A file whose
-// embedded formatVersion is higher than this was made by a newer version of
-// the extension - its data shape may not match what we expect here, so we
-// refuse to guess rather than risk opening bad links.
-const SUPPORTED_FORMAT_VERSION = 1;
+// to read. A file whose embedded formatVersion is higher than this was made
+// by a newer version of the extension - its data shape may not match what
+// we expect here, so we refuse to guess rather than risk opening bad links.
+//
+// Today this is simply the current export format (EXPORT_FORMAT_VERSION,
+// defined once in common.js and shared with background.js, so the two
+// values can't drift out of sync by editing only one of them). If an older
+// export format is ever kept readable after a version bump, this constant
+// is the one to change to widen support - see loadFile()'s formatVersion
+// check below.
+const SUPPORTED_FORMAT_VERSION = EXPORT_FORMAT_VERSION;
 
 // Milliseconds to wait between opening each tab during import. Opening
 // dozens of tabs back-to-back with zero delay bursts a lot of sudden load
