@@ -68,19 +68,13 @@
   #removeFileBtn:hover::after {
     opacity: 1;
   }
-  #noFileText {
-    display: block;
-    font-size: 14px;
-    color: #666;
-    margin-top: 12px;
-  }
 </style>
 </head>
 <body>
   <div class="card">
     <h1>Add-ons Importer</h1>
-    <p>Pick an <strong>HTML report</strong> exported earlier by Add-ons Exporter. Add-ons you don't already have are pre-selected; ones you've already installed are shown too, in case you want to revisit them.</p>
-    <p>Note: Firefox's own security policy doesn't allow any extension, including this one, to automatically download and install other add-ons. This tool can only open each add-on's page as a tab for you — you'll still need to click "Add to Firefox" yourself on each one.</p>
+    <p>Pick an <strong>HTML report</strong> exported earlier by <strong>Add-ons Exporter</strong>. The Add-ons you don't have yet are pre-selected, while your installed ones are shown too if you want to check them again.</p>
+    <p>Note: Firefox's own security policy doesn't allow any extension, including this one, to automatically download and install other add-ons. This tool can only open each add-on's page as a tab for you. You'll still need to click "Add&nbsp;to&nbsp;Firefox" yourself on each one.</p>
 
     <div class="picker" id="picker">
       <button id="chooseFileBtn">Choose file</button>
@@ -88,10 +82,8 @@
         <strong id="fileName"></strong>
         <button id="removeFileBtn" data-tooltip="Remove file">&times;</button>
       </div>
-      <strong id="noFileText">No file selected</strong>
+      <span id="compareNote"></span>
     </div>
-
-    <span id="compareNote"></span>
 
     <div class="list-controls" id="listControls" style="display:none;">
       <span>
@@ -103,7 +95,7 @@
 
     <div id="addonList" style="display:none;"></div>
 
-    <button id="openSelectedBtn" class="primary-btn" disabled>Open Selected in Tabs</button>
+    <button id="openSelectedBtn" class="primary-btn" disabled>Open Selected</button>
     <span id="status"></span>
 
     <input type="file" id="fileInput" accept=".html" style="display:none">

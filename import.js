@@ -51,7 +51,6 @@ function findInstalledMatch(item, index) {
 const statusEl = document.getElementById('status');
 const fileNameEl = document.getElementById('fileName');
 const fileNameRow = document.getElementById('fileNameRow');
-const noFileText = document.getElementById('noFileText');
 const fileInput = document.getElementById('fileInput');
 const picker = document.getElementById('picker');
 const removeFileBtn = document.getElementById('removeFileBtn');
@@ -182,7 +181,7 @@ async function loadFile(file) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const dataEl = doc.getElementById('addons-exporter-data');
     if (!dataEl) {
-      setStatus('This file doesn\'t look like an Add-ons Exporter export (no embedded data found)');
+      setStatus('This file doesn\'t look like an Add-ons Exporter file (no embedded data found)');
       return;
     }
     const parsed = JSON.parse(dataEl.textContent);
@@ -236,12 +235,12 @@ function setSelectedFile(file) {
     fileNameRow.style.alignItems = 'center';
     fileNameRow.style.justifyContent = 'center';
     fileNameRow.style.gap = '8px';
-    noFileText.style.display = 'none';
+    chooseFileBtn.style.display = 'none';
     loadFile(file);
   } else {
     fileInput.value = '';
     fileNameRow.style.display = 'none';
-    noFileText.style.display = 'block';
+    chooseFileBtn.style.display = '';
     clearAddonList();
     setStatus('');
   }
