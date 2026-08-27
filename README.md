@@ -6,7 +6,7 @@ Firefox doesn't allow any extension to install other extensions automatically �
 
 **🦊 Get it on Firefox Add-ons:** [addons.mozilla.org/en-US/firefox/addon/add-ons-exporter](https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/)
 
-> New updates are published on the 7th of odd-numbered months (January, March, May, July, September, November).
+> New updates are published on the 1st of odd-numbered months (January, March, May, July, September, November).
 >
 > Security issues or broken/critical bugs are fixed and released immediately, outside that schedule.
 
@@ -17,7 +17,7 @@ Firefox doesn't allow any extension to install other extensions automatically �
 ```
 addons-exporter/
 ├── manifest.json        # Extension config, permissions, background script
-├── common.js             # Shared helpers (escapeHtml, byName) for background.js / export.js / import.js
+├── common.js             # Shared helpers (escapeHtml, isSafeUrl, byName) and the export format version
 ├── background.js        # Export logic, AMO lookups, HTML report generation
 ├── shared.css            # Shared styles for export.html / import.html / confirmation.html
 ├── popup.html            # Toolbar popup UI
