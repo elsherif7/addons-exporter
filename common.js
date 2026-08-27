@@ -23,3 +23,31 @@ function isSafeUrl(link) {
 function byName(a, b) {
   return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 }
+
+// Shows/hides .addon-row elements in a checklist based on a search query,
+// matched against each row's label text. Also hides a .group-heading if
+// none of its rows still match. Works on export.html and import.html's
+// checklists, since both use the same row/heading markup.
+function filterAddonRows(container, query) {
+  const q = query.trim().toLowerCase();
+  let heading = null;
+  let headingHasMatch = false;
+
+  const finishHeading = () => {
+    if (heading) heading.style.display = headingHasMatch ? '' : 'none';
+  };
+
+  for (const el of container.children) {
+    if (el.classList.contains('group-heading')) {
+      finishHeading();
+      heading = el;
+      headingHasMatch = false;
+    } else if (el.classList.contains('addon-row')) {
+      const label = el.querySelector('label');
+      const match = q === '' || (label && label.textContent.toLowerCase().includes(q));
+      el.style.display = match ? '' : 'none';
+      if (match) headingHasMatch = true;
+    }
+  }
+  finishHeading();
+}
