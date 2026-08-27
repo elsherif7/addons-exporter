@@ -33,19 +33,6 @@ const TAB_OPEN_DELAY_MS = 150;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Only http/https links are ever opened. An imported file's data isn't
-// trusted - it could come from someone else, or be hand-edited - so a
-// link claiming to be, say, "uBlock Origin" is still just a string until
-// checked. This also guards against non-navigable schemes generally.
-function isSafeUrl(link) {
-  try {
-    const u = new URL(link);
-    return u.protocol === 'http:' || u.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
 // Indexes currently-installed add-ons by both id and lowercased name, so an
 // imported item can be matched against what's already installed either way.
 function buildInstalledIndex(installed) {

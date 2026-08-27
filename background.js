@@ -299,10 +299,10 @@ async function doExport(ids) {
     const amoMatch = await findAmoPage(a.id, a.name);
     let link;
     let linkType;
-    if (amoMatch) {
+    if (amoMatch && isSafeUrl(amoMatch.url)) {
       link = amoMatch.url;
       linkType = amoMatch.matchType;
-    } else if (a.homepageUrl && a.homepageUrl.startsWith('http')) {
+    } else if (a.homepageUrl && isSafeUrl(a.homepageUrl)) {
       link = a.homepageUrl;
       linkType = 'homepage';
     } else {

@@ -17,6 +17,21 @@ function escapeHtml(str) {
   }[c]));
 }
 
+// Only http/https links are ever used - by background.js when building a
+// report's links, and by import.js before opening a tab. Add-on metadata
+// (name, homepage URL) is attacker-controlled for any sideloaded/unlisted
+// extension, and an imported file's data isn't trusted either - it could
+// come from someone else, or be hand-edited. This also guards against
+// non-navigable schemes generally.
+function isSafeUrl(link) {
+  try {
+    const u = new URL(link);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 // Case-insensitive alphabetical comparator for objects with a .name field -
 // used to sort every add-on checklist and report table the same way.
 function byName(a, b) {
