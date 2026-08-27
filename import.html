@@ -45,9 +45,8 @@
     padding: 0 4px;
   }
   #removeFileBtn:hover { color: #c0392b; }
-  /* Custom tooltip via content: attr(data-tooltip) instead of a native
-     title="" attribute - browsers vary a lot in native tooltip delay and
-     styling, so this gives consistent, immediate, on-brand styling. */
+  /* Custom tooltip via content: attr() instead of a native title
+     attribute - more consistent styling and no native delay. */
   #removeFileBtn::after {
     content: attr(data-tooltip);
     position: absolute;
@@ -68,10 +67,8 @@
   #removeFileBtn:hover::after {
     opacity: 1;
   }
-  /* Each note in #compareNote (e.g. "already have everything" and
-     "N add-ons not in this export") renders as its own <span> - stacked
-     on separate lines instead of run together in one paragraph, since
-     they're two unrelated observations, not one sentence. */
+  /* compareNote's notes each get their own line instead of running
+     together in one sentence. */
   .compare-note-line {
     display: block;
   }

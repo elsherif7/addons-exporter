@@ -32,9 +32,7 @@ function renderList(addons) {
   const enabled = addons.filter(a => a.enabled).sort(byName);
   const disabled = addons.filter(a => !a.enabled).sort(byName);
 
-  // A single counter across both groups keeps every checkbox/label id
-  // attribute unique, even though enabled and disabled are rendered as
-  // two separate mapped lists.
+  // Single counter across both groups so every checkbox id stays unique.
   let idx = 0;
   const rowHtml = (a) => {
     const i = idx++;
@@ -84,8 +82,8 @@ exportBtn.addEventListener('click', async () => {
   setStatus('Exporting your add-ons, please wait...');
   try {
     await browser.runtime.sendMessage({ type: 'export', ids });
-    // background.js opens the confirmation tab itself once the download
-    // starts, so this tab just reports success and stays open for review.
+    // background.js opens the confirmation tab itself - this one just
+    // reports success and stays open.
     setStatus('Export complete. Your report has been saved to the folder you picked.');
   } catch (e) {
     setStatus('Error: ' + e.message);
@@ -93,9 +91,7 @@ exportBtn.addEventListener('click', async () => {
   }
 });
 
-// background.js broadcasts progress as each add-on's link is resolved -
-// this replaces the static "please wait" message with a live count once
-// the first update arrives.
+// background.js broadcasts progress as each link is resolved.
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'exportProgress') {
     setStatus(`Resolved ${message.done} of ${message.total} add-ons...`);

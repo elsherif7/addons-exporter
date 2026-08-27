@@ -1,8 +1,4 @@
-/* Shared base styles for the extension's full-page tabs (import.html,
-   export.html, confirmation.html). Keeps the page background, card layout,
-   and base typography in one place instead of duplicated per page - each
-   page's own <style> block only needs its page-specific rules on top of
-   this. */
+/* Shared base styles for the extension's full-page tabs. */
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -23,10 +19,7 @@ body {
 h1 { font-size: 28px; margin: 0 0 16px; }
 p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
 
-/* Add-on checklist UI, shared by export.html and import.html - both list
-   installed/imported add-ons the same way, so they share one definition
-   instead of drifting the way import.html/confirmation.html's base styles
-   once did (see git history). */
+/* Add-on checklist, shared by export.html and import.html. */
 .list-controls {
   display: flex;
   justify-content: space-between;
@@ -127,8 +120,7 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   color: #666;
   margin-bottom: 10px;
 }
-/* Only add space above the note when there actually is one - an empty
-   #compareNote (nothing to report) shouldn't push the layout down. */
+/* Space only shows up when there's actually a note. */
 #compareNote:not(:empty) {
   margin-top: 12px;
 }

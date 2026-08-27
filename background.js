@@ -4,10 +4,8 @@ browser.runtime.onMessage.addListener((message) => {
   }
   if (message.type === 'export') {
     return doExport(message.ids).then(() => {
-      // Open the confirmation tab from here (the background script),
-      // not from the popup - the popup can close early when the native
-      // "Save As" dialog steals focus, which would otherwise stop this
-      // step from ever running.
+      // Opened from here, not the popup - the popup can close early once
+      // the native Save dialog steals focus.
       browser.tabs.create({
         url: browser.runtime.getURL('confirmation.html')
       });
@@ -15,34 +13,22 @@ browser.runtime.onMessage.addListener((message) => {
   }
 });
 
-// Milliseconds to wait for a single AMO API request before giving up on it
-// and falling through to the next lookup step. Generous, since an accurate
-// AMO match is worth waiting for - but bounded, so a slow/unreachable AMO
-// endpoint can't stall the whole export indefinitely.
 const AMO_FETCH_TIMEOUT_MS = 15000;
 
 async function fetchWithTimeout(url, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    // credentials: 'omit' - explicit per Mozilla's own MV3 migration
-    // guidance for background-script cross-origin fetches. Also reinforces
-    // this extension's own zero-data-collection stance: without this, any
-    // ambient addons.mozilla.org cookies in the user's browser (e.g. from
-    // being logged into an AMO account) could otherwise ride along on
-    // every lookup, identifying the user to AMO for what's meant to be an
-    // anonymous public listing lookup.
+    // omit credentials so an AMO login cookie doesn't ride along on what's
+    // meant to be an anonymous lookup.
     return await fetch(url, { signal: controller.signal, credentials: 'omit' });
   } finally {
     clearTimeout(timer);
   }
 }
 
-// Look up the extension's real AMO (addons.mozilla.org) listing page.
-// Try by exact ID/GUID first (most reliable), then fall back to a name search.
-// Returns { url, matchType } - matchType lets the report show how confident
-// each link is, since a fuzzy name search can genuinely point to the wrong
-// add-on - or null if neither lookup found anything.
+// Tries an exact ID lookup first, then a name search. Returns
+// { url, matchType } or null.
 async function findAmoPage(id, name) {
   // 1. Exact lookup by addon ID/GUID
   try {
@@ -53,18 +39,12 @@ async function findAmoPage(id, name) {
     if (res.ok) {
       const data = await res.json();
       if (data.url) return { url: data.url, matchType: 'amo-exact' };
-      // 200 but no url field - AMO's response shape may have changed.
       console.warn(`[Add-ons Exporter] AMO exact lookup for "${name}" (${id}) returned no url field`, data);
-    } else {
-      // Distinguishes a real AMO problem (rate limit, outage, API change)
-      // from "this add-on just isn't on AMO" (typically a 404, which is
-      // expected and not logged as a warning).
-      if (res.status !== 404) {
-        console.warn(`[Add-ons Exporter] AMO exact lookup for "${name}" (${id}) failed: HTTP ${res.status}`);
-      }
+    } else if (res.status !== 404) {
+      // 404 just means it's not on AMO, not worth a warning.
+      console.warn(`[Add-ons Exporter] AMO exact lookup for "${name}" (${id}) failed: HTTP ${res.status}`);
     }
   } catch (err) {
-    // Network error, timeout (AbortError), or bad JSON.
     console.warn(`[Add-ons Exporter] AMO exact lookup for "${name}" (${id}) threw:`, err);
   }
 
@@ -79,9 +59,6 @@ async function findAmoPage(id, name) {
       if (data.results && data.results.length > 0 && data.results[0].url) {
         return { url: data.results[0].url, matchType: 'amo-search' };
       }
-      // 200 but no usable results - could be a genuine "not found" or a
-      // response shape change; log at debug level since an empty result
-      // set is a normal, expected outcome for obscure/unlisted add-ons.
       console.debug(`[Add-ons Exporter] AMO name search for "${name}" (${id}) returned no usable results`, data);
     } else {
       console.warn(`[Add-ons Exporter] AMO name search for "${name}" (${id}) failed: HTTP ${res.status}`);
@@ -109,26 +86,15 @@ function formatFilenameTimestamp(d) {
   return `${date}_${time}`;
 }
 
-// JSON.stringify never escapes "/", so a string value containing the
-// literal text "</script>" - like an add-on's name, which is completely
-// attacker-controlled for any sideloaded/unlisted extension - would
-// prematurely close this embedding <script> tag when a real browser
-// parses the exported file (opening the report directly is the file's
-// whole purpose, not just importing it back through this extension).
-// That lets a maliciously-named add-on inject and execute a genuine new
-// <script> tag in the report. Escaping "</" as "<\/" is a lossless,
-// standard fix - "\/" is a valid JSON escape for "/", so JSON.parse
-// reads it back identically, but the browser's HTML tokenizer no longer
-// sees a closing tag.
+// An attacker-controlled add-on name containing "</script>" would
+// otherwise close this tag early when the report is opened directly.
+// Escaping "</" as "<\/" is a safe JSON escape that JSON.parse reads back
+// identically, so it can't do that.
 function safeJsonForScriptTag(value) {
   return JSON.stringify(value).replace(/<\//g, '<\\/');
 }
 
 function buildHtmlReport(list) {
-  // Human-readable labels for how each link was resolved (see linkType,
-  // set in doExport). Fuzzy/fallback matches are flagged with the
-  // .match-uncertain style below since they can genuinely point to the
-  // wrong add-on and are worth a second look.
   const linkTypeLabels = {
     'amo-exact': 'Exact match',
     'amo-search': 'Possible match',
@@ -189,15 +155,10 @@ function buildHtmlReport(list) {
 </html>`;
 }
 
-// Max number of AMO lookups (findAmoPage calls) allowed to run at once
-// during export. Unbounded concurrency (one fetch pair per installed
-// add-on, all at once) risks tripping AMO's rate limiting for users with
-// large add-on collections - this keeps lookups running in parallel for
-// speed, but caps how many are in flight at a time.
+// Caps how many AMO lookups run at once, so a big add-on collection
+// doesn't trip AMO's rate limiting.
 const AMO_LOOKUP_CONCURRENCY = 5;
 
-// Runs fn(item) over items with at most `limit` calls in flight at once,
-// returning results in the same order as items.
 async function mapWithConcurrency(items, limit, fn) {
   const results = new Array(items.length);
   let nextIndex = 0;
@@ -214,38 +175,23 @@ async function mapWithConcurrency(items, limit, fn) {
   return results;
 }
 
-// Reads installed add-ons and filters down to the ones this extension can
-// export (extensions/themes, excluding Firefox's own built-ins). Shared by
-// listInstalledAddons() (export.html's picker, and import.html's compare
-// against what's installed) and doExport() (the actual export), so all of
-// them always agree on exactly which add-ons are eligible.
+// Shared by listInstalledAddons() and doExport() so both always agree on
+// which add-ons are eligible.
 async function getExportableAddons() {
   let all;
   try {
     all = await browser.management.getAll();
   } catch {
-    // Surfaces as "Error: <message>" in the popup/export page - give it
-    // something actionable instead of whatever raw message crosses the
-    // runtime messaging boundary.
     throw new Error('Could not read your installed add-ons. Try reloading the extension, or check that it still has permission to manage add-ons.');
   }
 
-  // browser.management can also report 'dictionary' and 'locale' items
-  // (spell-check dictionaries, language packs). Deliberately excluded here:
-  // buildHtmlReport() only has Enabled/Disabled sections, so including
-  // them would silently drop them from the report body while still
-  // counting them in the "Found N add-ons" total - worse than leaving
-  // them out. Revisit if dictionaries/locales ever get their own section.
+  // Also excludes 'dictionary'/'locale' items - the report only has
+  // Enabled/Disabled sections, so they'd be counted but never shown.
   return all.filter(a =>
     (a.type === 'extension' || a.type === 'theme') && !a.id.endsWith('@mozilla.org')
   );
 }
 
-// Lightweight listing (no AMO lookups) requested via the 'listAddons'
-// message - used by export.html's picker to render checkboxes, and by
-// import.html to compare an imported file against what's currently
-// installed. AMO lookups only run for whatever the user actually selects
-// to export, in doExport().
 async function listInstalledAddons() {
   const extensions = await getExportableAddons();
   return extensions.map(a => ({
@@ -253,29 +199,13 @@ async function listInstalledAddons() {
   }));
 }
 
-// MV3's non-persistent background page can be terminated by Firefox if it
-// looks idle, and doExport() can run for a while (multiple AMO round
-// trips). The protection against that isn't anything in this function -
-// it's that export.js calls this via browser.runtime.sendMessage() and
-// awaits the response the whole time doExport() runs. Firefox's extension
-// messaging API is specifically confirmed to reset the idle-suspend timer
-// while a request/response is pending (Firefox bug 1851373). An earlier
-// version of this function tried adding a manual setInterval() ping as
-// extra insurance, but that's a known anti-pattern Mozilla advises
-// against - timers like that live inside the background page's own JS
-// context, so they get wiped out along with everything else if the page
-// is actually suspended, and real-world reports show this exact pattern
-// (periodic setTimeout calls polling an API) still gets terminated
-// anyway. If the background page ever is terminated mid-export despite
-// the pending message, the sendMessage promise simply rejects, and
-// export.js's existing error handling surfaces that and re-enables the
-// button so the user can retry - a plain, honest failure mode rather
-// than a silent hang.
+// Don't add a setInterval() keep-alive here. Firefox already resets the
+// idle-suspend timer while export.js's sendMessage() call is pending
+// (bug 1851373) - a manual timer was tried before and still got killed
+// with the background page anyway.
 async function doExport(ids) {
   let extensions = await getExportableAddons();
 
-  // ids comes from export.html's checkbox selection. If provided, export
-  // only those add-ons instead of everything eligible.
   if (Array.isArray(ids)) {
     const idSet = new Set(ids);
     extensions = extensions.filter(a => idSet.has(a.id));
@@ -287,9 +217,6 @@ async function doExport(ids) {
 
   const total = extensions.length;
   let done = 0;
-  // Broadcasts to any listening extension page (export.html). If nothing
-  // is listening - the export tab was closed, or export was triggered
-  // some other way - sendMessage rejects; that's fine, just ignore it.
   const reportProgress = () => {
     done++;
     browser.runtime.sendMessage({ type: 'exportProgress', done, total }).catch(() => {});
