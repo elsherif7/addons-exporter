@@ -168,7 +168,7 @@ function renderAddonList(addons, installed) {
   if (newSinceExport.length > 0) {
     notes.push(`${newSinceExport.length} add-on${newSinceExport.length === 1 ? '' : 's'} installed now ${newSinceExport.length === 1 ? "wasn't" : "weren't"} in this export.`);
   }
-  compareNoteEl.textContent = notes.join(' ');
+  compareNoteEl.innerHTML = notes.map(n => `<span class="compare-note-line">${escapeHtml(n)}</span>`).join('');
 
   checkboxes().forEach((cb) => {
     cb.addEventListener('change', updateSelectionCount);
