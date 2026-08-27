@@ -11,6 +11,20 @@
 // check below.
 const SUPPORTED_FORMAT_VERSION = EXPORT_FORMAT_VERSION;
 
+// Upgrades a parsed export's addon list from an older formatVersion to the
+// shape this version of the extension expects. A no-op today - there's
+// only ever been one format version - but it's the seam to use the next
+// time EXPORT_FORMAT_VERSION is bumped and old files should stay
+// importable instead of just being rejected. Add a case per old version,
+// each one transforming to the next version's shape, e.g.:
+//   if (formatVersion === 1) { addons = addons.map(a => ({ ...a, newField: someDefault })); formatVersion = 2; }
+// loadFile() calls this right after the version check passes, so list
+// always reaches renderAddonList() in the current shape regardless of
+// which formatVersion the file was made with.
+function migrateAddonsData(addons, formatVersion) {
+  return addons;
+}
+
 // Milliseconds to wait between opening each tab during import. Opening
 // dozens of tabs back-to-back with zero delay bursts a lot of sudden load
 // on the browser at once - a small stagger smooths that out without
@@ -211,6 +225,7 @@ async function loadFile(file) {
       setStatus('This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.');
       return;
     }
+    const migratedList = migrateAddonsData(list, formatVersion);
 
     // Compare against what's currently installed, so items already present
     // aren't pre-checked. If this fails for any reason, degrade gracefully
@@ -227,7 +242,7 @@ async function loadFile(file) {
     }
 
     setStatus('');
-    renderAddonList(list, installed);
+    renderAddonList(migratedList, installed);
   } catch (err) {
     if (myGeneration !== loadGeneration) return;
     setStatus('Error reading file: ' + err.message);
