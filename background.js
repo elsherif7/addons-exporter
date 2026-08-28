@@ -208,6 +208,7 @@ function buildHtmlReport(list) {
   <div class="card">
   <h1>Add-ons Exporter</h1>
   <p><em><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Exporter</a> installed, click its toolbar icon and choose <strong>Import Add-ons</strong> to open every link below as a tab automatically.</em></p>
+  <p><strong>Note:</strong> your browser may block <strong>Open Selected</strong> from opening several tabs at once. If nothing opens, look for a popup-blocked icon near the address bar and allow popups for this page.</p>
 
   <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
 
