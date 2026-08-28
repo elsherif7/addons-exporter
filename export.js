@@ -55,6 +55,7 @@ function renderList(addons) {
     : '';
 
   listEl.innerHTML = groupHtml('Enabled', enabled) + groupHtml('Disabled', disabled);
+  searchInput.style.display = 'block';
 
   checkboxes().forEach((cb) => {
     cb.addEventListener('change', updateSelectionCount);
