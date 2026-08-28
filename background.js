@@ -149,6 +149,19 @@ function buildHtmlReport(list) {
     padding: 4px 8px;
   }
   .list-controls button:hover { text-decoration: underline; }
+  .search-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    border: 1px solid #d0d3d9;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .search-input:focus { outline: none; border-color: #1f2937; }
+  .placeholder-text { padding: 20px; color: #666; font-size: 14px; margin: 0; }
   .checklist-box {
     text-align: left;
     border: 1px solid #e2e4e8;
@@ -186,25 +199,74 @@ function buildHtmlReport(list) {
   <p>Exported on ${formatExportDate(new Date())}. Found ${list.length} add-ons in total.</p>
   <p><em>Tip: on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Exporter</a> installed, click its toolbar icon and choose "Import Add-ons" to open every link below as a tab automatically. Don't have it yet? Install it from the link above first.</em></p>
 
+  <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
+
   <div class="list-controls">
     <button id="selectAllBtn" type="button">Select all</button>
     <button id="deselectAllBtn" type="button">Deselect all</button>
   </div>
 
   <div class="checklist-box">
-    ${section('Enabled', list.filter(a => a.enabled).sort(byName))}
-    ${section('Disabled', list.filter(a => !a.enabled).sort(byName))}
+    <div id="addonList">
+      ${section('Enabled', list.filter(a => a.enabled).sort(byName))}
+      ${section('Disabled', list.filter(a => !a.enabled).sort(byName))}
+    </div>
+    <p id="noSearchMatches" class="placeholder-text" style="display:none;">No add-ons match your search.</p>
   </div>
 
   <script type="application/json" id="addons-exporter-data">${safeJsonForScriptTag({ formatVersion: EXPORT_FORMAT_VERSION, addons: list })}</script>
   <script>
     // Self-contained - this file has no access to the extension's own
     // scripts or APIs once it's saved and opened on its own.
+    // Select all/Deselect all only touch what the current search still
+    // shows - same rule as the extension's own export/import pages.
     document.getElementById('selectAllBtn').addEventListener('click', function () {
-      document.querySelectorAll('.addon-row input[type="checkbox"]').forEach(function (cb) { cb.checked = true; });
+      document.querySelectorAll('.addon-row').forEach(function (row) {
+        if (row.style.display === 'none') return;
+        var cb = row.querySelector('input[type="checkbox"]');
+        if (cb) cb.checked = true;
+      });
     });
     document.getElementById('deselectAllBtn').addEventListener('click', function () {
-      document.querySelectorAll('.addon-row input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+      document.querySelectorAll('.addon-row').forEach(function (row) {
+        if (row.style.display === 'none') return;
+        var cb = row.querySelector('input[type="checkbox"]');
+        if (cb) cb.checked = false;
+      });
+    });
+
+    var addonListEl = document.getElementById('addonList');
+    var noSearchMatchesEl = document.getElementById('noSearchMatches');
+
+    function filterAddonRows(query) {
+      var q = query.trim().toLowerCase();
+      var heading = null;
+      var headingHasMatch = false;
+      var anyMatch = false;
+      var finishHeading = function () {
+        if (heading) heading.style.display = headingHasMatch ? '' : 'none';
+      };
+      var children = addonListEl.children;
+      for (var i = 0; i < children.length; i++) {
+        var el = children[i];
+        if (el.classList.contains('group-heading')) {
+          finishHeading();
+          heading = el;
+          headingHasMatch = false;
+        } else if (el.classList.contains('addon-row')) {
+          var label = el.querySelector('label');
+          var match = q === '' || (label && label.textContent.toLowerCase().indexOf(q) !== -1);
+          el.style.display = match ? '' : 'none';
+          if (match) { headingHasMatch = true; anyMatch = true; }
+        }
+      }
+      finishHeading();
+      return anyMatch;
+    }
+
+    document.getElementById('searchInput').addEventListener('input', function (e) {
+      var anyMatch = filterAddonRows(e.target.value);
+      noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
     });
   </script>
 </body>
