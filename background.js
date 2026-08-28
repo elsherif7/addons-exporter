@@ -102,17 +102,19 @@ function buildHtmlReport(list) {
   };
   const uncertainLinkTypes = new Set(['amo-search', 'amo-search-fallback']);
 
+  let idx = 0;
   const row = (a) => {
+    const i = idx++;
     const matchLabel = linkTypeLabels[a.linkType] || '';
     const matchClass = uncertainLinkTypes.has(a.linkType) ? ' match-uncertain' : '';
     return `<div class="addon-row">
-      <div class="addon-row-main">
-        <span class="addon-name">${escapeHtml(a.name)}</span>
-        <span class="addon-version">${escapeHtml(a.version)}</span>
-      </div>
-      <div class="addon-row-link">
-        <a href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.link)}</a>
-        <span class="match-label${matchClass}">${escapeHtml(matchLabel)}</span>
+      <input type="checkbox" id="rcb-${i}" checked>
+      <div class="addon-row-body">
+        <label for="rcb-${i}"><span class="addon-name">${escapeHtml(a.name)}</span> <span class="addon-version">${escapeHtml(a.version)}</span></label>
+        <div class="addon-row-link">
+          <a href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.link)}</a>
+          <span class="match-label${matchClass}">${escapeHtml(matchLabel)}</span>
+        </div>
       </div>
     </div>`;
   };
@@ -131,6 +133,22 @@ function buildHtmlReport(list) {
   h1 { font-size: 28px; }
   p { font-size: 16px; color: #444; line-height: 1.7; }
   .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }
+  .list-controls {
+    display: flex;
+    justify-content: flex-start;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .list-controls button {
+    background: none;
+    border: none;
+    color: #1a73e8;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+  .list-controls button:hover { text-decoration: underline; }
   .checklist-box {
     text-align: left;
     border: 1px solid #e2e4e8;
@@ -146,10 +164,15 @@ function buildHtmlReport(list) {
     padding: 10px 14px 4px;
   }
   .addon-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
     padding: 10px 14px;
     border-bottom: 1px solid #f0f1f3;
   }
   .addon-row:last-child { border-bottom: none; }
+  .addon-row input[type="checkbox"] { margin-top: 3px; }
+  .addon-row-body { flex: 1; min-width: 0; }
   .addon-name { font-size: 14px; font-weight: 600; }
   .addon-version { color: #888; font-size: 12px; margin-left: 6px; }
   .addon-row-link { font-size: 13px; margin-top: 2px; word-break: break-all; }
@@ -163,12 +186,27 @@ function buildHtmlReport(list) {
   <p>Exported on ${formatExportDate(new Date())}. Found ${list.length} add-ons in total.</p>
   <p><em>Tip: on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Exporter</a> installed, click its toolbar icon and choose "Import Add-ons" to open every link below as a tab automatically. Don't have it yet? Install it from the link above first.</em></p>
 
+  <div class="list-controls">
+    <button id="selectAllBtn" type="button">Select all</button>
+    <button id="deselectAllBtn" type="button">Deselect all</button>
+  </div>
+
   <div class="checklist-box">
     ${section('Enabled', list.filter(a => a.enabled).sort(byName))}
     ${section('Disabled', list.filter(a => !a.enabled).sort(byName))}
   </div>
 
   <script type="application/json" id="addons-exporter-data">${safeJsonForScriptTag({ formatVersion: EXPORT_FORMAT_VERSION, addons: list })}</script>
+  <script>
+    // Self-contained - this file has no access to the extension's own
+    // scripts or APIs once it's saved and opened on its own.
+    document.getElementById('selectAllBtn').addEventListener('click', function () {
+      document.querySelectorAll('.addon-row input[type="checkbox"]').forEach(function (cb) { cb.checked = true; });
+    });
+    document.getElementById('deselectAllBtn').addEventListener('click', function () {
+      document.querySelectorAll('.addon-row input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+    });
+  </script>
 </body>
 </html>`;
 }
