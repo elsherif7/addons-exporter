@@ -45,6 +45,7 @@ const removeFileBtn = document.getElementById('removeFileBtn');
 const chooseFileBtn = document.getElementById('chooseFileBtn');
 const listControls = document.getElementById('listControls');
 const addonListEl = document.getElementById('addonList');
+const checklistBoxEl = document.getElementById('checklistBox');
 const selectAllBtn = document.getElementById('selectAllBtn');
 const deselectAllBtn = document.getElementById('deselectAllBtn');
 const selectionCountEl = document.getElementById('selectionCount');
@@ -81,7 +82,7 @@ function updateSelectionCount() {
 function clearAddonList() {
   displayItems = [];
   addonListEl.innerHTML = '';
-  addonListEl.style.display = 'none';
+  checklistBoxEl.style.display = 'none';
   listControls.style.display = 'none';
   openSelectedBtn.disabled = true;
   selectionCountEl.textContent = '';
@@ -129,6 +130,7 @@ function renderAddonList(addons, installed) {
     groupHtml('Not Installed Yet', notInstalled, 0, false) +
     groupHtml('Already Installed', alreadyInstalled, notInstalled.length, true);
   addonListEl.style.display = 'block';
+  checklistBoxEl.style.display = 'block';
   listControls.style.display = 'flex';
   searchInput.style.display = 'block';
   noSearchMatchesEl.style.display = 'none';
