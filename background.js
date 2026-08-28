@@ -207,7 +207,7 @@ function buildHtmlReport(list) {
   }
   .primary-btn:hover:not(:disabled) { background: #111827; }
   .primary-btn:disabled { background: #9ca3af; cursor: not-allowed; }
-  #status { display: block; font-size: 14px; color: #444; margin-top: 14px; min-height: 18px; }
+  #status { display: block; text-align: center; font-size: 14px; color: #444; margin-top: 14px; min-height: 18px; }
 </style>
 </head>
 <body>
@@ -345,19 +345,27 @@ function buildHtmlReport(list) {
       openSelectedBtn.disabled = true;
       setStatus('Opening ' + links.length + ' tabs...');
       var opened = 0;
+      var blocked = 0;
       var failed = 0;
       for (var i = 0; i < links.length; i++) {
         try {
           if (!isSafeUrl(links[i])) throw new Error('unsafe link');
           var w = window.open(links[i], '_blank', 'noopener');
-          if (!w) throw new Error('popup blocked');
-          opened++;
+          if (!w) {
+            blocked++;
+          } else {
+            opened++;
+          }
         } catch (e) {
           failed++;
         }
         if (i < links.length - 1) await delay(150);
       }
-      setStatus(failed > 0 ? ('Opened ' + opened + ' tabs, ' + failed + ' failed to open') : ('Opened ' + opened + ' tabs'));
+      var msg = 'Opened ' + opened + (opened === 1 ? ' tab' : ' tabs');
+      if (blocked > 0) msg += ', ' + blocked + " blocked by your browser's popup blocker";
+      if (failed > 0) msg += ', ' + failed + ' failed to open';
+      if (blocked > 0) msg += '. Allow popups for this page, then try again.';
+      setStatus(msg);
       openSelectedBtn.disabled = false;
     });
   </script>
