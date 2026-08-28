@@ -104,21 +104,22 @@ function buildHtmlReport(list) {
 
   const row = (a) => {
     const matchLabel = linkTypeLabels[a.linkType] || '';
-    const matchClass = uncertainLinkTypes.has(a.linkType) ? ' class="match-uncertain"' : '';
-    return `<tr>
-      <td>${escapeHtml(a.name)}</td>
-      <td>${escapeHtml(a.version)}</td>
-      <td><a href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.link)}</a></td>
-      <td${matchClass}>${escapeHtml(matchLabel)}</td>
-    </tr>`;
+    const matchClass = uncertainLinkTypes.has(a.linkType) ? ' match-uncertain' : '';
+    return `<div class="addon-row">
+      <div class="addon-row-main">
+        <span class="addon-name">${escapeHtml(a.name)}</span>
+        <span class="addon-version">${escapeHtml(a.version)}</span>
+      </div>
+      <div class="addon-row-link">
+        <a href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.link)}</a>
+        <span class="match-label${matchClass}">${escapeHtml(matchLabel)}</span>
+      </div>
+    </div>`;
   };
 
-  const section = (title, items) => items.length ? `
-    <h1 class="group-title">${title} (${items.length})</h1>
-    <table>
-      <tr><th>Name</th><th>Version</th><th>Link</th><th>Match</th></tr>
-      ${items.map(row).join('\n')}
-    </table>` : '';
+  const section = (title, items) => items.length
+    ? `<div class="group-heading">${title} (${items.length})</div>${items.map(row).join('')}`
+    : '';
 
   return `<!DOCTYPE html>
 <html>
@@ -126,19 +127,35 @@ function buildHtmlReport(list) {
 <meta charset="utf-8">
 <title>My Add-ons - Add-ons Exporter Export</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 15px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 15px; color: #222; }
   h1 { font-size: 28px; }
-  h1.group-title { font-size: 20px; margin-top: 40px; }
   p { font-size: 16px; color: #444; line-height: 1.7; }
-  table { border-collapse: collapse; width: 100%; margin-bottom: 30px; table-layout: fixed; }
-  th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; overflow-wrap: break-word; }
-  th { background: #f0f0f0; }
-  th:nth-child(1), td:nth-child(1) { width: 28%; }
-  th:nth-child(2), td:nth-child(2) { width: 10%; }
-  th:nth-child(3), td:nth-child(3) { width: 47%; }
-  th:nth-child(4), td:nth-child(4) { width: 15%; white-space: nowrap; }
   .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }
-  .match-uncertain { color: #b45309; font-style: italic; }
+  .checklist-box {
+    text-align: left;
+    border: 1px solid #e2e4e8;
+    border-radius: 8px;
+    padding: 4px 0;
+    margin-bottom: 30px;
+  }
+  .group-heading {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #888;
+    padding: 10px 14px 4px;
+  }
+  .addon-row {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f0f1f3;
+  }
+  .addon-row:last-child { border-bottom: none; }
+  .addon-name { font-size: 14px; font-weight: 600; }
+  .addon-version { color: #888; font-size: 12px; margin-left: 6px; }
+  .addon-row-link { font-size: 13px; margin-top: 2px; word-break: break-all; }
+  .addon-row-link a { color: #0060df; }
+  .match-label { font-size: 11px; color: #666; margin-left: 8px; }
+  .match-uncertain { color: #b45309; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -146,8 +163,10 @@ function buildHtmlReport(list) {
   <p>Exported on ${formatExportDate(new Date())}. Found ${list.length} add-ons in total.</p>
   <p><em>Tip: on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Exporter</a> installed, click its toolbar icon and choose "Import Add-ons" to open every link below as a tab automatically. Don't have it yet? Install it from the link above first.</em></p>
 
-  ${section('Enabled', list.filter(a => a.enabled).sort(byName))}
-  ${section('Disabled', list.filter(a => !a.enabled).sort(byName))}
+  <div class="checklist-box">
+    ${section('Enabled', list.filter(a => a.enabled).sort(byName))}
+    ${section('Disabled', list.filter(a => !a.enabled).sort(byName))}
+  </div>
 
   <script type="application/json" id="addons-exporter-data">${safeJsonForScriptTag({ formatVersion: EXPORT_FORMAT_VERSION, addons: list })}</script>
 </body>
