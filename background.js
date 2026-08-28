@@ -135,10 +135,12 @@ function buildHtmlReport(list) {
   .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }
   .list-controls {
     display: flex;
-    justify-content: flex-start;
+    justify-content: space-between;
+    align-items: center;
     gap: 8px;
     margin-bottom: 10px;
   }
+  #selectionCount { font-size: 13px; color: #666; }
   .list-controls button {
     background: none;
     border: none;
@@ -216,8 +218,11 @@ function buildHtmlReport(list) {
   <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
 
   <div class="list-controls">
-    <button id="selectAllBtn" type="button">Select all</button>
-    <button id="deselectAllBtn" type="button">Deselect all</button>
+    <span>
+      <button id="selectAllBtn" type="button">Select all</button>
+      <button id="deselectAllBtn" type="button">Deselect all</button>
+    </span>
+    <span id="selectionCount"></span>
   </div>
 
   <div class="checklist-box">
@@ -235,6 +240,19 @@ function buildHtmlReport(list) {
   <script>
     // Self-contained - this file has no access to the extension's own
     // scripts or APIs once it's saved and opened on its own.
+    var selectionCountEl = document.getElementById('selectionCount');
+
+    function updateSelectionCount() {
+      var boxes = document.querySelectorAll('.addon-row input[type="checkbox"]');
+      var checked = document.querySelectorAll('.addon-row input[type="checkbox"]:checked').length;
+      selectionCountEl.textContent = boxes.length ? (checked + ' of ' + boxes.length + ' selected') : '';
+    }
+
+    document.querySelectorAll('.addon-row input[type="checkbox"]').forEach(function (cb) {
+      cb.addEventListener('change', updateSelectionCount);
+    });
+    updateSelectionCount();
+
     // Select all/Deselect all only touch what the current search still
     // shows - same rule as the extension's own export/import pages.
     document.getElementById('selectAllBtn').addEventListener('click', function () {
@@ -243,6 +261,7 @@ function buildHtmlReport(list) {
         var cb = row.querySelector('input[type="checkbox"]');
         if (cb) cb.checked = true;
       });
+      updateSelectionCount();
     });
     document.getElementById('deselectAllBtn').addEventListener('click', function () {
       document.querySelectorAll('.addon-row').forEach(function (row) {
@@ -250,6 +269,7 @@ function buildHtmlReport(list) {
         var cb = row.querySelector('input[type="checkbox"]');
         if (cb) cb.checked = false;
       });
+      updateSelectionCount();
     });
 
     var addonListEl = document.getElementById('addonList');
