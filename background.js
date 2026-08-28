@@ -70,15 +70,6 @@ async function findAmoPage(id, name) {
   return null;
 }
 
-function formatExportDate(d) {
-  const months = ['January','February','March','April','May','June',
-                  'July','August','September','October','November','December'];
-  const day = d.getDate();
-  const month = months[d.getMonth()];
-  const year = d.getFullYear();
-  return `${month} ${day}, ${year}`;
-}
-
 function formatFilenameTimestamp(d) {
   const pad = (n) => String(n).padStart(2, '0');
   const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -129,9 +120,10 @@ function buildHtmlReport(list) {
 <meta charset="utf-8">
 <title>My Add-ons - Add-ons Exporter Export</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 15px; color: #222; }
-  h1 { font-size: 28px; }
-  p { font-size: 16px; color: #444; line-height: 1.7; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f4f5f7; margin: 0; padding: 60px 20px; color: #222; }
+  .card { max-width: 560px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 40px; text-align: center; }
+  h1 { font-size: 28px; margin: 0 0 16px; }
+  p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }
   .list-controls {
     display: flex;
@@ -210,8 +202,8 @@ function buildHtmlReport(list) {
 </style>
 </head>
 <body>
+  <div class="card">
   <h1>Add-ons Exporter</h1>
-  <p>Exported on ${formatExportDate(new Date())}. Found ${list.length} add-ons in total.</p>
   <p><em>Tip: on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Exporter</a> installed, click its toolbar icon and choose "Import Add-ons" to open every link below as a tab automatically. Don't have it yet? Install it from the link above first.</em></p>
 
   <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
@@ -234,6 +226,7 @@ function buildHtmlReport(list) {
 
   <button id="openSelectedBtn" class="primary-btn" type="button">Open Selected</button>
   <span id="status"></span>
+  </div>
 
   <script type="application/json" id="addons-exporter-data">${safeJsonForScriptTag({ formatVersion: EXPORT_FORMAT_VERSION, addons: list })}</script>
   <script>
