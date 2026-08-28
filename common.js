@@ -27,11 +27,14 @@ function byName(a, b) {
 // Shows/hides .addon-row elements in a checklist based on a search query,
 // matched against each row's label text. Also hides a .group-heading if
 // none of its rows still match. Works on export.html and import.html's
-// checklists, since both use the same row/heading markup.
+// checklists, since both use the same row/heading markup. Returns true
+// if at least one row is still visible, so callers can show a
+// "no matches" message when it returns false.
 function filterAddonRows(container, query) {
   const q = query.trim().toLowerCase();
   let heading = null;
   let headingHasMatch = false;
+  let anyMatch = false;
 
   const finishHeading = () => {
     if (heading) heading.style.display = headingHasMatch ? '' : 'none';
@@ -46,8 +49,12 @@ function filterAddonRows(container, query) {
       const label = el.querySelector('label');
       const match = q === '' || (label && label.textContent.toLowerCase().includes(q));
       el.style.display = match ? '' : 'none';
-      if (match) headingHasMatch = true;
+      if (match) {
+        headingHasMatch = true;
+        anyMatch = true;
+      }
     }
   }
   finishHeading();
+  return anyMatch;
 }

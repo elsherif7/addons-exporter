@@ -5,6 +5,7 @@ const exportBtn = document.getElementById('exportSelectedBtn');
 const statusEl = document.getElementById('status');
 const selectionCountEl = document.getElementById('selectionCount');
 const searchInput = document.getElementById('searchInput');
+const noSearchMatchesEl = document.getElementById('noSearchMatches');
 
 function setStatus(msg) {
   statusEl.textContent = msg;
@@ -76,7 +77,8 @@ deselectAllBtn.addEventListener('click', () => {
 });
 
 searchInput.addEventListener('input', () => {
-  filterAddonRows(listEl, searchInput.value);
+  const anyMatch = filterAddonRows(listEl, searchInput.value);
+  noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
 });
 
 exportBtn.addEventListener('click', async () => {
