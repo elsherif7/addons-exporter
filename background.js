@@ -189,6 +189,7 @@ function buildHtmlReport(list) {
   .match-uncertain { color: #b45309; font-weight: 600; }
   .primary-btn {
     width: 100%;
+    max-width: 560px;
     padding: 12px 20px;
     border: none;
     border-radius: 8px;
