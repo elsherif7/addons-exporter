@@ -110,11 +110,11 @@ function buildHtmlReport(list) {
     return `<div class="addon-row">
       <input type="checkbox" id="rcb-${i}" checked>
       <div class="addon-row-body">
-        <label for="rcb-${i}"><span class="addon-name">${escapeHtml(a.name)}</span> <span class="addon-version">${escapeHtml(a.version)}</span></label>
-        <div class="addon-row-link">
-          <a href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.link)}</a>
+        <label for="rcb-${i}">
+          <a class="addon-name" href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.name)}</a>
+          <span class="addon-version">${escapeHtml(a.version)}</span>
           <span class="match-label${matchClass}">${escapeHtml(matchLabel)}</span>
-        </div>
+        </label>
       </div>
     </div>`;
   };
@@ -188,10 +188,9 @@ function buildHtmlReport(list) {
   .addon-row:last-child { border-bottom: none; }
   .addon-row input[type="checkbox"] { margin-top: 3px; }
   .addon-row-body { flex: 1; min-width: 0; }
-  .addon-name { font-size: 14px; font-weight: 600; }
+  .addon-name { font-size: 14px; font-weight: 600; color: #0060df; text-decoration: none; }
+  .addon-name:hover { text-decoration: underline; }
   .addon-version { color: #888; font-size: 12px; margin-left: 6px; }
-  .addon-row-link { font-size: 13px; margin-top: 2px; word-break: break-all; }
-  .addon-row-link a { color: #0060df; }
   .match-label { font-size: 11px; color: #666; margin-left: 8px; }
   .match-uncertain { color: #b45309; font-weight: 600; }
   .primary-btn {
@@ -306,8 +305,11 @@ function buildHtmlReport(list) {
       noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
     });
 
-    // Only the checkbox itself toggles it - clicking the name shouldn't.
+    // The add-on name is a real link now - let it navigate. Only block
+    // the label's default checkbox-toggle for clicks elsewhere in it
+    // (the version text, the match label, empty space).
     addonListEl.addEventListener('click', function (e) {
+      if (e.target.closest('a')) return;
       if (e.target.closest('label')) e.preventDefault();
     });
 
@@ -338,7 +340,7 @@ function buildHtmlReport(list) {
       var links = [];
       document.querySelectorAll('.addon-row').forEach(function (row) {
         var cb = row.querySelector('input[type="checkbox"]');
-        var a = row.querySelector('.addon-row-link a');
+        var a = row.querySelector('.addon-name');
         if (cb && cb.checked && a) links.push(a.href);
       });
 
