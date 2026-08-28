@@ -121,7 +121,7 @@ function buildHtmlReport(list) {
 <title>My Add-ons - Add-ons Exporter Export</title>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f4f5f7; margin: 0; padding: 60px 20px; color: #222; }
-  .card { max-width: 560px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 40px; text-align: center; }
+  .card { max-width: 640px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 40px; text-align: center; }
   h1 { font-size: 28px; margin: 0 0 16px; }
   p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }
