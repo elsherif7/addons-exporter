@@ -192,6 +192,20 @@ function buildHtmlReport(list) {
   .addon-row-link a { color: #0060df; }
   .match-label { font-size: 11px; color: #666; margin-left: 8px; }
   .match-uncertain { color: #b45309; font-weight: 600; }
+  .primary-btn {
+    width: 100%;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    background: #1f2937;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .primary-btn:hover:not(:disabled) { background: #111827; }
+  .primary-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+  #status { display: block; font-size: 14px; color: #444; margin-top: 14px; min-height: 18px; }
 </style>
 </head>
 <body>
@@ -213,6 +227,9 @@ function buildHtmlReport(list) {
     </div>
     <p id="noSearchMatches" class="placeholder-text" style="display:none;">No add-ons match your search.</p>
   </div>
+
+  <button id="openSelectedBtn" class="primary-btn" type="button">Open Selected</button>
+  <span id="status"></span>
 
   <script type="application/json" id="addons-exporter-data">${safeJsonForScriptTag({ formatVersion: EXPORT_FORMAT_VERSION, addons: list })}</script>
   <script>
@@ -267,6 +284,61 @@ function buildHtmlReport(list) {
     document.getElementById('searchInput').addEventListener('input', function (e) {
       var anyMatch = filterAddonRows(e.target.value);
       noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
+    });
+
+    function isSafeUrl(link) {
+      try {
+        var u = new URL(link);
+        return u.protocol === 'http:' || u.protocol === 'https:';
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function delay(ms) {
+      return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    }
+
+    var openSelectedBtn = document.getElementById('openSelectedBtn');
+    var statusEl = document.getElementById('status');
+
+    function setStatus(msg) {
+      statusEl.textContent = msg;
+    }
+
+    // Selection is read from every checkbox regardless of the current
+    // search - same rule as the extension's own pages, so a checked box
+    // that gets hidden by a search isn't silently dropped.
+    openSelectedBtn.addEventListener('click', async function () {
+      var links = [];
+      document.querySelectorAll('.addon-row').forEach(function (row) {
+        var cb = row.querySelector('input[type="checkbox"]');
+        var a = row.querySelector('.addon-row-link a');
+        if (cb && cb.checked && a) links.push(a.href);
+      });
+
+      if (links.length === 0) {
+        setStatus('Select at least one add-on to open');
+        return;
+      }
+
+      openSelectedBtn.disabled = true;
+      setStatus('Opening ' + links.length + ' tabs...');
+      var opened = 0;
+      var failed = 0;
+      for (var i = 0; i < links.length; i++) {
+        try {
+          if (!isSafeUrl(links[i])) throw new Error('unsafe link');
+          var w = window.open(links[i], '_blank', 'noopener');
+          if (!w) throw new Error('popup blocked');
+          opened++;
+        } catch (e) {
+          failed++;
+        }
+        if (i < links.length - 1) await delay(150);
+      }
+      setStatus(failed > 0 ? ('Opened ' + opened + ' tabs, ' + failed + ' failed to open') : ('Opened ' + opened + ' tabs'));
+      openSelectedBtn.disabled = false;
     });
   </script>
 </body>
