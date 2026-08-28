@@ -158,6 +158,8 @@ function buildHtmlReport(list) {
   .placeholder-text { padding: 20px; color: #666; font-size: 14px; margin: 0; }
   .checklist-box {
     text-align: left;
+    max-height: 360px;
+    overflow-y: auto;
     border: 1px solid #e2e4e8;
     border-radius: 8px;
     padding: 4px 0;
