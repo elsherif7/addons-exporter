@@ -283,6 +283,11 @@ searchInput.addEventListener('input', () => {
   noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
 });
 
+// Only the checkbox itself toggles it - clicking the name shouldn't.
+addonListEl.addEventListener('click', (e) => {
+  if (e.target.closest('label')) e.preventDefault();
+});
+
 openSelectedBtn.addEventListener('click', async () => {
   const selected = Array.from(checkboxes())
     .filter((cb) => cb.checked)
