@@ -65,6 +65,12 @@ function checkboxes() {
   return addonListEl.querySelectorAll('input[type="checkbox"]');
 }
 
+// Select all/Deselect all only touch what the current search still shows -
+// a checked box that gets filtered out of view stays checked.
+function visibleCheckboxes() {
+  return Array.from(checkboxes()).filter((cb) => cb.closest('.addon-row').style.display !== 'none');
+}
+
 function updateSelectionCount() {
   const boxes = checkboxes();
   const checked = addonListEl.querySelectorAll('input[type="checkbox"]:checked').length;
@@ -261,12 +267,12 @@ picker.addEventListener('drop', (e) => {
 });
 
 selectAllBtn.addEventListener('click', () => {
-  checkboxes().forEach((cb) => { cb.checked = true; });
+  visibleCheckboxes().forEach((cb) => { cb.checked = true; });
   updateSelectionCount();
 });
 
 deselectAllBtn.addEventListener('click', () => {
-  checkboxes().forEach((cb) => { cb.checked = false; });
+  visibleCheckboxes().forEach((cb) => { cb.checked = false; });
   updateSelectionCount();
 });
 
