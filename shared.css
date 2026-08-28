@@ -83,7 +83,9 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   align-items: flex-start;
   gap: 10px;
   padding: 8px 14px;
+  border-bottom: 1px solid #f0f1f3;
 }
+.addon-row:last-child { border-bottom: none; }
 .addon-row:hover { background: #fafbfc; }
 .addon-row label {
   flex: 1;
