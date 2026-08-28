@@ -111,14 +111,25 @@ function renderAddonList(addons, installed) {
   alreadyInstalled.sort(byName);
   displayItems = [...notInstalled, ...alreadyInstalled];
 
+  const linkTypeLabels = {
+    'amo-exact': 'Exact match',
+    'amo-search': 'Possible match',
+    'homepage': 'Homepage',
+    'amo-search-fallback': 'Search results',
+  };
+  const uncertainLinkTypes = new Set(['amo-search', 'amo-search-fallback']);
+
   const rowHtml = (a, i, isInstalled) => {
     const safe = isSafeUrl(a.link);
     const warning = safe ? '' : '<br><span class="addon-link-preview unsafe">invalid or unsafe link - skipped</span>';
     const checkedAttr = safe && !isInstalled ? 'checked' : '';
     const version = typeof a.version === 'string' ? a.version : '';
+    const matchLabel = linkTypeLabels[a.linkType] || '';
+    const matchClass = uncertainLinkTypes.has(a.linkType) ? ' match-uncertain' : '';
+    const match = matchLabel ? ` <span class="match-label${matchClass}">${escapeHtml(matchLabel)}</span>` : '';
     return `<div class="addon-row">
       <input type="checkbox" id="icb-${i}" data-idx="${i}" ${checkedAttr}>
-      <label for="icb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(version)}</span>${warning}</label>
+      <label for="icb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(version)}</span>${match}${warning}</label>
     </div>`;
   };
 
