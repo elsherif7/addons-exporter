@@ -111,8 +111,9 @@ function renderAddonList(addons, installed) {
   alreadyInstalled.sort(byName);
   displayItems = [...notInstalled, ...alreadyInstalled];
 
+  // No label for an exact match - that's the expected common case, only
+  // worth flagging when the link is less certain.
   const linkTypeLabels = {
-    'amo-exact': 'Exact match',
     'amo-search': 'Possible match',
     'homepage': 'Homepage',
     'amo-search-fallback': 'Search results',
