@@ -17,7 +17,7 @@ Firefox doesn't allow any extension to install other extensions automatically �
 ```
 addons-exporter/
 ├── manifest.json        # Extension config, permissions, background script
-├── common.js             # Shared helpers (escapeHtml, isSafeUrl, byName) and the export format version
+├── common.js             # Shared helpers (escapeHtml, isSafeUrl, byName, filterAddonRows) and the export format version
 ├── background.js        # Export logic, AMO lookups, HTML report generation
 ├── shared.css            # Shared styles for export.html / import.html / confirmation.html
 ├── popup.html            # Toolbar popup UI
