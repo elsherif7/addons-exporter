@@ -99,21 +99,14 @@ function buildHtmlReport(list) {
   };
   const uncertainLinkTypes = new Set(['amo-search', 'amo-search-fallback']);
 
-  let idx = 0;
   const row = (a) => {
-    const i = idx++;
     const matchLabel = linkTypeLabels[a.linkType] || '';
     const matchClass = uncertainLinkTypes.has(a.linkType) ? ' match-uncertain' : '';
     const match = matchLabel ? `<span class="match-label${matchClass}">${escapeHtml(matchLabel)}</span>` : '';
     return `<div class="addon-row">
-      <input type="checkbox" id="rcb-${i}" checked>
-      <div class="addon-row-body">
-        <label for="rcb-${i}">
-          <a class="addon-name" href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.name)}</a>
-          <span class="addon-version">${escapeHtml(a.version)}</span>
-          ${match}
-        </label>
-      </div>
+      <a class="addon-name" href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.name)}</a>
+      <span class="addon-version">${escapeHtml(a.version)}</span>
+      ${match}
     </div>`;
   };
 
@@ -133,24 +126,6 @@ function buildHtmlReport(list) {
   h1 { font-size: 28px; margin: 0 0 16px; }
   p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }
-  .list-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
-  }
-  #selectionCount { font-size: 13px; color: #666; }
-  .list-controls button {
-    background: none;
-    border: none;
-    color: #1a73e8;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 4px 8px;
-  }
-  .list-controls button:hover { text-decoration: underline; }
   .search-input {
     display: block;
     width: 100%;
@@ -181,52 +156,23 @@ function buildHtmlReport(list) {
     padding: 10px 14px 4px;
   }
   .addon-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
     padding: 10px 14px;
     border-bottom: 1px solid #f0f1f3;
   }
   .addon-row:last-child { border-bottom: none; }
-  .addon-row input[type="checkbox"] { margin-top: 3px; }
-  .addon-row-body { flex: 1; min-width: 0; }
   .addon-name { font-size: 14px; font-weight: 600; color: #0060df; text-decoration: none; }
   .addon-name:hover { text-decoration: underline; }
   .addon-version { color: #888; font-size: 12px; margin-left: 6px; }
   .match-label { font-size: 11px; color: #666; margin-left: 8px; }
   .match-uncertain { color: #b45309; font-weight: 600; }
-  .primary-btn {
-    width: 100%;
-    max-width: 560px;
-    padding: 12px 20px;
-    border: none;
-    border-radius: 8px;
-    background: #1f2937;
-    color: #fff;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .primary-btn:hover:not(:disabled) { background: #111827; }
-  .primary-btn:disabled { background: #9ca3af; cursor: not-allowed; }
-  #status { display: block; text-align: center; font-size: 14px; color: #444; margin-top: 14px; min-height: 18px; }
 </style>
 </head>
 <body>
   <div class="card">
   <h1>Add-ons Exporter</h1>
   <p><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Exporter</a> installed, click its toolbar icon and choose <strong>Import Add-ons</strong> to open every link below as a tab automatically.</p>
-  <p><strong>Note:</strong> your browser may block <strong>Open Selected</strong> from opening several tabs at once. If nothing opens, look for a popup-blocked icon near the address bar and allow popups for this page.</p>
 
   <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
-
-  <div class="list-controls">
-    <span>
-      <button id="selectAllBtn" type="button">Select all</button>
-      <button id="deselectAllBtn" type="button">Deselect all</button>
-    </span>
-    <span id="selectionCount"></span>
-  </div>
 
   <div class="checklist-box">
     <div id="addonList">
@@ -235,47 +181,12 @@ function buildHtmlReport(list) {
     </div>
     <p id="noSearchMatches" class="placeholder-text" style="display:none;">No add-ons match your search.</p>
   </div>
-
-  <button id="openSelectedBtn" class="primary-btn" type="button">Open Selected</button>
-  <span id="status"></span>
   </div>
 
   <script type="application/json" id="addons-exporter-data">${safeJsonForScriptTag({ formatVersion: EXPORT_FORMAT_VERSION, addons: list })}</script>
   <script>
     // Self-contained - this file has no access to the extension's own
     // scripts or APIs once it's saved and opened on its own.
-    var selectionCountEl = document.getElementById('selectionCount');
-
-    function updateSelectionCount() {
-      var boxes = document.querySelectorAll('.addon-row input[type="checkbox"]');
-      var checked = document.querySelectorAll('.addon-row input[type="checkbox"]:checked').length;
-      selectionCountEl.textContent = boxes.length ? (checked + ' of ' + boxes.length + ' selected') : '';
-    }
-
-    document.querySelectorAll('.addon-row input[type="checkbox"]').forEach(function (cb) {
-      cb.addEventListener('change', updateSelectionCount);
-    });
-    updateSelectionCount();
-
-    // Select all/Deselect all only touch what the current search still
-    // shows - same rule as the extension's own export/import pages.
-    document.getElementById('selectAllBtn').addEventListener('click', function () {
-      document.querySelectorAll('.addon-row').forEach(function (row) {
-        if (row.style.display === 'none') return;
-        var cb = row.querySelector('input[type="checkbox"]');
-        if (cb) cb.checked = true;
-      });
-      updateSelectionCount();
-    });
-    document.getElementById('deselectAllBtn').addEventListener('click', function () {
-      document.querySelectorAll('.addon-row').forEach(function (row) {
-        if (row.style.display === 'none') return;
-        var cb = row.querySelector('input[type="checkbox"]');
-        if (cb) cb.checked = false;
-      });
-      updateSelectionCount();
-    });
-
     var addonListEl = document.getElementById('addonList');
     var noSearchMatchesEl = document.getElementById('noSearchMatches');
 
@@ -295,8 +206,7 @@ function buildHtmlReport(list) {
           heading = el;
           headingHasMatch = false;
         } else if (el.classList.contains('addon-row')) {
-          var label = el.querySelector('label');
-          var match = q === '' || (label && label.textContent.toLowerCase().indexOf(q) !== -1);
+          var match = q === '' || el.textContent.toLowerCase().indexOf(q) !== -1;
           el.style.display = match ? '' : 'none';
           if (match) { headingHasMatch = true; anyMatch = true; }
         }
@@ -308,77 +218,6 @@ function buildHtmlReport(list) {
     document.getElementById('searchInput').addEventListener('input', function (e) {
       var anyMatch = filterAddonRows(e.target.value);
       noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
-    });
-
-    // The add-on name is a real link now - let it navigate. Only block
-    // the label's default checkbox-toggle for clicks elsewhere in it
-    // (the version text, the match label, empty space).
-    addonListEl.addEventListener('click', function (e) {
-      if (e.target.closest('a')) return;
-      if (e.target.closest('label')) e.preventDefault();
-    });
-
-    function isSafeUrl(link) {
-      try {
-        var u = new URL(link);
-        return u.protocol === 'http:' || u.protocol === 'https:';
-      } catch (e) {
-        return false;
-      }
-    }
-
-    function delay(ms) {
-      return new Promise(function (resolve) { setTimeout(resolve, ms); });
-    }
-
-    var openSelectedBtn = document.getElementById('openSelectedBtn');
-    var statusEl = document.getElementById('status');
-
-    function setStatus(msg) {
-      statusEl.textContent = msg;
-    }
-
-    // Selection is read from every checkbox regardless of the current
-    // search - same rule as the extension's own pages, so a checked box
-    // that gets hidden by a search isn't silently dropped.
-    openSelectedBtn.addEventListener('click', async function () {
-      var links = [];
-      document.querySelectorAll('.addon-row').forEach(function (row) {
-        var cb = row.querySelector('input[type="checkbox"]');
-        var a = row.querySelector('.addon-name');
-        if (cb && cb.checked && a) links.push(a.href);
-      });
-
-      if (links.length === 0) {
-        setStatus('Select at least one add-on to open');
-        return;
-      }
-
-      openSelectedBtn.disabled = true;
-      setStatus('Opening ' + links.length + ' tabs...');
-      var opened = 0;
-      var blocked = 0;
-      var failed = 0;
-      for (var i = 0; i < links.length; i++) {
-        try {
-          if (!isSafeUrl(links[i])) throw new Error('unsafe link');
-          var w = window.open(links[i], '_blank', 'noopener');
-          if (!w) {
-            blocked++;
-          } else {
-            opened++;
-          }
-        } catch (e) {
-          failed++;
-        }
-        if (i < links.length - 1) await delay(150);
-      }
-      var msg = 'Opened ' + opened + (opened === 1 ? ' tab' : ' tabs');
-      if (blocked > 0) msg += ', ' + blocked + " blocked by your browser's popup blocker";
-      if (failed > 0) msg += ', ' + failed + ' failed to open';
-      if (blocked > 0) msg += '. Allow popups for this page, then try again.';
-      setStatus(msg);
-      openSelectedBtn.disabled = false;
     });
   </script>
 </body>
