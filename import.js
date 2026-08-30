@@ -111,22 +111,13 @@ function renderAddonList(addons, installed) {
   alreadyInstalled.sort(byName);
   displayItems = [...notInstalled, ...alreadyInstalled];
 
-  // No label for an exact match - that's the expected common case, only
-  // worth flagging when the link is less certain.
-  const linkTypeLabels = {
-    'amo-search': 'Possible match',
-    'homepage': 'Homepage',
-    'amo-search-fallback': 'Search results',
-  };
-  const uncertainLinkTypes = new Set(['amo-search', 'amo-search-fallback']);
-
   const rowHtml = (a, i, isInstalled) => {
     const safe = isSafeUrl(a.link);
     const warning = safe ? '' : '<br><span class="addon-link-preview unsafe">invalid or unsafe link - skipped</span>';
     const checkedAttr = safe && !isInstalled ? 'checked' : '';
     const version = typeof a.version === 'string' ? a.version : '';
-    const matchLabel = linkTypeLabels[a.linkType] || '';
-    const matchClass = uncertainLinkTypes.has(a.linkType) ? ' match-uncertain' : '';
+    const matchLabel = LINK_TYPE_LABELS[a.linkType] || '';
+    const matchClass = UNCERTAIN_LINK_TYPES.has(a.linkType) ? ' match-uncertain' : '';
     const match = matchLabel ? ` <span class="match-label${matchClass}">${escapeHtml(matchLabel)}</span>` : '';
     return `<div class="addon-row">
       <input type="checkbox" id="icb-${i}" data-idx="${i}" ${checkedAttr}>
