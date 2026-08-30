@@ -94,14 +94,12 @@ function clearAddonList() {
 
 function renderAddonList(addons, installed) {
   const index = buildInstalledIndex(installed);
-  const matchedInstalledIds = new Set();
   const notInstalled = [];
   const alreadyInstalled = [];
 
   for (const a of addons) {
     const match = findInstalledMatch(a, index);
     if (match) {
-      matchedInstalledIds.add(match.id);
       alreadyInstalled.push(a);
     } else {
       notInstalled.push(a);
@@ -138,14 +136,11 @@ function renderAddonList(addons, installed) {
   searchInput.style.display = 'block';
   noSearchMatchesEl.style.display = 'none';
 
-  // Installed add-ons this file doesn't mention at all.
-  const newSinceExport = installed.filter(a => !matchedInstalledIds.has(a.id));
+  // Only note when everything from this file is already installed - a
+  // count of extra add-ons installed since doesn't lead anywhere useful.
   const notes = [];
   if (notInstalled.length === 0 && alreadyInstalled.length > 0) {
     notes.push('You already have every add-on from this export installed.');
-  }
-  if (newSinceExport.length > 0) {
-    notes.push(`${newSinceExport.length} add-on${newSinceExport.length === 1 ? '' : 's'} installed now ${newSinceExport.length === 1 ? "wasn't" : "weren't"} in this export.`);
   }
   compareNoteEl.innerHTML = notes.map(n => `<span class="compare-note-line">${escapeHtml(n)}</span>`).join('');
 
