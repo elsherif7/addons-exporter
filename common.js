@@ -25,8 +25,7 @@ function byName(a, b) {
 }
 
 // No label for an exact match - that's the expected common case, only
-// worth flagging when the link is less certain. Shared by import.js and
-// background.js's report generation so both show the same wording.
+// worth flagging when the link is less certain.
 const LINK_TYPE_LABELS = {
   'amo-search': 'Possible match',
   'homepage': 'Homepage',
@@ -34,12 +33,8 @@ const LINK_TYPE_LABELS = {
 };
 const UNCERTAIN_LINK_TYPES = new Set(['amo-search', 'amo-search-fallback']);
 
-// Shows/hides .addon-row elements in a checklist based on a search query,
-// matched against each row's label text. Also hides a .group-heading if
-// none of its rows still match. Works on export.html and import.html's
-// checklists, since both use the same row/heading markup. Returns true
-// if at least one row is still visible, so callers can show a
-// "no matches" message when it returns false.
+// Filters .addon-row elements by search query, hiding a .group-heading
+// if none of its rows still match. Returns true if anything's visible.
 function filterAddonRows(container, query) {
   const q = query.trim().toLowerCase();
   let heading = null;
