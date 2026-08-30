@@ -143,7 +143,7 @@ function buildHtmlReport(list) {
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.04em;
-    color: #888;
+    color: #555;
     padding: 10px 14px 4px;
   }
   .addon-row {
