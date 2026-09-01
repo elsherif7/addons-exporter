@@ -24,6 +24,12 @@ function byName(a, b) {
   return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 }
 
+// Select all/Deselect all only touch what the current search still shows -
+// a checked box that gets filtered out of view stays checked.
+function visibleCheckboxes(allCheckboxes) {
+  return Array.from(allCheckboxes).filter((cb) => cb.closest('.addon-row').style.display !== 'none');
+}
+
 // No label for an exact match - that's the expected common case, only
 // worth flagging when the link is less certain.
 const LINK_TYPE_LABELS = {

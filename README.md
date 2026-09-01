@@ -63,7 +63,7 @@ A few other things worth knowing:
 - AMO lookups are capped at 15 seconds each and 5 in flight at once, so a slow AMO response can't stall an export, and a large add-on collection can't trip AMO's rate limiting.
 - Firefox's own bundled built-ins (New Tab page, default themes) and spell-check dictionaries/language packs are excluded, since they aren't real installed add-ons and have no matching store listing.
 - Import only ever opens http/https links; anything else is flagged and left unselected, since an export file's data isn't inherently trusted.
-- If any currently-installed add-ons aren't mentioned in the file at all, Import shows a short note about it — informational only, since there's nothing to open for something you already have.
+- If every add-on in the file is already installed, Import shows a short note about it — informational only, since there's nothing to open.
 
 ---
 
