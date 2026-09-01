@@ -263,10 +263,8 @@ async function listInstalledAddons() {
 
 // Don't add a setInterval() keep-alive here. Firefox already resets the
 // idle-suspend timer while export.js's sendMessage() call is pending
-// (bug 1851373). A keep-alive timer was added in an earlier version to
-// work around background-page suspension during long exports, but the
-// background page was still killed despite it — the sendMessage approach
-// is sufficient and the timer is not needed.
+// (bug 1851373). A keep-alive timer was tried in an earlier version but
+// the background page was still killed despite it.
 async function doExport(ids) {
   let extensions = await getExportableAddons();
 

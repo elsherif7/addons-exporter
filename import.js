@@ -3,10 +3,7 @@
 // side has been updated to handle the new shape via migrateAddonsData().
 const SUPPORTED_FORMAT_VERSION = EXPORT_FORMAT_VERSION;
 
-// Upgrades an old formatVersion's addon list to the current shape. A
-// no-op today since there's only ever been one version - this is the
-// seam to use next time EXPORT_FORMAT_VERSION bumps and old files should
-// stay importable instead of getting rejected.
+// No-op until EXPORT_FORMAT_VERSION bumps — add migration logic here then.
 function migrateAddonsData(addons, formatVersion) {
   return addons;
 }
