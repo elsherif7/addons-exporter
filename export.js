@@ -82,7 +82,8 @@ searchInput.addEventListener('input', () => {
   noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
 });
 
-// Only the checkbox itself toggles it - clicking the name shouldn't.
+// Prevent the label's synthetic checkbox click — the label's own default
+// behaviour already toggled it once; without this, it would toggle twice.
 listEl.addEventListener('click', (e) => {
   if (e.target.closest('label')) e.preventDefault();
 });

@@ -110,6 +110,17 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   color: #c0392b;
   font-weight: 600;
 }
+/* Rows with an unsafe link are non-interactive — disable and grey them out. */
+.addon-row:has(input[type="checkbox"]:disabled) {
+  opacity: 0.5;
+  cursor: default;
+}
+.addon-row:has(input[type="checkbox"]:disabled):hover {
+  background: none;
+}
+.addon-row input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
 .match-label {
   font-size: 11px;
   color: #666;
@@ -150,4 +161,3 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
 #compareNote:not(:empty) {
   margin-top: 12px;
 }
-

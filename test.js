@@ -12,7 +12,7 @@ const sandbox = { URL };
 vm.createContext(sandbox);
 vm.runInContext(src, sandbox);
 
-const { escapeHtml, isSafeUrl, byName, filterAddonRows } = sandbox;
+const { escapeHtml, isSafeUrl, byName, filterAddonRows, visibleCheckboxes } = sandbox;
 
 let passed = 0;
 let failed = 0;
@@ -127,6 +127,39 @@ test('filterAddonRows: no matches hides everything and returns false', () => {
   for (const el of [enabledHeading, row1, row2, disabledHeading, row3]) {
     assert.strictEqual(el.style.display, 'none');
   }
+});
+
+// --- byName (tie-breaking) ---
+
+test('byName with identical names: both items survive the sort', () => {
+  const items = [{ name: 'uBlock Origin' }, { name: 'uBlock Origin' }];
+  items.sort(byName);
+  assert.strictEqual(items.length, 2);
+  assert.strictEqual(items[0].name, 'uBlock Origin');
+  assert.strictEqual(items[1].name, 'uBlock Origin');
+});
+
+// --- visibleCheckboxes ---
+// Minimal fake checkboxes — visibleCheckboxes only needs cb.closest('.addon-row')
+// and the row's style.display.
+
+function makeCheckbox(rowDisplay) {
+  const row = { style: { display: rowDisplay } };
+  return { closest: (sel) => (sel === '.addon-row' ? row : null) };
+}
+
+test('visibleCheckboxes: returns all checkboxes when all rows are visible', () => {
+  const cbs = [makeCheckbox(''), makeCheckbox(''), makeCheckbox('')];
+  const visible = visibleCheckboxes(cbs);
+  assert.strictEqual(visible.length, 3);
+});
+
+test('visibleCheckboxes: excludes checkboxes whose row is hidden', () => {
+  const cbs = [makeCheckbox(''), makeCheckbox('none'), makeCheckbox('')];
+  const visible = visibleCheckboxes(cbs);
+  assert.strictEqual(visible.length, 2);
+  assert.strictEqual(visible[0], cbs[0]);
+  assert.strictEqual(visible[1], cbs[2]);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

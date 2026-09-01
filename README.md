@@ -27,6 +27,7 @@ addons-exporter/
 ├── confirmation.html     # Tab shown after export completes
 ├── import.html           # Page to pick an exported file and choose which add-ons to open
 ├── import.js             # Import logic (parses the file, opens the selected tabs)
+├── test.js               # Plain Node.js tests for common.js — run with: node test.js
 └── icons/                # Toolbar and extension icons (16/32/48/96/128px)
 ```
 
@@ -53,9 +54,9 @@ addons-exporter/
 
 ## How it works
 
-**Export** — click the toolbar icon → **Export Add-ons** to open a checklist of every installed extension and theme, split into Enabled/Disabled groups and alphabetized within each. Pick which ones to include, or use Select all / Deselect all, then click **Export Selected**. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage as a last resort), and the result is saved as a single HTML report — human-readable on its own, with the underlying data embedded for the Import page to read back. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on.
+**Export** — click the toolbar icon → **Export Add-ons** to open a checklist of every installed extension and theme, split into Enabled/Disabled groups and alphabetized within each. A search box at the top lets you filter the list by name. Pick which ones to include, or use Select all / Deselect all, then click **Export Selected**. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage as a last resort), and the result is saved as a single HTML report — human-readable on its own, with the underlying data embedded for the Import page to read back. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on.
 
-**Import** — click **Import Add-ons**, then choose or drag in a previously exported report. It's read and validated automatically as soon as it's selected, and only accepted if its embedded format version is one this copy of the extension understands — anything missing or newer is rejected with a clear message rather than guessed at. It's automatically compared against what's currently installed (matched by add-on ID, falling back to name for older exports), so the checklist splits into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference, not pre-selected) — no need to reopen things you already have. Pick what to open and click **Open Selected**; tabs open one at a time with a short stagger between each, rather than all at once.
+**Import** — click **Import Add-ons**, then choose or drag in a previously exported report. It's read and validated automatically as soon as it's selected, and only accepted if its embedded format version is one this copy of the extension understands — anything missing or newer is rejected with a clear message rather than guessed at. It's automatically compared against what's currently installed (matched by add-on ID, falling back to name for older exports), so the checklist splits into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference, not pre-selected) — no need to reopen things you already have. A search box at the top lets you filter the list by name. Pick what to open and click **Open Selected**; tabs open one at a time with a short stagger between each, rather than all at once.
 
 A few other things worth knowing:
 

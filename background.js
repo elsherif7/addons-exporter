@@ -13,6 +13,7 @@ browser.runtime.onMessage.addListener((message) => {
   }
 });
 
+const AMO_API_BASE = 'https://addons.mozilla.org/api/v5';
 const AMO_FETCH_TIMEOUT_MS = 15000;
 
 async function fetchWithTimeout(url, timeoutMs) {
@@ -33,7 +34,7 @@ async function findAmoPage(id, name) {
   // 1. Exact lookup by addon ID/GUID
   try {
     const res = await fetchWithTimeout(
-      `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(id)}/`,
+      `${AMO_API_BASE}/addons/addon/${encodeURIComponent(id)}/`,
       AMO_FETCH_TIMEOUT_MS
     );
     if (res.ok) {
@@ -51,7 +52,7 @@ async function findAmoPage(id, name) {
   // 2. Fuzzy search by name
   try {
     const res = await fetchWithTimeout(
-      `https://addons.mozilla.org/api/v5/addons/search/?q=${encodeURIComponent(name)}&app=firefox`,
+      `${AMO_API_BASE}/addons/search/?q=${encodeURIComponent(name)}&app=firefox`,
       AMO_FETCH_TIMEOUT_MS
     );
     if (res.ok) {
@@ -245,8 +246,9 @@ async function getExportableAddons() {
     throw new Error('Could not read your installed add-ons. Try reloading the extension, or check that it still has permission to manage add-ons.');
   }
 
-  // Also excludes 'dictionary'/'locale' items - the report only has
-  // Enabled/Disabled sections, so they'd be counted but never shown.
+  // Excludes dictionaries, language packs, and anything else that isn't
+  // a plain extension or theme — the report only has Enabled/Disabled
+  // sections, and those types have no matching store listing.
   return all.filter(a =>
     (a.type === 'extension' || a.type === 'theme') && !a.id.endsWith('@mozilla.org')
   );
@@ -261,8 +263,10 @@ async function listInstalledAddons() {
 
 // Don't add a setInterval() keep-alive here. Firefox already resets the
 // idle-suspend timer while export.js's sendMessage() call is pending
-// (bug 1851373) - a manual timer was tried before and still got killed
-// with the background page anyway.
+// (bug 1851373). A keep-alive timer was added in an earlier version to
+// work around background-page suspension during long exports, but the
+// background page was still killed despite it — the sendMessage approach
+// is sufficient and the timer is not needed.
 async function doExport(ids) {
   let extensions = await getExportableAddons();
 
@@ -279,6 +283,7 @@ async function doExport(ids) {
   let done = 0;
   const reportProgress = () => {
     done++;
+    // Silenced — export.html may already be closed; that's expected.
     browser.runtime.sendMessage({ type: 'exportProgress', done, total }).catch(() => {});
   };
 
@@ -306,11 +311,13 @@ async function doExport(ids) {
 
   // saveAs: true = always show the native "Save As" dialog, letting the
   // user pick the folder and filename themselves.
-  await browser.downloads.download({
-    url,
-    filename: `Firefox-Addons (${formatFilenameTimestamp(new Date())}).html`,
-    saveAs: true
-  });
-
-  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  try {
+    await browser.downloads.download({
+      url,
+      filename: `Firefox-Addons (${formatFilenameTimestamp(new Date())}).html`,
+      saveAs: true
+    });
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  }
 }

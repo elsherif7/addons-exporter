@@ -1,6 +1,6 @@
-// A file whose formatVersion is higher than this was made by a newer
-// version of the extension - we can't safely assume its data shape, so
-// we reject it rather than guess.
+// Must equal EXPORT_FORMAT_VERSION as long as import.js handles the same
+// shape. Only diverge this when EXPORT_FORMAT_VERSION bumps and the import
+// side has been updated to handle the new shape via migrateAddonsData().
 const SUPPORTED_FORMAT_VERSION = EXPORT_FORMAT_VERSION;
 
 // Upgrades an old formatVersion's addon list to the current shape. A
@@ -107,12 +107,13 @@ function renderAddonList(addons, installed) {
     const safe = isSafeUrl(a.link);
     const warning = safe ? '' : '<br><span class="addon-link-preview unsafe">invalid or unsafe link - skipped</span>';
     const checkedAttr = safe && !isInstalled ? 'checked' : '';
+    const disabledAttr = safe ? '' : 'disabled';
     const version = typeof a.version === 'string' ? a.version : '';
     const matchLabel = LINK_TYPE_LABELS[a.linkType] || '';
     const matchClass = UNCERTAIN_LINK_TYPES.has(a.linkType) ? ' match-uncertain' : '';
     const match = matchLabel ? ` <span class="match-label${matchClass}">${escapeHtml(matchLabel)}</span>` : '';
     return `<div class="addon-row">
-      <input type="checkbox" id="icb-${i}" data-idx="${i}" ${checkedAttr}>
+      <input type="checkbox" id="icb-${i}" data-idx="${i}" ${checkedAttr} ${disabledAttr}>
       <label for="icb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(version)}</span>${match}${warning}</label>
     </div>`;
   };
@@ -275,7 +276,8 @@ searchInput.addEventListener('input', () => {
   noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
 });
 
-// Only the checkbox itself toggles it - clicking the name shouldn't.
+// Prevent the label's synthetic checkbox click — the label's own default
+// behaviour already toggled it once; without this, it would toggle twice.
 addonListEl.addEventListener('click', (e) => {
   if (e.target.closest('label')) e.preventDefault();
 });
