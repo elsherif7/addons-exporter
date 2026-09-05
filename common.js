@@ -41,6 +41,10 @@ const UNCERTAIN_LINK_TYPES = new Set(['amo-search', 'amo-search-fallback']);
 
 // Filters .addon-row elements by search query, hiding a .group-heading
 // if none of its rows still match. Returns true if anything's visible.
+//
+// NOTE: background.js's buildHtmlReport() has its own copy of this
+// inlined into the exported report (it can't load common.js once saved
+// elsewhere). Keep both copies in sync if you change this.
 function filterAddonRows(container, query) {
   const q = query.trim().toLowerCase();
   let heading = null;

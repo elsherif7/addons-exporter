@@ -182,6 +182,9 @@ function buildHtmlReport(list) {
     var addonListEl = document.getElementById('addonList');
     var noSearchMatchesEl = document.getElementById('noSearchMatches');
 
+    // NOTE: mirrors filterAddonRows() in common.js. Duplicated here
+    // because this report is self-contained and can't load common.js
+    // once saved elsewhere. Keep both copies in sync if you change this.
     function filterAddonRows(query) {
       var q = query.trim().toLowerCase();
       var heading = null;
