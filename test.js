@@ -49,6 +49,34 @@ const {
 // Evaluate it there directly instead of destructuring it from sandbox.
 const EXPORT_FORMAT_VERSION = vm.runInContext('EXPORT_FORMAT_VERSION', sandbox);
 
+// background.js's buildHtmlReport() inlines its own copy of
+// filterAddonRows into the exported report (it can't load common.js once
+// saved elsewhere). Pull that copy's literal source straight out of
+// background.js - not a hand-copied snapshot - so a future edit to one
+// copy and not the other gets caught here instead of silently drifting.
+const backgroundSrc = fs.readFileSync(path.join(__dirname, 'background.js'), 'utf8');
+const reportScriptMatch = backgroundSrc.match(/<script>([\s\S]*?)<\/script>/);
+if (!reportScriptMatch) {
+  throw new Error("Could not find the report's inline <script> block in background.js - update this extraction if the report template changed.");
+}
+const reportInlineScript = reportScriptMatch[1];
+
+// Runs the report's inline script against a fake `addonList` container and
+// returns its filterAddonRows, so it can be called directly the same way
+// common.js's version is called in the test below.
+function loadReportFilterAddonRows(addonListContainer) {
+  const stubEl = () => ({ style: {}, addEventListener() {} });
+  const reportDocument = {
+    getElementById(id) {
+      return id === 'addonList' ? addonListContainer : stubEl();
+    },
+  };
+  const reportSandbox = { document: reportDocument };
+  vm.createContext(reportSandbox);
+  vm.runInContext(reportInlineScript, reportSandbox);
+  return reportSandbox.filterAddonRows;
+}
+
 let passed = 0;
 let failed = 0;
 
@@ -113,13 +141,17 @@ test('byName sorts case-insensitively', () => {
 
 // --- filterAddonRows ---
 // Minimal fake DOM - just enough surface area (children, classList.contains,
-// style.display, querySelector) for filterAddonRows to run against.
+// style.display, querySelector, textContent) for filterAddonRows to run
+// against. textContent is also used below to test the report's inline
+// copy of filterAddonRows, which reads a row's text directly instead of
+// via querySelector('label').
 
 function makeEl(cls, labelText) {
   return {
     style: { display: '' },
     classList: { contains: (c) => c === cls },
     querySelector: (sel) => (sel === 'label' && labelText != null ? { textContent: labelText } : null),
+    textContent: labelText || '',
   };
 }
 
@@ -161,6 +193,25 @@ test('filterAddonRows: no matches hides everything and returns false', () => {
   assert.strictEqual(anyMatch, false);
   for (const el of [enabledHeading, row1, row2, disabledHeading, row3]) {
     assert.strictEqual(el.style.display, 'none');
+  }
+});
+
+test('filterAddonRows: common.js and the report\'s inline copy agree on the same fixture', () => {
+  const fixtureA = makeContainer(); // run through common.js's version
+  const fixtureB = makeContainer(); // run through background.js's inline copy
+
+  const reportFilterAddonRows = loadReportFilterAddonRows(fixtureB.container);
+
+  for (const query of ['dark', '', 'zzz-nomatch']) {
+    const anyMatchA = filterAddonRows(fixtureA.container, query);
+    const anyMatchB = reportFilterAddonRows(query);
+    assert.strictEqual(anyMatchA, anyMatchB, `anyMatch differed for query "${query}"`);
+
+    const rowsA = [fixtureA.enabledHeading, fixtureA.row1, fixtureA.row2, fixtureA.disabledHeading, fixtureA.row3];
+    const rowsB = [fixtureB.enabledHeading, fixtureB.row1, fixtureB.row2, fixtureB.disabledHeading, fixtureB.row3];
+    rowsA.forEach((el, i) => {
+      assert.strictEqual(el.style.display, rowsB[i].style.display, `row ${i} display differed for query "${query}"`);
+    });
   }
 });
 
