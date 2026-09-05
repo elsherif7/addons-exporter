@@ -1,9 +1,15 @@
-// Must equal EXPORT_FORMAT_VERSION as long as import.js handles the same
-// shape. Only diverge this when EXPORT_FORMAT_VERSION bumps and the import
-// side has been updated to handle the new shape via migrateAddonsData().
+// SUPPORTED_FORMAT_VERSION tracks EXPORT_FORMAT_VERSION, and
+// migrateAddonsData() below is what's supposed to handle any shape
+// change between them. These two are coupled: bumping the format
+// version without also updating migrateAddonsData means old-format
+// files get passed straight through unmigrated. A tripwire test in
+// test.js hardcodes today's version number specifically to fail when
+// that happens - see "migrateAddonsData: bumping the format version
+// requires updating this test and migrateAddonsData".
 const SUPPORTED_FORMAT_VERSION = EXPORT_FORMAT_VERSION;
 
-// No-op until EXPORT_FORMAT_VERSION bumps — add migration logic here then.
+// No-op for format version 1. Update this (and the tripwire test above)
+// before bumping EXPORT_FORMAT_VERSION for real.
 function migrateAddonsData(addons, formatVersion) {
   return addons;
 }
