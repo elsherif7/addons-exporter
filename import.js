@@ -131,6 +131,63 @@ function clearAddonList() {
   noSearchMatchesEl.style.display = 'none';
 }
 
+// Builds one <div class="addon-row"> via DOM APIs (not innerHTML) so
+// a.name/version/matchLabel never pass through HTML parsing - textContent
+// and property assignment don't need escapeHtml the way a template
+// string did.
+function createAddonRow(a, i, isInstalled) {
+  const safe = isSafeUrl(a.link);
+  const version = typeof a.version === 'string' ? a.version : '';
+  const matchLabel = LINK_TYPE_LABELS[a.linkType] || '';
+  const matchClass = UNCERTAIN_LINK_TYPES.has(a.linkType) ? ' match-uncertain' : '';
+
+  const row = document.createElement('div');
+  row.className = 'addon-row';
+
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.id = `icb-${i}`;
+  checkbox.dataset.idx = String(i);
+  checkbox.checked = safe && !isInstalled;
+  checkbox.disabled = !safe;
+
+  const versionSpan = document.createElement('span');
+  versionSpan.className = 'addon-version';
+  versionSpan.textContent = version;
+
+  const label = document.createElement('label');
+  label.htmlFor = `icb-${i}`;
+  label.append(`${a.name} `, versionSpan);
+
+  if (matchLabel) {
+    const matchSpan = document.createElement('span');
+    matchSpan.className = `match-label${matchClass}`;
+    matchSpan.textContent = matchLabel;
+    label.append(' ', matchSpan);
+  }
+
+  if (!safe) {
+    const warningSpan = document.createElement('span');
+    warningSpan.className = 'addon-link-preview unsafe';
+    warningSpan.textContent = 'invalid or unsafe link - skipped';
+    label.append(document.createElement('br'), warningSpan);
+  }
+
+  row.append(checkbox, label);
+  return row;
+}
+
+function appendGroup(fragment, title, items, offset, isInstalled) {
+  if (items.length === 0) return;
+  const heading = document.createElement('div');
+  heading.className = 'group-heading';
+  heading.textContent = `${title} (${items.length})`;
+  fragment.appendChild(heading);
+  items.forEach((a, i) => {
+    fragment.appendChild(createAddonRow(a, offset + i, isInstalled));
+  });
+}
+
 function renderAddonList(addons, installed) {
   const index = buildInstalledIndex(installed);
   const notInstalled = [];
@@ -148,28 +205,10 @@ function renderAddonList(addons, installed) {
   alreadyInstalled.sort(byName);
   displayItems = [...notInstalled, ...alreadyInstalled];
 
-  const rowHtml = (a, i, isInstalled) => {
-    const safe = isSafeUrl(a.link);
-    const warning = safe ? '' : '<br><span class="addon-link-preview unsafe">invalid or unsafe link - skipped</span>';
-    const checkedAttr = safe && !isInstalled ? 'checked' : '';
-    const disabledAttr = safe ? '' : 'disabled';
-    const version = typeof a.version === 'string' ? a.version : '';
-    const matchLabel = LINK_TYPE_LABELS[a.linkType] || '';
-    const matchClass = UNCERTAIN_LINK_TYPES.has(a.linkType) ? ' match-uncertain' : '';
-    const match = matchLabel ? ` <span class="match-label${matchClass}">${escapeHtml(matchLabel)}</span>` : '';
-    return `<div class="addon-row">
-      <input type="checkbox" id="icb-${i}" data-idx="${i}" ${checkedAttr} ${disabledAttr}>
-      <label for="icb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(version)}</span>${match}${warning}</label>
-    </div>`;
-  };
-
-  const groupHtml = (title, items, offset, isInstalled) => items.length
-    ? `<div class="group-heading">${title} (${items.length})</div>${items.map((a, i) => rowHtml(a, offset + i, isInstalled)).join('')}`
-    : '';
-
-  addonListEl.innerHTML =
-    groupHtml('Not Installed Yet', notInstalled, 0, false) +
-    groupHtml('Already Installed', alreadyInstalled, notInstalled.length, true);
+  const fragment = document.createDocumentFragment();
+  appendGroup(fragment, 'Not Installed Yet', notInstalled, 0, false);
+  appendGroup(fragment, 'Already Installed', alreadyInstalled, notInstalled.length, true);
+  addonListEl.replaceChildren(fragment);
   addonListEl.style.display = 'block';
   checklistBoxEl.style.display = 'block';
   listControls.style.display = 'flex';
@@ -182,7 +221,14 @@ function renderAddonList(addons, installed) {
   if (notInstalled.length === 0 && alreadyInstalled.length > 0) {
     notes.push('You already have every add-on from this export installed.');
   }
-  compareNoteEl.innerHTML = notes.map(n => `<span class="compare-note-line">${escapeHtml(n)}</span>`).join('');
+  const noteFragment = document.createDocumentFragment();
+  notes.forEach((n) => {
+    const span = document.createElement('span');
+    span.className = 'compare-note-line';
+    span.textContent = n;
+    noteFragment.appendChild(span);
+  });
+  compareNoteEl.replaceChildren(noteFragment);
 
   checkboxes().forEach((cb) => {
     cb.addEventListener('change', updateSelectionCount);

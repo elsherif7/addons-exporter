@@ -24,6 +24,42 @@ function updateSelectionCount() {
   exportBtn.disabled = checked === 0;
 }
 
+// Builds one <div class="addon-row"> via DOM APIs (not innerHTML) so
+// a.name/a.version never pass through HTML parsing - textContent and
+// property assignment don't need escapeHtml the way a template string did.
+function createAddonRow(a, i) {
+  const row = document.createElement('div');
+  row.className = 'addon-row';
+
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.id = `cb-${i}`;
+  checkbox.dataset.id = a.id;
+  checkbox.checked = true;
+
+  const versionSpan = document.createElement('span');
+  versionSpan.className = 'addon-version';
+  versionSpan.textContent = a.version;
+
+  const label = document.createElement('label');
+  label.htmlFor = `cb-${i}`;
+  label.append(`${a.name} `, versionSpan);
+
+  row.append(checkbox, label);
+  return row;
+}
+
+function appendGroup(fragment, title, items, nextIndex) {
+  if (items.length === 0) return;
+  const heading = document.createElement('div');
+  heading.className = 'group-heading';
+  heading.textContent = `${title} (${items.length})`;
+  fragment.appendChild(heading);
+  items.forEach((a) => {
+    fragment.appendChild(createAddonRow(a, nextIndex()));
+  });
+}
+
 function renderList(addons) {
   if (addons.length === 0) {
     listEl.innerHTML = '<p class="placeholder-text">No add-ons found to export.</p>';
@@ -36,19 +72,12 @@ function renderList(addons) {
 
   // Single counter across both groups so every checkbox id stays unique.
   let idx = 0;
-  const rowHtml = (a) => {
-    const i = idx++;
-    return `<div class="addon-row">
-      <input type="checkbox" id="cb-${i}" data-id="${escapeHtml(a.id)}" checked>
-      <label for="cb-${i}">${escapeHtml(a.name)} <span class="addon-version">${escapeHtml(a.version)}</span></label>
-    </div>`;
-  };
+  const nextIndex = () => idx++;
 
-  const groupHtml = (title, items) => items.length
-    ? `<div class="group-heading">${title} (${items.length})</div>${items.map(rowHtml).join('')}`
-    : '';
-
-  listEl.innerHTML = groupHtml('Enabled', enabled) + groupHtml('Disabled', disabled);
+  const fragment = document.createDocumentFragment();
+  appendGroup(fragment, 'Enabled', enabled, nextIndex);
+  appendGroup(fragment, 'Disabled', disabled, nextIndex);
+  listEl.replaceChildren(fragment);
   searchInput.style.display = 'block';
 
   checkboxes().forEach((cb) => {
@@ -63,7 +92,10 @@ function renderList(addons) {
     const addons = await browser.runtime.sendMessage({ type: 'listAddons' });
     renderList(addons);
   } catch (e) {
-    listEl.innerHTML = `<p class="placeholder-text error">Could not load add-ons: ${escapeHtml(e.message)}</p>`;
+    const p = document.createElement('p');
+    p.className = 'placeholder-text error';
+    p.textContent = `Could not load add-ons: ${e.message}`;
+    listEl.replaceChildren(p);
   }
 })();
 
