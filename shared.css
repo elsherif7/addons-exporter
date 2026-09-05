@@ -84,6 +84,7 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   gap: 10px;
   padding: 8px 14px;
   border-bottom: 1px solid #f0f1f3;
+  cursor: pointer; /* whole row is clickable - overridden to default below for disabled rows */
 }
 .addon-row:last-child { border-bottom: none; }
 .addon-row:hover { background: #fafbfc; }

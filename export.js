@@ -82,10 +82,20 @@ searchInput.addEventListener('input', () => {
   noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
 });
 
-// Prevent the label's synthetic checkbox click — the label's own default
-// behaviour already toggled it once; without this, it would toggle twice.
+// Makes the whole row clickable, not just the checkbox/label text.
+// Clicking the checkbox itself is left alone - its own native click
+// already toggles it. Anything else in the row calls cb.click(), which
+// fires the checkbox's own native toggle and change event. The
+// preventDefault stops a label click's own default forwarding to the
+// checkbox, so that path doesn't also fire and double the toggle.
 listEl.addEventListener('click', (e) => {
-  if (e.target.closest('label')) e.preventDefault();
+  if (e.target.matches('input[type="checkbox"]')) return;
+  const row = e.target.closest('.addon-row');
+  if (!row) return;
+  const cb = row.querySelector('input[type="checkbox"]');
+  if (!cb || cb.disabled) return;
+  e.preventDefault();
+  cb.click();
 });
 
 exportBtn.addEventListener('click', async () => {
