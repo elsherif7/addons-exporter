@@ -33,6 +33,48 @@ function findInstalledMatch(item, index) {
   return index.byName.get(item.name.toLowerCase()) || null;
 }
 
+// Validates and normalizes the embedded addons payload from an exported
+// report. Takes the raw text of the #addons-exporter-data script tag (or
+// null if that tag wasn't found in the file) and returns either the
+// ready-to-render addon list or a user-facing reason the file was
+// rejected. The file isn't trusted - could be hand-edited or corrupted -
+// so every shape assumption here is checked rather than assumed.
+// Pulled out of loadFile() as a pure function so it can be unit tested
+// without a DOM; loadFile() still owns actually reading/parsing the file
+// and reacting to the result.
+// Throws if jsonText is present but isn't valid JSON - loadFile()'s
+// existing try/catch around the whole read handles that the same way it
+// always has, so this doesn't catch it separately.
+function parseAddonsPayload(jsonText) {
+  if (jsonText == null) {
+    return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no embedded data found)' };
+  }
+
+  const parsed = JSON.parse(jsonText);
+  const list = parsed && Array.isArray(parsed.addons) ? parsed.addons : null;
+
+  if (!Array.isArray(list) || list.length === 0) {
+    return { ok: false, error: 'No add-ons found in that file' };
+  }
+
+  // A name is the one field every row needs; entries missing one are
+  // dropped instead of failing the whole import.
+  const validList = list.filter((a) => a && typeof a.name === 'string' && a.name.trim() !== '');
+  if (validList.length === 0) {
+    return { ok: false, error: 'No valid add-ons found in that file' };
+  }
+
+  const formatVersion = parsed.formatVersion;
+  if (typeof formatVersion !== 'number') {
+    return { ok: false, error: 'This file is missing its export format version and can\'t be imported.' };
+  }
+  if (formatVersion > SUPPORTED_FORMAT_VERSION) {
+    return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
+  }
+
+  return { ok: true, addons: migrateAddonsData(validList, formatVersion) };
+}
+
 const statusEl = document.getElementById('status');
 const fileNameEl = document.getElementById('fileName');
 const fileNameRow = document.getElementById('fileNameRow');
@@ -158,37 +200,11 @@ async function loadFile(file) {
     // safe even for an untrusted file.
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const dataEl = doc.getElementById('addons-exporter-data');
-    if (!dataEl) {
-      setStatus('This file doesn\'t look like an Add-ons Exporter file (no embedded data found)');
+    const result = parseAddonsPayload(dataEl ? dataEl.textContent : null);
+    if (!result.ok) {
+      setStatus(result.error);
       return;
     }
-    const parsed = JSON.parse(dataEl.textContent);
-    const list = parsed && Array.isArray(parsed.addons) ? parsed.addons : null;
-
-    if (!Array.isArray(list) || list.length === 0) {
-      setStatus('No add-ons found in that file');
-      return;
-    }
-
-    // The file isn't trusted - could be hand-edited or corrupted. A name
-    // is the one field every row needs; entries missing one are dropped
-    // instead of failing the whole import.
-    const validList = list.filter((a) => a && typeof a.name === 'string' && a.name.trim() !== '');
-    if (validList.length === 0) {
-      setStatus('No valid add-ons found in that file');
-      return;
-    }
-
-    const formatVersion = parsed.formatVersion;
-    if (typeof formatVersion !== 'number') {
-      setStatus('This file is missing its export format version and can\'t be imported.');
-      return;
-    }
-    if (formatVersion > SUPPORTED_FORMAT_VERSION) {
-      setStatus('This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.');
-      return;
-    }
-    const migratedList = migrateAddonsData(validList, formatVersion);
 
     // If this fails, degrade gracefully instead of blocking the import -
     // treat everything as not-installed.
@@ -203,7 +219,7 @@ async function loadFile(file) {
     }
 
     setStatus('');
-    renderAddonList(migratedList, installed);
+    renderAddonList(result.addons, installed);
   } catch (err) {
     if (myGeneration !== loadGeneration) return;
     setStatus('Error reading file: ' + err.message);
