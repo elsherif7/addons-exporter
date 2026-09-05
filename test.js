@@ -346,6 +346,25 @@ test('migrateAddonsData: currently a no-op, returns the list unchanged', () => {
   assert.strictEqual(migrateAddonsData(list, EXPORT_FORMAT_VERSION), list);
 });
 
+// Deliberately hardcodes today's version number and today's no-op
+// behavior, rather than reading EXPORT_FORMAT_VERSION dynamically like
+// the test above. The moment someone bumps EXPORT_FORMAT_VERSION, this
+// starts failing - that's the point. It's a tripwire: a format bump
+// can't ship without someone consciously updating migrateAddonsData for
+// the new shape and updating this test to match, instead of the bump
+// quietly going out with the old no-op still in place.
+test('migrateAddonsData: bumping the format version requires updating this test and migrateAddonsData', () => {
+  assert.strictEqual(
+    EXPORT_FORMAT_VERSION, 1,
+    'EXPORT_FORMAT_VERSION changed - implement real migration logic in migrateAddonsData for the new format, then update this test to match.'
+  );
+  const list = [{ name: 'X' }];
+  assert.deepStrictEqual(
+    migrateAddonsData(list, 1), list,
+    'migrateAddonsData is expected to still be a no-op for format version 1'
+  );
+});
+
 // --- buildInstalledIndex / findInstalledMatch ---
 
 test('findInstalledMatch: matches by id even when names differ', () => {
