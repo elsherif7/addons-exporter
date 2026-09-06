@@ -35,7 +35,7 @@ vm.createContext(sandbox);
 vm.runInContext(commonSrc, sandbox);
 vm.runInContext(importSrc, sandbox);
 
-const { escapeHtml, isSafeUrl, byName, filterAddonRows, visibleCheckboxes } = sandbox;
+const { escapeHtml, isSafeUrl, byName, filterAddonRows, visibleCheckboxes, extractTranslatedField, isPlausibleNameMatch } = sandbox;
 const {
   parseAddonsPayload,
   buildInstalledIndex,
@@ -225,7 +225,52 @@ test('byName with identical names: both items survive the sort', () => {
   assert.strictEqual(items[1].name, 'uBlock Origin');
 });
 
-// --- visibleCheckboxes ---
+// --- extractTranslatedField ---
+// AMO's API returns translated fields (name, summary, etc.) as a
+// locale-keyed object unless a `lang` param is passed - findAmoPage()
+// doesn't pass one, so it always gets the object form back.
+
+test('extractTranslatedField: plain string passes through unchanged', () => {
+  assert.strictEqual(extractTranslatedField('uBlock Origin'), 'uBlock Origin');
+});
+
+test('extractTranslatedField: locale-keyed object picks a usable value', () => {
+  assert.strictEqual(extractTranslatedField({ 'en-US': 'uBlock Origin', fr: 'uBlock Origin FR' }), 'uBlock Origin');
+});
+
+test('extractTranslatedField: null/undefined/empty object returns empty string', () => {
+  assert.strictEqual(extractTranslatedField(null), '');
+  assert.strictEqual(extractTranslatedField(undefined), '');
+  assert.strictEqual(extractTranslatedField({}), '');
+});
+
+// --- isPlausibleNameMatch ---
+// Guards findAmoPage()'s fuzzy name search from handing back an
+// unrelated add-on just because it happened to rank first.
+
+test('isPlausibleNameMatch: exact name (case/whitespace-insensitive) matches', () => {
+  assert.strictEqual(isPlausibleNameMatch('uBlock Origin', '  UBLOCK   origin  '), true);
+});
+
+test('isPlausibleNameMatch: a listing title with an extra tagline still matches', () => {
+  assert.strictEqual(isPlausibleNameMatch('uBlock Origin', 'uBlock Origin: Ad Blocker'), true);
+  assert.strictEqual(isPlausibleNameMatch('uBlock Origin: Ad Blocker', 'uBlock Origin'), true);
+});
+
+test('isPlausibleNameMatch: reordered/extra shared words still match', () => {
+  assert.strictEqual(isPlausibleNameMatch('Dark Reader Night Mode', 'Night Mode Dark Reader'), true);
+});
+
+test('isPlausibleNameMatch: an unrelated result is rejected', () => {
+  assert.strictEqual(isPlausibleNameMatch('uBlock Origin', 'Grammarly for Firefox'), false);
+});
+
+test('isPlausibleNameMatch: empty installed or result name is rejected', () => {
+  assert.strictEqual(isPlausibleNameMatch('', 'uBlock Origin'), false);
+  assert.strictEqual(isPlausibleNameMatch('uBlock Origin', ''), false);
+});
+
+
 // Minimal fake checkboxes — visibleCheckboxes only needs cb.closest('.addon-row')
 // and the row's style.display.
 

@@ -57,10 +57,14 @@ async function findAmoPage(id, name) {
     );
     if (res.ok) {
       const data = await res.json();
-      if (data.results && data.results.length > 0 && data.results[0].url) {
-        return { url: data.results[0].url, matchType: 'amo-search' };
+      const top = data.results && data.results[0];
+      if (top && top.url && isPlausibleNameMatch(name, extractTranslatedField(top.name))) {
+        return { url: top.url, matchType: 'amo-search' };
       }
-      console.debug(`[Add-ons Exporter] AMO name search for "${name}" (${id}) returned no usable results`, data);
+      // Either no results, or the top result's name didn't clear the
+      // relevance bar - don't hand back an unrelated add-on just
+      // because it happened to rank first.
+      console.debug(`[Add-ons Exporter] AMO name search for "${name}" (${id}) returned no plausible match`, data);
     } else {
       console.warn(`[Add-ons Exporter] AMO name search for "${name}" (${id}) failed: HTTP ${res.status}`);
     }
