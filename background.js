@@ -314,14 +314,22 @@ async function doExport(ids) {
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
 
+  const downloadOptions = {
+    url,
+    filename: `Firefox-Addons (${formatFilenameTimestamp(new Date())}).html`,
+  };
+
   // saveAs: true = always show the native "Save As" dialog, letting the
-  // user pick the folder and filename themselves.
+  // user pick the folder and filename themselves. Firefox for Android has
+  // no such dialog and throws if saveAs is true there, so only set it on
+  // desktop - Android just saves straight to the default Downloads folder.
+  const platform = await browser.runtime.getPlatformInfo();
+  if (platform.os !== 'android') {
+    downloadOptions.saveAs = true;
+  }
+
   try {
-    await browser.downloads.download({
-      url,
-      filename: `Firefox-Addons (${formatFilenameTimestamp(new Date())}).html`,
-      saveAs: true
-    });
+    await browser.downloads.download(downloadOptions);
   } finally {
     setTimeout(() => URL.revokeObjectURL(url), 30000);
   }

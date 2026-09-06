@@ -54,6 +54,7 @@ const EXPORT_FORMAT_VERSION = vm.runInContext('EXPORT_FORMAT_VERSION', sandbox);
 // saved elsewhere). Pull that copy's literal source straight out of
 // background.js - not a hand-copied snapshot - so a future edit to one
 // copy and not the other gets caught here instead of silently drifting.
+// (backgroundSrc is also reused further down to test doExport() directly.)
 const backgroundSrc = fs.readFileSync(path.join(__dirname, 'background.js'), 'utf8');
 const reportScriptMatch = backgroundSrc.match(/<script>([\s\S]*?)<\/script>/);
 if (!reportScriptMatch) {
@@ -90,6 +91,24 @@ function test(name, fn) {
     console.log(`  FAIL - ${name}`);
     console.log(`    ${err.message}`);
   }
+}
+
+// test() is synchronous - fine for everything above, but doExport() below
+// is async. testAsync() runs the same pass/fail bookkeeping against a
+// promise instead, and the calls are collected so the final summary
+// waits for all of them before printing.
+const pendingAsyncTests = [];
+function testAsync(name, fn) {
+  pendingAsyncTests.push(
+    fn().then(() => {
+      passed++;
+      console.log(`  ok - ${name}`);
+    }).catch((err) => {
+      failed++;
+      console.log(`  FAIL - ${name}`);
+      console.log(`    ${err.message}`);
+    })
+  );
 }
 
 // --- escapeHtml ---
@@ -440,5 +459,65 @@ test('findInstalledMatch: returns null when neither id nor name matches', () => 
   assert.strictEqual(match, null);
 });
 
-console.log(`\n${passed} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+// --- background.js: Android saveAs safeguard ---
+// Firefox for Android throws if downloads.download() is called with
+// saveAs: true - there's no native file picker there. doExport() must
+// omit saveAs on Android and keep it on desktop. Loads the real
+// background.js via vm with a mocked browser/fetch, and checks what it
+// actually passes to downloads.download() on each platform.
+
+async function captureDownloadOptions(platformOs) {
+  let downloadOptions = null;
+  const bgSandbox = {
+    URL,
+    Blob,
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    fetch: async (url) => {
+      // Exact-id lookup: pretend it's not on AMO. Name search: no results.
+      // Neither path matters for this test - only the final download call does.
+      if (url.includes('/addons/addon/')) return { ok: false, status: 404, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => ({ results: [] }) };
+    },
+    browser: {
+      runtime: {
+        onMessage: { addListener() {} },
+        getPlatformInfo: async () => ({ os: platformOs }),
+        sendMessage: async () => {},
+      },
+      management: {
+        getAll: async () => [
+          { id: 'ext1@example.com', name: 'Test Addon', version: '1.0', enabled: true, type: 'extension' },
+        ],
+      },
+      downloads: {
+        download: async (options) => {
+          downloadOptions = options;
+          return 1;
+        },
+      },
+    },
+  };
+  vm.createContext(bgSandbox);
+  vm.runInContext(commonSrc, bgSandbox);
+  vm.runInContext(backgroundSrc, bgSandbox);
+  await bgSandbox.doExport(['ext1@example.com']);
+  return downloadOptions;
+}
+
+testAsync('doExport: omits saveAs on Android (no native picker there)', async () => {
+  const options = await captureDownloadOptions('android');
+  assert.strictEqual(options.saveAs, undefined);
+});
+
+testAsync('doExport: sets saveAs on desktop platforms', async () => {
+  const options = await captureDownloadOptions('win');
+  assert.strictEqual(options.saveAs, true);
+});
+
+Promise.all(pendingAsyncTests).then(() => {
+  console.log(`\n${passed} passed, ${failed} failed`);
+  if (failed > 0) process.exit(1);
+});
