@@ -137,9 +137,30 @@ exportBtn.addEventListener('click', async () => {
   exportBtn.disabled = true;
   setStatus('Exporting your add-ons, please wait...');
   try {
-    await browser.runtime.sendMessage({ type: 'export', ids });
-    // background.js opens the confirmation tab itself - this one just
-    // reports success and stays open.
+    const result = await browser.runtime.sendMessage({ type: 'export', ids });
+    if (result) {
+      // Android: background.js couldn't save the file itself there (its
+      // downloads API can't handle client-generated content on Android -
+      // see the comment in background.js's message listener), so it
+      // handed the report back here instead. Triggering the save right
+      // here, in this same click's continuation, is what gives it a
+      // chance of being recognized as a real download rather than
+      // getting silently dropped - the same click.download() call made
+      // from a freshly opened tab or after another message hop wasn't.
+      const blob = new Blob([result.html], { type: 'text/html' });
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = result.filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+      await browser.tabs.create({ url: browser.runtime.getURL('confirmation.html') });
+    }
+    // Desktop: background.js already saved the file and opened the
+    // confirmation tab itself - this one just reports success and stays open.
     setStatus('Export complete. Your report has been saved to the folder you picked.');
   } catch (e) {
     setStatus('Error: ' + e.message);

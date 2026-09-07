@@ -459,15 +459,49 @@ test('findInstalledMatch: returns null when neither id nor name matches', () => 
   assert.strictEqual(match, null);
 });
 
-// --- background.js: Android saveAs safeguard ---
-// Firefox for Android throws if downloads.download() is called with
-// saveAs: true - there's no native file picker there. doExport() must
-// omit saveAs on Android and keep it on desktop. Loads the real
-// background.js via vm with a mocked browser/fetch, and checks what it
-// actually passes to downloads.download() on each platform.
+// --- background.js: excludes Firefox for Android's own bundled components ---
+// Android bundles several of its own WebExtension-based components
+// (ads/icons/fxa/readerview/search telemetry) with ids ending in
+// @mozac.org - these aren't anything the user installed and shouldn't
+// show up as exportable, the same way desktop's @mozilla.org ones don't.
 
-async function captureDownloadOptions(platformOs) {
+testAsync('listInstalledAddons: excludes both @mozilla.org and @mozac.org built-ins', async () => {
+  const bgSandbox = {
+    URL,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    browser: {
+      runtime: { onMessage: { addListener() {} } },
+      management: {
+        getAll: async () => [
+          { id: 'ublock@example.com', name: 'uBlock Origin', version: '1.0', enabled: true, type: 'extension' },
+          { id: 'webcompat@mozilla.org', name: 'Web Compat', version: '1.0', enabled: true, type: 'extension' },
+          { id: 'ads@mozac.org', name: 'Mozilla Android Components - Ads Telemetry', version: '1.0', enabled: true, type: 'extension' },
+          { id: 'readerview@mozac.org', name: 'Mozilla Android Components - ReaderView', version: '1.0', enabled: true, type: 'extension' },
+        ],
+      },
+    },
+  };
+  vm.createContext(bgSandbox);
+  vm.runInContext(commonSrc, bgSandbox);
+  vm.runInContext(backgroundSrc, bgSandbox);
+  const result = await bgSandbox.listInstalledAddons();
+  assert.deepStrictEqual(Array.from(result, (a) => a.id), ['ublock@example.com']);
+});
+
+
+// --- background.js: export message handler, platform-specific saving ---
+// Android's downloads.download() can't handle a blob: URL (Android's own
+// DownloadManager only accepts http/https) and there's no saveAs dialog
+// to fall back to either. The message handler now hands the report back
+// to export.js on Android instead of saving it itself - see the comment
+// there for why. Loads the real background.js via vm with a mocked
+// browser/fetch, and invokes the actual registered message listener
+// (not doExport() directly) so this covers the real platform branching.
+
+async function captureExportMessageResult(platformOs) {
   let downloadOptions = null;
+  const createdTabUrls = [];
+  let messageListener = null;
   const bgSandbox = {
     URL,
     Blob,
@@ -477,14 +511,15 @@ async function captureDownloadOptions(platformOs) {
     console: { warn() {}, debug() {}, log() {}, error() {} },
     fetch: async (url) => {
       // Exact-id lookup: pretend it's not on AMO. Name search: no results.
-      // Neither path matters for this test - only the final download call does.
+      // Neither path matters for this test - only the final export step does.
       if (url.includes('/addons/addon/')) return { ok: false, status: 404, json: async () => ({}) };
       return { ok: true, status: 200, json: async () => ({ results: [] }) };
     },
     browser: {
       runtime: {
-        onMessage: { addListener() {} },
+        onMessage: { addListener: (fn) => { messageListener = fn; } },
         getPlatformInfo: async () => ({ os: platformOs }),
+        getURL: (path) => `moz-extension://test-id/${path}`,
         sendMessage: async () => {},
       },
       management: {
@@ -498,23 +533,136 @@ async function captureDownloadOptions(platformOs) {
           return 1;
         },
       },
+      tabs: {
+        create: async (options) => {
+          createdTabUrls.push(options.url);
+          return {};
+        },
+      },
     },
   };
   vm.createContext(bgSandbox);
   vm.runInContext(commonSrc, bgSandbox);
   vm.runInContext(backgroundSrc, bgSandbox);
-  await bgSandbox.doExport(['ext1@example.com']);
-  return downloadOptions;
+  const result = await messageListener({ type: 'export', ids: ['ext1@example.com'] });
+  return { downloadOptions, createdTabUrls, result };
 }
 
-testAsync('doExport: omits saveAs on Android (no native picker there)', async () => {
-  const options = await captureDownloadOptions('android');
-  assert.strictEqual(options.saveAs, undefined);
+testAsync('export message: on Android, hands the report back instead of saving or opening any tab itself', async () => {
+  const { downloadOptions, createdTabUrls, result } = await captureExportMessageResult('android');
+  assert.strictEqual(downloadOptions, null);
+  assert.strictEqual(createdTabUrls.length, 0);
+  assert.match(result.html, /Test Addon/);
+  assert.match(result.filename, /^Firefox-Addons \(.+\)\.html$/);
 });
 
-testAsync('doExport: sets saveAs on desktop platforms', async () => {
-  const options = await captureDownloadOptions('win');
-  assert.strictEqual(options.saveAs, true);
+testAsync('export message: on desktop, downloads with saveAs, opens confirmation.html, and returns nothing', async () => {
+  const { downloadOptions, createdTabUrls, result } = await captureExportMessageResult('win');
+  assert.strictEqual(downloadOptions.saveAs, true);
+  assert.match(downloadOptions.url, /^blob:/);
+  assert.strictEqual(createdTabUrls.length, 1);
+  assert.match(createdTabUrls[0], /confirmation\.html$/);
+  assert.strictEqual(result, undefined);
+});
+
+// --- export.js: click handler ---
+// On desktop, background.js already saves the file and opens
+// confirmation.html itself, so export.js's handler does nothing beyond
+// showing status text. On Android, background.js hands the report back
+// instead (see above), and export.js must trigger the actual save right
+// here, synchronously within this same click - not after another
+// message hop - for it to have a chance of being treated as a real
+// user-triggered download. Loads the real export.js via vm with a
+// mocked browser/DOM, and invokes its actual exportBtn click handler.
+
+const exportSrc = fs.readFileSync(path.join(__dirname, 'export.js'), 'utf8');
+
+async function captureExportClick({ selectedIds, exportResponse }) {
+  const checkedCheckboxes = selectedIds.map((id) => ({ dataset: { id } }));
+  const listElStub = {
+    querySelectorAll: (sel) => (sel.includes('checkbox') ? checkedCheckboxes : []),
+    addEventListener() {},
+    replaceChildren() {},
+  };
+  let exportClickHandler = null;
+  const appendedLinks = [];
+  const bodyStub = { appendChild: (el) => appendedLinks.push(el) };
+  const createdTabUrls = [];
+  const sentMessages = [];
+  const elements = {
+    addonList: listElStub,
+    selectAllBtn: { addEventListener() {} },
+    deselectAllBtn: { addEventListener() {} },
+    exportSelectedBtn: {
+      addEventListener: (ev, fn) => { if (ev === 'click') exportClickHandler = fn; },
+      disabled: false,
+    },
+    status: { textContent: '' },
+    selectionCount: { textContent: '' },
+    searchInput: { addEventListener() {}, style: {} },
+    noSearchMatches: { style: {} },
+  };
+  const exSandbox = {
+    URL: { createObjectURL: () => 'blob:fake-url', revokeObjectURL() {} },
+    Blob: function Blob(parts, opts) { this.parts = parts; this.opts = opts; },
+    setTimeout,
+    clearTimeout,
+    document: {
+      getElementById: (id) => elements[id],
+      body: bodyStub,
+      createElement: () => ({ style: {}, click() { this.clicked = true; }, remove() { this.removed = true; } }),
+    },
+    browser: {
+      runtime: {
+        onMessage: { addListener() {} },
+        sendMessage: async (msg) => {
+          sentMessages.push(msg);
+          if (msg.type === 'listAddons') return [];
+          if (msg.type === 'export') return exportResponse;
+          return undefined;
+        },
+        getURL: (path) => `moz-extension://test-id/${path}`,
+      },
+      tabs: { create: async (options) => { createdTabUrls.push(options.url); return {}; } },
+    },
+  };
+  vm.createContext(exSandbox);
+  vm.runInContext(commonSrc, exSandbox);
+  vm.runInContext(exportSrc, exSandbox);
+  // Let the top-level IIFE's listAddons call settle before the button
+  // even exists to be clicked.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await exportClickHandler();
+  return { sentMessages, appendedLinks, createdTabUrls, statusEl: elements.status };
+}
+
+testAsync('export.js click handler: on Android, triggers the save itself once background.js hands back the report', async () => {
+  const { sentMessages, appendedLinks, createdTabUrls } = await captureExportClick({
+    selectedIds: ['ext1@example.com'],
+    exportResponse: { html: '<html>Test Addon report</html>', filename: 'Firefox-Addons (test).html' },
+  });
+  const exportMsg = sentMessages.find((m) => m.type === 'export');
+  // Array.from (called in this realm) normalizes the foreign-realm array
+  // that comes back from the vm sandbox, so deepStrictEqual can compare
+  // it against a plain literal instead of tripping over cross-realm
+  // Array identity.
+  assert.deepStrictEqual(Array.from(exportMsg.ids), ['ext1@example.com']);
+  assert.strictEqual(appendedLinks.length, 1);
+  assert.strictEqual(appendedLinks[0].href, 'blob:fake-url');
+  assert.strictEqual(appendedLinks[0].download, 'Firefox-Addons (test).html');
+  assert.strictEqual(appendedLinks[0].clicked, true);
+  assert.strictEqual(appendedLinks[0].removed, true);
+  assert.strictEqual(createdTabUrls.length, 1);
+  assert.match(createdTabUrls[0], /confirmation\.html$/);
+});
+
+testAsync('export.js click handler: on desktop, does nothing extra since background.js already handled it', async () => {
+  const { appendedLinks, createdTabUrls } = await captureExportClick({
+    selectedIds: ['ext1@example.com'],
+    exportResponse: undefined,
+  });
+  assert.strictEqual(appendedLinks.length, 0);
+  assert.strictEqual(createdTabUrls.length, 0);
 });
 
 Promise.all(pendingAsyncTests).then(() => {

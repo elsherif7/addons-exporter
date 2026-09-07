@@ -3,10 +3,38 @@ browser.runtime.onMessage.addListener((message) => {
     return listInstalledAddons();
   }
   if (message.type === 'export') {
-    return doExport(message.ids).then(() => {
+    return doExport(message.ids).then(async ({ html, filename }) => {
+      const platform = await browser.runtime.getPlatformInfo();
+
+      if (platform.os === 'android') {
+        // Android's downloads.download() hands the URL to the OS's own
+        // DownloadManager, which only accepts http/https URIs and throws
+        // "Can only download HTTP/HTTPS URIs" for a blob: URL - there's
+        // no saveAs dialog to fall back to either. A real download still
+        // needs to happen somewhere, and the only mechanism that works
+        // there (a plain <a download> click) needs to run in the same
+        // tab/continuation as the original Export click to have a
+        // chance of being recognized as a genuine user-triggered
+        // download rather than getting silently dropped - a new tab
+        // opened from here has no such gesture to inherit. So instead of
+        // saving it here, hand the report back to export.js and let it
+        // do the save itself.
+        return { html, filename };
+      }
+
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      try {
+        // saveAs: true always shows the native "Save As" dialog, letting
+        // the user pick the folder and filename themselves - desktop-only.
+        await browser.downloads.download({ url, filename, saveAs: true });
+      } finally {
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      }
+
       // Opened from here, not the popup - the popup can close early once
       // the native Save dialog steals focus.
-      browser.tabs.create({
+      await browser.tabs.create({
         url: browser.runtime.getURL('confirmation.html')
       });
     });
@@ -255,9 +283,15 @@ async function getExportableAddons() {
 
   // Excludes dictionaries, language packs, and anything else that isn't
   // a plain extension or theme — the report only has Enabled/Disabled
-  // sections, and those types have no matching store listing.
+  // sections, and those types have no matching store listing. Also
+  // excludes Mozilla's own built-in components: desktop's use ids ending
+  // in @mozilla.org, while Firefox for Android bundles several of its own
+  // (ads/icons/fxa/readerview/search telemetry) ending in @mozac.org -
+  // neither is something the user actually chose to install.
   return all.filter(a =>
-    (a.type === 'extension' || a.type === 'theme') && !a.id.endsWith('@mozilla.org')
+    (a.type === 'extension' || a.type === 'theme') &&
+    !a.id.endsWith('@mozilla.org') &&
+    !a.id.endsWith('@mozac.org')
   );
 }
 
@@ -311,26 +345,6 @@ async function doExport(ids) {
   });
 
   const html = buildHtmlReport(list);
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-
-  const downloadOptions = {
-    url,
-    filename: `Firefox-Addons (${formatFilenameTimestamp(new Date())}).html`,
-  };
-
-  // saveAs: true = always show the native "Save As" dialog, letting the
-  // user pick the folder and filename themselves. Firefox for Android has
-  // no such dialog and throws if saveAs is true there, so only set it on
-  // desktop - Android just saves straight to the default Downloads folder.
-  const platform = await browser.runtime.getPlatformInfo();
-  if (platform.os !== 'android') {
-    downloadOptions.saveAs = true;
-  }
-
-  try {
-    await browser.downloads.download(downloadOptions);
-  } finally {
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-  }
+  const filename = `Firefox-Addons (${formatFilenameTimestamp(new Date())}).html`;
+  return { html, filename };
 }

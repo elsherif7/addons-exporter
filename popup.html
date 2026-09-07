@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 260px; margin: 0; padding: 16px; background: #eff1f3; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 260px; margin: 0; padding: 16px; background: #eff1f3; box-sizing: border-box; }
+    /* Firefox for Android shows this popup as a full-screen overlay rather
+       than a small anchored dropdown, so the fixed 260px above leaves it
+       pinned to a corner with the rest of the screen empty. popup.js adds
+       this class after checking runtime.getPlatformInfo() - desktop's
+       layout above is untouched either way. */
+    body.android { width: 100%; max-width: 400px; margin: 0 auto; padding: 28px 20px; }
     .card {
       background: #fff;
       border-radius: 12px;
