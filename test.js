@@ -506,8 +506,12 @@ async function captureExportMessageResult(platformOs) {
     URL,
     Blob,
     AbortController,
-    setTimeout,
-    clearTimeout,
+    // background.js schedules a 30s delay before revoking the blob URL
+    // on desktop - firing immediately here avoids this test (and the
+    // whole test.js process) actually waiting that long to exit, since
+    // Node keeps the event loop alive for pending timers.
+    setTimeout: (fn) => { fn(); return 0; },
+    clearTimeout() {},
     console: { warn() {}, debug() {}, log() {}, error() {} },
     fetch: async (url) => {
       // Exact-id lookup: pretend it's not on AMO. Name search: no results.
@@ -577,7 +581,7 @@ testAsync('export message: on desktop, downloads with saveAs, opens confirmation
 
 const exportSrc = fs.readFileSync(path.join(__dirname, 'export.js'), 'utf8');
 
-async function captureExportClick({ selectedIds, exportResponse }) {
+async function captureExportClick({ selectedIds, exportResponse, simulateDownloadCreated = false }) {
   const checkedCheckboxes = selectedIds.map((id) => ({ dataset: { id } }));
   const listElStub = {
     querySelectorAll: (sel) => (sel.includes('checkbox') ? checkedCheckboxes : []),
@@ -605,8 +609,13 @@ async function captureExportClick({ selectedIds, exportResponse }) {
   const exSandbox = {
     URL: { createObjectURL: () => 'blob:fake-url', revokeObjectURL() {} },
     Blob: function Blob(parts, opts) { this.parts = parts; this.opts = opts; },
-    setTimeout,
-    clearTimeout,
+    // export.js's fallback timer fires immediately here, keeping the
+    // test fast. When simulateDownloadCreated is true, the
+    // downloads.onCreated stub below fires first anyway (synchronously,
+    // before this fallback even runs), so the "settled" guard in
+    // export.js means only one path actually resolves things either way.
+    setTimeout: (fn) => { fn(); return 0; },
+    clearTimeout() {},
     document: {
       getElementById: (id) => elements[id],
       body: bodyStub,
@@ -624,6 +633,16 @@ async function captureExportClick({ selectedIds, exportResponse }) {
         getURL: (path) => `moz-extension://test-id/${path}`,
       },
       tabs: { create: async (options) => { createdTabUrls.push(options.url); return {}; } },
+      downloads: {
+        onCreated: {
+          // Simulates the download actually being observed - fires
+          // synchronously at registration time, same as a very fast
+          // real download would resolve things before the fallback
+          // timer got a chance to.
+          addListener: (fn) => { if (simulateDownloadCreated) fn({}); },
+          removeListener() {},
+        },
+      },
     },
   };
   vm.createContext(exSandbox);
@@ -633,13 +652,14 @@ async function captureExportClick({ selectedIds, exportResponse }) {
   // even exists to be clicked.
   await new Promise((resolve) => setTimeout(resolve, 0));
   await exportClickHandler();
-  return { sentMessages, appendedLinks, createdTabUrls, statusEl: elements.status };
+  return { sentMessages, appendedLinks, createdTabUrls, statusEl: elements.status, exportBtnEl: elements.exportSelectedBtn };
 }
 
-testAsync('export.js click handler: on Android, triggers the save itself once background.js hands back the report', async () => {
-  const { sentMessages, appendedLinks, createdTabUrls } = await captureExportClick({
+testAsync('export.js click handler: on Android, proceeds to confirmation.html once downloads.onCreated fires', async () => {
+  const { sentMessages, appendedLinks, createdTabUrls, exportBtnEl } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
     exportResponse: { html: '<html>Test Addon report</html>', filename: 'Firefox-Addons (test).html' },
+    simulateDownloadCreated: true,
   });
   const exportMsg = sentMessages.find((m) => m.type === 'export');
   // Array.from (called in this realm) normalizes the foreign-realm array
@@ -652,6 +672,19 @@ testAsync('export.js click handler: on Android, triggers the save itself once ba
   assert.strictEqual(appendedLinks[0].download, 'Firefox-Addons (test).html');
   assert.strictEqual(appendedLinks[0].clicked, true);
   assert.strictEqual(appendedLinks[0].removed, true);
+  // Both onCreated and the (immediate, mocked) fallback timer fire here -
+  // the "settled" guard in export.js should mean only one tab opens.
+  assert.strictEqual(createdTabUrls.length, 1);
+  assert.match(createdTabUrls[0], /confirmation\.html$/);
+  assert.strictEqual(exportBtnEl.disabled, true);
+});
+
+testAsync('export.js click handler: on Android, still proceeds via the fallback timer if onCreated never fires', async () => {
+  const { createdTabUrls } = await captureExportClick({
+    selectedIds: ['ext1@example.com'],
+    exportResponse: { html: '<html>Test Addon report</html>', filename: 'Firefox-Addons (test).html' },
+    simulateDownloadCreated: false,
+  });
   assert.strictEqual(createdTabUrls.length, 1);
   assert.match(createdTabUrls[0], /confirmation\.html$/);
 });

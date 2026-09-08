@@ -154,14 +154,44 @@ exportBtn.addEventListener('click', async () => {
       link.download = result.filename;
       link.style.display = 'none';
       document.body.appendChild(link);
-      link.click();
+
+      setStatus('Saving report...');
+
+      // Android shows its own download confirmation prompt for this
+      // click, and navigating away before the user answers it dismisses
+      // it (confirmed by testing) - a fixed delay either cuts that off
+      // (too short) or forces an arbitrary wait (too long, still a
+      // guess). downloads.onCreated is a real signal instead: even
+      // though downloads.download() can't be called here, the browser's
+      // download-tracking system still seems to observe a plain <a
+      // download> click the same way, since it's the same underlying
+      // mechanism either way. Falls back to a generous timeout in case
+      // that turns out not to hold on a given build, so this still
+      // finishes instead of hanging indefinitely either way.
+      await new Promise((resolve) => {
+        let settled = false;
+        let fallbackTimer;
+        const proceed = () => {
+          if (settled) return;
+          settled = true;
+          browser.downloads.onCreated.removeListener(onCreated);
+          clearTimeout(fallbackTimer);
+          resolve();
+        };
+        const onCreated = () => proceed();
+        browser.downloads.onCreated.addListener(onCreated);
+        fallbackTimer = setTimeout(proceed, 5000);
+        link.click();
+      });
+
       link.remove();
       setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
       await browser.tabs.create({ url: browser.runtime.getURL('confirmation.html') });
+    } else {
+      // Desktop: background.js already saved the file and opened the
+      // confirmation tab itself - this one just reports success and stays open.
+      setStatus('Export complete. Your report has been saved to the folder you picked.');
     }
-    // Desktop: background.js already saved the file and opened the
-    // confirmation tab itself - this one just reports success and stays open.
-    setStatus('Export complete. Your report has been saved to the folder you picked.');
   } catch (e) {
     setStatus('Error: ' + e.message);
     exportBtn.disabled = false;
