@@ -51,6 +51,7 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
 #selectionCount {
   font-size: 13px;
   color: #666;
+  padding: 6px 10px;
 }
 .list-controls button {
   background: none;
