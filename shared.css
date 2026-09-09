@@ -42,8 +42,10 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
 }
 .list-controls {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 6px 12px;
   margin-bottom: 10px;
 }
 #selectionCount {
@@ -57,7 +59,7 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 6px 10px;
 }
 .list-controls button:hover { text-decoration: underline; }
 .checklist-box {
@@ -87,7 +89,7 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 8px 14px;
+  padding: 10px 14px;
   border-bottom: 1px solid #f0f1f3;
   cursor: pointer; /* whole row is clickable - overridden to default below for disabled rows */
   user-select: none; /* clicking to toggle shouldn't also highlight the row's text */
