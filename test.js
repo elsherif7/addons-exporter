@@ -93,10 +93,11 @@ function test(name, fn) {
   }
 }
 
-// test() is synchronous - fine for everything above, but doExport() below
-// is async. testAsync() runs the same pass/fail bookkeeping against a
-// promise instead, and the calls are collected so the final summary
-// waits for all of them before printing.
+// test() is synchronous - fine for everything above, but the
+// background.js/export.js tests further down are async. testAsync() runs
+// the same pass/fail bookkeeping against a promise instead, and the
+// calls are collected so the final summary waits for all of them before
+// printing.
 const pendingAsyncTests = [];
 function testAsync(name, fn) {
   pendingAsyncTests.push(
@@ -289,7 +290,7 @@ test('isPlausibleNameMatch: empty installed or result name is rejected', () => {
   assert.strictEqual(isPlausibleNameMatch('uBlock Origin', ''), false);
 });
 
-
+// --- visibleCheckboxes ---
 // Minimal fake checkboxes — visibleCheckboxes only needs cb.closest('.addon-row')
 // and the row's style.display.
 
@@ -487,7 +488,6 @@ testAsync('listInstalledAddons: excludes both @mozilla.org and @mozac.org built-
   const result = await bgSandbox.listInstalledAddons();
   assert.deepStrictEqual(Array.from(result, (a) => a.id), ['ublock@example.com']);
 });
-
 
 // --- background.js: export message handler, platform-specific saving ---
 // Android's downloads.download() can't handle a blob: URL (Android's own

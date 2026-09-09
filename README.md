@@ -17,7 +17,7 @@ Firefox doesn't allow any extension to install other extensions automatically �
 ```
 addons-exporter/
 ├── manifest.json        # Extension config, permissions, background script
-├── common.js             # Shared helpers (escapeHtml, isSafeUrl, byName, filterAddonRows) and the export format version
+├── common.js             # Shared helpers (escapeHtml, isSafeUrl, byName, filterAddonRows, AMO name-matching) and the export format version
 ├── background.js        # Export logic, AMO lookups, HTML report generation
 ├── shared.css            # Shared styles for export.html / import.html / confirmation.html
 ├── popup.html            # Toolbar popup UI
@@ -27,7 +27,7 @@ addons-exporter/
 ├── confirmation.html     # Tab shown after export completes
 ├── import.html           # Page to pick an exported file and choose which add-ons to open
 ├── import.js             # Import logic (parses the file, opens the selected tabs)
-├── test.js               # Plain Node.js tests for common.js — run with: node test.js
+├── test.js               # Plain Node.js tests for common.js, import.js, export.js, and background.js — run with: node test.js
 └── icons/                # Toolbar and extension icons (16/32/48/96/128px)
 ```
 
@@ -60,9 +60,9 @@ addons-exporter/
 
 A few other things worth knowing:
 
-- The confirmation tab opens from the background script itself once a download starts, not from the popup — so it still appears even if the popup's own tab has already closed.
+- On desktop, the confirmation tab opens from the background script itself once the file downloads, not from the popup — so it still appears even if the popup's own tab has already closed. On Firefox for Android, the platform doesn't allow the background script to trigger the download itself, so the Export page does it directly and opens the confirmation tab once the download is picked up.
 - AMO lookups are capped at 15 seconds each and 5 in flight at once, so a slow AMO response can't stall an export, and a large add-on collection can't trip AMO's rate limiting.
-- Firefox's own bundled built-ins (New Tab page, default themes) and spell-check dictionaries/language packs are excluded, since they aren't real installed add-ons and have no matching store listing.
+- Firefox's own bundled built-ins (New Tab page, default themes) and spell-check dictionaries/language packs are excluded, since they aren't real installed add-ons and have no matching store listing. On Firefox for Android, its own bundled components (ad-blocking telemetry, reader view, etc.) are excluded the same way.
 - Import only ever opens http/https links; anything else is flagged and left unselected, since an export file's data isn't inherently trusted.
 - If every add-on in the file is already installed, Import shows a short note about it — informational only, since there's nothing to open.
 
@@ -76,7 +76,7 @@ A few other things worth knowing:
 | `downloads` | To save the exported HTML report |
 | `https://addons.mozilla.org/*` | To look up each add-on's real AMO page |
 
-> Manifest V3, requiring Firefox 109 or newer (the first release with MV3 support). Migrated from Manifest V2.
+> Manifest V3, requiring Firefox 109 or newer (the first release with MV3 support), and Firefox for Android 113 or newer. Migrated from Manifest V2.
 >
 > Declares `data_collection_permissions: { required: ["none"] }` — this extension collects zero personal data.
 

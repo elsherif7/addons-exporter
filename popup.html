@@ -6,15 +6,12 @@
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 260px; margin: 0; padding: 16px; background: #eff1f3; box-sizing: border-box; }
     /* Firefox for Android shows this popup as a full-screen overlay rather
-       than a small anchored dropdown, so the fixed 260px above leaves it
-       pinned to a corner with the rest of the screen empty. popup.js adds
-       this class after checking runtime.getPlatformInfo() - desktop's
-       layout above is untouched either way. */
-    /* Fluid instead of a flat cap, so this scales smoothly across any
-       Android phone or tablet width instead of just looking right at
-       one tested size. min(92vw, 480px) keeps a comfortable margin on
-       phones and caps out at 480px on tablets; clamp() scales padding
-       and text with it instead of jumping at a single breakpoint. */
+       than a small anchored dropdown, so the fixed 260px above would leave
+       it pinned to a corner with the rest of the screen empty. popup.js
+       adds this class after checking runtime.getPlatformInfo() - desktop's
+       layout above is untouched either way. Fluid (min()/clamp()) rather
+       than a flat cap, so it scales smoothly across any Android phone or
+       tablet width instead of just looking right at one tested size. */
     body.android { width: 100%; max-width: min(92vw, 480px); margin: 0 auto; padding: clamp(20px, 6vw, 36px) clamp(16px, 5vw, 24px); }
     body.android h3 { font-size: clamp(16px, 4.5vw, 20px); }
     body.android button { padding: clamp(10px, 3vw, 14px); font-size: clamp(14px, 3.5vw, 16px); }
