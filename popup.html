@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 260px; margin: 0; padding: 16px; background: #eff1f3; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 260px; margin: 0; padding: 16px; background: #eff1f3; box-sizing: border-box; overflow-wrap: break-word; }
     /* Firefox for Android shows this popup as a full-screen overlay rather
        than a small anchored dropdown, so the fixed 260px above would leave
        it pinned to a corner with the rest of the screen empty. popup.js
@@ -12,7 +12,10 @@
        layout above is untouched either way. Fluid (min()/clamp()) rather
        than a flat cap, so it scales smoothly across any Android phone or
        tablet width instead of just looking right at one tested size. */
-    body.android { width: 100%; max-width: min(92vw, 480px); margin: 0 auto; padding: clamp(20px, 6vw, 36px) clamp(16px, 5vw, 24px); }
+    /* Vertical padding uses vmin (not vw) so it scales down on short
+       landscape viewports too - vw alone stays large even when height,
+       not width, is what's actually constrained there. */
+    body.android { width: 100%; max-width: min(92vw, 480px); margin: 0 auto; padding: clamp(20px, 6vmin, 36px) clamp(16px, 5vw, 24px); }
     body.android h3 { font-size: clamp(16px, 4.5vw, 20px); }
     body.android button { padding: clamp(10px, 3vw, 14px); font-size: clamp(14px, 3.5vw, 16px); }
     .card {

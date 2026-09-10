@@ -146,8 +146,11 @@ function buildHtmlReport(list) {
 <title>Add-ons Exporter</title>
 <link rel="icon" href="${REPORT_ICON_DATA_URI}">
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f4f5f7; margin: 0; padding: clamp(24px, 8vw, 60px) clamp(14px, 5vw, 20px); color: #222; box-sizing: border-box; }
-  .card { max-width: 640px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: clamp(20px, 6vw, 40px); text-align: center; box-sizing: border-box; }
+  /* Vertical padding uses vmin (not vw) so it also scales down on
+     short landscape viewports, where vw alone would keep it large
+     even though height is what's actually constrained there. */
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f4f5f7; margin: 0; padding: clamp(24px, 8vmin, 60px) clamp(14px, 5vw, 20px); color: #222; box-sizing: border-box; overflow-wrap: break-word; }
+  .card { max-width: 640px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: clamp(20px, 6vmin, 40px); text-align: center; box-sizing: border-box; }
   h1 { font-size: clamp(22px, 6vw, 28px); margin: 0 0 16px; }
   p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }

@@ -6,10 +6,14 @@ body {
   margin: 0;
   /* Fluid padding: scales down smoothly on narrow phones instead of a
      fixed 60px eating into limited width, and back up toward the
-     original 60px/20px on wider screens. */
-  padding: clamp(24px, 8vw, 60px) clamp(14px, 5vw, 20px);
+     original 60px/20px on wider screens. Vertical padding uses vmin
+     (not vw) so it also scales down on short landscape viewports,
+     where vw alone would keep it large even though height is what's
+     actually constrained there. */
+  padding: clamp(24px, 8vmin, 60px) clamp(14px, 5vw, 20px);
   color: #222;
   box-sizing: border-box;
+  overflow-wrap: break-word;
 }
 .card {
   max-width: 560px;
@@ -17,7 +21,7 @@ body {
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-  padding: clamp(20px, 6vw, 40px);
+  padding: clamp(20px, 6vmin, 40px);
   text-align: center;
   box-sizing: border-box;
 }

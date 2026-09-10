@@ -61,7 +61,12 @@
     font-weight: 600;
     padding: 5px 9px;
     border-radius: 5px;
-    white-space: nowrap;
+    /* max-width + normal wrapping instead of nowrap, so if this button
+       ever ends up near a viewport edge the tooltip wraps to fit
+       instead of extending off-screen. */
+    max-width: 140px;
+    white-space: normal;
+    text-align: center;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.12s;
