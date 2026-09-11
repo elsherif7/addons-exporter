@@ -35,7 +35,7 @@ browser.runtime.onMessage.addListener((message) => {
       // Opened from here, not the popup - the popup can close early once
       // the native Save dialog steals focus.
       await browser.tabs.create({
-        url: browser.runtime.getURL('confirmation.html')
+        url: browser.runtime.getURL('src/confirmation/confirmation.html')
       });
     });
   }

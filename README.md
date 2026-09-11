@@ -16,19 +16,26 @@ Firefox doesn't allow any extension to install other extensions automatically �
 
 ```
 addons-exporter/
-├── manifest.json        # Extension config, permissions, background script
-├── common.js             # Shared helpers (escapeHtml, isSafeUrl, byName, filterAddonRows, AMO name-matching) and the export format version
-├── background.js        # Export logic, AMO lookups, HTML report generation
-├── shared.css            # Shared styles for export.html / import.html / confirmation.html
-├── popup.html            # Toolbar popup UI
-├── popup.js              # Popup logic (Export / Import buttons)
-├── export.html           # Page to pick which installed add-ons to export
-├── export.js             # Export picker logic (loads the list, sends the selection)
-├── confirmation.html     # Tab shown after export completes
-├── import.html           # Page to pick an exported file and choose which add-ons to open
-├── import.js             # Import logic (parses the file, opens the selected tabs)
-├── test.js               # Plain Node.js tests for common.js, import.js, export.js, and background.js — run with: node test.js
-└── icons/                # Toolbar and extension icons (16/32/48/96/128px)
+├── manifest.json         # Extension config, permissions, background script
+├── test.js                # Plain Node.js tests for common.js, import.js, export.js, and background.js — run with: node test.js
+└── src/
+    ├── common/
+    │   ├── common.js      # Shared helpers (escapeHtml, isSafeUrl, byName, filterAddonRows, AMO name-matching) and the export format version
+    │   └── shared.css     # Shared styles for export.html / import.html / confirmation.html
+    ├── background/
+    │   └── background.js  # Export logic, AMO lookups, HTML report generation
+    ├── popup/
+    │   ├── popup.html     # Toolbar popup UI
+    │   └── popup.js       # Popup logic (Export / Import buttons)
+    ├── export/
+    │   ├── export.html    # Page to pick which installed add-ons to export
+    │   └── export.js      # Export picker logic (loads the list, sends the selection)
+    ├── import/
+    │   ├── import.html    # Page to pick an exported file and choose which add-ons to open
+    │   └── import.js      # Import logic (parses the file, opens the selected tabs)
+    ├── confirmation/
+    │   └── confirmation.html  # Tab shown after export completes
+    └── icons/             # Toolbar and extension icons (16/32/48/96/128px)
 ```
 
 ---

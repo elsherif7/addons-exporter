@@ -8,11 +8,11 @@ browser.runtime.getPlatformInfo().then((info) => {
 });
 
 document.getElementById('exportBtn').addEventListener('click', async () => {
-  await browser.tabs.create({ url: browser.runtime.getURL('export.html') });
+  await browser.tabs.create({ url: browser.runtime.getURL('src/export/export.html') });
   window.close();
 });
 
 document.getElementById('importBtn').addEventListener('click', async () => {
-  await browser.tabs.create({ url: browser.runtime.getURL('import.html') });
+  await browser.tabs.create({ url: browser.runtime.getURL('src/import/import.html') });
   window.close();
 });

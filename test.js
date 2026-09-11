@@ -28,8 +28,8 @@ function makeFakeElement() {
 // generic fake element for every id is enough.
 const fakeDocument = { getElementById() { return makeFakeElement(); } };
 
-const commonSrc = fs.readFileSync(path.join(__dirname, 'common.js'), 'utf8');
-const importSrc = fs.readFileSync(path.join(__dirname, 'import.js'), 'utf8');
+const commonSrc = fs.readFileSync(path.join(__dirname, 'src/common/common.js'), 'utf8');
+const importSrc = fs.readFileSync(path.join(__dirname, 'src/import/import.js'), 'utf8');
 const sandbox = { URL, document: fakeDocument };
 vm.createContext(sandbox);
 vm.runInContext(commonSrc, sandbox);
@@ -55,7 +55,7 @@ const EXPORT_FORMAT_VERSION = vm.runInContext('EXPORT_FORMAT_VERSION', sandbox);
 // background.js - not a hand-copied snapshot - so a future edit to one
 // copy and not the other gets caught here instead of silently drifting.
 // (backgroundSrc is also reused further down to test doExport() directly.)
-const backgroundSrc = fs.readFileSync(path.join(__dirname, 'background.js'), 'utf8');
+const backgroundSrc = fs.readFileSync(path.join(__dirname, 'src/background/background.js'), 'utf8');
 const reportScriptMatch = backgroundSrc.match(/<script>([\s\S]*?)<\/script>/);
 if (!reportScriptMatch) {
   throw new Error("Could not find the report's inline <script> block in background.js - update this extraction if the report template changed.");
@@ -579,7 +579,7 @@ testAsync('export message: on desktop, downloads with saveAs, opens confirmation
 // user-triggered download. Loads the real export.js via vm with a
 // mocked browser/DOM, and invokes its actual exportBtn click handler.
 
-const exportSrc = fs.readFileSync(path.join(__dirname, 'export.js'), 'utf8');
+const exportSrc = fs.readFileSync(path.join(__dirname, 'src/export/export.js'), 'utf8');
 
 async function captureExportClick({ selectedIds, exportResponse, simulateDownloadCreated = false }) {
   const checkedCheckboxes = selectedIds.map((id) => ({ dataset: { id } }));

@@ -186,7 +186,7 @@ exportBtn.addEventListener('click', async () => {
 
       link.remove();
       setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
-      await browser.tabs.create({ url: browser.runtime.getURL('confirmation.html') });
+      await browser.tabs.create({ url: browser.runtime.getURL('src/confirmation/confirmation.html') });
     } else {
       // Desktop: background.js already saved the file and opened the
       // confirmation tab itself - this one just reports success and stays open.
