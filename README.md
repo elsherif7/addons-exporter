@@ -17,7 +17,13 @@ Firefox doesn't allow any extension to install other extensions automatically �
 ```
 addons-exporter/
 ├── manifest.json         # Extension config, permissions, background script
-├── test.js                # Plain Node.js tests for common.js, import.js, export.js, and background.js — run with: node test.js
+├── tests/                 # Plain Node.js tests, one file per source file — run with: node tests/run.js
+│   ├── run.js             # Requires every *.test.js file, then prints the combined summary
+│   ├── helpers.js         # Shared test()/testAsync() harness and vm-loading utilities
+│   ├── common.test.js     # Tests for src/common/common.js
+│   ├── import.test.js     # Tests for src/import/import.js
+│   ├── background.test.js # Tests for src/background/background.js
+│   └── export.test.js     # Tests for src/export/export.js
 └── src/
     ├── common/
     │   ├── common.js      # Shared helpers (escapeHtml, isSafeUrl, byName, filterAddonRows, AMO name-matching) and the export format version
