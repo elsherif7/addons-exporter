@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Add-ons Exporter",
+  "name": "Add-ons Hub",
   "version": "1.2.0",
   "description": "Export or import your installed add-ons as an HTML report with real store links.",
   "permissions": [
@@ -33,7 +33,7 @@
     "scripts": ["src/common/common.js", "src/background/background.js"]
   },
   "action": {
-    "default_title": "Add-ons Exporter",
+    "default_title": "Add-ons Hub",
     "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "src/icons/icon16.png",

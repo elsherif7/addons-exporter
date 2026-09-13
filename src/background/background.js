@@ -68,13 +68,13 @@ async function findAmoPage(id, name) {
     if (res.ok) {
       const data = await res.json();
       if (data.url) return { url: data.url, matchType: 'amo-exact' };
-      console.warn(`[Add-ons Exporter] AMO exact lookup for "${name}" (${id}) returned no url field`, data);
+      console.warn(`[Add-ons Hub] AMO exact lookup for "${name}" (${id}) returned no url field`, data);
     } else if (res.status !== 404) {
       // 404 just means it's not on AMO, not worth a warning.
-      console.warn(`[Add-ons Exporter] AMO exact lookup for "${name}" (${id}) failed: HTTP ${res.status}`);
+      console.warn(`[Add-ons Hub] AMO exact lookup for "${name}" (${id}) failed: HTTP ${res.status}`);
     }
   } catch (err) {
-    console.warn(`[Add-ons Exporter] AMO exact lookup for "${name}" (${id}) threw:`, err);
+    console.warn(`[Add-ons Hub] AMO exact lookup for "${name}" (${id}) threw:`, err);
   }
 
   // 2. Fuzzy search by name
@@ -92,12 +92,12 @@ async function findAmoPage(id, name) {
       // Either no results, or the top result's name didn't clear the
       // relevance bar - don't hand back an unrelated add-on just
       // because it happened to rank first.
-      console.debug(`[Add-ons Exporter] AMO name search for "${name}" (${id}) returned no plausible match`, data);
+      console.debug(`[Add-ons Hub] AMO name search for "${name}" (${id}) returned no plausible match`, data);
     } else {
-      console.warn(`[Add-ons Exporter] AMO name search for "${name}" (${id}) failed: HTTP ${res.status}`);
+      console.warn(`[Add-ons Hub] AMO name search for "${name}" (${id}) failed: HTTP ${res.status}`);
     }
   } catch (err) {
-    console.warn(`[Add-ons Exporter] AMO name search for "${name}" (${id}) threw:`, err);
+    console.warn(`[Add-ons Hub] AMO name search for "${name}" (${id}) threw:`, err);
   }
 
   return null;
@@ -198,7 +198,7 @@ function buildHtmlReport(list) {
 <body>
   <div class="card">
   <h1>Add-ons Exporter</h1>
-  <p><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Exporter</a> installed, click its toolbar icon and choose <strong>Import Add-ons</strong> to open every link below as a tab automatically.</p>
+  <p><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Hub</a> installed, click its toolbar icon and choose <strong>Add-ons Importer</strong> to open every link below as a tab automatically.</p>
 
   <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
 
