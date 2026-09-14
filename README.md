@@ -1,10 +1,10 @@
-# addons-exporter
+# addons-hub
 
-A Firefox WebExtension that exports your installed add-ons to an HTML report, so you can quickly reinstall them all on another Gecko-based browser (Firefox, Zen, LibreWolf, Waterfox, etc.) instead of hunting them down one by one.
+**Add-ons Hub** is a Firefox WebExtension that exports your installed add-ons to an HTML report, so you can quickly reinstall them all on another Gecko-based browser (Firefox, Zen, LibreWolf, Waterfox, etc.) instead of hunting them down one by one.
 
 Firefox doesn't allow any extension to install other extensions automatically — that's a deliberate security restriction, not a limitation of this tool. This just makes the manual reinstall process as fast as possible: pick which add-ons to include, export, then pick which of them to open as tabs on the new browser.
 
-**🦊 Get it on Firefox Add-ons:** [addons.mozilla.org/en-US/firefox/addon/add-ons-exporter](https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/)
+**🦊 Get it on Firefox Add-ons:** [addons.mozilla.org/en-US/firefox/addon/add-ons-hub](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/)
 
 > New updates are published on the 1st of odd-numbered months (January, March, May, July, September, November).
 >
@@ -15,7 +15,7 @@ Firefox doesn't allow any extension to install other extensions automatically �
 ## Structure
 
 ```
-addons-exporter/
+addons-hub/
 ├── manifest.json         # Extension config, permissions, background script
 ├── tests/                 # Plain Node.js tests, one file per source file — run with: node tests/run.js
 │   ├── run.js             # Requires every *.test.js file, then prints the combined summary
@@ -32,7 +32,7 @@ addons-exporter/
     │   └── background.js  # Export logic, AMO lookups, HTML report generation
     ├── popup/
     │   ├── popup.html     # Toolbar popup UI
-    │   └── popup.js       # Popup logic (Export / Import buttons)
+    │   └── popup.js       # Popup logic (Add-ons Exporter / Add-ons Importer buttons)
     ├── export/
     │   ├── export.html    # Page to pick which installed add-ons to export
     │   └── export.js      # Export picker logic (loads the list, sends the selection)
@@ -50,13 +50,13 @@ addons-exporter/
 
 **1. Install from Firefox Add-ons (recommended)**
 
-> Install directly from [addons.mozilla.org](https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/) — the signed, permanent version.
+> Install directly from [addons.mozilla.org/en-US/firefox/addon/add-ons-hub](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/) — the signed, permanent version.
 
 **2. Or load a local copy for development**
 
 1. Clone the repo:
    ```
-   git clone https://github.com/elsherif7/addons-exporter
+   git clone https://github.com/elsherif7/addons-hub
    ```
 2. Go to `about:debugging#/runtime/this-firefox` and click **"Load Temporary Add-on"**.
 3. Select `manifest.json` from the cloned folder.
@@ -67,9 +67,9 @@ addons-exporter/
 
 ## How it works
 
-**Export** — click the toolbar icon → **Export Add-ons** to open a checklist of every installed extension and theme, split into Enabled/Disabled groups and alphabetized within each. A search box at the top lets you filter the list by name. Pick which ones to include, or use Select all / Deselect all, then click **Export Selected**. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage as a last resort), and the result is saved as a single HTML report — human-readable on its own, with the underlying data embedded for the Import page to read back. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on.
+**Export** — click the toolbar icon → **Add-ons Exporter** to open a checklist of every installed extension and theme, split into Enabled/Disabled groups and alphabetized within each. A search box at the top lets you filter the list by name. Pick which ones to include, or use Select all / Deselect all, then click **Export Selected**. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage as a last resort), and the result is saved as a single HTML report — human-readable on its own, with the underlying data embedded for the Import page to read back. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on.
 
-**Import** — click **Import Add-ons**, then choose or drag in a previously exported report. It's read and validated automatically as soon as it's selected, and only accepted if its embedded format version is one this copy of the extension understands — anything missing or newer is rejected with a clear message rather than guessed at. It's automatically compared against what's currently installed (matched by add-on ID, falling back to name for older exports), so the checklist splits into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference, not pre-selected) — no need to reopen things you already have. A search box at the top lets you filter the list by name. Pick what to open and click **Open Selected**; tabs open one at a time with a short stagger between each, rather than all at once.
+**Import** — click **Add-ons Importer**, then choose or drag in a previously exported report. It's read and validated automatically as soon as it's selected, and only accepted if its embedded format version is one this copy of the extension understands — anything missing or newer is rejected with a clear message rather than guessed at. It's automatically compared against what's currently installed (matched by add-on ID, falling back to name for older exports), so the checklist splits into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference, not pre-selected) — no need to reopen things you already have. A search box at the top lets you filter the list by name. Pick what to open and click **Open Selected**; tabs open one at a time with a short stagger between each, rather than all at once.
 
 A few other things worth knowing:
 
@@ -101,7 +101,7 @@ This extension does not collect, store, or transmit any personal data. The only 
 
 ## Contributing
 
-Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/elsherif7/addons-exporter/issues).
+Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/elsherif7/addons-hub/issues).
 
 ## Credits
 

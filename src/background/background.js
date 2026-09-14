@@ -198,7 +198,7 @@ function buildHtmlReport(list) {
 <body>
   <div class="card">
   <h1>Add-ons Exporter</h1>
-  <p><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Hub</a> installed, click its toolbar icon and choose <strong>Add-ons Importer</strong> to open every link below as a tab automatically.</p>
+  <p><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener">Add-ons Hub</a> installed, click its toolbar icon and choose <strong>Add-ons Importer</strong> to open every link below as a tab automatically.</p>
 
   <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
 
