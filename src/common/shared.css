@@ -114,6 +114,12 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   color: #888;
   font-size: 12px;
 }
+/* Base layout/typography for a link-preview note under an add-on's name.
+   Split from .unsafe below so a future non-error use (e.g. a neutral
+   "resolved via homepage" note) could reuse the same block/size/spacing
+   without also getting the red warning styling — import.js only ever
+   applies this alongside .unsafe today, but the two are kept separate
+   on purpose. */
 .addon-link-preview {
   display: block;
   font-size: 12px;

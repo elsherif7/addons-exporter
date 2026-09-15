@@ -44,6 +44,16 @@ addons-hub/
     └── icons/             # Toolbar and extension icons (16/32/48/96/128px)
 ```
 
+> **Note:** `manifest.json`'s `browser_specific_settings.gecko.id` is
+> `addons-exporter@local` — a legacy id left over from this project's
+> previous "Add-ons Exporter" name, before it was renamed to "Add-ons
+> Hub". It can't be documented with an inline comment since
+> `manifest.json` is parsed as strict JSON (no comments allowed), hence
+> the note here instead. Don't change it casually: Firefox uses this id
+> to match an installed copy to its future updates, so changing it would
+> break update continuity for anyone who already has the extension
+> installed.
+
 ---
 
 ## Installation
