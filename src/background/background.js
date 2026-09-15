@@ -153,7 +153,8 @@ function buildHtmlReport(list) {
   .card { max-width: 640px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: clamp(20px, 6vmin, 40px); text-align: center; box-sizing: border-box; }
   h1 { font-size: clamp(22px, 6vw, 28px); margin: 0 0 16px; }
   p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
-  .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }
+  .cta-link { color: #0060df; font-weight: bold; text-decoration: none; }
+  .cta-link:hover { text-decoration: underline; }
   .search-input {
     display: block;
     width: 100%;
@@ -221,6 +222,8 @@ function buildHtmlReport(list) {
     // NOTE: mirrors filterAddonRows() in common.js. Duplicated here
     // because this report is self-contained and can't load common.js
     // once saved elsewhere. Keep both copies in sync if you change this.
+    // Both copies intentionally match against .addon-name only, not the
+    // version number or match-type labels.
     function filterAddonRows(query) {
       var q = query.trim().toLowerCase();
       var heading = null;
