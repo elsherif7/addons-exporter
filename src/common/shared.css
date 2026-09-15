@@ -16,7 +16,7 @@ body {
   overflow-wrap: break-word;
 }
 .card {
-  max-width: 560px;
+  max-width: 640px;
   margin: 0 auto;
   background: #fff;
   border-radius: 12px;
