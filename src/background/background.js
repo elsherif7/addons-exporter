@@ -174,7 +174,7 @@ function buildHtmlReport(list) {
     border: 1px solid #e2e4e8;
     border-radius: 8px;
     padding: 4px 0;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
   }
   .group-heading {
     font-size: 12px;
