@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
+    /* body's #eff1f3 background here is intentional, not drift - the
+       popup doesn't load shared.css and was never meant to match the
+       #f4f5f7 used on export.html/import.html/confirmation.html/the
+       report. Don't "fix" this to match without checking first. */
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 260px; margin: 0; padding: 16px; background: #eff1f3; box-sizing: border-box; overflow-wrap: break-word; }
     /* Firefox for Android shows this popup as a full-screen overlay rather
        than a small anchored dropdown, so the fixed 260px above would leave
