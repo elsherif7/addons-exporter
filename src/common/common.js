@@ -79,8 +79,10 @@ const LINK_TYPE_LABELS = {
 };
 const UNCERTAIN_LINK_TYPES = new Set(['amo-search', 'amo-search-fallback']);
 
-// Filters .addon-row elements by search query, hiding a .group-heading
-// if none of its rows still match. Returns true if anything's visible.
+// Filters .addon-row elements by search query (matched against each row's
+// .addon-name only, not version numbers or match-type labels), hiding a
+// .group-heading if none of its rows still match. Returns true if
+// anything's visible.
 //
 // NOTE: background.js's buildHtmlReport() has its own copy of this
 // inlined into the exported report (it can't load common.js once saved
@@ -101,8 +103,8 @@ function filterAddonRows(container, query) {
       heading = el;
       headingHasMatch = false;
     } else if (el.classList.contains('addon-row')) {
-      const label = el.querySelector('label');
-      const match = q === '' || (label && label.textContent.toLowerCase().includes(q));
+      const nameEl = el.querySelector('.addon-name');
+      const match = q === '' || (nameEl && nameEl.textContent.toLowerCase().includes(q));
       el.style.display = match ? '' : 'none';
       if (match) {
         headingHasMatch = true;

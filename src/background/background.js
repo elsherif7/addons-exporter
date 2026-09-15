@@ -237,7 +237,8 @@ function buildHtmlReport(list) {
           heading = el;
           headingHasMatch = false;
         } else if (el.classList.contains('addon-row')) {
-          var match = q === '' || el.textContent.toLowerCase().indexOf(q) !== -1;
+          var nameEl = el.querySelector('.addon-name');
+          var match = q === '' || (nameEl && nameEl.textContent.toLowerCase().indexOf(q) !== -1);
           el.style.display = match ? '' : 'none';
           if (match) { headingHasMatch = true; anyMatch = true; }
         }

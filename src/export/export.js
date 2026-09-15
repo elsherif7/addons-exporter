@@ -37,13 +37,17 @@ function createAddonRow(a, i) {
   checkbox.dataset.id = a.id;
   checkbox.checked = true;
 
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'addon-name';
+  nameSpan.textContent = a.name;
+
   const versionSpan = document.createElement('span');
   versionSpan.className = 'addon-version';
   versionSpan.textContent = a.version;
 
   const label = document.createElement('label');
   label.htmlFor = `cb-${i}`;
-  label.append(`${a.name} `, versionSpan);
+  label.append(nameSpan, ' ', versionSpan);
 
   row.append(checkbox, label);
   return row;

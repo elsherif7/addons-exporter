@@ -87,25 +87,25 @@ test('byName sorts case-insensitively', () => {
 // --- filterAddonRows ---
 // Minimal fake DOM - just enough surface area (children, classList.contains,
 // style.display, querySelector, textContent) for filterAddonRows to run
-// against. textContent is also used below to test the report's inline
-// copy of filterAddonRows, which reads a row's text directly instead of
-// via querySelector('label').
+// against. Name and version are modeled as separate sub-elements, same as
+// the real .addon-name / .addon-version markup, so tests can tell them apart.
 
-function makeEl(cls, labelText) {
+function makeEl(cls, nameText, versionText) {
+  const nameEl = nameText != null ? { textContent: nameText } : null;
   return {
     style: { display: '' },
     classList: { contains: (c) => c === cls },
-    querySelector: (sel) => (sel === 'label' && labelText != null ? { textContent: labelText } : null),
-    textContent: labelText || '',
+    querySelector: (sel) => (sel === '.addon-name' ? nameEl : null),
+    textContent: [nameText, versionText].filter((t) => t != null).join(' '),
   };
 }
 
 function makeContainer() {
   const enabledHeading = makeEl('group-heading');
-  const row1 = makeEl('addon-row', 'uBlock Origin 1.58.0');
-  const row2 = makeEl('addon-row', 'Dark Reader 4.9.90');
+  const row1 = makeEl('addon-row', 'uBlock Origin', '1.58.0');
+  const row2 = makeEl('addon-row', 'Dark Reader', '4.9.90');
   const disabledHeading = makeEl('group-heading');
-  const row3 = makeEl('addon-row', 'Old Extension 0.5');
+  const row3 = makeEl('addon-row', 'Old Extension', '0.5');
   return {
     container: { children: [enabledHeading, row1, row2, disabledHeading, row3] },
     enabledHeading, row1, row2, disabledHeading, row3,
@@ -141,13 +141,20 @@ test('filterAddonRows: no matches hides everything and returns false', () => {
   }
 });
 
+test('filterAddonRows: query matching a version number does not match the row', () => {
+  const { container, row1 } = makeContainer(); // row1 is "uBlock Origin" / "1.58.0"
+  const anyMatch = filterAddonRows(container, '58');
+  assert.strictEqual(anyMatch, false);
+  assert.strictEqual(row1.style.display, 'none');
+});
+
 test('filterAddonRows: common.js and the report\'s inline copy agree on the same fixture', () => {
   const fixtureA = makeContainer(); // run through common.js's version
   const fixtureB = makeContainer(); // run through background.js's inline copy
 
   const reportFilterAddonRows = loadReportFilterAddonRows(fixtureB.container);
 
-  for (const query of ['dark', '', 'zzz-nomatch']) {
+  for (const query of ['dark', '58', '', 'zzz-nomatch']) {
     const anyMatchA = filterAddonRows(fixtureA.container, query);
     const anyMatchB = reportFilterAddonRows(query);
     assert.strictEqual(anyMatchA, anyMatchB, `anyMatch differed for query "${query}"`);

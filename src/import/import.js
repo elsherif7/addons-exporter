@@ -151,13 +151,17 @@ function createAddonRow(a, i, isInstalled) {
   checkbox.checked = safe && !isInstalled;
   checkbox.disabled = !safe;
 
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'addon-name';
+  nameSpan.textContent = a.name;
+
   const versionSpan = document.createElement('span');
   versionSpan.className = 'addon-version';
   versionSpan.textContent = version;
 
   const label = document.createElement('label');
   label.htmlFor = `icb-${i}`;
-  label.append(`${a.name} `, versionSpan);
+  label.append(nameSpan, ' ', versionSpan);
 
   if (matchLabel) {
     const matchSpan = document.createElement('span');
