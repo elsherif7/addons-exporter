@@ -330,13 +330,16 @@ picker.addEventListener('drop', (e) => {
   if (file) setSelectedFile(file);
 });
 
+// Disabled checkboxes (unsafe links) are skipped by both buttons below -
+// they're not part of the selectable set, same as the row-click handler
+// already respects via its own cb.disabled check.
 selectAllBtn.addEventListener('click', () => {
-  visibleCheckboxes(checkboxes()).forEach((cb) => { cb.checked = true; });
+  visibleCheckboxes(checkboxes()).forEach((cb) => { if (!cb.disabled) cb.checked = true; });
   updateSelectionCount();
 });
 
 deselectAllBtn.addEventListener('click', () => {
-  visibleCheckboxes(checkboxes()).forEach((cb) => { cb.checked = false; });
+  visibleCheckboxes(checkboxes()).forEach((cb) => { if (!cb.disabled) cb.checked = false; });
   updateSelectionCount();
 });
 

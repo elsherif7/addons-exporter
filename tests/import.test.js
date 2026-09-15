@@ -192,3 +192,90 @@ test('findInstalledMatch: returns null when neither id nor name matches', () => 
   const match = findInstalledMatch({ id: 'nope', name: 'Something Else' }, index);
   assert.strictEqual(match, null);
 });
+
+// --- selectAllBtn / deselectAllBtn click handlers ---
+// These load the real import.js via vm with a fake addon list (some rows
+// disabled the way createAddonRow disables them for unsafe links, some
+// hidden the way a search filter hides them) and invoke the actual
+// registered click handlers, the same approach export.test.js uses for
+// export.js's exportBtn handler.
+
+function makeCheckbox({ disabled = false, hidden = false } = {}) {
+  return {
+    checked: false,
+    disabled,
+    closest: () => ({ style: { display: hidden ? 'none' : '' } }),
+  };
+}
+
+function captureBulkSelectHandlers(checkboxList) {
+  let selectAllHandler = null;
+  let deselectAllHandler = null;
+  const addonListElStub = {
+    querySelectorAll: (sel) => (sel.includes(':checked') ? checkboxList.filter((cb) => cb.checked) : checkboxList),
+    addEventListener() {},
+  };
+  const elements = {
+    status: { textContent: '' },
+    fileName: {},
+    fileNameRow: { style: {} },
+    fileInput: { addEventListener() {} },
+    picker: { addEventListener() {} },
+    removeFileBtn: { addEventListener() {} },
+    chooseFileBtn: { addEventListener() {} },
+    listControls: { style: {} },
+    addonList: addonListElStub,
+    checklistBox: { style: {} },
+    selectAllBtn: { addEventListener: (ev, fn) => { if (ev === 'click') selectAllHandler = fn; } },
+    deselectAllBtn: { addEventListener: (ev, fn) => { if (ev === 'click') deselectAllHandler = fn; } },
+    selectionCount: { textContent: '' },
+    openSelectedBtn: { addEventListener() {}, disabled: false },
+    compareNote: { textContent: '' },
+    searchInput: { addEventListener() {}, style: {} },
+    noSearchMatches: { style: {} },
+  };
+  const sandbox = { URL, document: { getElementById: (id) => elements[id] } };
+  vm.createContext(sandbox);
+  vm.runInContext(commonSrc, sandbox);
+  vm.runInContext(importSrc, sandbox);
+  return { selectAllHandler, deselectAllHandler, selectionCountEl: elements.selectionCount, openSelectedBtnEl: elements.openSelectedBtn };
+}
+
+test('selectAllBtn: checks visible enabled rows, skips disabled (unsafe-link) rows', () => {
+  const enabled1 = makeCheckbox();
+  const disabled = makeCheckbox({ disabled: true });
+  const enabled2 = makeCheckbox();
+  const { selectAllHandler, selectionCountEl } = captureBulkSelectHandlers([enabled1, disabled, enabled2]);
+
+  selectAllHandler();
+
+  assert.strictEqual(enabled1.checked, true);
+  assert.strictEqual(enabled2.checked, true);
+  assert.strictEqual(disabled.checked, false, 'a disabled (unsafe-link) checkbox should never be checked by Select all');
+  assert.strictEqual(selectionCountEl.textContent, '2 of 3 selected');
+});
+
+test('selectAllBtn: skips rows hidden by the current search filter', () => {
+  const visible = makeCheckbox();
+  const hidden = makeCheckbox({ hidden: true });
+  const { selectAllHandler } = captureBulkSelectHandlers([visible, hidden]);
+
+  selectAllHandler();
+
+  assert.strictEqual(visible.checked, true);
+  assert.strictEqual(hidden.checked, false);
+});
+
+test('deselectAllBtn: unchecks visible enabled rows, leaves disabled rows alone', () => {
+  const enabled1 = makeCheckbox();
+  const disabled = makeCheckbox({ disabled: true });
+  enabled1.checked = true;
+  const { deselectAllHandler, selectionCountEl, openSelectedBtnEl } = captureBulkSelectHandlers([enabled1, disabled]);
+
+  deselectAllHandler();
+
+  assert.strictEqual(enabled1.checked, false);
+  assert.strictEqual(disabled.checked, false);
+  assert.strictEqual(selectionCountEl.textContent, '0 of 2 selected');
+  assert.strictEqual(openSelectedBtnEl.disabled, true);
+});
