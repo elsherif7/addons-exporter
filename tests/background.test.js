@@ -118,3 +118,126 @@ testAsync('export message: on desktop, downloads with saveAs, opens confirmation
   assert.match(createdTabUrls[0], /confirmation\.html$/);
   assert.strictEqual(result, undefined);
 });
+
+// --- background.js: doExport()'s link-resolution branching ---
+// findAmoPage() tries an exact AMO lookup first, then a fuzzy name
+// search; doExport() then falls back to the add-on's own homepage, and
+// finally to a raw AMO search-results URL, if neither AMO path found
+// anything. Calls doExport() directly (same pattern as
+// listInstalledAddons() above) since the branching under test lives
+// there and in findAmoPage() itself, not in the message listener's
+// platform switch that the tests above already cover.
+
+const baseAddon = { id: 'ext1@example.com', name: 'Test Addon', version: '1.0', enabled: true, type: 'extension' };
+
+async function runDoExportWithFetch(addon, fetchImpl) {
+  const bgSandbox = {
+    URL,
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    fetch: fetchImpl,
+    browser: {
+      runtime: { onMessage: { addListener() {} }, sendMessage: async () => {} },
+      management: { getAll: async () => [addon] },
+    },
+  };
+  vm.createContext(bgSandbox);
+  vm.runInContext(commonSrc, bgSandbox);
+  vm.runInContext(backgroundSrc, bgSandbox);
+  const { html } = await bgSandbox.doExport([addon.id]);
+  const dataMatch = html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/);
+  return JSON.parse(dataMatch[1]).addons[0];
+}
+
+testAsync('doExport: uses the exact AMO match when found', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('/addons/addon/')) {
+      return { ok: true, status: 200, json: async () => ({ url: 'https://addons.mozilla.org/en-US/firefox/addon/exact-match/' }) };
+    }
+    throw new Error('should not reach name search when the exact lookup already succeeded');
+  };
+  const result = await runDoExportWithFetch(baseAddon, fetchImpl);
+  assert.strictEqual(result.linkType, 'amo-exact');
+  assert.strictEqual(result.link, 'https://addons.mozilla.org/en-US/firefox/addon/exact-match/');
+});
+
+testAsync('doExport: falls back to a name search match when the exact lookup 404s', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('/addons/addon/')) return { ok: false, status: 404, json: async () => ({}) };
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ results: [{ url: 'https://addons.mozilla.org/en-US/firefox/addon/test-addon/', name: { 'en-US': 'Test Addon' } }] }),
+    };
+  };
+  const result = await runDoExportWithFetch(baseAddon, fetchImpl);
+  assert.strictEqual(result.linkType, 'amo-search');
+  assert.strictEqual(result.link, 'https://addons.mozilla.org/en-US/firefox/addon/test-addon/');
+});
+
+testAsync('doExport: falls back to the add-on\'s homepage when neither AMO path finds anything', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('/addons/addon/')) return { ok: false, status: 404, json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => ({ results: [] }) };
+  };
+  const addon = { ...baseAddon, homepageUrl: 'https://example.com/test-addon' };
+  const result = await runDoExportWithFetch(addon, fetchImpl);
+  assert.strictEqual(result.linkType, 'homepage');
+  assert.strictEqual(result.link, 'https://example.com/test-addon');
+});
+
+testAsync('doExport: falls back to an AMO search-results URL when there\'s no AMO match and no homepage', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('/addons/addon/')) return { ok: false, status: 404, json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => ({ results: [] }) };
+  };
+  const result = await runDoExportWithFetch(baseAddon, fetchImpl);
+  assert.strictEqual(result.linkType, 'amo-search-fallback');
+  assert.strictEqual(result.link, `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(baseAddon.name)}`);
+});
+
+testAsync('doExport: an unsafe homepage URL is rejected in favor of the search-results fallback', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('/addons/addon/')) return { ok: false, status: 404, json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => ({ results: [] }) };
+  };
+  const addon = { ...baseAddon, homepageUrl: 'javascript:alert(1)' };
+  const result = await runDoExportWithFetch(addon, fetchImpl);
+  assert.strictEqual(result.linkType, 'amo-search-fallback');
+});
+
+// --- background.js: mapWithConcurrency()'s concurrency cap ---
+// AMO_LOOKUP_CONCURRENCY caps how many lookups run at once so a big
+// add-on collection doesn't trip AMO's rate limiting. Calls
+// mapWithConcurrency() directly with a tracking fn instead of going
+// through findAmoPage()/fetch, since the cap itself is what's under test
+// here, not the AMO lookup logic already covered above.
+
+testAsync('mapWithConcurrency: never runs more than `limit` calls at once', async () => {
+  const bgSandbox = {
+    URL,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    browser: { runtime: { onMessage: { addListener() {} } } },
+  };
+  vm.createContext(bgSandbox);
+  vm.runInContext(commonSrc, bgSandbox);
+  vm.runInContext(backgroundSrc, bgSandbox);
+
+  let current = 0;
+  let maxConcurrent = 0;
+  const fn = async () => {
+    current++;
+    maxConcurrent = Math.max(maxConcurrent, current);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    current--;
+    return true;
+  };
+
+  const items = Array.from({ length: 12 }, (_, i) => i);
+  await bgSandbox.mapWithConcurrency(items, 5, fn);
+
+  assert.ok(maxConcurrent <= 5, `expected at most 5 concurrent calls, saw ${maxConcurrent}`);
+  assert.strictEqual(maxConcurrent, 5, 'expected concurrency to actually reach the cap with 12 items and a limit of 5');
+});
