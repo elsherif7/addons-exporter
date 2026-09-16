@@ -11,6 +11,7 @@
 
 require('./common.test.js');
 require('./import.test.js');
+require('./report-template.test.js');
 require('./background.test.js');
 require('./export.test.js');
 

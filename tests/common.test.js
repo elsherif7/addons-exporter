@@ -12,15 +12,15 @@ vm.runInContext(commonSrc, sandbox);
 
 const { escapeHtml, isSafeUrl, byName, filterAddonRows, visibleCheckboxes, extractTranslatedField, isPlausibleNameMatch } = sandbox;
 
-// background.js's buildHtmlReport() inlines its own copy of
+// report-template.js's buildHtmlReport() inlines its own copy of
 // filterAddonRows into the exported report (it can't load common.js once
 // saved elsewhere). Pull that copy's literal source straight out of
-// background.js - not a hand-copied snapshot - so a future edit to one
-// copy and not the other gets caught here instead of silently drifting.
-const backgroundSrc = readSrc('src/background/background.js');
-const reportScriptMatch = backgroundSrc.match(/<script>([\s\S]*?)<\/script>/);
+// report-template.js - not a hand-copied snapshot - so a future edit to
+// one copy and not the other gets caught here instead of silently drifting.
+const reportTemplateSrc = readSrc('src/background/report-template.js');
+const reportScriptMatch = reportTemplateSrc.match(/<script>([\s\S]*?)<\/script>/);
 if (!reportScriptMatch) {
-  throw new Error("Could not find the report's inline <script> block in background.js - update this extraction if the report template changed.");
+  throw new Error("Could not find the report's inline <script> block in report-template.js - update this extraction if the report template changed.");
 }
 const reportInlineScript = reportScriptMatch[1];
 
@@ -150,7 +150,7 @@ test('filterAddonRows: query matching a version number does not match the row', 
 
 test('filterAddonRows: common.js and the report\'s inline copy agree on the same fixture', () => {
   const fixtureA = makeContainer(); // run through common.js's version
-  const fixtureB = makeContainer(); // run through background.js's inline copy
+  const fixtureB = makeContainer(); // run through report-template.js's inline copy
 
   const reportFilterAddonRows = loadReportFilterAddonRows(fixtureB.container);
 

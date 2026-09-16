@@ -30,7 +30,7 @@
     "128": "src/icons/icon128.png"
   },
   "background": {
-    "scripts": ["src/common/common.js", "src/background/background.js"]
+    "scripts": ["src/common/common.js", "src/background/report-template.js", "src/background/background.js"]
   },
   "action": {
     "default_title": "Add-ons Hub",
