@@ -8,7 +8,7 @@ const assert = require('assert');
 const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
-const { test, readSrc } = require('./helpers');
+const { test, readSrc, evalInContext } = require('./helpers');
 
 const commonSrc = readSrc('src/common/common.js');
 const reportTemplateSrc = readSrc('src/background/report-template.js');
@@ -18,6 +18,13 @@ vm.createContext(sandbox);
 vm.runInContext(commonSrc, sandbox);
 vm.runInContext(reportTemplateSrc, sandbox);
 const { buildHtmlReport, safeJsonForScriptTag } = sandbox;
+
+// REPORT_ICON_DATA_URI is declared with top-level `const` in
+// report-template.js, so (unlike the function declarations above) it
+// isn't copied onto the sandbox object - it only exists in the context's
+// own lexical scope. Evaluate it there directly instead of destructuring
+// it from sandbox, same as import.test.js does for EXPORT_FORMAT_VERSION.
+const REPORT_ICON_DATA_URI = evalInContext(sandbox, 'REPORT_ICON_DATA_URI');
 
 const sampleList = [
   { id: 'ublock@example.com', name: 'uBlock Origin', version: '1.58.0', enabled: true, type: 'extension', link: 'https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/', linkType: 'amo-exact' },
@@ -56,14 +63,7 @@ test('buildHtmlReport: uses REPORT_ICON_DATA_URI as the page favicon', () => {
   const html = buildHtmlReport(sampleList);
   const faviconMatch = html.match(/<link rel="icon" href="(data:image\/png;base64,[^"]+)">/);
   assert.ok(faviconMatch, 'expected a <link rel="icon" href="data:image/png;base64,..."> in the report');
-
-  // REPORT_ICON_DATA_URI is declared with const, so (unlike buildHtmlReport
-  // and safeJsonForScriptTag, both function declarations) it never becomes
-  // a property of the vm sandbox's global object - pull its literal value
-  // out of the source text instead, same as the byte-for-byte test below.
-  const constMatch = reportTemplateSrc.match(/REPORT_ICON_DATA_URI = '(data:image\/png;base64,[^']+)'/);
-  assert.ok(constMatch, 'expected to find the REPORT_ICON_DATA_URI declaration in report-template.js');
-  assert.strictEqual(faviconMatch[1], constMatch[1]);
+  assert.strictEqual(faviconMatch[1], REPORT_ICON_DATA_URI);
 });
 
 test('safeJsonForScriptTag: escapes "</" so an add-on name can\'t close the script tag early', () => {
@@ -75,16 +75,13 @@ test('safeJsonForScriptTag: escapes "</" so an add-on name can\'t close the scri
 // --- REPORT_ICON_DATA_URI stays in sync with icon32.png ---
 // The report's favicon is a hand-pasted base64 blob with nothing else
 // tying it to the actual icon file - nothing would catch it going stale
-// if the icons are ever regenerated. Decodes the embedded data straight
-// out of the real report-template.js source (not a copy) and compares it
-// byte-for-byte against the real icon32.png file on disk.
+// if the icons are ever regenerated. REPORT_ICON_DATA_URI above is the
+// real value from the actual loaded report-template.js (not a copy),
+// compared here byte-for-byte against the real icon32.png file on disk.
 
 test('REPORT_ICON_DATA_URI: matches src/icons/icon32.png byte-for-byte', () => {
-  const uriMatch = reportTemplateSrc.match(/REPORT_ICON_DATA_URI = 'data:image\/png;base64,([^']+)'/);
-  if (!uriMatch) {
-    throw new Error('Could not find REPORT_ICON_DATA_URI in report-template.js - update this test if its definition changed.');
-  }
-  const embeddedBytes = Buffer.from(uriMatch[1], 'base64');
+  const base64Payload = REPORT_ICON_DATA_URI.slice('data:image/png;base64,'.length);
+  const embeddedBytes = Buffer.from(base64Payload, 'base64');
   const iconBytes = fs.readFileSync(path.join(__dirname, '..', 'src/icons/icon32.png'));
   assert.ok(
     embeddedBytes.equals(iconBytes),
