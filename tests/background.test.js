@@ -5,6 +5,8 @@
 
 const assert = require('assert');
 const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
 const { test, testAsync, readSrc } = require('./helpers');
 
 const commonSrc = readSrc('src/common/common.js');
@@ -240,4 +242,24 @@ testAsync('mapWithConcurrency: never runs more than `limit` calls at once', asyn
 
   assert.ok(maxConcurrent <= 5, `expected at most 5 concurrent calls, saw ${maxConcurrent}`);
   assert.strictEqual(maxConcurrent, 5, 'expected concurrency to actually reach the cap with 12 items and a limit of 5');
+});
+
+// --- background.js: REPORT_ICON_DATA_URI stays in sync with icon32.png ---
+// The report's favicon is a hand-pasted base64 blob with nothing else
+// tying it to the actual icon file - nothing would catch it going stale
+// if the icons are ever regenerated. Decodes the embedded data straight
+// out of the real background.js source (not a copy) and compares it
+// byte-for-byte against the real icon32.png file on disk.
+
+test('REPORT_ICON_DATA_URI: matches src/icons/icon32.png byte-for-byte', () => {
+  const uriMatch = backgroundSrc.match(/REPORT_ICON_DATA_URI = 'data:image\/png;base64,([^']+)'/);
+  if (!uriMatch) {
+    throw new Error('Could not find REPORT_ICON_DATA_URI in background.js - update this test if its definition changed.');
+  }
+  const embeddedBytes = Buffer.from(uriMatch[1], 'base64');
+  const iconBytes = fs.readFileSync(path.join(__dirname, '..', 'src/icons/icon32.png'));
+  assert.ok(
+    embeddedBytes.equals(iconBytes),
+    'REPORT_ICON_DATA_URI no longer matches src/icons/icon32.png - re-encode it if the icon changed intentionally'
+  );
 });
