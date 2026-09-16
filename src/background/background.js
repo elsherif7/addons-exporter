@@ -92,7 +92,7 @@ async function findAmoPage(id, name) {
       // Either no results, or the top result's name didn't clear the
       // relevance bar - don't hand back an unrelated add-on just
       // because it happened to rank first.
-      console.debug(`[Add-ons Hub] AMO name search for "${name}" (${id}) returned no plausible match`, data);
+      console.warn(`[Add-ons Hub] AMO name search for "${name}" (${id}) returned no plausible match`, data);
     } else {
       console.warn(`[Add-ons Hub] AMO name search for "${name}" (${id}) failed: HTTP ${res.status}`);
     }
