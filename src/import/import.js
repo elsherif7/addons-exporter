@@ -3,9 +3,9 @@
 // change between them. These two are coupled: bumping the format
 // version without also updating migrateAddonsData means old-format
 // files get passed straight through unmigrated. A tripwire test in
-// test.js hardcodes today's version number specifically to fail when
-// that happens - see "migrateAddonsData: bumping the format version
-// requires updating this test and migrateAddonsData".
+// tests/import.test.js hardcodes today's version number specifically
+// to fail when that happens - see "migrateAddonsData: bumping the
+// format version requires updating this test and migrateAddonsData".
 const SUPPORTED_FORMAT_VERSION = EXPORT_FORMAT_VERSION;
 
 // No-op for format version 1. Update this (and the tripwire test above)
