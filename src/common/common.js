@@ -1,4 +1,5 @@
-// Shared helpers used by background.js, export.js, and import.js.
+// Shared helpers used by background.js, report-template.js, export.js,
+// and import.js.
 
 // Bump if the exported JSON shape ever changes.
 const EXPORT_FORMAT_VERSION = 1;
@@ -84,7 +85,7 @@ const UNCERTAIN_LINK_TYPES = new Set(['amo-search', 'amo-search-fallback']);
 // .group-heading if none of its rows still match. Returns true if
 // anything's visible.
 //
-// NOTE: background.js's buildHtmlReport() has its own copy of this
+// NOTE: report-template.js's buildHtmlReport() has its own copy of this
 // inlined into the exported report (it can't load common.js once saved
 // elsewhere). Keep both copies in sync if you change this.
 function filterAddonRows(container, query) {
