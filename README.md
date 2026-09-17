@@ -1,10 +1,8 @@
 # addons-hub
 
-**Add-ons Hub** is a Firefox WebExtension that exports your installed add-ons to an HTML report, so you can quickly reinstall them all on another Gecko-based browser (Firefox, Zen, LibreWolf, Waterfox, etc.) instead of hunting them down one by one.
+**Add-ons Hub** is a Firefox WebExtension for managing your installed add-ons. It currently includes **Add-ons Exporter** and **Add-ons Importer**, which let you export them to an HTML report and reinstall them all on another Gecko-based browser (Firefox, Zen, LibreWolf, Waterfox, etc.) instead of hunting them down one by one. More tools may be added over time.
 
-Firefox doesn't allow any extension to install other extensions automatically — that's a deliberate security restriction, not a limitation of this tool. This just makes the manual reinstall process as fast as possible: pick which add-ons to include, export, then pick which of them to open as tabs on the new browser.
-
-**🦊 Get it on Firefox Add-ons:** [addons.mozilla.org/en-US/firefox/addon/add-ons-hub](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/)
+**🦊 Get it on Firefox Add-ons:** [Add-ons Hub on AMO](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/)
 
 > New updates are published on the 1st of odd-numbered months (January, March, May, July, September, November).
 >
@@ -16,32 +14,34 @@ Firefox doesn't allow any extension to install other extensions automatically �
 
 ```
 addons-hub/
-├── manifest.json         # Extension config, permissions, background script
-├── tests/                 # Plain Node.js tests, one file per source file — run with: node tests/run.js
-│   ├── run.js             # Requires every *.test.js file, then prints the combined summary
-│   ├── helpers.js         # Shared test()/testAsync() harness and vm-loading utilities
-│   ├── common.test.js     # Tests for src/common/common.js
-│   ├── import.test.js     # Tests for src/import/import.js
-│   ├── background.test.js # Tests for src/background/background.js
-│   └── export.test.js     # Tests for src/export/export.js
+├── manifest.json         # Extension manifest: config, permissions, and background script list
+├── tests/                 # Plain Node.js test suite, run via node tests/run.js
+│   ├── run.js                   # Requires every test file, then prints the combined summary
+│   ├── helpers.js               # Shared test()/testAsync() harness plus vm-loading and sandbox utilities
+│   ├── common.test.js           # Unit tests covering every helper function in common.js
+│   ├── import.test.js           # Tests covering the import page's parsing and UI logic
+│   ├── report-template.test.js  # Tests for the standalone HTML report template builder
+│   ├── background.test.js       # Tests covering messaging, AMO lookups, and export logic
+│   └── export.test.js           # Tests covering the export page's picker and click logic
 └── src/
     ├── common/
-    │   ├── common.js      # Shared helpers (escapeHtml, isSafeUrl, byName, filterAddonRows, AMO name-matching) and the export format version
-    │   └── shared.css     # Shared styles for export.html / import.html / confirmation.html
+    │   ├── common.js   # Shared helper functions used across every page and script
+    │   └── shared.css  # Shared styles used by export, import, and confirmation pages
     ├── background/
-    │   └── background.js  # Export logic, AMO lookups, HTML report generation
+    │   ├── background.js       # Handles messaging, AMO lookups, and export orchestration logic
+    │   └── report-template.js  # Builds the self-contained HTML report returned by doExport()
     ├── popup/
-    │   ├── popup.html     # Toolbar popup UI
-    │   └── popup.js       # Popup logic (Add-ons Exporter / Add-ons Importer buttons)
+    │   ├── popup.html  # Markup for the small toolbar popup interface
+    │   └── popup.js    # Handles clicks on the popup's export and import buttons
     ├── export/
-    │   ├── export.html    # Page to pick which installed add-ons to export
-    │   └── export.js      # Export picker logic (loads the list, sends the selection)
+    │   ├── export.html  # Page for choosing which installed add-ons to export
+    │   └── export.js    # Loads the add-on list and sends the export selection
     ├── import/
-    │   ├── import.html    # Page to pick an exported file and choose which add-ons to open
-    │   └── import.js      # Import logic (parses the file, opens the selected tabs)
+    │   ├── import.html  # Page for picking an exported file and add-ons to open
+    │   └── import.js    # Parses the exported file and opens the selected tabs
     ├── confirmation/
-    │   └── confirmation.html  # Tab shown after export completes
-    └── icons/             # Toolbar and extension icons (16/32/48/96/128px)
+    │   └── confirmation.html  # Tab shown to the user after export finishes
+    └── icons/             # Toolbar and extension icons in several standard sizes
 ```
 
 > **Note:** `manifest.json`'s `browser_specific_settings.gecko.id` is
@@ -58,9 +58,11 @@ addons-hub/
 
 ## Installation
 
+> Requires Firefox 109 or newer (the first release with MV3 support), or Firefox for Android 113 or newer.
+
 **1. Install from Firefox Add-ons (recommended)**
 
-> Install directly from [addons.mozilla.org/en-US/firefox/addon/add-ons-hub](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/) — the signed, permanent version.
+> Install directly from the [Firefox Add-ons page](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/) — the official signed version.
 
 **2. Or load a local copy for development**
 
@@ -75,19 +77,23 @@ addons-hub/
 
 ---
 
-## How it works
+## Tools
 
-**Export** — click the toolbar icon → **Add-ons Exporter** to open a checklist of every installed extension and theme, split into Enabled/Disabled groups and alphabetized within each. A search box at the top lets you filter the list by name. Pick which ones to include, or use Select all / Deselect all, then click **Export Selected**. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage as a last resort), and the result is saved as a single HTML report — human-readable on its own, with the underlying data embedded for the Import page to read back. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on.
+### Add-ons Exporter
 
-**Import** — click **Add-ons Importer**, then choose or drag in a previously exported report. It's read and validated automatically as soon as it's selected, and only accepted if its embedded format version is one this copy of the extension understands — anything missing or newer is rejected with a clear message rather than guessed at. It's automatically compared against what's currently installed (matched by add-on ID, falling back to name for older exports), so the checklist splits into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference, not pre-selected) — no need to reopen things you already have. A search box at the top lets you filter the list by name. Pick what to open and click **Open Selected**; tabs open one at a time with a short stagger between each, rather than all at once.
+Creates a checklist of every installed extension and theme, split into Enabled/Disabled groups with a search box to filter by name. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage as a last resort), and the result is saved as a single HTML report — human-readable on its own, with the underlying data embedded for Add-ons Importer to read back. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on.
 
-A few other things worth knowing:
+### Add-ons Importer
 
-- On desktop, the confirmation tab opens from the background script itself once the file downloads, not from the popup — so it still appears even if the popup's own tab has already closed. On Firefox for Android, the platform doesn't allow the background script to trigger the download itself, so the Export page does it directly and opens the confirmation tab once the download is picked up.
+Reads a previously exported report, chosen or dragged in, validating it automatically and rejecting anything with a missing or unsupported format version rather than guessing. It compares the report against what's currently installed (matched by add-on ID, falling back to name for older exports), splitting the checklist into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference) — so you never need to reopen things you already have. It opens each pick as a tab rather than installing it directly, which is the workaround for a real limitation: Firefox doesn't allow any extension to install other extensions automatically — a deliberate security restriction, not a limitation of these tools.
+
+#### A few other things worth knowing
+
+- On desktop, the confirmation tab opens from the background script itself once the file downloads, not from the popup — so it still appears even if the popup's own tab has already closed. On Firefox for Android, the platform doesn't allow the background script to trigger the download itself, so Add-ons Exporter does it directly and opens the confirmation tab once the download is picked up.
 - AMO lookups are capped at 15 seconds each and 5 in flight at once, so a slow AMO response can't stall an export, and a large add-on collection can't trip AMO's rate limiting.
 - Firefox's own bundled built-ins (New Tab page, default themes) and spell-check dictionaries/language packs are excluded, since they aren't real installed add-ons and have no matching store listing. On Firefox for Android, its own bundled components (ad-blocking telemetry, reader view, etc.) are excluded the same way.
-- Import only ever opens http/https links; anything else is flagged and left unselected, since an export file's data isn't inherently trusted.
-- If every add-on in the file is already installed, Import shows a short note about it — informational only, since there's nothing to open.
+- Add-ons Importer only ever opens http/https links; anything else is flagged and left unselected, since an export file's data isn't inherently trusted.
+- If every add-on in the file is already installed, Add-ons Importer shows a short note about it — informational only, since there's nothing to open.
 
 ---
 
@@ -98,10 +104,6 @@ A few other things worth knowing:
 | `management` | To read the list of installed add-ons |
 | `downloads` | To save the exported HTML report |
 | `https://addons.mozilla.org/*` | To look up each add-on's real AMO page |
-
-> Manifest V3, requiring Firefox 109 or newer (the first release with MV3 support), and Firefox for Android 113 or newer. Migrated from Manifest V2.
->
-> Declares `data_collection_permissions: { required: ["none"] }` — this extension collects zero personal data.
 
 ---
 
