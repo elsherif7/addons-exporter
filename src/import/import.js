@@ -397,5 +397,8 @@ openSelectedBtn.addEventListener('click', async () => {
   setStatus(failed > 0
     ? `Opened ${opened} tabs, ${failed} failed to open`
     : `Opened ${opened} tabs`);
+  if (opened > 0) {
+    await browser.tabs.create({ url: browser.runtime.getURL('src/confirmation/confirmation.html?from=import') });
+  }
   openSelectedBtn.disabled = false;
 });

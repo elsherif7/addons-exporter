@@ -4,7 +4,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, readSrc, evalInContext } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext } = require('./helpers');
 
 function makeFakeElement() {
   return {
@@ -211,9 +211,15 @@ function makeCheckbox({ disabled = false, hidden = false } = {}) {
 function captureBulkSelectHandlers(checkboxList) {
   let selectAllHandler = null;
   let deselectAllHandler = null;
+  let openSelectedHandler = null;
+  const createdTabUrls = [];
   const addonListElStub = {
     querySelectorAll: (sel) => (sel.includes(':checked') ? checkboxList.filter((cb) => cb.checked) : checkboxList),
     addEventListener() {},
+  };
+  const openSelectedBtnEl = {
+    addEventListener: (ev, fn) => { if (ev === 'click') openSelectedHandler = fn; },
+    disabled: false,
   };
   const elements = {
     status: { textContent: '' },
@@ -229,16 +235,27 @@ function captureBulkSelectHandlers(checkboxList) {
     selectAllBtn: { addEventListener: (ev, fn) => { if (ev === 'click') selectAllHandler = fn; } },
     deselectAllBtn: { addEventListener: (ev, fn) => { if (ev === 'click') deselectAllHandler = fn; } },
     selectionCount: { textContent: '' },
-    openSelectedBtn: { addEventListener() {}, disabled: false },
+    openSelectedBtn: openSelectedBtnEl,
     compareNote: { textContent: '' },
     searchInput: { addEventListener() {}, style: {} },
     noSearchMatches: { style: {} },
   };
-  const sandbox = { URL, document: { getElementById: (id) => elements[id] } };
+  const sandbox = {
+    URL,
+    setTimeout: (fn) => { fn(); return 0; }, // fires the stagger delay immediately - no reason for tests to actually wait
+    document: { getElementById: (id) => elements[id] },
+    browser: {
+      runtime: { getURL: (path) => `moz-extension://test-id/${path}` },
+      tabs: { create: async (options) => { createdTabUrls.push(options.url); return {}; } },
+    },
+  };
   vm.createContext(sandbox);
   vm.runInContext(commonSrc, sandbox);
   vm.runInContext(importSrc, sandbox);
-  return { selectAllHandler, deselectAllHandler, selectionCountEl: elements.selectionCount, openSelectedBtnEl: elements.openSelectedBtn };
+  return {
+    selectAllHandler, deselectAllHandler, openSelectedHandler,
+    selectionCountEl: elements.selectionCount, openSelectedBtnEl, createdTabUrls, sandbox,
+  };
 }
 
 test('selectAllBtn: checks visible enabled rows, skips disabled (unsafe-link) rows', () => {
@@ -278,4 +295,48 @@ test('deselectAllBtn: unchecks visible enabled rows, leaves disabled rows alone'
   assert.strictEqual(disabled.checked, false);
   assert.strictEqual(selectionCountEl.textContent, '0 of 2 selected');
   assert.strictEqual(openSelectedBtnEl.disabled, true);
+});
+
+// --- openSelectedBtn click handler ---
+// displayItems is a module-level `let`, reassigned by loadFile() in real
+// use - it isn't a sandbox property (only var/function declarations are),
+// so it's set here via vm.runInContext() directly against the returned
+// sandbox, in the same lexical scope where it was declared.
+
+testAsync('openSelectedBtn: opens each selected link as a tab, then opens the import confirmation tab', async () => {
+  const cb1 = makeCheckbox();
+  cb1.checked = true;
+  cb1.dataset = { idx: '0' };
+  const cb2 = makeCheckbox();
+  cb2.checked = true;
+  cb2.dataset = { idx: '1' };
+
+  const { openSelectedHandler, createdTabUrls, sandbox } = captureBulkSelectHandlers([cb1, cb2]);
+  vm.runInContext(
+    "displayItems = [{ link: 'https://addons.mozilla.org/a/' }, { link: 'https://addons.mozilla.org/b/' }];",
+    sandbox
+  );
+
+  await openSelectedHandler();
+
+  assert.deepStrictEqual(createdTabUrls, [
+    'https://addons.mozilla.org/a/',
+    'https://addons.mozilla.org/b/',
+    'moz-extension://test-id/src/confirmation/confirmation.html?from=import',
+  ]);
+});
+
+testAsync('openSelectedBtn: does not open the confirmation tab if every selected link fails to open', async () => {
+  const cb1 = makeCheckbox();
+  cb1.checked = true;
+  cb1.dataset = { idx: '0' };
+
+  const { openSelectedHandler, createdTabUrls, sandbox } = captureBulkSelectHandlers([cb1]);
+  // Re-validated at open time regardless of how it got selected - see
+  // isSafeUrl's use in the real handler.
+  vm.runInContext("displayItems = [{ link: 'javascript:alert(1)' }];", sandbox);
+
+  await openSelectedHandler();
+
+  assert.deepStrictEqual(createdTabUrls, []);
 });

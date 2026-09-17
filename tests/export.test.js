@@ -110,7 +110,7 @@ testAsync('export.js click handler: on Android, proceeds to confirmation.html on
   // Both onCreated and the (immediate, mocked) fallback timer fire here -
   // the "settled" guard in export.js should mean only one tab opens.
   assert.strictEqual(createdTabUrls.length, 1);
-  assert.match(createdTabUrls[0], /confirmation\.html$/);
+  assert.match(createdTabUrls[0], /confirmation\.html\?from=export$/);
   assert.strictEqual(exportBtnEl.disabled, true);
 });
 
@@ -121,7 +121,7 @@ testAsync('export.js click handler: on Android, still proceeds via the fallback 
     simulateDownloadCreated: false,
   });
   assert.strictEqual(createdTabUrls.length, 1);
-  assert.match(createdTabUrls[0], /confirmation\.html$/);
+  assert.match(createdTabUrls[0], /confirmation\.html\?from=export$/);
 });
 
 testAsync('export.js click handler: on desktop, does nothing extra since background.js already handled it', async () => {

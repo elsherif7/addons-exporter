@@ -45,7 +45,8 @@ addons-hub/
     │   ├── settings.html  # Settings page, opened from the popup or the browser's own menu
     │   └── settings.js    # Settings page logic
     ├── confirmation/
-    │   └── confirmation.html  # Tab shown to the user after export finishes
+    │   ├── confirmation.html  # Tab shown after Add-ons Exporter or Add-ons Importer finishes
+    │   └── confirmation.js    # Sets the heading/message based on which tool opened this tab
     └── icons/             # Toolbar and extension icons in several standard sizes
 ```
 
@@ -97,6 +98,7 @@ Reads a previously exported report, chosen or dragged in, validating it automati
 #### A few other things worth knowing
 
 - On desktop, the confirmation tab opens from the background script itself once the file downloads, not from the popup — so it still appears even if the popup's own tab has already closed. On Firefox for Android, the platform doesn't allow the background script to trigger the download itself, so Add-ons Exporter does it directly and opens the confirmation tab once the download is picked up.
+- Add-ons Importer opens its own confirmation tab too, once it's done opening the selected add-ons' pages — skipped if every one of them failed to open.
 - AMO lookups are capped at 15 seconds each and 5 in flight at once, so a slow AMO response can't stall an export, and a large add-on collection can't trip AMO's rate limiting.
 - Firefox's own bundled built-ins (New Tab page, default themes) and spell-check dictionaries/language packs are excluded, since they aren't real installed add-ons and have no matching store listing. On Firefox for Android, its own bundled components (ad-blocking telemetry, reader view, etc.) are excluded the same way.
 - Add-ons Importer only ever opens http/https links; anything else is flagged and left unselected, since an export file's data isn't inherently trusted.

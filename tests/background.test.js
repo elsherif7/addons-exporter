@@ -118,7 +118,7 @@ testAsync('export message: on desktop, downloads with saveAs, opens confirmation
   assert.strictEqual(downloadOptions.saveAs, true);
   assert.match(downloadOptions.url, /^blob:/);
   assert.strictEqual(createdTabUrls.length, 1);
-  assert.match(createdTabUrls[0], /confirmation\.html$/);
+  assert.match(createdTabUrls[0], /confirmation\.html\?from=export$/);
   assert.strictEqual(result, undefined);
 });
 
