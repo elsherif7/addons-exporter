@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Add-ons Hub",
   "version": "1.2.0",
-  "description": "Export or import your installed add-ons as an HTML report with real store links.",
+  "description": "A Firefox WebExtension for managing your installed add-ons, starting with Add-ons Exporter and Add-ons Importer.",
   "permissions": [
     "management",
     "downloads"
