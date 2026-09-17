@@ -3,49 +3,51 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="../common/theme.js"></script>
 <link rel="icon" href="../icons/icon48.png">
 <link rel="stylesheet" href="../common/shared.css">
 <title>Add-ons Importer</title>
 <style>
   .picker {
-    border: 2px dashed #d0d3d9;
+    border: 2px dashed var(--border);
     border-radius: 10px;
     padding: 24px;
     margin-bottom: 20px;
     text-align: center;
-    background: #fafbfc;
+    background: var(--hover-bg);
     transition: border-color 0.15s, background 0.15s;
   }
   .picker.dragover {
-    border-color: #1f2937;
-    background: #eef0f3;
+    border-color: var(--btn-bg);
+    background: var(--border-soft);
   }
   #chooseFileBtn {
     padding: 12px 20px;
     border-radius: 6px;
-    border: 1px solid #ccc;
-    background: #fff;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
   }
-  #chooseFileBtn:hover { background: #f0f0f0; }
+  #chooseFileBtn:hover { background: var(--hover-bg); }
   #fileName {
     display: block;
     font-size: 14px;
-    color: #666;
+    color: var(--text-muted);
   }
   #removeFileBtn {
     position: relative;
     border: none;
     background: none;
-    color: #999;
+    color: var(--text-faint);
     font-size: 18px;
     line-height: 1;
     cursor: pointer;
     padding: 8px;
   }
-  #removeFileBtn:hover { color: #c0392b; }
+  #removeFileBtn:hover { color: var(--danger-color); }
   /* Custom tooltip via content: attr() instead of a native title
      attribute - more consistent styling and no native delay. */
   #removeFileBtn::after {

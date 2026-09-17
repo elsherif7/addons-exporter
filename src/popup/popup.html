@@ -3,12 +3,34 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="../common/theme.js"></script>
   <style>
-    /* body's #eff1f3 background here is intentional, not drift - the
-       popup doesn't load shared.css and was never meant to match the
-       #f4f5f7 used on export.html/import.html/confirmation.html/the
-       report. Don't "fix" this to match without checking first. */
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 260px; margin: 0; padding: 16px; background: #eff1f3; box-sizing: border-box; overflow-wrap: break-word; }
+    /* Same variable names as shared.css, defined locally rather than
+       loaded from it - popup.html is a separate document with its own
+       distinct layout (fixed width, different padding/background), so
+       it keeps its own self-contained styles rather than depending on
+       shared.css, same as report-template.js's report does. */
+    :root {
+      --bg: #eff1f3;
+      --card-bg: #fff;
+      --text: #1f2937;
+      --btn-bg: #1f2937;
+      --btn-bg-hover: #111827;
+      --btn-text: #fff;
+    }
+    :root[data-theme="dark"] {
+      --bg: #1a1c21;
+      --card-bg: #24272e;
+      --text: #e8e9ec;
+      --btn-bg: #374151;
+      --btn-bg-hover: #4b5563;
+      --btn-text: #fff;
+    }
+    /* body's light-mode #eff1f3 background is intentional, not drift -
+       the popup was never meant to match the #f4f5f7 used on
+       export.html/import.html/confirmation.html/the report. Don't "fix"
+       this to match without checking first. */
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 260px; margin: 0; padding: 16px; background: var(--bg); color: var(--text); box-sizing: border-box; overflow-wrap: break-word; }
     /* Firefox for Android shows this popup as a full-screen overlay rather
        than a small anchored dropdown, so the fixed 260px above would leave
        it pinned to a corner with the rest of the screen empty. popup.js
@@ -23,7 +45,7 @@
     body.android h3 { font-size: clamp(16px, 4.5vw, 20px); }
     body.android button { padding: clamp(10px, 3vw, 14px); font-size: clamp(14px, 3.5vw, 16px); }
     .card {
-      background: #fff;
+      background: var(--card-bg);
       border-radius: 12px;
       padding: 20px 16px;
       text-align: center;
@@ -34,15 +56,15 @@
       padding: 10px;
       border: none;
       border-radius: 8px;
-      background: #1f2937;
-      color: #fff;
+      background: var(--btn-bg);
+      color: var(--btn-text);
       margin-bottom: 8px;
       cursor: pointer;
       font-size: 14px;
       font-weight: 600;
     }
     button:last-of-type { margin-bottom: 0; }
-    button:hover { background: #111827; }
+    button:hover { background: var(--btn-bg-hover); }
   </style>
 </head>
 <body>

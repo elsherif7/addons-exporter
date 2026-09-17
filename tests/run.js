@@ -10,6 +10,7 @@
 // readSrc()/evalInContext() as needed), then add a require() for it below.
 
 require('./common.test.js');
+require('./theme.test.js');
 require('./import.test.js');
 require('./report-template.test.js');
 require('./background.test.js');

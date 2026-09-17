@@ -1,8 +1,60 @@
 /* Shared base styles for the extension's full-page tabs. */
 
+/* Theme variables. Light values here are :root's defaults (used when no
+   data-theme attribute is set, and by [data-theme="light"] explicitly);
+   dark values override under [data-theme="dark"]. src/common/theme.js
+   sets document.documentElement's data-theme attribute on load, based
+   on the stored setting from the Settings page - this file only holds
+   the color values themselves, not the logic that picks between them.
+   Accent colors (link/warning/danger) get their own, lighter dark-mode
+   values rather than reusing the light-mode ones as-is, since several
+   of the light values are too low-contrast against a dark background. */
+:root {
+  --bg: #f4f5f7;
+  --card-bg: #fff;
+  --card-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  --card-border: transparent;
+  --text: #222;
+  --text-secondary: #444;
+  --text-muted: #666;
+  --text-faint: #888;
+  --border: #d0d3d9;
+  --border-soft: #e2e4e8;
+  --border-faint: #f0f1f3;
+  --hover-bg: #fafbfc;
+  --btn-bg: #1f2937;
+  --btn-bg-hover: #111827;
+  --btn-disabled-bg: #9ca3af;
+  --btn-text: #fff;
+  --link-accent: #1a73e8;
+  --warn-color: #b45309;
+  --danger-color: #c0392b;
+}
+:root[data-theme="dark"] {
+  --bg: #15171c;
+  --card-bg: #1e2128;
+  --card-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  --card-border: #2a2e37;
+  --text: #e8e9ec;
+  --text-secondary: #c3c5ca;
+  --text-muted: #9199a3;
+  --text-faint: #7d848f;
+  --border: #3a3f4b;
+  --border-soft: #2f333c;
+  --border-faint: #262932;
+  --hover-bg: #262a33;
+  --btn-bg: #374151;
+  --btn-bg-hover: #4b5563;
+  --btn-disabled-bg: #4b5563;
+  --btn-text: #fff;
+  --link-accent: #6ea8fe;
+  --warn-color: #f0a838;
+  --danger-color: #ef6a5e;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background: #f4f5f7;
+  background: var(--bg);
   margin: 0;
   /* Fluid padding: scales down smoothly on narrow phones instead of a
      fixed 60px eating into limited width, and back up toward the
@@ -11,22 +63,23 @@ body {
      where vw alone would keep it large even though height is what's
      actually constrained there. */
   padding: clamp(24px, 8vmin, 60px) clamp(14px, 5vw, 20px);
-  color: #222;
+  color: var(--text);
   box-sizing: border-box;
   overflow-wrap: break-word;
 }
 .card {
   max-width: 640px;
   margin: 0 auto;
-  background: #fff;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 12px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  box-shadow: var(--card-shadow);
   padding: clamp(20px, 6vmin, 40px);
   text-align: center;
   box-sizing: border-box;
 }
 h1 { font-size: clamp(22px, 6vw, 28px); margin: 0 0 16px; }
-p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
+p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0 28px; }
 
 /* Add-on checklist, shared by export.html and import.html. */
 .search-input {
@@ -35,14 +88,16 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   box-sizing: border-box;
   padding: 8px 12px;
   margin-bottom: 10px;
-  border: 1px solid #d0d3d9;
+  border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 14px;
   font-family: inherit;
+  background: var(--card-bg);
+  color: var(--text);
 }
 .search-input:focus {
   outline: none;
-  border-color: #1f2937;
+  border-color: var(--btn-bg);
 }
 .list-controls {
   display: flex;
@@ -54,13 +109,13 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
 }
 #selectionCount {
   font-size: 13px;
-  color: #666;
+  color: var(--text-muted);
   padding: 6px 10px;
 }
 .list-controls button {
   background: none;
   border: none;
-  color: #1a73e8;
+  color: var(--link-accent);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -71,23 +126,23 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   text-align: left;
   max-height: min(360px, 55vh);
   overflow-y: auto;
-  border: 1px solid #e2e4e8;
+  border: 1px solid var(--border-soft);
   border-radius: 8px;
   padding: 4px 0;
   margin-bottom: 20px;
 }
 .placeholder-text {
   padding: 20px;
-  color: #666;
+  color: var(--text-muted);
   font-size: 14px;
   margin: 0;
 }
-.placeholder-text.error { color: #c0392b; }
+.placeholder-text.error { color: var(--danger-color); }
 .group-heading {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: #555;
+  color: var(--text-muted);
   padding: 10px 14px 4px;
 }
 .addon-row {
@@ -95,12 +150,12 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   align-items: flex-start;
   gap: 10px;
   padding: 10px 14px;
-  border-bottom: 1px solid #f0f1f3;
+  border-bottom: 1px solid var(--border-faint);
   cursor: pointer; /* whole row is clickable - overridden to default below for disabled rows */
   user-select: none; /* clicking to toggle shouldn't also highlight the row's text */
 }
 .addon-row:last-child { border-bottom: none; }
-.addon-row:hover { background: #fafbfc; }
+.addon-row:hover { background: var(--hover-bg); }
 .addon-row label {
   flex: 1;
   text-align: left;
@@ -111,7 +166,7 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   margin-top: 3px;
 }
 .addon-version {
-  color: #888;
+  color: var(--text-faint);
   font-size: 12px;
 }
 /* Base layout/typography for a link-preview note under an add-on's name.
@@ -123,11 +178,11 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
 .addon-link-preview {
   display: block;
   font-size: 12px;
-  color: #999;
+  color: var(--text-faint);
   margin-top: 2px;
 }
 .addon-link-preview.unsafe {
-  color: #c0392b;
+  color: var(--danger-color);
   font-weight: 600;
 }
 /* Rows with an unsafe link are non-interactive — disable and grey them out. */
@@ -143,11 +198,11 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
 }
 .match-label {
   font-size: 12px;
-  color: #666;
+  color: var(--text-muted);
   margin-left: 8px;
 }
 .match-uncertain {
-  color: #b45309;
+  color: var(--warn-color);
   font-weight: 600;
 }
 .primary-btn {
@@ -158,25 +213,25 @@ p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
   padding: 8px 20px;
   border-radius: 8px;
   border: none;
-  background: #1f2937;
-  color: #fff;
+  background: var(--btn-bg);
+  color: var(--btn-text);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
 }
-.primary-btn:hover:not(:disabled) { background: #111827; }
-.primary-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+.primary-btn:hover:not(:disabled) { background: var(--btn-bg-hover); }
+.primary-btn:disabled { background: var(--btn-disabled-bg); cursor: not-allowed; }
 #status {
   display: block;
   font-size: 14px;
-  color: #444;
+  color: var(--text-secondary);
   margin-top: 14px;
   min-height: 18px;
 }
 #compareNote {
   display: block;
   font-size: 13px;
-  color: #666;
+  color: var(--text-muted);
   margin-bottom: 10px;
 }
 /* Space only shows up when there's actually a note. */

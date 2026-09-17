@@ -19,6 +19,7 @@ addons-hub/
 │   ├── run.js                   # Requires every test file, then prints the combined summary
 │   ├── helpers.js               # Shared test()/testAsync() harness plus vm-loading and sandbox utilities
 │   ├── common.test.js           # Unit tests covering every helper function in common.js
+│   ├── theme.test.js            # Tests for the shared light/dark theme logic
 │   ├── import.test.js           # Tests covering the import page's parsing and UI logic
 │   ├── report-template.test.js  # Tests for the standalone HTML report template builder
 │   ├── background.test.js       # Tests covering messaging, AMO lookups, and export logic
@@ -26,6 +27,7 @@ addons-hub/
 └── src/
     ├── common/
     │   ├── common.js   # Shared helper functions used across every page and script
+    │   ├── theme.js    # Applies the stored light/dark theme on page load
     │   └── shared.css  # Shared styles used by export, import, settings, and confirmation pages
     ├── background/
     │   ├── background.js       # Handles messaging, AMO lookups, and export orchestration logic
