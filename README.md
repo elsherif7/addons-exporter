@@ -26,19 +26,22 @@ addons-hub/
 └── src/
     ├── common/
     │   ├── common.js   # Shared helper functions used across every page and script
-    │   └── shared.css  # Shared styles used by export, import, and confirmation pages
+    │   └── shared.css  # Shared styles used by export, import, settings, and confirmation pages
     ├── background/
     │   ├── background.js       # Handles messaging, AMO lookups, and export orchestration logic
     │   └── report-template.js  # Builds the self-contained HTML report returned by doExport()
     ├── popup/
     │   ├── popup.html  # Markup for the small toolbar popup interface
-    │   └── popup.js    # Handles clicks on the popup's export and import buttons
+    │   └── popup.js    # Handles clicks on the popup's export, import, and settings buttons
     ├── export/
     │   ├── export.html  # Page for choosing which installed add-ons to export
     │   └── export.js    # Loads the add-on list and sends the export selection
     ├── import/
     │   ├── import.html  # Page for picking an exported file and add-ons to open
     │   └── import.js    # Parses the exported file and opens the selected tabs
+    ├── settings/
+    │   ├── settings.html  # Settings page, opened from the popup or the browser's own menu
+    │   └── settings.js    # Settings page logic
     ├── confirmation/
     │   └── confirmation.html  # Tab shown to the user after export finishes
     └── icons/             # Toolbar and extension icons in several standard sizes
@@ -105,6 +108,7 @@ Reads a previously exported report, chosen or dragged in, validating it automati
 |---|---|
 | `management` | To read the list of installed add-ons |
 | `downloads` | To save the exported HTML report |
+| `storage` | To remember your settings |
 | `https://addons.mozilla.org/*` | To look up each add-on's real AMO page |
 
 ---

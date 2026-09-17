@@ -16,3 +16,8 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   await browser.tabs.create({ url: browser.runtime.getURL('src/import/import.html') });
   window.close();
 });
+
+document.getElementById('settingsBtn').addEventListener('click', async () => {
+  await browser.runtime.openOptionsPage();
+  window.close();
+});

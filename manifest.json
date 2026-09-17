@@ -5,11 +5,16 @@
   "description": "A Firefox WebExtension for managing your installed add-ons, starting with Add-ons Exporter and Add-ons Importer.",
   "permissions": [
     "management",
-    "downloads"
+    "downloads",
+    "storage"
   ],
   "host_permissions": [
     "https://addons.mozilla.org/*"
   ],
+  "options_ui": {
+    "page": "src/settings/settings.html",
+    "open_in_tab": true
+  },
   "browser_specific_settings": {
     "gecko": {
       "id": "addons-exporter@local",
