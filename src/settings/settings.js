@@ -171,3 +171,45 @@ settingsFileInput.addEventListener('change', async () => {
 
 loadCurrentTheme();
 loadCurrentExportFormat();
+
+// --- Check for updates ---
+
+const CURRENT_VERSION = '1.2.0';
+const AMO_ADDON_ID = 'addons-exporter@local';
+
+document.getElementById('checkUpdateBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('checkUpdateBtn');
+  const statusRow = document.getElementById('updateStatusRow');
+  const statusMsg = document.getElementById('updateStatusMsg');
+
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+  statusRow.style.display = 'none';
+
+  try {
+    const res = await fetch(
+      `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(AMO_ADDON_ID)}/`,
+      { credentials: 'omit' }
+    );
+    if (!res.ok) throw new Error(`AMO returned HTTP ${res.status}`);
+    const data = await res.json();
+    const latest = data.current_version && data.current_version.version;
+    if (!latest) throw new Error('Could not read the latest version from AMO.');
+
+    statusRow.style.display = '';
+    if (latest === CURRENT_VERSION) {
+      statusMsg.style.color = 'var(--text-muted)';
+      statusMsg.textContent = `You're up to date (version ${CURRENT_VERSION}).`;
+    } else {
+      statusMsg.style.color = 'var(--link-accent)';
+      statusMsg.innerHTML = `Version ${latest} is available. <a href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener" style="color:var(--link-accent);font-weight:600;">Update on Firefox Add-ons</a>`;
+    }
+  } catch (err) {
+    statusRow.style.display = '';
+    statusMsg.style.color = 'var(--danger-color)';
+    statusMsg.textContent = 'Could not check for updates: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Check now';
+  }
+});
