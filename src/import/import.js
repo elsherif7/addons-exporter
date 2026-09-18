@@ -376,6 +376,13 @@ openSelectedBtn.addEventListener('click', async () => {
 
   openSelectedBtn.disabled = true;
   setStatus(`Opening ${selected.length} tabs...`);
+
+  // Opened first (and becomes the active tab) so it's the thing you see
+  // right away - the add-ons' own pages then open behind it as
+  // background tabs via the loop below.
+  await browser.tabs.create({ url: browser.runtime.getURL('src/confirmation/confirmation.html?from=import') });
+  await delay(TAB_OPEN_DELAY_MS);
+
   let opened = 0;
   let failed = 0;
   for (let i = 0; i < selected.length; i++) {
@@ -397,8 +404,5 @@ openSelectedBtn.addEventListener('click', async () => {
   setStatus(failed > 0
     ? `Opened ${opened} tabs, ${failed} failed to open`
     : `Opened ${opened} tabs`);
-  if (opened > 0) {
-    await browser.tabs.create({ url: browser.runtime.getURL('src/confirmation/confirmation.html?from=import') });
-  }
   openSelectedBtn.disabled = false;
 });

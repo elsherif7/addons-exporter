@@ -212,6 +212,7 @@ function captureBulkSelectHandlers(checkboxList) {
   let selectAllHandler = null;
   let deselectAllHandler = null;
   let openSelectedHandler = null;
+  let setTimeoutCallCount = 0;
   const createdTabUrls = [];
   const addonListElStub = {
     querySelectorAll: (sel) => (sel.includes(':checked') ? checkboxList.filter((cb) => cb.checked) : checkboxList),
@@ -242,7 +243,7 @@ function captureBulkSelectHandlers(checkboxList) {
   };
   const sandbox = {
     URL,
-    setTimeout: (fn) => { fn(); return 0; }, // fires the stagger delay immediately - no reason for tests to actually wait
+    setTimeout: (fn) => { setTimeoutCallCount++; fn(); return 0; }, // fires the stagger delay immediately - no reason for tests to actually wait
     document: { getElementById: (id) => elements[id] },
     browser: {
       runtime: { getURL: (path) => `moz-extension://test-id/${path}` },
@@ -255,6 +256,7 @@ function captureBulkSelectHandlers(checkboxList) {
   return {
     selectAllHandler, deselectAllHandler, openSelectedHandler,
     selectionCountEl: elements.selectionCount, openSelectedBtnEl, createdTabUrls, sandbox,
+    getSetTimeoutCallCount: () => setTimeoutCallCount,
   };
 }
 
@@ -303,7 +305,7 @@ test('deselectAllBtn: unchecks visible enabled rows, leaves disabled rows alone'
 // so it's set here via vm.runInContext() directly against the returned
 // sandbox, in the same lexical scope where it was declared.
 
-testAsync('openSelectedBtn: opens each selected link as a tab, then opens the import confirmation tab', async () => {
+testAsync('openSelectedBtn: opens the import confirmation tab first, then each selected link, staggered throughout', async () => {
   const cb1 = makeCheckbox();
   cb1.checked = true;
   cb1.dataset = { idx: '0' };
@@ -311,7 +313,7 @@ testAsync('openSelectedBtn: opens each selected link as a tab, then opens the im
   cb2.checked = true;
   cb2.dataset = { idx: '1' };
 
-  const { openSelectedHandler, createdTabUrls, sandbox } = captureBulkSelectHandlers([cb1, cb2]);
+  const { openSelectedHandler, createdTabUrls, sandbox, getSetTimeoutCallCount } = captureBulkSelectHandlers([cb1, cb2]);
   vm.runInContext(
     "displayItems = [{ link: 'https://addons.mozilla.org/a/' }, { link: 'https://addons.mozilla.org/b/' }];",
     sandbox
@@ -320,13 +322,16 @@ testAsync('openSelectedBtn: opens each selected link as a tab, then opens the im
   await openSelectedHandler();
 
   assert.deepStrictEqual(createdTabUrls, [
+    'moz-extension://test-id/src/confirmation/confirmation.html?from=import',
     'https://addons.mozilla.org/a/',
     'https://addons.mozilla.org/b/',
-    'moz-extension://test-id/src/confirmation/confirmation.html?from=import',
   ]);
+  // One stagger delay after confirmation, before the first tab, plus one
+  // between the two tabs (none needed after the last one) - 2 total.
+  assert.strictEqual(getSetTimeoutCallCount(), 2);
 });
 
-testAsync('openSelectedBtn: does not open the confirmation tab if every selected link fails to open', async () => {
+testAsync('openSelectedBtn: still opens the confirmation tab even if every selected link fails to open', async () => {
   const cb1 = makeCheckbox();
   cb1.checked = true;
   cb1.dataset = { idx: '0' };
@@ -338,5 +343,10 @@ testAsync('openSelectedBtn: does not open the confirmation tab if every selected
 
   await openSelectedHandler();
 
-  assert.deepStrictEqual(createdTabUrls, []);
+  // Confirmation opens before the loop runs, so it can't know yet
+  // whether anything will actually succeed - only the unsafe link is
+  // blocked, same as always.
+  assert.deepStrictEqual(createdTabUrls, [
+    'moz-extension://test-id/src/confirmation/confirmation.html?from=import',
+  ]);
 });
