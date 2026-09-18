@@ -28,13 +28,21 @@ const reportInlineScript = reportScriptMatch[1];
 // returns its filterAddonRows, so it can be called directly the same way
 // common.js's version is called in the test below.
 function loadReportFilterAddonRows(addonListContainer) {
-  const stubEl = () => ({ style: {}, addEventListener() {} });
+  // The inline script now calls applyTheme() on load, which needs
+  // setAttribute/textContent on the themeToggle element, and also reads
+  // from localStorage. Provide minimal stubs for both so the script can
+  // initialise without throwing.
+  const stubEl = () => ({ style: {}, addEventListener() {}, setAttribute() {}, textContent: '' });
   const reportDocument = {
+    documentElement: { setAttribute() {} },
     getElementById(id) {
       return id === 'addonList' ? addonListContainer : stubEl();
     },
   };
-  const reportSandbox = { document: reportDocument };
+  const reportSandbox = {
+    document: reportDocument,
+    localStorage: { getItem() { return null; }, setItem() {} },
+  };
   vm.createContext(reportSandbox);
   vm.runInContext(reportInlineScript, reportSandbox);
   return reportSandbox.filterAddonRows;

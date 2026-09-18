@@ -20,10 +20,10 @@ const REPORT_ICON_DATA_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAA
 // list is the resolved add-ons array (see doExport() for its shape).
 // theme is 'light' or 'dark' - the report's starting appearance,
 // baked in from whatever the exporter's own Settings said at export
-// time (see doExport()'s call site). It's just a starting point, not
-// a permanent choice: the toggle button below lets anyone viewing the
-// report flip it, entirely client-side, with no storage of any kind -
-// a fresh open of the file always starts back at the baked-in value.
+// time (see doExport()'s call site). The toggle button lets anyone
+// viewing the report flip it, and the choice is persisted in
+// localStorage so it survives between opens of the same file.
+// Falls back to the baked-in value if localStorage is unavailable.
 function buildHtmlReport(list, theme) {
   const startingTheme = theme === 'dark' ? 'dark' : 'light';
 
@@ -180,16 +180,36 @@ function buildHtmlReport(list, theme) {
     var addonListEl = document.getElementById('addonList');
     var noSearchMatchesEl = document.getElementById('noSearchMatches');
 
-    // Purely in-memory - no localStorage, since file:// pages often
-    // can't reliably use it anyway. Every fresh open starts back at
-    // whichever theme was baked in at export time.
+    var THEME_KEY = 'addons-hub-report-theme';
+    var BAKED_THEME = '${startingTheme}';
+
+    // Reads the persisted theme from localStorage, falling back to the
+    // baked-in value if localStorage is unavailable or has nothing stored.
+    function loadPersistedTheme() {
+      try {
+        var stored = localStorage.getItem(THEME_KEY);
+        return stored === 'dark' || stored === 'light' ? stored : BAKED_THEME;
+      } catch (e) {
+        return BAKED_THEME;
+      }
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      themeToggleEl.textContent = theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+      themeToggleEl.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+    }
+
     var themeToggleEl = document.getElementById('themeToggle');
+
+    // Apply persisted theme on load (may differ from the baked-in default).
+    applyTheme(loadPersistedTheme());
+
     themeToggleEl.addEventListener('click', function () {
       var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
       var next = isDark ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      themeToggleEl.textContent = next === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
-      themeToggleEl.setAttribute('aria-label', next === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+      applyTheme(next);
+      try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
     });
 
     // NOTE: mirrors filterAddonRows() in common.js. Duplicated here
