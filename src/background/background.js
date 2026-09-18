@@ -209,7 +209,19 @@ async function doExport(ids) {
     return { id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
   });
 
-  const html = buildHtmlReport(list);
+  // background.js has no document to apply a theme to, so it doesn't
+  // load theme.js - it only needs the resolved value here, to bake into
+  // the report's starting state (see report-template.js's
+  // buildHtmlReport). Falls back to light if storage is ever unavailable.
+  let theme = 'light';
+  try {
+    const stored = await browser.storage.local.get('theme');
+    theme = stored.theme === 'dark' ? 'dark' : 'light';
+  } catch {
+    // keep the 'light' default
+  }
+
+  const html = buildHtmlReport(list, theme);
   const filename = `Firefox-Addons (${formatFilenameTimestamp(new Date())}).html`;
   return { html, filename };
 }

@@ -89,7 +89,7 @@ Both are opened from the toolbar icon's popup.
 
 ### Add-ons Exporter
 
-Creates a checklist of every installed extension and theme, split into Enabled/Disabled groups with a search box to filter by name. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage, and finally a plain AMO search link if none of those find anything), and the result is saved as a single HTML report — human-readable on its own, with the underlying data embedded for Add-ons Importer to read back. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on.
+Creates a checklist of every installed extension and theme, split into Enabled/Disabled groups with a search box to filter by name. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage, and finally a plain AMO search link if none of those find anything), and the result is saved as a single HTML report — human-readable on its own, with the underlying data embedded for Add-ons Importer to read back. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on. The report opens in whichever theme Settings is currently set to, and has its own light/dark toggle in the corner — that toggle is just for the current viewing session, though, since the report has no way to remember a choice once it's saved outside the extension.
 
 ### Add-ons Importer
 

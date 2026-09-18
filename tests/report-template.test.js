@@ -66,6 +66,31 @@ test('buildHtmlReport: uses REPORT_ICON_DATA_URI as the page favicon', () => {
   assert.strictEqual(faviconMatch[1], REPORT_ICON_DATA_URI);
 });
 
+test('buildHtmlReport: defaults to light when no theme is given', () => {
+  const html = buildHtmlReport(sampleList);
+  assert.match(html, /<html data-theme="light">/);
+});
+
+test('buildHtmlReport: honors an explicit "dark" theme', () => {
+  const html = buildHtmlReport(sampleList, 'dark');
+  assert.match(html, /<html data-theme="dark">/);
+});
+
+test('buildHtmlReport: falls back to light for anything other than exactly "dark"', () => {
+  assert.match(buildHtmlReport(sampleList, 'light'), /<html data-theme="light">/);
+  assert.match(buildHtmlReport(sampleList, 'nonsense'), /<html data-theme="light">/);
+  assert.match(buildHtmlReport(sampleList, undefined), /<html data-theme="light">/);
+});
+
+test('buildHtmlReport: includes a theme toggle button matching the starting theme', () => {
+  const lightHtml = buildHtmlReport(sampleList, 'light');
+  assert.match(lightHtml, /id="themeToggle"/);
+  assert.match(lightHtml, /aria-label="Switch to dark mode"/);
+
+  const darkHtml = buildHtmlReport(sampleList, 'dark');
+  assert.match(darkHtml, /aria-label="Switch to light mode"/);
+});
+
 test('safeJsonForScriptTag: escapes "</" so an add-on name can\'t close the script tag early', () => {
   const json = safeJsonForScriptTag({ addons: [{ name: 'x</script><script>alert(1)</script>' }] });
   assert.ok(!json.includes('</script>'), 'a literal </script> would close the tag early if left unescaped');

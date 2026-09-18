@@ -17,7 +17,16 @@ function safeJsonForScriptTag(value) {
 // extension's icons folder sitting next to it once it's saved elsewhere.
 const REPORT_ICON_DATA_URI = 'data:image/png;base64,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';
 
-function buildHtmlReport(list) {
+// list is the resolved add-ons array (see doExport() for its shape).
+// theme is 'light' or 'dark' - the report's starting appearance,
+// baked in from whatever the exporter's own Settings said at export
+// time (see doExport()'s call site). It's just a starting point, not
+// a permanent choice: the toggle button below lets anyone viewing the
+// report flip it, entirely client-side, with no storage of any kind -
+// a fresh open of the file always starts back at the baked-in value.
+function buildHtmlReport(list, theme) {
+  const startingTheme = theme === 'dark' ? 'dark' : 'light';
+
   const row = (a) => {
     const matchLabel = LINK_TYPE_LABELS[a.linkType] || '';
     const matchClass = UNCERTAIN_LINK_TYPES.has(a.linkType) ? ' match-uncertain' : '';
@@ -34,40 +43,96 @@ function buildHtmlReport(list) {
     : '';
 
   return `<!DOCTYPE html>
-<html>
+<html data-theme="${startingTheme}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Add-ons Exporter</title>
 <link rel="icon" href="${REPORT_ICON_DATA_URI}">
 <style>
+  /* Same variable names/values as shared.css, duplicated here since
+     the report is a standalone file with no access to that file once
+     saved. Accent colors (link/warning) get their own lighter
+     dark-mode values for contrast, same reasoning as shared.css. */
+  :root {
+    --bg: #f4f5f7;
+    --card-bg: #fff;
+    --card-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    --text: #222;
+    --text-secondary: #444;
+    --text-muted: #666;
+    --text-faint: #888;
+    --border: #d0d3d9;
+    --border-soft: #e2e4e8;
+    --border-faint: #f0f1f3;
+    --hover-bg: #fafbfc;
+    --btn-bg: #1f2937;
+    --link-accent: #0060df;
+    --warn-color: #b45309;
+  }
+  :root[data-theme="dark"] {
+    --bg: #15171c;
+    --card-bg: #1e2128;
+    --card-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    --text: #e8e9ec;
+    --text-secondary: #c3c5ca;
+    --text-muted: #9199a3;
+    --text-faint: #7d848f;
+    --border: #3a3f4b;
+    --border-soft: #2f333c;
+    --border-faint: #262932;
+    --hover-bg: #262a33;
+    --btn-bg: #374151;
+    --link-accent: #6ea8fe;
+    --warn-color: #f0a838;
+  }
   /* Vertical padding uses vmin (not vw) so it also scales down on
      short landscape viewports, where vw alone would keep it large
      even though height is what's actually constrained there. */
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f4f5f7; margin: 0; padding: clamp(24px, 8vmin, 60px) clamp(14px, 5vw, 20px); color: #222; box-sizing: border-box; overflow-wrap: break-word; }
-  .card { max-width: 640px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: clamp(20px, 6vmin, 40px); text-align: center; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg); margin: 0; padding: clamp(24px, 8vmin, 60px) clamp(14px, 5vw, 20px); color: var(--text); box-sizing: border-box; overflow-wrap: break-word; }
+  .card { position: relative; max-width: 640px; margin: 0 auto; background: var(--card-bg); border-radius: 12px; box-shadow: var(--card-shadow); padding: clamp(20px, 6vmin, 40px); text-align: center; box-sizing: border-box; }
   h1 { font-size: clamp(22px, 6vw, 28px); margin: 0 0 16px; }
-  p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
-  .cta-link { color: #0060df; font-weight: bold; text-decoration: none; }
+  p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0 28px; }
+  .cta-link { color: var(--link-accent); font-weight: bold; text-decoration: none; }
   .cta-link:hover { text-decoration: underline; }
+  .theme-toggle {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--border-soft);
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .theme-toggle:hover { background: var(--hover-bg); }
   .search-input {
     display: block;
     width: 100%;
     box-sizing: border-box;
     padding: 8px 12px;
     margin-bottom: 10px;
-    border: 1px solid #d0d3d9;
+    border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 14px;
     font-family: inherit;
+    background: var(--card-bg);
+    color: var(--text);
   }
-  .search-input:focus { outline: none; border-color: #1f2937; }
-  .placeholder-text { padding: 20px; color: #666; font-size: 14px; margin: 0; }
+  .search-input:focus { outline: none; border-color: var(--btn-bg); }
+  .placeholder-text { padding: 20px; color: var(--text-muted); font-size: 14px; margin: 0; }
   .checklist-box {
     text-align: left;
     max-height: min(360px, 55vh);
     overflow-y: auto;
-    border: 1px solid #e2e4e8;
+    border: 1px solid var(--border-soft);
     border-radius: 8px;
     padding: 4px 0;
     margin-bottom: 20px;
@@ -76,23 +141,24 @@ function buildHtmlReport(list) {
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.04em;
-    color: #555;
+    color: var(--text-muted);
     padding: 10px 14px 4px;
   }
   .addon-row {
     padding: 10px 14px;
-    border-bottom: 1px solid #f0f1f3;
+    border-bottom: 1px solid var(--border-faint);
   }
   .addon-row:last-child { border-bottom: none; }
-  .addon-name { font-size: 14px; font-weight: 600; color: #0060df; text-decoration: none; }
+  .addon-name { font-size: 14px; font-weight: 600; color: var(--link-accent); text-decoration: none; }
   .addon-name:hover { text-decoration: underline; }
-  .addon-version { color: #888; font-size: 12px; margin-left: 6px; }
-  .match-label { font-size: 12px; color: #666; margin-left: 8px; }
-  .match-uncertain { color: #b45309; font-weight: 600; }
+  .addon-version { color: var(--text-faint); font-size: 12px; margin-left: 6px; }
+  .match-label { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+  .match-uncertain { color: var(--warn-color); font-weight: 600; }
 </style>
 </head>
 <body>
   <div class="card">
+  <button type="button" id="themeToggle" class="theme-toggle" aria-label="${startingTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}">${startingTheme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19'}</button>
   <h1>Add-ons Exporter</h1>
   <p><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener">Add-ons Hub</a> installed, click its toolbar icon and choose <strong>Add-ons Importer</strong> to open every link below as a tab automatically.</p>
 
@@ -113,6 +179,18 @@ function buildHtmlReport(list) {
     // scripts or APIs once it's saved and opened on its own.
     var addonListEl = document.getElementById('addonList');
     var noSearchMatchesEl = document.getElementById('noSearchMatches');
+
+    // Purely in-memory - no localStorage, since file:// pages often
+    // can't reliably use it anyway. Every fresh open starts back at
+    // whichever theme was baked in at export time.
+    var themeToggleEl = document.getElementById('themeToggle');
+    themeToggleEl.addEventListener('click', function () {
+      var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      var next = isDark ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      themeToggleEl.textContent = next === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+      themeToggleEl.setAttribute('aria-label', next === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+    });
 
     // NOTE: mirrors filterAddonRows() in common.js. Duplicated here
     // because this report is self-contained and can't load common.js

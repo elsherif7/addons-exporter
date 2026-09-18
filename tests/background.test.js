@@ -212,6 +212,54 @@ testAsync('doExport: an unsafe homepage URL is rejected in favor of the search-r
   assert.strictEqual(result.linkType, 'amo-search-fallback');
 });
 
+// --- doExport()'s theme-reading behavior ---
+// The report should start in whatever theme is currently stored, so a
+// dark-mode user gets a dark-mode report by default. Separate harness
+// from runDoExportWithFetch above since its return shape (the parsed
+// addon data) is already relied on by every test above this point -
+// this one needs the raw html string instead, to check <html data-theme>.
+
+async function runDoExportForTheme(storageLocalGetImpl) {
+  const fetchImpl = async (url) => {
+    if (url.includes('/addons/addon/')) return { ok: true, status: 200, json: async () => ({ url: 'https://addons.mozilla.org/en-US/firefox/addon/exact-match/' }) };
+    return { ok: true, status: 200, json: async () => ({ results: [] }) };
+  };
+  const bgSandbox = {
+    URL,
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    fetch: fetchImpl,
+    browser: {
+      runtime: { onMessage: { addListener() {} }, sendMessage: async () => {} },
+      management: { getAll: async () => [baseAddon] },
+      storage: { local: { get: storageLocalGetImpl } },
+    },
+  };
+  vm.createContext(bgSandbox);
+  vm.runInContext(commonSrc, bgSandbox);
+  vm.runInContext(reportTemplateSrc, bgSandbox);
+  vm.runInContext(backgroundSrc, bgSandbox);
+  const { html } = await bgSandbox.doExport([baseAddon.id]);
+  return html;
+}
+
+testAsync('doExport: bakes the stored dark theme into the report', async () => {
+  const html = await runDoExportForTheme(async () => ({ theme: 'dark' }));
+  assert.match(html, /<html data-theme="dark">/);
+});
+
+testAsync('doExport: defaults to light when no theme is stored', async () => {
+  const html = await runDoExportForTheme(async () => ({}));
+  assert.match(html, /<html data-theme="light">/);
+});
+
+testAsync('doExport: falls back to light if storage.local.get throws', async () => {
+  const html = await runDoExportForTheme(async () => { throw new Error('storage unavailable'); });
+  assert.match(html, /<html data-theme="light">/);
+});
+
 // --- background.js: mapWithConcurrency()'s concurrency cap ---
 // AMO_LOOKUP_CONCURRENCY caps how many lookups run at once so a big
 // add-on collection doesn't trip AMO's rate limiting. Calls
