@@ -113,7 +113,7 @@ testAsync('export message: on Android, hands the report back instead of saving o
   assert.strictEqual(downloadOptions, null);
   assert.strictEqual(createdTabUrls.length, 0);
   assert.match(result.html, /Test Addon/);
-  assert.match(result.filename, /^Firefox-Addons \(.+\)\.html$/);
+  assert.match(result.filename, /^Firefox Add-ons \(.+\)\.html$/);
 });
 
 testAsync('export message: on desktop, downloads with saveAs, opens confirmation.html, and returns nothing', async () => {

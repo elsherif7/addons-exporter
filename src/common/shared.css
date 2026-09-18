@@ -94,7 +94,9 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   font-family: inherit;
   background: var(--card-bg);
   color: var(--text);
+  transition: border-color 0.12s;
 }
+.search-input:hover { border-color: var(--btn-bg); }
 .search-input:focus {
   outline: none;
   border-color: var(--btn-bg);
@@ -125,6 +127,7 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 .checklist-box {
   text-align: left;
   max-height: min(360px, 55vh);
+  overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid var(--border-soft);
   border-radius: 8px;
@@ -150,12 +153,13 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   align-items: flex-start;
   gap: 10px;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--border-faint);
-  cursor: pointer; /* whole row is clickable - overridden to default below for disabled rows */
-  user-select: none; /* clicking to toggle shouldn't also highlight the row's text */
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, transform 0.1s;
 }
 .addon-row:last-child { border-bottom: none; }
-.addon-row:hover { background: var(--hover-bg); }
+.addon-row:hover { background: var(--hover-bg); border-bottom-color: var(--border); transform: scale(1.01); }
 .addon-row label {
   flex: 1;
   text-align: left;
@@ -212,15 +216,17 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   margin: 0 auto;
   padding: 8px 20px;
   border-radius: 8px;
-  border: none;
-  background: var(--btn-bg);
-  color: var(--btn-text);
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, transform 0.1s;
 }
-.primary-btn:hover:not(:disabled) { background: var(--btn-bg-hover); }
-.primary-btn:disabled { background: var(--btn-disabled-bg); cursor: not-allowed; }
+.primary-btn:hover:not(:disabled) { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.01); }
+.primary-btn:active:not(:disabled) { transform: scale(0.99); }
+.primary-btn:disabled { background: var(--card-bg); color: var(--btn-disabled-bg); border-color: var(--border-soft); cursor: not-allowed; }
 #status {
   display: block;
   font-size: 14px;

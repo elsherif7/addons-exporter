@@ -95,7 +95,7 @@ async function captureExportClick({ selectedIds, exportResponse, simulateDownloa
 testAsync('export.js click handler: on Android, proceeds to confirmation.html once downloads.onCreated fires', async () => {
   const { sentMessages, appendedLinks, createdTabUrls, exportBtnEl } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
-    exportResponse: { html: '<html>Test Addon report</html>', filename: 'Firefox-Addons (test).html' },
+    exportResponse: { html: '<html>Test Addon report</html>', filename: 'Firefox Add-ons (test).html' },
     simulateDownloadCreated: true,
   });
   const exportMsg = sentMessages.find((m) => m.type === 'export');
@@ -106,7 +106,7 @@ testAsync('export.js click handler: on Android, proceeds to confirmation.html on
   assert.deepStrictEqual(Array.from(exportMsg.ids), ['ext1@example.com']);
   assert.strictEqual(appendedLinks.length, 1);
   assert.strictEqual(appendedLinks[0].href, 'blob:fake-url');
-  assert.strictEqual(appendedLinks[0].download, 'Firefox-Addons (test).html');
+  assert.strictEqual(appendedLinks[0].download, 'Firefox Add-ons (test).html');
   assert.strictEqual(appendedLinks[0].clicked, true);
   assert.strictEqual(appendedLinks[0].removed, true);
   // Both onCreated and the (immediate, mocked) fallback timer fire here -
@@ -118,7 +118,7 @@ testAsync('export.js click handler: on Android, proceeds to confirmation.html on
 testAsync('export.js click handler: on Android, still proceeds via the fallback timer if onCreated never fires', async () => {
   const { createdTabUrls } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
-    exportResponse: { html: '<html>Test Addon report</html>', filename: 'Firefox-Addons (test).html' },
+    exportResponse: { html: '<html>Test Addon report</html>', filename: 'Firefox Add-ons (test).html' },
     simulateDownloadCreated: false,
   });
   assert.strictEqual(createdTabUrls.length, 1);

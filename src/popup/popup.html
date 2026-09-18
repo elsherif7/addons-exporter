@@ -17,6 +17,8 @@
       --btn-bg: #1f2937;
       --btn-bg-hover: #111827;
       --btn-text: #fff;
+      --border: #d0d3d9;
+      --hover-bg: #fafbfc;
     }
     :root[data-theme="dark"] {
       --bg: #1a1c21;
@@ -25,6 +27,8 @@
       --btn-bg: #374151;
       --btn-bg-hover: #4b5563;
       --btn-text: #fff;
+      --border: #3a3f4b;
+      --hover-bg: #262a33;
     }
     /* body's light-mode #eff1f3 background is intentional, not drift -
        the popup was never meant to match the #f4f5f7 used on
@@ -54,17 +58,19 @@
     button {
       width: 100%;
       padding: 10px;
-      border: none;
+      border: 1px solid var(--border);
       border-radius: 8px;
-      background: var(--btn-bg);
-      color: var(--btn-text);
+      background: var(--card-bg);
+      color: var(--text);
       margin-bottom: 8px;
       cursor: pointer;
       font-size: 14px;
       font-weight: 600;
+      transition: background 0.12s, border-color 0.12s, transform 0.1s;
     }
     button:last-of-type { margin-bottom: 0; }
-    button:hover { background: var(--btn-bg-hover); }
+    button:hover { background: var(--hover-bg); border-color: var(--btn-bg-hover); transform: scale(1.02); }
+    button:active { transform: scale(0.98); }
   </style>
 </head>
 <body>

@@ -14,7 +14,7 @@
     margin-bottom: 24px;
   }
   .settings-group h2 {
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 700;
     letter-spacing: 0.04em;
     color: var(--text-muted);
@@ -29,10 +29,15 @@
     border-radius: 8px;
     margin-bottom: 8px;
     cursor: pointer;
+    user-select: none;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
   .theme-option:last-child { margin-bottom: 0; }
   .theme-option input { margin: 0; }
-  .theme-option label { flex: 1; cursor: pointer; text-align: left; font-size: 14px; }
+  .theme-option { font-size: 14px; }
+  .theme-option:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.01); }
+  :root[data-theme="dark"] .theme-option:hover { background: #2e3340; border-color: #6b7280; }
+  :root[data-theme="dark"] .settings-btn:hover { background: #2e3340; border-color: #6b7280; }
   .settings-action-group {
     display: flex;
     gap: 10px;
@@ -49,8 +54,10 @@
     font-weight: 600;
     cursor: pointer;
     text-align: center;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
-  .settings-btn:hover { background: var(--hover-bg); }
+  .settings-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg-hover); transform: scale(1.01); }
+  .settings-btn:active { transform: scale(0.99); }
   #settingsStatus {
     display: block;
     font-size: 13px;
@@ -68,30 +75,30 @@
 
     <div class="settings-group">
       <h2>Appearance</h2>
-      <div class="theme-option">
+      <label class="theme-option" for="themeLight">
         <input type="radio" name="theme" id="themeLight" value="light">
-        <label for="themeLight">Light</label>
-      </div>
-      <div class="theme-option">
+        Light
+      </label>
+      <label class="theme-option" for="themeDark">
         <input type="radio" name="theme" id="themeDark" value="dark">
-        <label for="themeDark">Dark</label>
-      </div>
+        Dark
+      </label>
     </div>
 
     <div class="settings-group">
       <h2>Export Format</h2>
-      <div class="theme-option">
+      <label class="theme-option" for="formatHtml">
         <input type="radio" name="exportFormat" id="formatHtml" value="html" checked>
-        <label for="formatHtml">HTML</label>
-      </div>
-      <div class="theme-option">
+        HTML
+      </label>
+      <label class="theme-option" for="formatJson">
         <input type="radio" name="exportFormat" id="formatJson" value="json">
-        <label for="formatJson">JSON</label>
-      </div>
-      <div class="theme-option">
+        JSON
+      </label>
+      <label class="theme-option" for="formatCsv">
         <input type="radio" name="exportFormat" id="formatCsv" value="csv">
-        <label for="formatCsv">CSV</label>
-      </div>
+        CSV
+      </label>
     </div>
     <div class="settings-group">
       <h2>Settings Backup</h2>

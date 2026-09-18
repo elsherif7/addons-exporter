@@ -23,15 +23,17 @@
   }
   #chooseFileBtn {
     padding: 12px 20px;
-    border-radius: 6px;
+    border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--card-bg);
     color: var(--text);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
-  #chooseFileBtn:hover { background: var(--hover-bg); }
+  #chooseFileBtn:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.02); }
+  #chooseFileBtn:active { transform: scale(0.98); }
   #fileName {
     display: block;
     font-size: 14px;

@@ -230,6 +230,6 @@ async function doExport(ids) {
     ext = 'html';
   }
 
-  const filename = `Firefox-Addons (${formatFilenameTimestamp(new Date())}).${ext}`;
+  const filename = `Firefox Add-ons (${formatFilenameTimestamp(new Date())}).${ext}`;
   return { html: content, filename, format: ext };
 }
