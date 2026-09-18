@@ -17,7 +17,7 @@ const sandbox = { URL };
 vm.createContext(sandbox);
 vm.runInContext(commonSrc, sandbox);
 vm.runInContext(reportTemplateSrc, sandbox);
-const { buildHtmlReport, safeJsonForScriptTag } = sandbox;
+const { buildHtmlReport, safeJsonForScriptTag, buildJsonExport, buildCsvExport } = sandbox;
 
 // REPORT_ICON_DATA_URI is declared with top-level `const` in
 // report-template.js, so (unlike the function declarations above) it
@@ -112,4 +112,93 @@ test('REPORT_ICON_DATA_URI: matches src/icons/icon32.png byte-for-byte', () => {
     embeddedBytes.equals(iconBytes),
     'REPORT_ICON_DATA_URI no longer matches src/icons/icon32.png - re-encode it if the icon changed intentionally'
   );
+});
+
+// --- buildJsonExport ---
+
+test('buildJsonExport: returns valid JSON with formatVersion and all addons', () => {
+  const json = buildJsonExport(sampleList);
+  const parsed = JSON.parse(json);
+  assert.strictEqual(typeof parsed.formatVersion, 'number');
+  assert.ok(Array.isArray(parsed.addons));
+  assert.strictEqual(parsed.addons.length, sampleList.length);
+  assert.deepStrictEqual(
+    new Set(parsed.addons.map((a) => a.id)),
+    new Set(sampleList.map((a) => a.id))
+  );
+});
+
+test('buildJsonExport: preserves all fields on each add-on', () => {
+  const json = buildJsonExport(sampleList);
+  const parsed = JSON.parse(json);
+  const ublock = parsed.addons.find((a) => a.id === 'ublock@example.com');
+  assert.ok(ublock);
+  assert.strictEqual(ublock.name, 'uBlock Origin');
+  assert.strictEqual(ublock.version, '1.58.0');
+  assert.strictEqual(ublock.enabled, true);
+  assert.strictEqual(ublock.type, 'extension');
+  assert.strictEqual(ublock.link, 'https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/');
+  assert.strictEqual(ublock.linkType, 'amo-exact');
+});
+
+test('buildJsonExport: output is valid JSON even when names contain special characters', () => {
+  const list = [{ id: 'x@e.com', name: 'A & B <>"\'', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
+  assert.doesNotThrow(() => JSON.parse(buildJsonExport(list)));
+});
+
+// --- buildCsvExport ---
+
+test('buildCsvExport: first line is the format-version comment', () => {
+  const csv = buildCsvExport(sampleList);
+  const firstLine = csv.split('\r\n')[0];
+  assert.match(firstLine, /^# addons-hub-format-version: \d+$/);
+});
+
+test('buildCsvExport: second line is the header row with all expected columns', () => {
+  const csv = buildCsvExport(sampleList);
+  const headerLine = csv.split('\r\n')[1];
+  assert.strictEqual(headerLine, 'id,name,version,enabled,type,link,linkType');
+});
+
+test('buildCsvExport: produces one data row per add-on', () => {
+  const csv = buildCsvExport(sampleList);
+  // Lines: comment + header + N data rows
+  const dataRows = csv.split('\r\n').slice(2);
+  assert.strictEqual(dataRows.length, sampleList.length);
+});
+
+test('buildCsvExport: enabled field is "true" or "false" (not 1/0)', () => {
+  const csv = buildCsvExport(sampleList);
+  const rows = csv.split('\r\n').slice(2);
+  for (const row of rows) {
+    const fields = row.split(',');
+    // enabled is the 4th column (index 3)
+    assert.ok(fields[3] === 'true' || fields[3] === 'false', `expected true/false, got "${fields[3]}"`);
+  }
+});
+
+test('buildCsvExport: fields containing commas are quoted per RFC 4180', () => {
+  const list = [{ id: 'x@e.com', name: 'Hello, World', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
+  const csv = buildCsvExport(list);
+  const dataRow = csv.split('\r\n')[2];
+  assert.match(dataRow, /"Hello, World"/);
+});
+
+test('buildCsvExport: fields containing double-quotes double them per RFC 4180', () => {
+  const list = [{ id: 'x@e.com', name: 'Say "Hi"', version: '1.0', enabled: false, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
+  const csv = buildCsvExport(list);
+  const dataRow = csv.split('\r\n')[2];
+  assert.match(dataRow, /"Say ""Hi"""/);
+});
+
+test('buildCsvExport: all seven columns are present on every data row', () => {
+  const csv = buildCsvExport(sampleList);
+  const rows = csv.split('\r\n').slice(2);
+  for (const row of rows) {
+    // A naive split on comma works here since our sample data has no
+    // commas inside fields - just check the column count is right.
+    // (RFC 4180 quoting is tested separately above.)
+    const fields = row.split(',');
+    assert.strictEqual(fields.length, 7, `expected 7 columns, got ${fields.length} in row: ${row}`);
+  }
 });

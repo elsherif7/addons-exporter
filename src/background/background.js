@@ -221,7 +221,29 @@ async function doExport(ids) {
     // keep the 'light' default
   }
 
-  const html = buildHtmlReport(list, theme);
-  const filename = `Firefox-Addons (${formatFilenameTimestamp(new Date())}).html`;
-  return { html, filename };
+  // Read the user's chosen export format, defaulting to HTML.
+  let exportFormat = EXPORT_FORMAT_DEFAULT;
+  try {
+    const stored = await browser.storage.local.get(EXPORT_FORMAT_STORAGE_KEY);
+    const val = stored[EXPORT_FORMAT_STORAGE_KEY];
+    if (val === 'html' || val === 'json' || val === 'csv') exportFormat = val;
+  } catch {
+    // keep the default
+  }
+
+  let content;
+  let ext;
+  if (exportFormat === 'json') {
+    content = buildJsonExport(list);
+    ext = 'json';
+  } else if (exportFormat === 'csv') {
+    content = buildCsvExport(list);
+    ext = 'csv';
+  } else {
+    content = buildHtmlReport(list, theme);
+    ext = 'html';
+  }
+
+  const filename = `Firefox-Addons (${formatFilenameTimestamp(new Date())}).${ext}`;
+  return { html: content, filename };
 }

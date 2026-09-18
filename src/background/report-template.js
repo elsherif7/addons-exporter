@@ -17,6 +17,33 @@ function safeJsonForScriptTag(value) {
 // extension's icons folder sitting next to it once it's saved elsewhere.
 const REPORT_ICON_DATA_URI = 'data:image/png;base64,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';
 
+// Builds a plain JSON export. Same payload shape as the embedded
+// #addons-exporter-data in the HTML report, just saved as a standalone
+// .json file. Importable by the importer the same way HTML is.
+function buildJsonExport(list) {
+  return JSON.stringify({ formatVersion: EXPORT_FORMAT_VERSION, addons: list }, null, 2);
+}
+
+// Builds a CSV export. First line is a format-version comment so the
+// importer can validate it without guessing. Second line is the header
+// row. One data row per add-on. Fields with commas or quotes are
+// quoted and internal quotes are doubled per RFC 4180.
+function buildCsvExport(list) {
+  const csvField = (val) => {
+    const s = String(val == null ? '' : val);
+    // Quote the field if it contains a comma, double-quote, or newline.
+    return /[,"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const row = (fields) => fields.map(csvField).join(',');
+
+  const lines = [
+    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
+    row(['id', 'name', 'version', 'enabled', 'type', 'link', 'linkType']),
+    ...list.map((a) => row([a.id, a.name, a.version, a.enabled, a.type, a.link, a.linkType])),
+  ];
+  return lines.join('\r\n');
+}
+
 // list is the resolved add-ons array (see doExport() for its shape).
 // theme is 'light' or 'dark' - the report's starting appearance,
 // baked in from whatever the exporter's own Settings said at export

@@ -294,3 +294,81 @@ testAsync('mapWithConcurrency: never runs more than `limit` calls at once', asyn
   assert.ok(maxConcurrent <= 5, `expected at most 5 concurrent calls, saw ${maxConcurrent}`);
   assert.strictEqual(maxConcurrent, 5, 'expected concurrency to actually reach the cap with 12 items and a limit of 5');
 });
+
+// --- doExport()'s export-format dispatch ---
+// doExport() reads EXPORT_FORMAT_STORAGE_KEY from storage and calls the
+// matching builder. Separate harness from runDoExportWithFetch/
+// runDoExportForTheme since those already rely on their specific return
+// shapes - this one just needs the raw content string and filename.
+
+async function runDoExportForFormat(storageLocalGetImpl) {
+  const fetchImpl = async (url) => {
+    if (url.includes('/addons/addon/')) return { ok: true, status: 200, json: async () => ({ url: 'https://addons.mozilla.org/en-US/firefox/addon/exact-match/' }) };
+    return { ok: true, status: 200, json: async () => ({ results: [] }) };
+  };
+  const bgSandbox = {
+    URL,
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    fetch: fetchImpl,
+    browser: {
+      runtime: { onMessage: { addListener() {} }, sendMessage: async () => {} },
+      management: { getAll: async () => [baseAddon] },
+      storage: { local: { get: storageLocalGetImpl } },
+    },
+  };
+  vm.createContext(bgSandbox);
+  vm.runInContext(commonSrc, bgSandbox);
+  vm.runInContext(reportTemplateSrc, bgSandbox);
+  vm.runInContext(backgroundSrc, bgSandbox);
+  const { html: content, filename } = await bgSandbox.doExport([baseAddon.id]);
+  return { content, filename };
+}
+
+testAsync('doExport: produces a .json file when exportFormat is "json"', async () => {
+  const { content, filename } = await runDoExportForFormat(async (key) => {
+    if (key === 'exportFormat') return { exportFormat: 'json' };
+    return {};
+  });
+  assert.match(filename, /\.json$/);
+  const parsed = JSON.parse(content);
+  assert.strictEqual(typeof parsed.formatVersion, 'number');
+  assert.ok(Array.isArray(parsed.addons));
+  assert.strictEqual(parsed.addons[0].name, baseAddon.name);
+});
+
+testAsync('doExport: produces a .csv file when exportFormat is "csv"', async () => {
+  const { content, filename } = await runDoExportForFormat(async (key) => {
+    if (key === 'exportFormat') return { exportFormat: 'csv' };
+    return {};
+  });
+  assert.match(filename, /\.csv$/);
+  assert.match(content, /^# addons-hub-format-version:/);
+  assert.match(content, /id,name,version,enabled,type,link,linkType/);
+  assert.match(content, new RegExp(baseAddon.name));
+});
+
+testAsync('doExport: defaults to .html when exportFormat is unset', async () => {
+  const { content, filename } = await runDoExportForFormat(async () => ({}));
+  assert.match(filename, /\.html$/);
+  assert.match(content, /<!DOCTYPE html>/);
+});
+
+testAsync('doExport: defaults to .html when exportFormat is an unrecognised value', async () => {
+  const { content, filename } = await runDoExportForFormat(async (key) => {
+    if (key === 'exportFormat') return { exportFormat: 'xml' };
+    return {};
+  });
+  assert.match(filename, /\.html$/);
+  assert.match(content, /<!DOCTYPE html>/);
+});
+
+testAsync('doExport: defaults to .html when storage.local.get throws for exportFormat', async () => {
+  const { content, filename } = await runDoExportForFormat(async () => {
+    throw new Error('storage unavailable');
+  });
+  assert.match(filename, /\.html$/);
+  assert.match(content, /<!DOCTYPE html>/);
+});
