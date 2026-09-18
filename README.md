@@ -23,7 +23,8 @@ addons-hub/
 │   ├── import.test.js           # Tests covering the import page's parsing and UI logic
 │   ├── report-template.test.js  # Tests for the standalone HTML report template builder
 │   ├── background.test.js       # Tests covering messaging, AMO lookups, and export logic
-│   └── export.test.js           # Tests covering the export page's picker and click logic
+│   ├── export.test.js           # Tests covering the export page's picker and click logic
+│   └── settings.test.js         # Tests for the settings export/import logic
 └── src/
     ├── common/
     │   ├── common.js   # Shared helper functions used across every page and script
@@ -94,6 +95,14 @@ Creates a checklist of every installed extension and theme, split into Enabled/D
 ### Add-ons Importer
 
 Reads a previously exported file (HTML, JSON, or CSV), chosen or dragged in, validating it automatically and rejecting anything with a missing or unsupported format version rather than guessing. It compares the file against what's currently installed (matched by add-on ID, falling back to name for older exports), splitting the checklist into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference) — so you never need to reopen things you already have. It opens each pick as a tab rather than installing it directly, which is the workaround for a real limitation: Firefox doesn't allow any extension to install other extensions automatically — a deliberate security restriction, not a limitation of these tools.
+
+### Settings Backup
+
+The Settings page has **Export Settings** and **Import Settings** buttons at the bottom.
+
+**Export Settings** saves your current Add-ons Hub settings (theme and export format) to a small JSON file — `addons-hub-settings.json`. You can use it to carry your preferences to another browser or device.
+
+**Import Settings** reads a previously exported settings file, validates it, and applies the recognised settings immediately. Unknown keys from future versions are silently ignored, so a file exported by a newer version will still apply whatever it can.
 
 #### A few other things worth knowing
 

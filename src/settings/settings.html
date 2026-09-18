@@ -33,6 +33,33 @@
   .theme-option:last-child { margin-bottom: 0; }
   .theme-option input { margin: 0; }
   .theme-option label { flex: 1; cursor: pointer; text-align: left; font-size: 14px; }
+  .settings-action-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .settings-btn {
+    flex: 1;
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+  .settings-btn:hover { background: var(--hover-bg); }
+  #settingsStatus {
+    display: block;
+    font-size: 13px;
+    margin-top: 10px;
+    min-height: 18px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+  #settingsStatus.error { color: var(--danger-color); }
 </style>
 </head>
 <body>
@@ -66,8 +93,17 @@
         <label for="formatCsv">CSV</label>
       </div>
     </div>
+    <div class="settings-group">
+      <h2>Settings Backup</h2>
+      <div class="settings-action-group">
+        <button class="settings-btn" id="exportSettingsBtn">Export Settings</button>
+        <button class="settings-btn" id="importSettingsBtn">Import Settings</button>
+      </div>
+      <span id="settingsStatus"></span>
+    </div>
   </div>
 
+  <input type="file" id="settingsFileInput" accept=".json" style="display:none">
   <script src="settings.js"></script>
 </body>
 </html>
