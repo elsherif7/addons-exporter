@@ -49,6 +49,22 @@
         <label for="themeDark">Dark</label>
       </div>
     </div>
+
+    <div class="settings-group">
+      <h2>Export Format</h2>
+      <div class="theme-option">
+        <input type="radio" name="exportFormat" id="formatHtml" value="html">
+        <label for="formatHtml">HTML <span style="font-size:12px; color:var(--text-muted);">(default — human-readable report, re-importable)</span></label>
+      </div>
+      <div class="theme-option">
+        <input type="radio" name="exportFormat" id="formatJson" value="json">
+        <label for="formatJson">JSON <span style="font-size:12px; color:var(--text-muted);">(compact data file, re-importable)</span></label>
+      </div>
+      <div class="theme-option">
+        <input type="radio" name="exportFormat" id="formatCsv" value="csv">
+        <label for="formatCsv">CSV <span style="font-size:12px; color:var(--text-muted);">(spreadsheet-compatible, re-importable)</span></label>
+      </div>
+    </div>
   </div>
 
   <script src="settings.js"></script>

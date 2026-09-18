@@ -4,6 +4,11 @@
 // Bump if the exported JSON shape ever changes.
 const EXPORT_FORMAT_VERSION = 1;
 
+// Storage key for the user's chosen export file format.
+// Valid values: 'html' | 'json' | 'csv'. Defaults to 'html' when unset.
+const EXPORT_FORMAT_STORAGE_KEY = 'exportFormat';
+const EXPORT_FORMAT_DEFAULT = 'html';
+
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
