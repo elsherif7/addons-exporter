@@ -128,7 +128,7 @@ function buildHtmlReport(list, theme) {
     right: 12px;
     width: 32px;
     height: 32px;
-    border-radius: 50%;
+    border-radius: 8px;
     border: 1px solid var(--border-soft);
     background: var(--card-bg);
     color: var(--text);
@@ -138,8 +138,10 @@ function buildHtmlReport(list, theme) {
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
-  .theme-toggle:hover { background: var(--hover-bg); }
+  .theme-toggle:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.08); }
+  .theme-toggle:active { transform: scale(0.95); }
   .search-input {
     display: block;
     width: 100%;
@@ -152,12 +154,15 @@ function buildHtmlReport(list, theme) {
     font-family: inherit;
     background: var(--card-bg);
     color: var(--text);
+    transition: border-color 0.12s, transform 0.1s;
   }
   .search-input:focus { outline: none; border-color: var(--btn-bg); }
+  .search-input:hover { border-color: var(--btn-bg); transform: scale(1.01); }
   .placeholder-text { padding: 20px; color: var(--text-muted); font-size: 14px; margin: 0; }
   .checklist-box {
     text-align: left;
     max-height: min(360px, 55vh);
+    overflow-x: hidden;
     overflow-y: auto;
     border: 1px solid var(--border-soft);
     border-radius: 8px;
@@ -173,9 +178,11 @@ function buildHtmlReport(list, theme) {
   }
   .addon-row {
     padding: 10px 14px;
-    border-bottom: 1px solid var(--border-faint);
+    border-bottom: 1px solid var(--border-soft);
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
   .addon-row:last-child { border-bottom: none; }
+  .addon-row:hover { background: var(--hover-bg); border-bottom-color: var(--border); transform: scale(1.01); }
   .addon-name { font-size: 14px; font-weight: 600; color: var(--link-accent); text-decoration: none; }
   .addon-name:hover { text-decoration: underline; }
   .addon-version { color: var(--text-faint); font-size: 12px; margin-left: 6px; }
@@ -185,7 +192,12 @@ function buildHtmlReport(list, theme) {
 </head>
 <body>
   <div class="card">
-  <button type="button" id="themeToggle" class="theme-toggle" aria-label="${startingTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}">${startingTheme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19'}</button>
+  <button type="button" id="themeToggle" class="theme-toggle" aria-label="${startingTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}">
+    ${startingTheme === 'dark'
+      ? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+      : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path transform="scale(-1,1) translate(-24,0)" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'
+    }
+  </button>
   <h1>Add-ons Exporter</h1>
   <p><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener">Add-ons Hub</a> installed, click its toolbar icon and choose <strong>Add-ons Importer</strong> to open every link below as a tab automatically.</p>
 
@@ -221,9 +233,12 @@ function buildHtmlReport(list, theme) {
       }
     }
 
+    var SUN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+    var MOON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path transform="scale(-1,1) translate(-24,0)" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+
     function applyTheme(theme) {
       document.documentElement.setAttribute('data-theme', theme);
-      themeToggleEl.textContent = theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+      themeToggleEl.innerHTML = theme === 'dark' ? SUN_SVG : MOON_SVG;
       themeToggleEl.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
     }
 

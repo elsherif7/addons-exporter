@@ -94,9 +94,9 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   font-family: inherit;
   background: var(--card-bg);
   color: var(--text);
-  transition: border-color 0.12s;
+  transition: border-color 0.12s, transform 0.1s;
 }
-.search-input:hover { border-color: var(--btn-bg); }
+.search-input:hover { border-color: var(--btn-bg); transform: scale(1.01); }
 .search-input:focus {
   outline: none;
   border-color: var(--btn-bg);
