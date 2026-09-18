@@ -50,7 +50,9 @@ testAsync('listInstalledAddons: excludes both @mozilla.org and @mozac.org built-
 // browser/fetch, and invokes the actual registered message listener
 // (not doExport() directly) so this covers the real platform branching.
 
-async function captureExportMessageResult(platformOs) {
+async function captureExportMessageResult(platformOs, storageLocalGetImpl) {
+  const defaultStorage = async () => ({});
+  const storageGet = storageLocalGetImpl || defaultStorage;
   let downloadOptions = null;
   const createdTabUrls = [];
   let messageListener = null;
@@ -83,6 +85,7 @@ async function captureExportMessageResult(platformOs) {
           { id: 'ext1@example.com', name: 'Test Addon', version: '1.0', enabled: true, type: 'extension' },
         ],
       },
+      storage: { local: { get: storageGet } },
       downloads: {
         download: async (options) => {
           downloadOptions = options;
@@ -118,7 +121,7 @@ testAsync('export message: on desktop, downloads with saveAs, opens confirmation
   assert.strictEqual(downloadOptions.saveAs, true);
   assert.match(downloadOptions.url, /^blob:/);
   assert.strictEqual(createdTabUrls.length, 1);
-  assert.match(createdTabUrls[0], /confirmation\.html\?from=export$/);
+  assert.match(createdTabUrls[0], /confirmation\.html\?from=export&format=\w+$/);
   assert.strictEqual(result, undefined);
 });
 
@@ -371,4 +374,24 @@ testAsync('doExport: defaults to .html when storage.local.get throws for exportF
   });
   assert.match(filename, /\.html$/);
   assert.match(content, /<!DOCTYPE html>/);
+});
+
+// --- background.js: confirmation URL carries the correct format param ---
+
+testAsync('export message: on desktop with JSON format, confirmation URL has format=json', async () => {
+  const { createdTabUrls } = await captureExportMessageResult('win', async (key) => {
+    if (key === 'exportFormat') return { exportFormat: 'json' };
+    return {};
+  });
+  assert.strictEqual(createdTabUrls.length, 1);
+  assert.match(createdTabUrls[0], /confirmation\.html\?from=export&format=json$/);
+});
+
+testAsync('export message: on desktop with CSV format, confirmation URL has format=csv', async () => {
+  const { createdTabUrls } = await captureExportMessageResult('win', async (key) => {
+    if (key === 'exportFormat') return { exportFormat: 'csv' };
+    return {};
+  });
+  assert.strictEqual(createdTabUrls.length, 1);
+  assert.match(createdTabUrls[0], /confirmation\.html\?from=export&format=csv$/);
 });

@@ -1,6 +1,6 @@
 # addons-hub
 
-**Add-ons Hub** is a Firefox WebExtension for managing your installed add-ons. It currently includes **Add-ons Exporter** and **Add-ons Importer**, which let you export them to an HTML report and reinstall them all on another Gecko-based browser (Firefox, Zen, LibreWolf, Waterfox, etc.) instead of hunting them down one by one. More tools may be added over time.
+**Add-ons Hub** is a Firefox WebExtension for managing your installed add-ons. It currently includes **Add-ons Exporter** and **Add-ons Importer**, which let you export your add-ons to a file (HTML, JSON, or CSV) and reinstall them all on another Gecko-based browser (Firefox, Zen, LibreWolf, Waterfox, etc.) instead of hunting them down one by one. More tools may be added over time.
 
 **🦊 Get it on Firefox Add-ons:** [Add-ons Hub on AMO](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/)
 
@@ -89,11 +89,11 @@ Both are opened from the toolbar icon's popup.
 
 ### Add-ons Exporter
 
-Creates a checklist of every installed extension and theme, split into Enabled/Disabled groups with a search box to filter by name. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage, and finally a plain AMO search link if none of those find anything), and the result is saved as a single HTML report — human-readable on its own, with the underlying data embedded for Add-ons Importer to read back. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on. The report opens in whichever theme Settings is currently set to, and has its own light/dark toggle in the corner — the toggle choice is remembered in `localStorage` so it persists across opens of the same file.
+Creates a checklist of every installed extension and theme, split into Enabled/Disabled groups with a search box to filter by name. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage, and finally a plain AMO search link if none of those find anything), and the result is saved as a file in whichever format you've chosen in Settings — **HTML** (default, human-readable with the data embedded for re-import), **JSON**, or **CSV**. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on. The HTML report opens in whichever theme Settings is currently set to, and has its own light/dark toggle in the corner — the toggle choice is remembered in `localStorage` so it persists across opens of the same file.
 
 ### Add-ons Importer
 
-Reads a previously exported report, chosen or dragged in, validating it automatically and rejecting anything with a missing or unsupported format version rather than guessing. It compares the report against what's currently installed (matched by add-on ID, falling back to name for older exports), splitting the checklist into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference) — so you never need to reopen things you already have. It opens each pick as a tab rather than installing it directly, which is the workaround for a real limitation: Firefox doesn't allow any extension to install other extensions automatically — a deliberate security restriction, not a limitation of these tools.
+Reads a previously exported file (HTML, JSON, or CSV), chosen or dragged in, validating it automatically and rejecting anything with a missing or unsupported format version rather than guessing. It compares the file against what's currently installed (matched by add-on ID, falling back to name for older exports), splitting the checklist into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference) — so you never need to reopen things you already have. It opens each pick as a tab rather than installing it directly, which is the workaround for a real limitation: Firefox doesn't allow any extension to install other extensions automatically — a deliberate security restriction, not a limitation of these tools.
 
 #### A few other things worth knowing
 
@@ -111,7 +111,7 @@ Reads a previously exported report, chosen or dragged in, validating it automati
 | Permission | Why it's needed |
 |---|---|
 | `management` | To read the list of installed add-ons |
-| `downloads` | To save the exported HTML report |
+| `downloads` | To save the exported file |
 | `storage` | To remember your settings |
 | `https://addons.mozilla.org/*` | To look up each add-on's real AMO page |
 

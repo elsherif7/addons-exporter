@@ -6,6 +6,29 @@ const statusEl = document.getElementById('status');
 const selectionCountEl = document.getElementById('selectionCount');
 const searchInput = document.getElementById('searchInput');
 const noSearchMatchesEl = document.getElementById('noSearchMatches');
+const exportDescEl = document.getElementById('exportDesc');
+
+// Maps the stored exportFormat value to a human-readable file type label.
+function formatLabel(fmt) {
+  if (fmt === 'json') return 'JSON file';
+  if (fmt === 'csv') return 'CSV file';
+  return 'HTML report';
+}
+
+// Updates the description paragraph to reflect the currently stored format.
+async function updateExportDesc() {
+  let fmt = EXPORT_FORMAT_DEFAULT;
+  try {
+    const stored = await browser.storage.local.get(EXPORT_FORMAT_STORAGE_KEY);
+    const val = stored[EXPORT_FORMAT_STORAGE_KEY];
+    if (val === 'html' || val === 'json' || val === 'csv') fmt = val;
+  } catch {
+    // keep default
+  }
+  exportDescEl.innerHTML = `Select the <strong>Add-ons</strong> you want to export, then click <strong>Export Selected</strong> to create a ${formatLabel(fmt)} you can use to reinstall them later on any Firefox&#8209;based&nbsp;browser.`;
+}
+
+updateExportDesc();
 
 function setStatus(msg) {
   statusEl.textContent = msg;
@@ -190,7 +213,8 @@ exportBtn.addEventListener('click', async () => {
 
       link.remove();
       setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
-      await browser.tabs.create({ url: browser.runtime.getURL('src/confirmation/confirmation.html?from=export') });
+      const fmt = result.filename.split('.').pop().toLowerCase() || 'html';
+      await browser.tabs.create({ url: browser.runtime.getURL(`src/confirmation/confirmation.html?from=export&format=${fmt}`) });
     } else {
       // Desktop: background.js already saved the file and opened the
       // confirmation tab itself - this one just reports success and stays open.

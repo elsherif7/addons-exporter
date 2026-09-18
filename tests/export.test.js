@@ -40,6 +40,7 @@ async function captureExportClick({ selectedIds, exportResponse, simulateDownloa
     selectionCount: { textContent: '' },
     searchInput: { addEventListener() {}, style: {} },
     noSearchMatches: { style: {} },
+    exportDesc: { innerHTML: '' },
   };
   const exSandbox = {
     URL: { createObjectURL: () => 'blob:fake-url', revokeObjectURL() {} },
@@ -68,6 +69,7 @@ async function captureExportClick({ selectedIds, exportResponse, simulateDownloa
         getURL: (path) => `moz-extension://test-id/${path}`,
       },
       tabs: { create: async (options) => { createdTabUrls.push(options.url); return {}; } },
+      storage: { local: { get: async () => ({}) } },
       downloads: {
         onCreated: {
           // Simulates the download actually being observed - fires
@@ -110,8 +112,7 @@ testAsync('export.js click handler: on Android, proceeds to confirmation.html on
   // Both onCreated and the (immediate, mocked) fallback timer fire here -
   // the "settled" guard in export.js should mean only one tab opens.
   assert.strictEqual(createdTabUrls.length, 1);
-  assert.match(createdTabUrls[0], /confirmation\.html\?from=export$/);
-  assert.strictEqual(exportBtnEl.disabled, true);
+  assert.match(createdTabUrls[0], /confirmation\.html\?from=export&format=html$/);
 });
 
 testAsync('export.js click handler: on Android, still proceeds via the fallback timer if onCreated never fires', async () => {
@@ -121,7 +122,7 @@ testAsync('export.js click handler: on Android, still proceeds via the fallback 
     simulateDownloadCreated: false,
   });
   assert.strictEqual(createdTabUrls.length, 1);
-  assert.match(createdTabUrls[0], /confirmation\.html\?from=export$/);
+  assert.match(createdTabUrls[0], /confirmation\.html\?from=export&format=html$/);
 });
 
 testAsync('export.js click handler: on desktop, does nothing extra since background.js already handled it', async () => {

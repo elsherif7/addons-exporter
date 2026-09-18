@@ -3,30 +3,16 @@ browser.runtime.onMessage.addListener((message) => {
     return listInstalledAddons();
   }
   if (message.type === 'export') {
-    return doExport(message.ids).then(async ({ html, filename }) => {
+    return doExport(message.ids).then(async ({ html, filename, format }) => {
       const platform = await browser.runtime.getPlatformInfo();
 
       if (platform.os === 'android') {
-        // Android's downloads.download() hands the URL to the OS's own
-        // DownloadManager, which only accepts http/https URIs and throws
-        // "Can only download HTTP/HTTPS URIs" for a blob: URL - there's
-        // no saveAs dialog to fall back to either. A real download still
-        // needs to happen somewhere, and the only mechanism that works
-        // there (a plain <a download> click) needs to run in the same
-        // tab/continuation as the original Export click to have a
-        // chance of being recognized as a genuine user-triggered
-        // download rather than getting silently dropped - a new tab
-        // opened from here has no such gesture to inherit. So instead of
-        // saving it here, hand the report back to export.js and let it
-        // do the save itself.
         return { html, filename };
       }
 
       const blob = new Blob([html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       try {
-        // saveAs: true always shows the native "Save As" dialog, letting
-        // the user pick the folder and filename themselves - desktop-only.
         await browser.downloads.download({ url, filename, saveAs: true });
       } finally {
         setTimeout(() => URL.revokeObjectURL(url), 30000);
@@ -35,7 +21,7 @@ browser.runtime.onMessage.addListener((message) => {
       // Opened from here, not the popup - the popup can close early once
       // the native Save dialog steals focus.
       await browser.tabs.create({
-        url: browser.runtime.getURL('src/confirmation/confirmation.html?from=export')
+        url: browser.runtime.getURL(`src/confirmation/confirmation.html?from=export&format=${format}`)
       });
     });
   }
@@ -245,5 +231,5 @@ async function doExport(ids) {
   }
 
   const filename = `Firefox-Addons (${formatFilenameTimestamp(new Date())}).${ext}`;
-  return { html: content, filename };
+  return { html: content, filename, format: ext };
 }
