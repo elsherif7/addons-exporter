@@ -199,7 +199,7 @@ document.getElementById('checkUpdateBtn').addEventListener('click', async () => 
     statusRow.style.display = '';
     if (latest === CURRENT_VERSION) {
       statusMsg.style.color = 'var(--text-muted)';
-      statusMsg.textContent = `You're up to date (version ${CURRENT_VERSION}).`;
+      statusMsg.textContent = `You're up to date (version ${CURRENT_VERSION})`;
     } else {
       statusMsg.style.color = 'var(--link-accent)';
       statusMsg.innerHTML = `Version ${latest} is available. <a href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener" style="color:var(--link-accent);font-weight:600;">Update on Firefox Add-ons</a>`;

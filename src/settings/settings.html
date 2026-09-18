@@ -79,12 +79,25 @@
     padding: 10px 14px;
     font-size: 14px;
     border-bottom: 1px solid var(--border-soft);
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
   .about-row:last-child { border-bottom: none; }
+  .about-row:hover { background: var(--hover-bg); border-bottom-color: var(--border); transform: scale(1.01); }
+  :root[data-theme="dark"] .about-row:hover { background: #2e3340; border-bottom-color: #6b7280; }
   .about-label { color: var(--text-muted); }
   .about-value { color: var(--text); font-weight: 600; }
   .about-value a { color: var(--link-accent); text-decoration: none; font-weight: 600; }
   .about-value a:hover { text-decoration: underline; }
+  .about-check-btn {
+    border: none;
+    background: none;
+    color: var(--link-accent);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+  }
+  .about-check-btn:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -131,28 +144,28 @@
       <h2>About</h2>
       <div class="about-block">
         <div class="about-row">
-          <span class="about-label">Version</span>
-          <span class="about-value">1.2.0</span>
-        </div>
-        <div class="about-row">
           <span class="about-label">Developer</span>
           <span class="about-value">Elsherif</span>
         </div>
         <div class="about-row">
-          <span class="about-label">GitHub</span>
-          <span class="about-value"><a href="https://github.com/elsherif7/addons-hub" target="_blank" rel="noopener">elsherif7/addons-hub</a></span>
+          <span class="about-label">Version</span>
+          <span class="about-value">1.2.0</span>
         </div>
         <div class="about-row">
           <span class="about-label">Rate this extension</span>
           <span class="about-value"><a href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener">Firefox Add-ons</a></span>
         </div>
         <div class="about-row">
-          <span class="about-label">Report a bug / request a feature</span>
+          <span class="about-label">Report a bug / Request a feature</span>
           <span class="about-value"><a href="https://github.com/elsherif7/addons-hub/issues" target="_blank" rel="noopener">GitHub Issues</a></span>
         </div>
         <div class="about-row">
+          <span class="about-label">GitHub Repository</span>
+          <span class="about-value"><a href="https://github.com/elsherif7/addons-hub" target="_blank" rel="noopener">elsherif7/addons-hub</a></span>
+        </div>
+        <div class="about-row">
           <span class="about-label">Check for updates</span>
-          <span class="about-value"><button class="settings-btn" id="checkUpdateBtn">Check now</button></span>
+          <span class="about-value"><button class="about-check-btn" id="checkUpdateBtn">Check now</button></span>
         </div>
         <div class="about-row" id="updateStatusRow" style="display:none;">
           <span id="updateStatusMsg" style="font-size:13px;"></span>
