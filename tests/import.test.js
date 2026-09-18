@@ -35,6 +35,9 @@ vm.runInContext(importSrc, sandbox);
 
 const {
   parseAddonsPayload,
+  parseJsonPayload,
+  parseCsvPayload,
+  parseCsvRow,
   buildInstalledIndex,
   findInstalledMatch,
   migrateAddonsData,
@@ -349,4 +352,125 @@ testAsync('openSelectedBtn: still opens the confirmation tab even if every selec
   assert.deepStrictEqual(createdTabUrls, [
     'moz-extension://test-id/src/confirmation/confirmation.html?from=import',
   ]);
+});
+
+// --- parseJsonPayload ---
+
+function jsonFile(addons, formatVersion = EXPORT_FORMAT_VERSION) {
+  return JSON.stringify({ formatVersion, addons });
+}
+
+test('parseJsonPayload: valid JSON file succeeds and returns the parsed addons', () => {
+  const result = parseJsonPayload(jsonFile([
+    { id: 'ext1@example.com', name: 'uBlock Origin', version: '1.58.0', enabled: true, type: 'extension', link: 'https://addons.mozilla.org/x', linkType: 'amo-exact' },
+  ]));
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.addons.length, 1);
+  assert.strictEqual(result.addons[0].name, 'uBlock Origin');
+});
+
+test('parseJsonPayload: throws on malformed JSON', () => {
+  assert.throws(() => parseJsonPayload('{not valid json'));
+});
+
+test('parseJsonPayload: rejects a newer formatVersion', () => {
+  const result = parseJsonPayload(jsonFile([{ name: 'X' }], EXPORT_FORMAT_VERSION + 1));
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /newer version of Add-ons Exporter/);
+});
+
+test('parseJsonPayload: rejects an empty addons array', () => {
+  const result = parseJsonPayload(jsonFile([]));
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /No add-ons found/);
+});
+
+// --- parseCsvRow ---
+
+test('parseCsvRow: splits a plain unquoted row', () => {
+  assert.deepStrictEqual(Array.from(parseCsvRow('a,b,c')), ['a', 'b', 'c']);
+});
+
+test('parseCsvRow: handles a quoted field containing a comma', () => {
+  assert.deepStrictEqual(Array.from(parseCsvRow('"Hello, World",b,c')), ['Hello, World', 'b', 'c']);
+});
+
+test('parseCsvRow: handles doubled double-quotes inside a quoted field', () => {
+  assert.deepStrictEqual(Array.from(parseCsvRow('"Say ""Hi""",b')), ['Say "Hi"', 'b']);
+});
+
+test('parseCsvRow: handles an empty field', () => {
+  assert.deepStrictEqual(Array.from(parseCsvRow('a,,c')), ['a', '', 'c']);
+});
+
+// --- parseCsvPayload ---
+
+function csvFile(addons, formatVersion = EXPORT_FORMAT_VERSION) {
+  const header = 'id,name,version,enabled,type,link,linkType';
+  const rows = addons.map((a) =>
+    [a.id || '', a.name || '', a.version || '', a.enabled, a.type || '', a.link || '', a.linkType || ''].join(',')
+  );
+  return [`# addons-hub-format-version: ${formatVersion}`, header, ...rows].join('\r\n');
+}
+
+test('parseCsvPayload: valid CSV file succeeds and returns the parsed addons', () => {
+  const result = parseCsvPayload(csvFile([
+    { id: 'ext1@example.com', name: 'uBlock Origin', version: '1.58.0', enabled: true, type: 'extension', link: 'https://addons.mozilla.org/x', linkType: 'amo-exact' },
+  ]));
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.addons.length, 1);
+  assert.strictEqual(result.addons[0].name, 'uBlock Origin');
+});
+
+test('parseCsvPayload: converts enabled field from string to boolean', () => {
+  const result = parseCsvPayload(csvFile([
+    { id: 'a@e.com', name: 'Enabled One', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' },
+    { id: 'b@e.com', name: 'Disabled One', version: '1.0', enabled: false, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' },
+  ]));
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.addons[0].enabled, true);
+  assert.strictEqual(result.addons[1].enabled, false);
+});
+
+test('parseCsvPayload: missing format-version comment is rejected', () => {
+  const result = parseCsvPayload('id,name,version,enabled,type,link,linkType\next1,uBlock Origin,1.0,true,extension,https://x.com/,amo-exact');
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /no format-version comment found/);
+});
+
+test('parseCsvPayload: rejects a newer formatVersion', () => {
+  const result = parseCsvPayload(csvFile([{ id: 'x@e.com', name: 'X', version: '1.0', enabled: true, type: 'extension', link: 'https://x.com/', linkType: 'amo-exact' }], EXPORT_FORMAT_VERSION + 1));
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /newer version of Add-ons Exporter/);
+});
+
+test('parseCsvPayload: missing expected columns is rejected', () => {
+  const result = parseCsvPayload(`# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}\r\nid,name\r\next1,uBlock Origin`);
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /missing expected CSV columns/);
+});
+
+test('parseCsvPayload: no data rows is rejected', () => {
+  const result = parseCsvPayload(`# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}\r\nid,name,version,enabled,type,link,linkType`);
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /No add-ons found/);
+});
+
+test('parseCsvPayload: drops rows with blank names, keeps valid ones', () => {
+  const result = parseCsvPayload(csvFile([
+    { id: 'a@e.com', name: 'uBlock Origin', version: '1.0', enabled: true, type: 'extension', link: 'https://x.com/', linkType: 'amo-exact' },
+    { id: 'b@e.com', name: '', version: '1.0', enabled: true, type: 'extension', link: 'https://x.com/', linkType: 'amo-exact' },
+  ]));
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.addons.length, 1);
+  assert.strictEqual(result.addons[0].name, 'uBlock Origin');
+});
+
+test('parseCsvPayload: handles CRLF and LF line endings', () => {
+  const withLf = csvFile([
+    { id: 'a@e.com', name: 'uBlock Origin', version: '1.0', enabled: true, type: 'extension', link: 'https://x.com/', linkType: 'amo-exact' },
+  ]).replace(/\r\n/g, '\n');
+  const result = parseCsvPayload(withLf);
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.addons.length, 1);
 });

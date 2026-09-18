@@ -81,6 +81,107 @@ function parseAddonsPayload(jsonText) {
   return { ok: true, addons: migrateAddonsData(validList, formatVersion) };
 }
 
+// Validates and parses a JSON export file's text content. Same return
+// shape as parseAddonsPayload(): { ok, addons } or { ok: false, error }.
+// Throws on malformed JSON - loadFile()'s try/catch handles it.
+function parseJsonPayload(text) {
+  const parsed = JSON.parse(text);
+  return parseAddonsPayload(parsed && typeof parsed === 'object'
+    ? JSON.stringify(parsed)
+    : text);
+}
+
+// Validates and parses a CSV export file's text content. Expects:
+//   line 1: # addons-hub-format-version: <n>
+//   line 2: header row (id,name,version,enabled,type,link,linkType)
+//   line 3+: one data row per add-on
+// Returns { ok, addons } or { ok: false, error }.
+function parseCsvPayload(text) {
+  // Normalise line endings.
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter((l) => l.trim() !== '');
+
+  // Line 1: format-version comment.
+  const versionMatch = lines[0] && lines[0].match(/^#\s*addons-hub-format-version:\s*(\d+)/);
+  if (!versionMatch) {
+    return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no format-version comment found)' };
+  }
+  const formatVersion = parseInt(versionMatch[1], 10);
+  if (formatVersion > SUPPORTED_FORMAT_VERSION) {
+    return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
+  }
+
+  // Line 2: header row — validate expected columns are present.
+  const expectedHeaders = ['id', 'name', 'version', 'enabled', 'type', 'link', 'linkType'];
+  const headers = parseCsvRow(lines[1] || '');
+  const missingHeaders = expectedHeaders.filter((h) => !headers.includes(h));
+  if (missingHeaders.length > 0) {
+    return { ok: false, error: 'This file is missing expected CSV columns and can\'t be imported.' };
+  }
+
+  // Lines 3+: data rows.
+  const dataLines = lines.slice(2);
+  if (dataLines.length === 0) {
+    return { ok: false, error: 'No add-ons found in that file' };
+  }
+
+  const addons = [];
+  for (const line of dataLines) {
+    const fields = parseCsvRow(line);
+    const row = {};
+    headers.forEach((h, i) => { row[h] = fields[i] !== undefined ? fields[i] : ''; });
+    // enabled: CSV stores 'true'/'false' strings - convert back to boolean.
+    row.enabled = row.enabled === 'true';
+    if (typeof row.name === 'string' && row.name.trim() !== '') {
+      addons.push(row);
+    }
+  }
+
+  if (addons.length === 0) {
+    return { ok: false, error: 'No valid add-ons found in that file' };
+  }
+
+  return { ok: true, addons: migrateAddonsData(addons, formatVersion) };
+}
+
+// Parses a single CSV row per RFC 4180: handles quoted fields (including
+// embedded commas and doubled double-quotes inside quotes).
+function parseCsvRow(line) {
+  const fields = [];
+  let i = 0;
+  while (i <= line.length) {
+    if (line[i] === '"') {
+      // Quoted field.
+      let field = '';
+      i++; // skip opening quote
+      while (i < line.length) {
+        if (line[i] === '"' && line[i + 1] === '"') {
+          field += '"';
+          i += 2;
+        } else if (line[i] === '"') {
+          i++; // skip closing quote
+          break;
+        } else {
+          field += line[i++];
+        }
+      }
+      fields.push(field);
+      if (line[i] === ',') i++; // skip comma after closing quote
+    } else {
+      // Unquoted field - read up to next comma or end.
+      const end = line.indexOf(',', i);
+      if (end === -1) {
+        fields.push(line.slice(i));
+        break;
+      } else {
+        fields.push(line.slice(i, end));
+        i = end + 1;
+      }
+    }
+  }
+  return fields;
+}
+
+
 const statusEl = document.getElementById('status');
 const fileNameEl = document.getElementById('fileName');
 const fileNameRow = document.getElementById('fileNameRow');
@@ -249,14 +350,24 @@ async function loadFile(file) {
   clearAddonList();
   setStatus('Reading file...');
   try {
-    const html = await file.text();
+    const text = await file.text();
     if (myGeneration !== loadGeneration) return;
 
-    // DOMParser never executes scripts in the parsed document, so this is
-    // safe even for an untrusted file.
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const dataEl = doc.getElementById('addons-exporter-data');
-    const result = parseAddonsPayload(dataEl ? dataEl.textContent : null);
+    const ext = file.name.split('.').pop().toLowerCase();
+    let result;
+    if (ext === 'json') {
+      result = parseJsonPayload(text);
+    } else if (ext === 'csv') {
+      result = parseCsvPayload(text);
+    } else {
+      // Default to HTML (also handles .html and any unrecognised extension).
+      // DOMParser never executes scripts in the parsed document, so this is
+      // safe even for an untrusted file.
+      const doc = new DOMParser().parseFromString(text, 'text/html');
+      const dataEl = doc.getElementById('addons-exporter-data');
+      result = parseAddonsPayload(dataEl ? dataEl.textContent : null);
+    }
+
     if (!result.ok) {
       setStatus(result.error);
       return;
