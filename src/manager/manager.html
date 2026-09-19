@@ -7,6 +7,50 @@
 <link rel="icon" href="../icons/icon48.png">
 <link rel="stylesheet" href="../common/shared.css">
 <title>Add-ons Manager</title>
+<style>
+  /* Nickname editing */
+  .addon-name-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .rename-btn {
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0 2px;
+    color: var(--text-faint);
+    font-size: 13px;
+    line-height: 1;
+    vertical-align: middle;
+    opacity: 0;
+    transition: opacity 0.12s, color 0.12s;
+  }
+  /* Show pencil when the row is hovered */
+  .addon-row:hover .rename-btn { opacity: 1; }
+  .rename-btn:hover { color: var(--link-accent); }
+
+  /* Inline nickname input — appears in place of the name span */
+  .nickname-input {
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--card-bg);
+    border: 1px solid var(--btn-bg);
+    border-radius: 4px;
+    padding: 1px 6px;
+    outline: none;
+    width: 200px;
+    max-width: 100%;
+  }
+
+  /* Nicknamed names get a subtle underline to hint they're custom */
+  .addon-name.has-nickname {
+    text-decoration: underline dotted var(--text-faint);
+    text-underline-offset: 3px;
+  }
+</style>
 </head>
 <body>
   <div class="card">
