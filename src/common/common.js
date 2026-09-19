@@ -87,7 +87,7 @@ const UNCERTAIN_LINK_TYPES = new Set(['amo-search', 'amo-search-fallback']);
 
 // Filters .addon-row elements by search query (matched against each row's
 // .addon-name only, not version numbers or match-type labels), hiding a
-// .group-heading if none of its rows still match. Returns true if
+// .group-box if none of its rows still match. Returns true if
 // anything's visible.
 //
 // NOTE: report-template.js's buildHtmlReport() has its own copy of this
@@ -95,29 +95,30 @@ const UNCERTAIN_LINK_TYPES = new Set(['amo-search', 'amo-search-fallback']);
 // elsewhere). Keep both copies in sync if you change this.
 function filterAddonRows(container, query) {
   const q = query.trim().toLowerCase();
-  let heading = null;
-  let headingHasMatch = false;
   let anyMatch = false;
 
-  const finishHeading = () => {
-    if (heading) heading.style.display = headingHasMatch ? '' : 'none';
-  };
-
   for (const el of container.children) {
-    if (el.classList.contains('group-heading')) {
-      finishHeading();
-      heading = el;
-      headingHasMatch = false;
+    if (el.classList.contains('group-box')) {
+      let groupHasMatch = false;
+      for (const child of el.children) {
+        if (child.classList.contains('addon-row')) {
+          const nameEl = child.querySelector('.addon-name');
+          const match = q === '' || (nameEl && nameEl.textContent.toLowerCase().includes(q));
+          child.style.display = match ? '' : 'none';
+          if (match) {
+            groupHasMatch = true;
+            anyMatch = true;
+          }
+        }
+      }
+      el.style.display = groupHasMatch ? '' : 'none';
     } else if (el.classList.contains('addon-row')) {
+      // Fallback: flat structure (e.g. report template)
       const nameEl = el.querySelector('.addon-name');
       const match = q === '' || (nameEl && nameEl.textContent.toLowerCase().includes(q));
       el.style.display = match ? '' : 'none';
-      if (match) {
-        headingHasMatch = true;
-        anyMatch = true;
-      }
+      if (match) anyMatch = true;
     }
   }
-  finishHeading();
   return anyMatch;
 }

@@ -78,13 +78,16 @@ function createAddonRow(a, i) {
 
 function appendGroup(fragment, title, items, nextIndex) {
   if (items.length === 0) return;
+  const box = document.createElement('div');
+  box.className = 'group-box';
   const heading = document.createElement('div');
   heading.className = 'group-heading';
   heading.textContent = `${title} (${items.length})`;
-  fragment.appendChild(heading);
+  box.appendChild(heading);
   items.forEach((a) => {
-    fragment.appendChild(createAddonRow(a, nextIndex()));
+    box.appendChild(createAddonRow(a, nextIndex()));
   });
+  fragment.appendChild(box);
 }
 
 function renderList(addons) {

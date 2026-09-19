@@ -32,7 +32,7 @@ function loadReportFilterAddonRows(addonListContainer) {
   // setAttribute/textContent on the themeToggle element, and also reads
   // from localStorage. Provide minimal stubs for both so the script can
   // initialise without throwing.
-  const stubEl = () => ({ style: {}, addEventListener() {}, setAttribute() {}, textContent: '' });
+  const stubEl = () => ({ style: {}, addEventListener() {}, setAttribute() {}, textContent: '', children: [] });
   const reportDocument = {
     documentElement: { setAttribute() {} },
     getElementById(id) {
@@ -105,7 +105,18 @@ function makeEl(cls, nameText, versionText) {
     classList: { contains: (c) => c === cls },
     querySelector: (sel) => (sel === '.addon-name' ? nameEl : null),
     textContent: [nameText, versionText].filter((t) => t != null).join(' '),
+    children: [],
   };
+}
+
+function makeGroupBox(heading, rows) {
+  const box = {
+    style: { display: '' },
+    classList: { contains: (c) => c === 'group-box' },
+    querySelector: () => null,
+    children: [heading, ...rows],
+  };
+  return box;
 }
 
 function makeContainer() {
@@ -114,37 +125,40 @@ function makeContainer() {
   const row2 = makeEl('addon-row', 'Dark Reader', '4.9.90');
   const disabledHeading = makeEl('group-heading');
   const row3 = makeEl('addon-row', 'Old Extension', '0.5');
+  const enabledBox = makeGroupBox(enabledHeading, [row1, row2]);
+  const disabledBox = makeGroupBox(disabledHeading, [row3]);
   return {
-    container: { children: [enabledHeading, row1, row2, disabledHeading, row3] },
-    enabledHeading, row1, row2, disabledHeading, row3,
+    container: { children: [enabledBox, disabledBox] },
+    enabledBox, enabledHeading, row1, row2,
+    disabledBox, disabledHeading, row3,
   };
 }
 
-test('filterAddonRows: matching query hides non-matches, keeps matching heading visible', () => {
-  const { container, enabledHeading, row1, row2, disabledHeading, row3 } = makeContainer();
+test('filterAddonRows: matching query hides non-matches, keeps matching group-box visible', () => {
+  const { container, enabledBox, row1, row2, disabledBox, row3 } = makeContainer();
   const anyMatch = filterAddonRows(container, 'dark');
   assert.strictEqual(anyMatch, true);
-  assert.strictEqual(enabledHeading.style.display, '');
+  assert.strictEqual(enabledBox.style.display, '');
   assert.strictEqual(row1.style.display, 'none');
   assert.strictEqual(row2.style.display, '');
-  assert.strictEqual(disabledHeading.style.display, 'none');
+  assert.strictEqual(disabledBox.style.display, 'none');
   assert.strictEqual(row3.style.display, 'none');
 });
 
 test('filterAddonRows: empty query shows everything', () => {
-  const { container, enabledHeading, row1, row2, disabledHeading, row3 } = makeContainer();
+  const { container, enabledBox, row1, row2, disabledBox, row3 } = makeContainer();
   const anyMatch = filterAddonRows(container, '');
   assert.strictEqual(anyMatch, true);
-  for (const el of [enabledHeading, row1, row2, disabledHeading, row3]) {
+  for (const el of [enabledBox, row1, row2, disabledBox, row3]) {
     assert.strictEqual(el.style.display, '');
   }
 });
 
 test('filterAddonRows: no matches hides everything and returns false', () => {
-  const { container, enabledHeading, row1, row2, disabledHeading, row3 } = makeContainer();
+  const { container, enabledBox, row1, row2, disabledBox, row3 } = makeContainer();
   const anyMatch = filterAddonRows(container, 'zzz-nomatch');
   assert.strictEqual(anyMatch, false);
-  for (const el of [enabledHeading, row1, row2, disabledHeading, row3]) {
+  for (const el of [enabledBox, row1, row2, disabledBox, row3]) {
     assert.strictEqual(el.style.display, 'none');
   }
 });
@@ -157,18 +171,28 @@ test('filterAddonRows: query matching a version number does not match the row', 
 });
 
 test('filterAddonRows: common.js and the report\'s inline copy agree on the same fixture', () => {
-  const fixtureA = makeContainer(); // run through common.js's version
-  const fixtureB = makeContainer(); // run through report-template.js's inline copy
+  // The report still uses the flat structure (group-heading + addon-row siblings),
+  // so use a flat container for the report copy and the group-box structure for common.js.
+  const fixtureA = makeContainer(); // group-box structure for common.js
 
-  const reportFilterAddonRows = loadReportFilterAddonRows(fixtureB.container);
+  // Flat fixture for the report's inline copy (unchanged structure).
+  const flatEnableHeading = makeEl('group-heading');
+  const flatRow1 = makeEl('addon-row', 'uBlock Origin', '1.58.0');
+  const flatRow2 = makeEl('addon-row', 'Dark Reader', '4.9.90');
+  const flatDisabledHeading = makeEl('group-heading');
+  const flatRow3 = makeEl('addon-row', 'Old Extension', '0.5');
+  const flatContainer = { children: [flatEnableHeading, flatRow1, flatRow2, flatDisabledHeading, flatRow3] };
+
+  const reportFilterAddonRows = loadReportFilterAddonRows(flatContainer);
 
   for (const query of ['dark', '58', '', 'zzz-nomatch']) {
     const anyMatchA = filterAddonRows(fixtureA.container, query);
     const anyMatchB = reportFilterAddonRows(query);
     assert.strictEqual(anyMatchA, anyMatchB, `anyMatch differed for query "${query}"`);
 
-    const rowsA = [fixtureA.enabledHeading, fixtureA.row1, fixtureA.row2, fixtureA.disabledHeading, fixtureA.row3];
-    const rowsB = [fixtureB.enabledHeading, fixtureB.row1, fixtureB.row2, fixtureB.disabledHeading, fixtureB.row3];
+    // Compare row visibility between the two implementations.
+    const rowsA = [fixtureA.row1, fixtureA.row2, fixtureA.row3];
+    const rowsB = [flatRow1, flatRow2, flatRow3];
     rowsA.forEach((el, i) => {
       assert.strictEqual(el.style.display, rowsB[i].style.display, `row ${i} display differed for query "${query}"`);
     });

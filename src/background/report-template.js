@@ -66,7 +66,7 @@ function buildHtmlReport(list, theme) {
   };
 
   const section = (title, items) => items.length
-    ? `<div class="group-heading">${title} (${items.length})</div>${items.map(row).join('')}`
+    ? `<div class="group-box"><div class="group-heading">${title} (${items.length})</div>${items.map(row).join('')}</div>`
     : '';
 
   return `<!DOCTYPE html>
@@ -164,13 +164,19 @@ function buildHtmlReport(list, theme) {
     max-height: min(360px, 55vh);
     overflow-x: hidden;
     overflow-y: auto;
-    border: 1px solid var(--border-soft);
-    border-radius: 8px;
     padding: 4px 0;
     margin-bottom: 20px;
   }
+  .group-box {
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+  .group-box:last-child { margin-bottom: 0; }
   .group-heading {
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 700;
     letter-spacing: 0.04em;
     color: var(--text-muted);
@@ -178,11 +184,12 @@ function buildHtmlReport(list, theme) {
   }
   .addon-row {
     padding: 10px 14px;
-    border-bottom: 1px solid var(--border-soft);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    margin: 6px 8px;
     transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
-  .addon-row:last-child { border-bottom: none; }
-  .addon-row:hover { background: var(--hover-bg); border-bottom-color: var(--border); transform: scale(1.01); }
+  .addon-row:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.01); }
   .addon-name { font-size: 14px; font-weight: 600; color: var(--link-accent); text-decoration: none; }
   .addon-name:hover { text-decoration: underline; }
   .addon-version { color: var(--text-faint); font-size: 12px; margin-left: 6px; }
