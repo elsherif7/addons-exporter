@@ -12,7 +12,17 @@
   <div class="card">
     <h1>Add-ons Manager</h1>
     <p>Manage your installed add-ons — enable, disable, rename, group, open settings, or remove them.</p>
-    <p id="status" style="color: var(--text-muted); font-size: 14px;">Coming soon.</p>
+
+    <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons..." style="display:none;">
+
+    <div class="checklist-box" id="checklistBox">
+      <div id="addonList">
+        <p class="placeholder-text">Loading installed add-ons...</p>
+      </div>
+      <p id="noSearchMatches" class="placeholder-text" style="display:none;">No add-ons match your search.</p>
+    </div>
+
+    <span id="status"></span>
   </div>
 
   <script src="../common/common.js"></script>
