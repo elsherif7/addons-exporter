@@ -35,7 +35,7 @@ vm.createContext(sandbox);
 vm.runInContext(commonSrc, sandbox);
 vm.runInContext(managerSrc, sandbox);
 
-const { displayName, applyNickname } = sandbox;
+const { displayName, applyNickname, createGroup, deleteGroup, renameGroup, assignToGroup, removeGroupAssignments } = sandbox;
 
 // --- displayName ---
 
@@ -100,4 +100,124 @@ test('applyNickname: clearing one nickname leaves others intact', () => {
   const result = applyNickname(original, 'a@e.com', '');
   assert.ok(!('a@e.com' in result));
   assert.strictEqual(result['b@e.com'], 'Beta');
+});
+
+// --- createGroup ---
+
+test('createGroup: adds a new group with the given id and name', () => {
+  const result = createGroup({}, 'g1', 'My Group');
+  assert.strictEqual(result['g1'].name, 'My Group');
+});
+
+test('createGroup: trims the group name', () => {
+  const result = createGroup({}, 'g1', '  Work  ');
+  assert.strictEqual(result['g1'].name, 'Work');
+});
+
+test('createGroup: does not mutate the original groups object', () => {
+  const original = { 'g1': { name: 'Existing' } };
+  createGroup(original, 'g2', 'New');
+  assert.ok(!('g2' in original));
+});
+
+test('createGroup: preserves existing groups', () => {
+  const original = { 'g1': { name: 'Existing' } };
+  const result = createGroup(original, 'g2', 'New');
+  assert.strictEqual(result['g1'].name, 'Existing');
+  assert.strictEqual(result['g2'].name, 'New');
+});
+
+// --- deleteGroup ---
+
+test('deleteGroup: removes the group with the given id', () => {
+  const groups = { 'g1': { name: 'A' }, 'g2': { name: 'B' } };
+  const result = deleteGroup(groups, 'g1');
+  assert.ok(!('g1' in result));
+  assert.ok('g2' in result);
+});
+
+test('deleteGroup: does not mutate the original', () => {
+  const original = { 'g1': { name: 'A' } };
+  deleteGroup(original, 'g1');
+  assert.ok('g1' in original);
+});
+
+test('deleteGroup: handles deleting a non-existent id gracefully', () => {
+  const groups = { 'g1': { name: 'A' } };
+  const result = deleteGroup(groups, 'g999');
+  assert.ok('g1' in result);
+});
+
+// --- renameGroup ---
+
+test('renameGroup: updates the group name', () => {
+  const groups = { 'g1': { name: 'Old' } };
+  const result = renameGroup(groups, 'g1', 'New');
+  assert.strictEqual(result['g1'].name, 'New');
+});
+
+test('renameGroup: trims the new name', () => {
+  const groups = { 'g1': { name: 'Old' } };
+  const result = renameGroup(groups, 'g1', '  Trimmed  ');
+  assert.strictEqual(result['g1'].name, 'Trimmed');
+});
+
+test('renameGroup: returns groups unchanged for a non-existent id', () => {
+  const groups = { 'g1': { name: 'A' } };
+  const result = renameGroup(groups, 'g999', 'New');
+  assert.ok(!('g999' in result));
+  assert.strictEqual(result['g1'].name, 'A');
+});
+
+test('renameGroup: does not mutate the original', () => {
+  const original = { 'g1': { name: 'Old' } };
+  renameGroup(original, 'g1', 'New');
+  assert.strictEqual(original['g1'].name, 'Old');
+});
+
+// --- assignToGroup ---
+
+test('assignToGroup: assigns an add-on to a group', () => {
+  const result = assignToGroup({}, 'ext@e.com', 'g1');
+  assert.strictEqual(result['ext@e.com'], 'g1');
+});
+
+test('assignToGroup: reassigns to a different group', () => {
+  const original = { 'ext@e.com': 'g1' };
+  const result = assignToGroup(original, 'ext@e.com', 'g2');
+  assert.strictEqual(result['ext@e.com'], 'g2');
+});
+
+test('assignToGroup: removes assignment when groupId is null', () => {
+  const original = { 'ext@e.com': 'g1' };
+  const result = assignToGroup(original, 'ext@e.com', null);
+  assert.ok(!('ext@e.com' in result));
+});
+
+test('assignToGroup: does not mutate the original', () => {
+  const original = { 'ext@e.com': 'g1' };
+  assignToGroup(original, 'ext@e.com', 'g2');
+  assert.strictEqual(original['ext@e.com'], 'g1');
+});
+
+// --- removeGroupAssignments ---
+
+test('removeGroupAssignments: removes all assignments for the given groupId', () => {
+  const assignments = { 'a@e.com': 'g1', 'b@e.com': 'g1', 'c@e.com': 'g2' };
+  const result = removeGroupAssignments(assignments, 'g1');
+  assert.ok(!('a@e.com' in result));
+  assert.ok(!('b@e.com' in result));
+  assert.strictEqual(result['c@e.com'], 'g2');
+});
+
+test('removeGroupAssignments: does nothing when no add-ons are assigned to that group', () => {
+  const assignments = { 'a@e.com': 'g2' };
+  const result = removeGroupAssignments(assignments, 'g1');
+  assert.strictEqual(result['a@e.com'], 'g2');
+});
+
+test('removeGroupAssignments: does not mutate the original', () => {
+  const original = { 'a@e.com': 'g1' };
+  removeGroupAssignments(original, 'g1');
+  assert.strictEqual(original['a@e.com'], 'g1');
 });

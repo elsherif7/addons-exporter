@@ -50,28 +50,6 @@
     padding: 8px;
   }
   #removeFileBtn:hover { color: var(--danger-color); }
-  /* Custom tooltip via content: attr() instead of a native title
-     attribute - more consistent styling and no native delay. */
-  #removeFileBtn::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    bottom: 130%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #1f2937;
-    color: #fff;
-    font-size: 12px;
-    font-weight: 600;
-    padding: 5px 9px;
-    border-radius: 5px;
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.12s;
-  }
-  #removeFileBtn:hover::after {
-    opacity: 1;
-  }
   /* compareNote's notes each get their own line instead of running
      together in one sentence. */
   .compare-note-line {
@@ -89,7 +67,7 @@
       <button id="chooseFileBtn">Choose file</button>
       <div id="fileNameRow" style="display:none; margin-top: 12px;">
         <strong id="fileName"></strong>
-        <button id="removeFileBtn" data-tooltip="Remove file">&times;</button>
+        <button id="removeFileBtn">&times;</button>
       </div>
       <span id="compareNote"></span>
     </div>

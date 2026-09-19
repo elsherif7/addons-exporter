@@ -8,7 +8,211 @@
 <link rel="stylesheet" href="../common/shared.css">
 <title>Add-ons Manager</title>
 <style>
-  /* Nickname editing */
+  /* Toolbar row: search + New Group button */
+  .manager-toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .manager-toolbar .search-input {
+    flex: 1;
+    margin-bottom: 0;
+  }
+  .new-group-btn {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
+  }
+  .new-group-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.01); }
+  .new-group-btn:active { transform: scale(0.99); }
+
+  /* Group heading action buttons (rename / delete group) */
+  .group-heading-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px 4px;
+  }
+  .group-heading-wrap .group-heading {
+    padding: 0;
+    flex: 1;
+  }
+  .group-heading-actions {
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  .group-box:hover .group-heading-actions { opacity: 1; }
+  .group-action-btn {
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    color: #9b7ec8;
+    font-size: 12px;
+    line-height: 1;
+    transition: color 0.12s;
+  }
+  .group-action-btn:hover { color: #7c5cbf; }
+  .group-action-btn.danger:hover { color: var(--danger-color); }
+
+  /* Per-row group badge + move button */
+  .group-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 10px;
+    border: 1px solid var(--border-soft);
+    background: var(--hover-bg);
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .move-group-btn {
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 2px 6px;
+    color: var(--text-faint);
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+    opacity: 0;
+  }
+  .addon-row:hover .move-group-btn { opacity: 1; }
+  .move-group-btn:hover { background: var(--hover-bg); border-color: var(--border); color: var(--text); }
+
+  /* Inline group-name input (same style as nickname input) */
+  .group-name-input {
+    font-size: 12px;
+    font-weight: 700;
+    font-family: inherit;
+    color: var(--text-muted);
+    background: var(--card-bg);
+    border: 1px solid var(--btn-bg);
+    border-radius: 4px;
+    padding: 1px 6px;
+    outline: none;
+    width: 160px;
+    letter-spacing: 0.04em;
+  }
+
+  /* Custom modal dialog */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .modal-box {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    min-width: 320px;
+    max-width: 480px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  }
+  .modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 16px;
+    color: var(--text);
+    text-align: center;
+  }
+  .modal-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0 0 10px;
+  }
+  .modal-input {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    outline: none;
+    margin-bottom: 18px;
+    transition: border-color 0.12s, transform 0.1s;
+  }
+  .modal-input:hover { border-color: var(--btn-bg); transform: scale(1.01); }
+  .modal-input:focus { border-color: var(--btn-bg); transform: scale(1.01); }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .modal-btn {
+    padding: 7px 20px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
+  }
+  .modal-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.04); }
+  .modal-btn:active { transform: scale(0.97); }
+  .modal-btn.primary {
+    background: var(--card-bg);
+    color: var(--text);
+    border-color: var(--border);
+  }
+  .modal-btn.primary:hover { background: var(--hover-bg); border-color: var(--btn-bg); }
+  .modal-btn.danger { color: var(--danger-color); border-color: var(--danger-color); }
+  .modal-btn.danger:hover { background: var(--danger-color); color: #fff; }
+  .modal-btn.confirm { color: #16a34a; border-color: #16a34a; }
+  .modal-btn.confirm:hover { background: #16a34a; color: #fff; }
+
+  /* Custom group picker dropdown */
+  .group-picker {
+    position: fixed;
+    z-index: 999;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    min-width: 160px;
+    padding: 4px 0;
+    overflow: hidden;
+  }
+  .group-picker-option {
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-faint);
+    transition: background 0.1s, color 0.1s, transform 0.1s;
+  }
+  .group-picker-option:last-child { border-bottom: none; }
+  .group-picker-option:hover { background: var(--hover-bg); color: var(--link-accent); transform: scale(1.02); }
+  .group-picker-option:active { transform: scale(0.98); }
+  .group-picker-option.selected { color: var(--link-accent); }
+  .group-picker-option.none-option { color: var(--text-muted); font-weight: 400; }
+  .group-picker-option.none-option:hover { color: var(--text); }
+
   .addon-name-wrap {
     display: inline-flex;
     align-items: center;
@@ -19,18 +223,17 @@
     background: none;
     cursor: pointer;
     padding: 0 2px;
-    color: var(--text-faint);
+    color: #9b7ec8;
     font-size: 13px;
     line-height: 1;
-    vertical-align: middle;
+    vertical-align: baseline;
+    position: relative;
+    top: 2px;
     opacity: 0;
     transition: opacity 0.12s, color 0.12s;
   }
-  /* Show pencil when the row is hovered */
   .addon-row:hover .rename-btn { opacity: 1; }
-  .rename-btn:hover { color: var(--link-accent); }
-
-  /* Inline nickname input — appears in place of the name span */
+  .rename-btn:hover { color: #7c5cbf; }
   .nickname-input {
     font-size: 14px;
     font-weight: 600;
@@ -44,8 +247,6 @@
     width: 200px;
     max-width: 100%;
   }
-
-  /* Nicknamed names get a subtle underline to hint they're custom */
   .addon-name.has-nickname {
     text-decoration: underline dotted var(--text-faint);
     text-underline-offset: 3px;
@@ -57,7 +258,10 @@
     <h1>Add-ons Manager</h1>
     <p>Manage your installed add-ons — enable, disable, rename, group, open settings, or remove them.</p>
 
-    <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons..." style="display:none;">
+    <div class="manager-toolbar" id="managerToolbar" style="display:none;">
+      <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
+      <button class="new-group-btn" id="newGroupBtn">+ New Group</button>
+    </div>
 
     <div class="checklist-box" id="checklistBox">
       <div id="addonList">
