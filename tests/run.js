@@ -16,6 +16,5 @@ require('./report-template.test.js');
 require('./background.test.js');
 require('./export.test.js');
 require('./settings.test.js');
-require('./manager.test.js');
 
 require('./helpers').finish();

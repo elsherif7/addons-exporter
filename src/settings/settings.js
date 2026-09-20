@@ -10,13 +10,9 @@ const SETTINGS_FILE_FORMAT_VERSION = 1;
 // The settings keys this page knows about. Only these are written on
 // import - unknown keys from future versions are silently ignored so a
 // file from a newer version can still be imported safely.
-// Also includes Add-ons Manager data so it can be backed up/restored.
 const KNOWN_SETTINGS_KEYS = [
   THEME_STORAGE_KEY,
   EXPORT_FORMAT_STORAGE_KEY,
-  'addonNicknames',
-  'addonGroups',
-  'addonGroupAssignments',
 ];
 
 // Builds the settings export object from the current stored values.
@@ -57,14 +53,6 @@ function parseSettingsFile(text) {
 
   const f = parsed.settings[EXPORT_FORMAT_STORAGE_KEY];
   if (f === 'html' || f === 'json' || f === 'csv') validated[EXPORT_FORMAT_STORAGE_KEY] = f;
-
-  // Manager data keys: accept any object value (or absence).
-  for (const key of ['addonNicknames', 'addonGroups', 'addonGroupAssignments']) {
-    const v = parsed.settings[key];
-    if (v !== undefined && v !== null && typeof v === 'object' && !Array.isArray(v)) {
-      validated[key] = v;
-    }
-  }
 
   return { ok: true, settings: validated };
 }
@@ -234,34 +222,6 @@ document.getElementById('checkUpdateBtn').addEventListener('click', async () => 
     btn.disabled = false;
     btn.textContent = 'Check now';
   }
-});
-
-// --- Reset Add-ons Manager ---
-
-document.getElementById('resetManagerBtn').addEventListener('click', function() {
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:1000;';
-  overlay.innerHTML = `
-    <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:24px 28px;min-width:300px;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
-      <div style="font-size:18px;font-weight:700;color:var(--text);text-align:center;margin-bottom:16px;">Reset Add-ons Manager</div>
-      <p style="font-size:14px;color:var(--text-secondary);margin:0 0 18px;">This will remove all nicknames, groups, and group assignments. The list will go back to its default state.</p>
-      <div style="display:flex;justify-content:flex-end;gap:10px;">
-        <button id="rmCancel" style="padding:7px 20px;border-radius:7px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;">Cancel</button>
-        <button id="rmConfirm" style="padding:7px 20px;border-radius:7px;border:1px solid var(--danger-color);background:var(--card-bg);color:var(--danger-color);font-size:14px;font-weight:600;cursor:pointer;">Reset</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-
-  new Promise((resolve) => {
-    overlay.querySelector('#rmCancel').addEventListener('click', () => { overlay.remove(); resolve(false); });
-    overlay.querySelector('#rmConfirm').addEventListener('click', () => { overlay.remove(); resolve(true); });
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
-  }).then((confirmed) => {
-    if (!confirmed) return;
-    return browser.storage.local.remove(['addonNicknames', 'addonGroups', 'addonGroupAssignments'])
-      .then(() => { setSettingsStatus('Add-ons Manager reset.'); })
-      .catch((err) => { setSettingsStatus('Could not reset: ' + err.message, true); });
-  });
 });
 
 // --- Reset Settings ---

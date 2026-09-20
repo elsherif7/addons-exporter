@@ -10,7 +10,7 @@ const sandbox = { URL };
 vm.createContext(sandbox);
 vm.runInContext(commonSrc, sandbox);
 
-const { escapeHtml, isSafeUrl, byName, filterAddonRows, visibleCheckboxes, extractTranslatedField, isPlausibleNameMatch } = sandbox;
+const { escapeHtml, isSafeUrl, byName, filterAddonRows, visibleCheckboxes, extractTranslatedField, isPlausibleNameMatch, shortName } = sandbox;
 
 // report-template.js's buildHtmlReport() inlines its own copy of
 // filterAddonRows into the exported report (it can't load common.js once
@@ -277,4 +277,32 @@ test('visibleCheckboxes: excludes checkboxes whose row is hidden', () => {
   assert.strictEqual(visible.length, 2);
   assert.strictEqual(visible[0], cbs[0]);
   assert.strictEqual(visible[1], cbs[2]);
+});
+
+// --- shortName ---
+// shortName lives in common.js and is used by export.js, import.js,
+// and report-template.js to shorten long add-on names at separators.
+
+test('shortName: truncates at " - "', () => {
+  assert.strictEqual(shortName('StayFree - Website Blocker, Web Usage Stats'), 'StayFree');
+});
+
+test('shortName: truncates at " – " (en-dash)', () => {
+  assert.strictEqual(shortName('Mate Translate – translator, dictionary'), 'Mate Translate');
+});
+
+test('shortName: truncates at ":"', () => {
+  assert.strictEqual(shortName('Buster: Captcha Solver for Humans'), 'Buster');
+});
+
+test('shortName: " & " is not a separator — keeps full name', () => {
+  assert.strictEqual(shortName('Unhook - Remove YouTube Recommended & Shorts'), 'Unhook');
+});
+
+test('shortName: returns full name when no separator found', () => {
+  assert.strictEqual(shortName('uBlock Origin'), 'uBlock Origin');
+});
+
+test('shortName: truncates at comma', () => {
+  assert.strictEqual(shortName('Dark Reader, night mode'), 'Dark Reader');
 });

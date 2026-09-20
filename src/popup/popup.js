@@ -7,11 +7,6 @@ browser.runtime.getPlatformInfo().then((info) => {
   }
 });
 
-document.getElementById('managerBtn').addEventListener('click', async () => {
-  await browser.tabs.create({ url: browser.runtime.getURL('src/manager/manager.html') });
-  window.close();
-});
-
 document.getElementById('exportBtn').addEventListener('click', async () => {
   await browser.tabs.create({ url: browser.runtime.getURL('src/export/export.html') });
   window.close();
