@@ -51,8 +51,10 @@
     gap: 6px;
     opacity: 0;
     transition: opacity 0.12s;
+    margin-right: 12px;
   }
-  .group-box:hover .group-heading-actions { opacity: 1; }
+  .group-box:hover .group-heading-actions,
+  .group-container:hover .group-heading-actions { opacity: 1; }
   .group-action-btn {
     border: none;
     background: none;
@@ -82,17 +84,18 @@
     border: none;
     background: none;
     cursor: pointer;
-    padding: 2px 6px;
-    color: var(--text-faint);
+    padding: 3px 8px;
+    color: #9b7ec8;
     font-size: 12px;
     font-weight: 600;
     border-radius: 6px;
-    border: 1px solid transparent;
-    transition: background 0.12s, border-color 0.12s, color 0.12s;
+    border: 1px solid #9b7ec8;
+    transition: background 0.12s, color 0.12s;
     opacity: 0;
   }
   .addon-row:hover .move-group-btn { opacity: 1; }
-  .move-group-btn:hover { background: var(--hover-bg); border-color: var(--border); color: var(--text); }
+  .move-group-btn:hover { background: #f5f0ff; border-color: #7c5cbf; color: #7c5cbf; }
+  :root[data-theme="dark"] .move-group-btn:hover { background: #2e2840; }
 
   /* Inline group-name input (same style as nickname input) */
   .group-name-input {
@@ -181,9 +184,11 @@
   }
   .modal-btn.primary:hover { background: var(--hover-bg); border-color: var(--btn-bg); }
   .modal-btn.danger { color: var(--danger-color); border-color: var(--danger-color); }
-  .modal-btn.danger:hover { background: var(--danger-color); color: #fff; }
+  .modal-btn.danger:hover { background: #fef2f2; border-color: var(--danger-color); transform: scale(1.04); }
+  :root[data-theme="dark"] .modal-btn.danger:hover { background: #3d1515; }
   .modal-btn.confirm { color: #16a34a; border-color: #16a34a; }
-  .modal-btn.confirm:hover { background: #16a34a; color: #fff; }
+  .modal-btn.confirm:hover { background: #f0fdf4; border-color: #16a34a; transform: scale(1.04); }
+  :root[data-theme="dark"] .modal-btn.confirm:hover { background: #14291e; }
 
   /* Custom group picker dropdown */
   .group-picker {
@@ -194,6 +199,7 @@
     border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.15);
     min-width: 160px;
+    max-width: 220px;
     padding: 4px 0;
     overflow: hidden;
   }
@@ -207,11 +213,51 @@
     transition: background 0.1s, color 0.1s, transform 0.1s;
   }
   .group-picker-option:last-child { border-bottom: none; }
-  .group-picker-option:hover { background: var(--hover-bg); color: var(--link-accent); transform: scale(1.02); }
+  .group-picker-option:hover { background: var(--hover-bg); color: var(--text); transform: scale(1.02); }
   .group-picker-option:active { transform: scale(0.98); }
   .group-picker-option.selected { color: var(--link-accent); }
   .group-picker-option.none-option { color: var(--text-muted); font-weight: 400; }
+  .group-picker-option.none-option.selected { color: var(--link-accent); font-weight: 600; }
   .group-picker-option.none-option:hover { color: var(--text); }
+
+  /* Drag handle for group reordering */
+  .group-drag-handle {
+    cursor: grab;
+    color: var(--text-faint);
+    font-size: 14px;
+    padding: 0 6px 0 2px;
+    line-height: 1;
+    user-select: none;
+    opacity: 0;
+    transition: opacity 0.12s, color 0.12s;
+  }
+  .group-container:hover .group-drag-handle { opacity: 1; }
+  .group-drag-handle:hover { color: var(--text-muted); }
+  .group-container.drag-over { outline: 2px dashed var(--link-accent); border-radius: 10px; }
+
+  /* Picker rename/delete actions */
+  .group-picker-option-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .option-text { flex: 1; }
+  .picker-opt-btn {
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 11px;
+    line-height: 1;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.1s, color 0.1s;
+    color: var(--text-faint);
+    flex-shrink: 0;
+  }
+  .group-picker-option:hover .picker-opt-btn { opacity: 1; }
+  .picker-opt-btn:hover { color: #9b7ec8; }
+  .picker-opt-btn.danger:hover { color: var(--danger-color); }
 
   .addon-name-wrap {
     display: inline-flex;
@@ -256,7 +302,7 @@
 <body>
   <div class="card">
     <h1>Add-ons Manager</h1>
-    <p>Manage your installed add-ons — enable, disable, rename, group, open settings, or remove them.</p>
+    <p>Manage your installed add-ons by organizing them into groups, renaming them, opening their settings, and removing them when needed.</p>
 
     <div class="manager-toolbar" id="managerToolbar" style="display:none;">
       <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
@@ -265,9 +311,9 @@
 
     <div class="checklist-box" id="checklistBox">
       <div id="addonList">
-        <p class="placeholder-text">Loading installed add-ons...</p>
+        <p class="placeholder-text" style="text-align:center;">Loading installed add-ons...</p>
       </div>
-      <p id="noSearchMatches" class="placeholder-text" style="display:none;">No add-ons match your search.</p>
+      <p id="noSearchMatches" class="placeholder-text" style="display:none; text-align:center;">No add-ons match your search.</p>
     </div>
 
     <span id="status"></span>

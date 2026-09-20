@@ -254,7 +254,7 @@ function createAddonRow(a, i, isInstalled) {
 
   const nameSpan = document.createElement('span');
   nameSpan.className = 'addon-name';
-  nameSpan.textContent = a.name;
+  nameSpan.textContent = shortName(a.name);
 
   const versionSpan = document.createElement('span');
   versionSpan.className = 'addon-version';
@@ -284,16 +284,22 @@ function createAddonRow(a, i, isInstalled) {
 
 function appendGroup(fragment, title, items, offset, isInstalled) {
   if (items.length === 0) return;
-  const box = document.createElement('div');
-  box.className = 'group-box';
+  const container = document.createElement('div');
+  container.className = 'group-container';
+
   const heading = document.createElement('div');
   heading.className = 'group-heading';
   heading.textContent = `${title} (${items.length})`;
-  box.appendChild(heading);
+
+  const box = document.createElement('div');
+  box.className = 'group-box';
   items.forEach((a, i) => {
     box.appendChild(createAddonRow(a, offset + i, isInstalled));
   });
-  fragment.appendChild(box);
+
+  container.appendChild(heading);
+  container.appendChild(box);
+  fragment.appendChild(container);
 }
 
 function renderAddonList(addons, installed) {

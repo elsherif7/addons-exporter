@@ -32,7 +32,7 @@ function loadReportFilterAddonRows(addonListContainer) {
   // setAttribute/textContent on the themeToggle element, and also reads
   // from localStorage. Provide minimal stubs for both so the script can
   // initialise without throwing.
-  const stubEl = () => ({ style: {}, addEventListener() {}, setAttribute() {}, textContent: '', children: [] });
+  const stubEl = () => ({ style: {}, addEventListener() {}, setAttribute() {}, textContent: '', children: [], classList: { contains: () => false }, querySelector: () => null });
   const reportDocument = {
     documentElement: { setAttribute() {} },
     getElementById(id) {
@@ -119,14 +119,25 @@ function makeGroupBox(heading, rows) {
   return box;
 }
 
+function makeGroupContainer(heading, rows) {
+  const box = makeGroupBox(heading, rows);
+  const container = {
+    style: { display: '' },
+    classList: { contains: (c) => c === 'group-container' },
+    querySelector: (sel) => sel === '.group-box' ? box : null,
+    children: [heading, box],
+  };
+  return { container, box };
+}
+
 function makeContainer() {
   const enabledHeading = makeEl('group-heading');
   const row1 = makeEl('addon-row', 'uBlock Origin', '1.58.0');
   const row2 = makeEl('addon-row', 'Dark Reader', '4.9.90');
   const disabledHeading = makeEl('group-heading');
   const row3 = makeEl('addon-row', 'Old Extension', '0.5');
-  const enabledBox = makeGroupBox(enabledHeading, [row1, row2]);
-  const disabledBox = makeGroupBox(disabledHeading, [row3]);
+  const { container: enabledBox } = makeGroupContainer(enabledHeading, [row1, row2]);
+  const { container: disabledBox } = makeGroupContainer(disabledHeading, [row3]);
   return {
     container: { children: [enabledBox, disabledBox] },
     enabledBox, enabledHeading, row1, row2,
@@ -171,28 +182,19 @@ test('filterAddonRows: query matching a version number does not match the row', 
 });
 
 test('filterAddonRows: common.js and the report\'s inline copy agree on the same fixture', () => {
-  // The report still uses the flat structure (group-heading + addon-row siblings),
-  // so use a flat container for the report copy and the group-box structure for common.js.
-  const fixtureA = makeContainer(); // group-box structure for common.js
+  // Both now use group-container structure — use the same fixture for both.
+  const fixtureA = makeContainer();
+  const fixtureB = makeContainer();
 
-  // Flat fixture for the report's inline copy (unchanged structure).
-  const flatEnableHeading = makeEl('group-heading');
-  const flatRow1 = makeEl('addon-row', 'uBlock Origin', '1.58.0');
-  const flatRow2 = makeEl('addon-row', 'Dark Reader', '4.9.90');
-  const flatDisabledHeading = makeEl('group-heading');
-  const flatRow3 = makeEl('addon-row', 'Old Extension', '0.5');
-  const flatContainer = { children: [flatEnableHeading, flatRow1, flatRow2, flatDisabledHeading, flatRow3] };
-
-  const reportFilterAddonRows = loadReportFilterAddonRows(flatContainer);
+  const reportFilterAddonRows = loadReportFilterAddonRows(fixtureB.container);
 
   for (const query of ['dark', '58', '', 'zzz-nomatch']) {
     const anyMatchA = filterAddonRows(fixtureA.container, query);
     const anyMatchB = reportFilterAddonRows(query);
     assert.strictEqual(anyMatchA, anyMatchB, `anyMatch differed for query "${query}"`);
 
-    // Compare row visibility between the two implementations.
     const rowsA = [fixtureA.row1, fixtureA.row2, fixtureA.row3];
-    const rowsB = [flatRow1, flatRow2, flatRow3];
+    const rowsB = [fixtureB.row1, fixtureB.row2, fixtureB.row3];
     rowsA.forEach((el, i) => {
       assert.strictEqual(el.style.display, rowsB[i].style.display, `row ${i} display differed for query "${query}"`);
     });

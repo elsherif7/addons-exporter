@@ -58,6 +58,27 @@
   }
   .settings-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg-hover); transform: scale(1.01); }
   .settings-btn:active { transform: scale(0.99); }
+  .settings-btn-danger { border-color: var(--danger-color); color: var(--danger-color); }
+  .settings-btn-danger:hover { background: #fef2f2; border-color: var(--danger-color); }
+  :root[data-theme="dark"] .settings-btn-danger:hover { background: #3d1515; }
+
+  /* Modal buttons shared by reset dialogs */
+  .s-modal-btn {
+    padding: 7px 20px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
+  }
+  .s-modal-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.04); }
+  .s-modal-btn:active { transform: scale(0.97); }
+  .s-modal-btn-danger { color: var(--danger-color); border-color: var(--danger-color); }
+  .s-modal-btn-danger:hover { background: #fef2f2; border-color: var(--danger-color); }
+  :root[data-theme="dark"] .s-modal-btn-danger:hover { background: #3d1515; }
   #settingsStatus {
     display: block;
     font-size: 13px;
@@ -107,7 +128,7 @@
     <div class="settings-group">
       <h2>Appearance</h2>
       <label class="theme-option" for="themeLight">
-        <input type="radio" name="theme" id="themeLight" value="light">
+        <input type="radio" name="theme" id="themeLight" value="light" checked>
         Light
       </label>
       <label class="theme-option" for="themeDark">
@@ -141,15 +162,35 @@
     </div>
 
     <div class="settings-group">
+      <h2>Reset</h2>
+      <div class="about-block">
+        <div class="about-row">
+          <span style="flex:1;">
+            <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Reset Add-ons Manager</span>
+            <span style="font-size:12px; color:var(--text-muted);">Clears all nicknames, groups, and group assignments.</span>
+          </span>
+          <button class="settings-btn settings-btn-danger" id="resetManagerBtn" style="flex-shrink:0; flex:none; width:auto; padding:6px 14px; margin-left:12px;">Reset</button>
+        </div>
+        <div class="about-row">
+          <span style="flex:1;">
+            <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Reset Settings</span>
+            <span style="font-size:12px; color:var(--text-muted);">Clears theme and export format back to defaults.</span>
+          </span>
+          <button class="settings-btn settings-btn-danger" id="resetSettingsBtn" style="flex-shrink:0; flex:none; width:auto; padding:6px 14px; margin-left:12px;">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-group">
       <h2>About</h2>
       <div class="about-block">
         <div class="about-row">
           <span class="about-label">Developer</span>
-          <span class="about-value">Elsherif</span>
+          <span class="about-value"><a href="https://github.com/elsherif7" target="_blank" rel="noopener">Elsherif</a></span>
         </div>
         <div class="about-row">
           <span class="about-label">Version</span>
-          <span class="about-value">1.2.0</span>
+          <span class="about-value"><a id="versionLink" href="https://github.com/elsherif7/addons-hub/releases/tag/v1.2.0" target="_blank" rel="noopener">1.2.0</a></span>
         </div>
         <div class="about-row">
           <span class="about-label">Rate this extension</span>

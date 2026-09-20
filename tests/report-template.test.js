@@ -202,3 +202,77 @@ test('buildCsvExport: all seven columns are present on every data row', () => {
     assert.strictEqual(fields.length, 7, `expected 7 columns, got ${fields.length} in row: ${row}`);
   }
 });
+
+// --- CSS drift-detection: report-template.js vs shared.css ---
+// The report embeds its own copy of shared layout CSS since it's a
+// standalone file. These tests catch drift between the two copies for
+// rules that must stay in sync. Intentional differences are excluded:
+// - CSS custom property blocks (:root / :root[data-theme]) differ by design
+// - Flex/checkbox layout on .addon-row (report rows have no checkboxes)
+// - margin-left on .addon-version (report compensates without flex)
+
+const sharedCssSrc = fs.readFileSync(
+  path.join(__dirname, '..', 'src/common/shared.css'), 'utf8'
+);
+const reportTemplateSrcRaw = fs.readFileSync(
+  path.join(__dirname, '..', 'src/background/report-template.js'), 'utf8'
+);
+
+// Extracts the first value of a CSS property within a named selector block
+// from a raw CSS/JS string. Looks for "selector { ... property: value ... }".
+function extractCssProp(src, selector, property) {
+  // Escape selector for regex
+  const sel = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const propName = property.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Find the block for this selector and pull the property value
+  const blockRe = new RegExp(sel + '\\s*\\{([^}]+)\\}');
+  const block = src.match(blockRe);
+  if (!block) return null;
+  const propRe = new RegExp(propName + '\\s*:\\s*([^;]+);');
+  const prop = block[1].match(propRe);
+  return prop ? prop[1].trim() : null;
+}
+
+// Selectors and properties that must be identical in both files.
+const sharedRules = [
+  ['.search-input', 'border-radius'],
+  ['.search-input', 'padding'],
+  ['.search-input', 'font-size'],
+  ['.search-input', 'border'],
+  ['.checklist-box', 'max-height'],
+  ['.checklist-box', 'overflow-x'],
+  ['.checklist-box', 'overflow-y'],
+  ['.checklist-box', 'margin-bottom'],
+  ['.group-container', 'margin-bottom'],
+  ['.group-box', 'border'],
+  ['.group-box', 'border-radius'],
+  ['.group-box', 'overflow'],
+  ['.group-heading', 'font-size'],
+  ['.group-heading', 'font-weight'],
+  ['.group-heading', 'letter-spacing'],
+  ['.group-heading', 'color'],
+  ['.group-heading', 'padding'],
+  ['.addon-row', 'padding'],
+  ['.addon-row', 'border-bottom'],
+  ['.placeholder-text', 'padding'],
+  ['.placeholder-text', 'color'],
+  ['.placeholder-text', 'font-size'],
+  ['.match-label', 'font-size'],
+  ['.match-label', 'color'],
+  ['.match-label', 'margin-left'],
+  ['.match-uncertain', 'color'],
+  ['.match-uncertain', 'font-weight'],
+];
+
+for (const [selector, property] of sharedRules) {
+  test(`CSS drift: "${selector} { ${property} }" matches between shared.css and report-template.js`, () => {
+    const fromShared = extractCssProp(sharedCssSrc, selector, property);
+    const fromReport = extractCssProp(reportTemplateSrcRaw, selector, property);
+    assert.ok(fromShared !== null,
+      `"${property}" not found in shared.css for selector "${selector}" — update this test if the rule moved`);
+    assert.ok(fromReport !== null,
+      `"${property}" not found in report-template.js for selector "${selector}" — the report copy may be missing this rule`);
+    assert.strictEqual(fromReport, fromShared,
+      `"${selector} { ${property} }" differs: shared.css has "${fromShared}", report has "${fromReport}"`);
+  });
+}

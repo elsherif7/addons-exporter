@@ -58,15 +58,16 @@ function buildHtmlReport(list, theme) {
     const matchLabel = LINK_TYPE_LABELS[a.linkType] || '';
     const matchClass = UNCERTAIN_LINK_TYPES.has(a.linkType) ? ' match-uncertain' : '';
     const match = matchLabel ? `<span class="match-label${matchClass}">${escapeHtml(matchLabel)}</span>` : '';
+    const displayShortName = escapeHtml(shortName(a.name));
     return `<div class="addon-row">
-      <a class="addon-name" href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(a.name)}</a>
+      <a class="addon-name" href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${displayShortName}</a>
       <span class="addon-version">${escapeHtml(a.version)}</span>
       ${match}
     </div>`;
   };
 
   const section = (title, items) => items.length
-    ? `<div class="group-box"><div class="group-heading">${title} (${items.length})</div>${items.map(row).join('')}</div>`
+    ? `<div class="group-container"><div class="group-heading">${title} (${items.length})</div><div class="group-box">${items.map(row).join('')}</div></div>`
     : '';
 
   return `<!DOCTYPE html>
@@ -167,29 +168,27 @@ function buildHtmlReport(list, theme) {
     padding: 4px 0;
     margin-bottom: 20px;
   }
+  .group-container { margin-bottom: 20px; }
+  .group-container:last-child { margin-bottom: 0; }
   .group-box {
-    border: 1px solid var(--border-soft);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    margin-bottom: 16px;
-    padding-top: 2px;
-    padding-bottom: 2px;
+    overflow: hidden;
   }
-  .group-box:last-child { margin-bottom: 0; }
   .group-heading {
     font-size: 14px;
     font-weight: 700;
     letter-spacing: 0.04em;
     color: var(--text-muted);
-    padding: 10px 14px 4px;
+    padding: 0 0 8px 2px;
   }
   .addon-row {
     padding: 10px 14px;
-    border: 1px solid var(--border-soft);
-    border-radius: 8px;
-    margin: 6px 8px;
-    transition: background 0.12s, border-color 0.12s, transform 0.1s;
+    border-bottom: 1px solid var(--border-soft);
+    transition: background 0.12s, transform 0.1s;
   }
-  .addon-row:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.01); }
+  .addon-row:last-child { border-bottom: none; }
+  .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
   .addon-name { font-size: 14px; font-weight: 600; color: var(--link-accent); text-decoration: none; }
   .addon-name:hover { text-decoration: underline; }
   .addon-version { color: var(--text-faint); font-size: 12px; margin-left: 6px; }
@@ -264,31 +263,29 @@ function buildHtmlReport(list, theme) {
     // NOTE: mirrors filterAddonRows() in common.js. Duplicated here
     // because this report is self-contained and can't load common.js
     // once saved elsewhere. Keep both copies in sync if you change this.
-    // Both copies intentionally match against .addon-name only, not the
-    // version number or match-type labels.
     function filterAddonRows(query) {
       var q = query.trim().toLowerCase();
-      var heading = null;
-      var headingHasMatch = false;
       var anyMatch = false;
-      var finishHeading = function () {
-        if (heading) heading.style.display = headingHasMatch ? '' : 'none';
-      };
       var children = addonListEl.children;
       for (var i = 0; i < children.length; i++) {
         var el = children[i];
-        if (el.classList.contains('group-heading')) {
-          finishHeading();
-          heading = el;
-          headingHasMatch = false;
-        } else if (el.classList.contains('addon-row')) {
-          var nameEl = el.querySelector('.addon-name');
-          var match = q === '' || (nameEl && nameEl.textContent.toLowerCase().indexOf(q) !== -1);
-          el.style.display = match ? '' : 'none';
-          if (match) { headingHasMatch = true; anyMatch = true; }
+        if (el.classList.contains('group-container')) {
+          var box = el.querySelector('.group-box');
+          var groupHasMatch = false;
+          if (box) {
+            var rows = box.children;
+            for (var j = 0; j < rows.length; j++) {
+              if (rows[j].classList.contains('addon-row')) {
+                var nameEl = rows[j].querySelector('.addon-name');
+                var match = q === '' || (nameEl && nameEl.textContent.toLowerCase().indexOf(q) !== -1);
+                rows[j].style.display = match ? '' : 'none';
+                if (match) { groupHasMatch = true; anyMatch = true; }
+              }
+            }
+          }
+          el.style.display = groupHasMatch ? '' : 'none';
         }
       }
-      finishHeading();
       return anyMatch;
     }
 

@@ -38,9 +38,11 @@ function makeSettingsSandbox() {
     URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
     Blob: function Blob() {},
     setTimeout: () => 0,
+    fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
     document: fakeDocument,
     browser: {
-      storage: { local: { get: async () => ({}), set: async () => {} } },
+      storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
+      runtime: { getManifest: () => ({ version: '1.2.0' }) },
     },
   };
   vm.createContext(sandbox);

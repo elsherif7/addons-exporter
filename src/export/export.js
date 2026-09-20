@@ -62,7 +62,7 @@ function createAddonRow(a, i) {
 
   const nameSpan = document.createElement('span');
   nameSpan.className = 'addon-name';
-  nameSpan.textContent = a.name;
+  nameSpan.textContent = shortName(a.name);
 
   const versionSpan = document.createElement('span');
   versionSpan.className = 'addon-version';
@@ -78,16 +78,22 @@ function createAddonRow(a, i) {
 
 function appendGroup(fragment, title, items, nextIndex) {
   if (items.length === 0) return;
-  const box = document.createElement('div');
-  box.className = 'group-box';
+  const container = document.createElement('div');
+  container.className = 'group-container';
+
   const heading = document.createElement('div');
   heading.className = 'group-heading';
   heading.textContent = `${title} (${items.length})`;
-  box.appendChild(heading);
+
+  const box = document.createElement('div');
+  box.className = 'group-box';
   items.forEach((a) => {
     box.appendChild(createAddonRow(a, nextIndex()));
   });
-  fragment.appendChild(box);
+
+  container.appendChild(heading);
+  container.appendChild(box);
+  fragment.appendChild(container);
 }
 
 function renderList(addons) {

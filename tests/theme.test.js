@@ -15,6 +15,7 @@ function loadThemeInSandbox(storageGetImpl) {
         setAttribute: (name, value) => setAttributeCalls.push([name, value]),
       },
     },
+    localStorage: { getItem() { return null; }, setItem() {} },
     browser: {
       storage: {
         local: {

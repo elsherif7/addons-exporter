@@ -6,6 +6,7 @@
 const NICKNAMES_KEY = 'addonNicknames';
 const GROUPS_KEY = 'addonGroups';
 const ASSIGNMENTS_KEY = 'addonGroupAssignments';
+const GROUP_ORDER_KEY = 'addonGroupOrder';
 
 const listEl = document.getElementById('addonList');
 const searchInput = document.getElementById('searchInput');
@@ -72,18 +73,28 @@ function removeGroupAssignments(assignments, groupId) {
   return updated;
 }
 
+// Returns a new order array with fromId moved immediately before toId.
+// If toId is null, fromId is moved to the end.
+function reorderGroups(order, fromId, toId) {
+  const arr = order.filter(id => id !== fromId);
+  const toIndex = toId ? arr.indexOf(toId) : arr.length;
+  arr.splice(toIndex === -1 ? arr.length : toIndex, 0, fromId);
+  return arr;
+}
+
 // ─── Storage ─────────────────────────────────────────────────────────────────
 
 async function loadAllData() {
   try {
-    const stored = await browser.storage.local.get([NICKNAMES_KEY, GROUPS_KEY, ASSIGNMENTS_KEY]);
+    const stored = await browser.storage.local.get([NICKNAMES_KEY, GROUPS_KEY, ASSIGNMENTS_KEY, GROUP_ORDER_KEY]);
     return {
       nicknames: stored[NICKNAMES_KEY] || {},
       groups: stored[GROUPS_KEY] || {},
       assignments: stored[ASSIGNMENTS_KEY] || {},
+      groupOrder: stored[GROUP_ORDER_KEY] || null,
     };
   } catch {
-    return { nicknames: {}, groups: {}, assignments: {} };
+    return { nicknames: {}, groups: {}, assignments: {}, groupOrder: null };
   }
 }
 
@@ -96,6 +107,7 @@ let currentAddons = [];
 let currentNicknames = {};
 let currentGroups = {};
 let currentAssignments = {};
+let currentGroupOrder = []; // ordered array of group IDs
 
 // ─── Custom modal ─────────────────────────────────────────────────────────────
 
@@ -255,17 +267,36 @@ function startGroupNameEdit(headingSpan, groupId) {
 function createMoveGroupBtn(addon) {
   const btn = document.createElement('button');
   btn.className = 'move-group-btn';
-  btn.textContent = 'Move to group ▾';
+  btn.textContent = 'Group';
   btn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    const groupList = Object.entries(currentGroups);
-    if (groupList.length === 0) {
-      setStatus('No groups yet — create one with "+ New Group".', false);
-      return;
+
+    // Toggle: if picker already open for this button, close it.
+    const existing = document.querySelector('.group-picker');
+    if (existing) {
+      existing.remove();
+      document.removeEventListener('click', existing._outsideClick);
+      if (existing._btn === btn) return;
     }
 
-    // Remove any existing picker.
-    document.querySelectorAll('.group-picker').forEach(el => el.remove());
+    const groupList = Object.entries(currentGroups);
+    if (groupList.length === 0) {
+      // No groups yet — offer to create one and assign this add-on immediately.
+      const name = await showInputModal('New Group', 'No groups yet. Enter a name to create one:');
+      if (!name) return;
+      try {
+        const id = generateGroupId();
+        currentGroups = createGroup(currentGroups, id, name);
+        currentGroupOrder = [...currentGroupOrder, id];
+        currentAssignments = assignToGroup(currentAssignments, addon.id, id);
+        await saveData({ [GROUPS_KEY]: currentGroups, [GROUP_ORDER_KEY]: currentGroupOrder, [ASSIGNMENTS_KEY]: currentAssignments });
+        setStatus(`Added to new group "${name}".`);
+        await renderList();
+      } catch (err) {
+        setStatus('Could not create group: ' + err.message, true);
+      }
+      return;
+    }
 
     const currentGroupId = currentAssignments[addon.id] || null;
     const picker = document.createElement('div');
@@ -280,19 +311,74 @@ function createMoveGroupBtn(addon) {
     groupList.forEach(([gId, g]) => {
       const opt = document.createElement('div');
       opt.className = 'group-picker-option' + (gId === currentGroupId ? ' selected' : '');
-      opt.textContent = g.name;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'group-picker-option-wrap';
+
+      const text = document.createElement('span');
+      text.className = 'option-text';
+      text.textContent = g.name;
+
+      const renameOptBtn = document.createElement('button');
+      renameOptBtn.className = 'picker-opt-btn';
+      renameOptBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+      renameOptBtn.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        picker.remove();
+        document.removeEventListener('click', outsideClick);
+        const newName = await showInputModal('Rename Group', `Enter a new name for "${g.name}":`, g.name);
+        if (!newName || newName === g.name) return;
+        try {
+          currentGroups = renameGroup(currentGroups, gId, newName);
+          await saveData({ [GROUPS_KEY]: currentGroups });
+          setStatus(`Group renamed to "${newName}".`);
+          await renderList();
+        } catch (err) {
+          setStatus('Could not rename group: ' + err.message, true);
+        }
+      });
+
+      const deleteOptBtn = document.createElement('button');
+      deleteOptBtn.className = 'picker-opt-btn danger';
+      deleteOptBtn.textContent = '✕';
+      deleteOptBtn.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        picker.remove();
+        document.removeEventListener('click', outsideClick);
+        const confirmed = await showConfirmModal('Delete Group',
+          `Delete the group "${g.name}"? Add-ons in it will become ungrouped.`, 'Delete', true);
+        if (!confirmed) return;
+        try {
+          currentGroups = deleteGroup(currentGroups, gId);
+          currentAssignments = removeGroupAssignments(currentAssignments, gId);
+          currentGroupOrder = currentGroupOrder.filter(id => id !== gId);
+          await saveData({ [GROUPS_KEY]: currentGroups, [ASSIGNMENTS_KEY]: currentAssignments, [GROUP_ORDER_KEY]: currentGroupOrder });
+          setStatus(`Group "${g.name}" deleted.`);
+          await renderList();
+        } catch (err) {
+          setStatus('Could not delete group: ' + err.message, true);
+        }
+      });
+
+      wrap.append(text, renameOptBtn, deleteOptBtn);
+      opt.appendChild(wrap);
       picker.appendChild(opt);
     });
 
-    // Position below the button.
+    // Position below the button, aligned to its right edge.
     const rect = btn.getBoundingClientRect();
     picker.style.top = (rect.bottom + 4) + 'px';
-    picker.style.left = rect.left + 'px';
+    const pickerWidth = 160;
+    const rightEdge = rect.right;
+    picker.style.left = Math.max(8, rightEdge - pickerWidth) + 'px';
     document.body.appendChild(picker);
+    picker._btn = btn;
 
     async function pick(chosen) {
       picker.remove();
       document.removeEventListener('click', outsideClick);
+      window.removeEventListener('wheel', outsideClick);
+      window.removeEventListener('scroll', outsideClick, true);
       if (chosen === currentGroupId || (chosen === null && !currentGroupId)) return;
       try {
         currentAssignments = assignToGroup(currentAssignments, addon.id, chosen);
@@ -307,11 +393,17 @@ function createMoveGroupBtn(addon) {
 
     noneOpt.addEventListener('click', (ev) => { ev.stopPropagation(); pick(null); });
     groupList.forEach(([gId], i) => {
-      picker.children[i + 1].addEventListener('click', (ev) => { ev.stopPropagation(); pick(gId); });
+      const opt = picker.children[i + 1];
+      opt.querySelector('.option-text').addEventListener('click', (ev) => { ev.stopPropagation(); pick(gId); });
     });
 
-    function outsideClick() { picker.remove(); document.removeEventListener('click', outsideClick); }
-    setTimeout(() => document.addEventListener('click', outsideClick), 0);
+    function outsideClick() { picker.remove(); document.removeEventListener('click', outsideClick); window.removeEventListener('wheel', outsideClick); window.removeEventListener('scroll', outsideClick, true); }
+    picker._outsideClick = outsideClick;
+    setTimeout(() => {
+      document.addEventListener('click', outsideClick);
+      window.addEventListener('wheel', outsideClick, { once: true });
+      window.addEventListener('scroll', outsideClick, { once: true, capture: true });
+    }, 0);
   });
   return btn;
 }
@@ -324,24 +416,12 @@ function createAddonRow(addon) {
   const nameSpan = document.createElement('span');
   nameSpan.className = 'addon-name';
   const nick = currentNicknames[addon.id] || '';
-  nameSpan.textContent = nick || addon.name;
+  nameSpan.textContent = nick || shortName(addon.name);
   if (nick) nameSpan.classList.add('has-nickname');
-
-  // Wrap name in a link to the AMO page.
-  const nameLink = document.createElement('a');
-  nameLink.href = `https://addons.mozilla.org/en-US/firefox/addon/${encodeURIComponent(addon.id)}/`;
-  nameLink.target = '_blank';
-  nameLink.rel = 'noopener';
-  nameLink.style.cssText = 'text-decoration:none; color:var(--link-accent); font-weight:600;';
-  nameLink.addEventListener('mouseover', () => { nameLink.style.textDecoration = 'underline'; });
-  nameLink.addEventListener('mouseout', () => { nameLink.style.textDecoration = 'none'; });
-  nameLink.appendChild(nameSpan);
-  nameLink.addEventListener('click', (e) => e.stopPropagation());
 
   const renameBtn = document.createElement('button');
   renameBtn.className = 'rename-btn';
   renameBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
-  renameBtn.title = 'Set nickname';
   renameBtn.setAttribute('aria-label', 'Set nickname for ' + addon.name);
   renameBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -350,7 +430,7 @@ function createAddonRow(addon) {
 
   const nameWrap = document.createElement('span');
   nameWrap.className = 'addon-name-wrap';
-  nameWrap.append(renameBtn, nameLink);
+  nameWrap.append(renameBtn, nameSpan);
 
   const versionSpan = document.createElement('span');
   versionSpan.className = 'addon-version';
@@ -375,14 +455,24 @@ function createAddonRow(addon) {
 
 // Builds a custom group-box with rename/delete heading actions.
 function createCustomGroupBox(groupId, groupName, addons) {
+  const container = document.createElement('div');
+  container.className = 'group-container';
+
   const box = document.createElement('div');
   box.className = 'group-box';
 
   const headingWrap = document.createElement('div');
   headingWrap.className = 'group-heading-wrap';
+  headingWrap.style.padding = '0 0 8px 2px';
+
+  const dragHandle = document.createElement('span');
+  dragHandle.className = 'group-drag-handle';
+  dragHandle.textContent = '⠿';
+  dragHandle.setAttribute('aria-label', 'Drag to reorder');
 
   const headingSpan = document.createElement('div');
   headingSpan.className = 'group-heading';
+  headingSpan.style.padding = '0';
   headingSpan.textContent = `${groupName} (${addons.length})`;
 
   const actions = document.createElement('div');
@@ -407,7 +497,8 @@ function createCustomGroupBox(groupId, groupName, addons) {
     try {
       currentGroups = deleteGroup(currentGroups, groupId);
       currentAssignments = removeGroupAssignments(currentAssignments, groupId);
-      await saveData({ [GROUPS_KEY]: currentGroups, [ASSIGNMENTS_KEY]: currentAssignments });
+      currentGroupOrder = currentGroupOrder.filter(id => id !== groupId);
+      await saveData({ [GROUPS_KEY]: currentGroups, [ASSIGNMENTS_KEY]: currentAssignments, [GROUP_ORDER_KEY]: currentGroupOrder });
       setStatus(`Group "${groupName}" deleted.`);
       await renderList();
     } catch (err) {
@@ -416,23 +507,65 @@ function createCustomGroupBox(groupId, groupName, addons) {
   });
 
   actions.append(renameGroupBtn, deleteGroupBtn);
-  headingWrap.append(headingSpan, actions);
-  box.appendChild(headingWrap);
+  headingWrap.append(dragHandle, headingSpan, actions);
+  container.appendChild(headingWrap);
+
+  // Drag-and-drop reordering
+  container.draggable = true;
+  container.dataset.groupId = groupId;
+
+  container.addEventListener('dragstart', (e) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', groupId);
+    setTimeout(() => container.style.opacity = '0.5', 0);
+  });
+  container.addEventListener('dragend', () => {
+    container.style.opacity = '';
+    document.querySelectorAll('.group-container.drag-over').forEach(el => el.classList.remove('drag-over'));
+  });
+  container.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.group-container.drag-over').forEach(el => el.classList.remove('drag-over'));
+    container.classList.add('drag-over');
+  });
+  container.addEventListener('dragleave', () => container.classList.remove('drag-over'));
+  container.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    container.classList.remove('drag-over');
+    const fromId = e.dataTransfer.getData('text/plain');
+    const toId = groupId;
+    if (fromId === toId) return;
+    try {
+      currentGroupOrder = reorderGroups(currentGroupOrder, fromId, toId);
+      await saveData({ [GROUP_ORDER_KEY]: currentGroupOrder });
+      await renderList();
+    } catch (err) {
+      setStatus('Could not reorder groups: ' + err.message, true);
+    }
+  });
 
   addons.forEach((addon) => box.appendChild(createAddonRow(addon)));
-  return box;
+  container.appendChild(box);
+  return container;
 }
 
 // Builds an Enabled or Disabled built-in group-box (no rename/delete).
 function createBuiltInGroupBox(title, addons) {
-  const box = document.createElement('div');
-  box.className = 'group-box';
+  const container = document.createElement('div');
+  container.className = 'group-container';
+
   const heading = document.createElement('div');
   heading.className = 'group-heading';
   heading.textContent = `${title} (${addons.length})`;
-  box.appendChild(heading);
+
+  const box = document.createElement('div');
+  box.className = 'group-box';
   addons.forEach((addon) => box.appendChild(createAddonRow(addon)));
-  return box;
+
+  container.appendChild(heading);
+  container.appendChild(box);
+  return container;
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -448,7 +581,7 @@ async function renderList() {
     displayName(a, currentNicknames).localeCompare(displayName(b, currentNicknames), undefined, { sensitivity: 'base' });
 
   const fragment = document.createDocumentFragment();
-  const groupOrder = Object.keys(currentGroups);
+  const groupOrder = currentGroupOrder.filter(id => currentGroups[id]);
 
   // Collect add-ons not assigned to any group (or assigned to a deleted group).
   const ungroupedAddons = currentAddons.filter(a => {
@@ -497,6 +630,11 @@ async function loadAndRender() {
     currentNicknames = data.nicknames;
     currentGroups = data.groups;
     currentAssignments = data.assignments;
+    // Reconcile order: keep stored order, append any new group ids not yet in it.
+    const allGroupIds = Object.keys(data.groups);
+    const storedOrder = (data.groupOrder || []).filter(id => data.groups[id]);
+    const missing = allGroupIds.filter(id => !storedOrder.includes(id));
+    currentGroupOrder = [...storedOrder, ...missing];
     await renderList();
   } catch (err) {
     const p = document.createElement('p');
@@ -515,7 +653,8 @@ newGroupBtn.addEventListener('click', async () => {
   try {
     const id = generateGroupId();
     currentGroups = createGroup(currentGroups, id, name);
-    await saveData({ [GROUPS_KEY]: currentGroups });
+    currentGroupOrder = [...currentGroupOrder, id];
+    await saveData({ [GROUPS_KEY]: currentGroups, [GROUP_ORDER_KEY]: currentGroupOrder });
     setStatus(`Group "${name}" created.`);
     await renderList();
   } catch (err) {

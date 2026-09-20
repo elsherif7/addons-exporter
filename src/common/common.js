@@ -70,6 +70,16 @@ function isPlausibleNameMatch(installedName, resultName) {
   return shared / wordsA.size >= 0.5;
 }
 
+// Returns a shortened display name by truncating at the first common
+// separator (dash, en-dash, em-dash, colon, or comma).
+// "Buster: Captcha Solver for Humans" → "Buster"
+// "StayFree - Website Blocker, ..." → "StayFree"
+// "Proton VPN: Fast & Secure" → "Proton VPN"
+function shortName(name) {
+  const match = String(name).match(/^(.+?)(?:\s+[-–—]|\s*[,:])/);
+  return match ? match[1].trim() : String(name);
+}
+
 // Select all/Deselect all only touch what the current search still shows -
 // a checked box that gets filtered out of view stays checked.
 function visibleCheckboxes(allCheckboxes) {
@@ -98,22 +108,34 @@ function filterAddonRows(container, query) {
   let anyMatch = false;
 
   for (const el of container.children) {
-    if (el.classList.contains('group-box')) {
+    if (el.classList.contains('group-container')) {
+      const box = el.querySelector('.group-box');
+      let groupHasMatch = false;
+      if (box) {
+        for (const child of box.children) {
+          if (child.classList.contains('addon-row')) {
+            const nameEl = child.querySelector('.addon-name');
+            const match = q === '' || (nameEl && nameEl.textContent.toLowerCase().includes(q));
+            child.style.display = match ? '' : 'none';
+            if (match) { groupHasMatch = true; anyMatch = true; }
+          }
+        }
+      }
+      el.style.display = groupHasMatch ? '' : 'none';
+    } else if (el.classList.contains('group-box')) {
+      // Legacy flat group-box (report template still uses this).
       let groupHasMatch = false;
       for (const child of el.children) {
         if (child.classList.contains('addon-row')) {
           const nameEl = child.querySelector('.addon-name');
           const match = q === '' || (nameEl && nameEl.textContent.toLowerCase().includes(q));
           child.style.display = match ? '' : 'none';
-          if (match) {
-            groupHasMatch = true;
-            anyMatch = true;
-          }
+          if (match) { groupHasMatch = true; anyMatch = true; }
         }
       }
       el.style.display = groupHasMatch ? '' : 'none';
     } else if (el.classList.contains('addon-row')) {
-      // Fallback: flat structure (e.g. report template)
+      // Fallback: flat structure (e.g. report template).
       const nameEl = el.querySelector('.addon-name');
       const match = q === '' || (nameEl && nameEl.textContent.toLowerCase().includes(q));
       el.style.display = match ? '' : 'none';
