@@ -259,6 +259,25 @@
   .picker-opt-btn:hover { color: #9b7ec8; }
   .picker-opt-btn.danger:hover { color: var(--danger-color); }
 
+  /* Open Settings button per row */
+  .open-settings-btn {
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 3px 8px;
+    color: var(--link-accent);
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid var(--link-accent);
+    transition: background 0.12s, color 0.12s;
+    opacity: 0;
+  }
+  .addon-row:hover .open-settings-btn { opacity: 1; }
+  .open-settings-btn:hover { background: #eef4ff; color: var(--link-accent); }
+  :root[data-theme="dark"] .open-settings-btn:hover { background: #1a2540; }
+
   .addon-name-wrap {
     display: inline-flex;
     align-items: center;

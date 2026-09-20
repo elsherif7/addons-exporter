@@ -149,7 +149,8 @@ async function getExportableAddons() {
 async function listInstalledAddons() {
   const extensions = await getExportableAddons();
   return extensions.map(a => ({
-    id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type
+    id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type,
+    optionsUrl: a.optionsUrl || null,
   }));
 }
 

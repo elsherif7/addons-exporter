@@ -395,3 +395,28 @@ testAsync('export message: on desktop with CSV format, confirmation URL has form
   assert.strictEqual(createdTabUrls.length, 1);
   assert.match(createdTabUrls[0], /confirmation\.html\?from=export&format=csv$/);
 });
+
+// --- listInstalledAddons: includes optionsUrl ---
+
+testAsync('listInstalledAddons: includes optionsUrl when present, null when absent', async () => {
+  const bgSandbox = {
+    URL,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    browser: {
+      runtime: { onMessage: { addListener() {} } },
+      management: {
+        getAll: async () => [
+          { id: 'ext1@example.com', name: 'Ext With Settings', version: '1.0', enabled: true, type: 'extension', optionsUrl: 'moz-extension://abc/options.html' },
+          { id: 'ext2@example.com', name: 'Ext Without Settings', version: '1.0', enabled: true, type: 'extension' },
+        ],
+      },
+    },
+  };
+  vm.createContext(bgSandbox);
+  vm.runInContext(commonSrc, bgSandbox);
+  vm.runInContext(reportTemplateSrc, bgSandbox);
+  vm.runInContext(backgroundSrc, bgSandbox);
+  const result = await bgSandbox.listInstalledAddons();
+  assert.strictEqual(result[0].optionsUrl, 'moz-extension://abc/options.html');
+  assert.strictEqual(result[1].optionsUrl, null);
+});

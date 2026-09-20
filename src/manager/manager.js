@@ -444,12 +444,29 @@ function createAddonRow(addon) {
 
   const moveBtn = createMoveGroupBtn(addon);
 
+  // Open Settings button — always shown; shows inline message if no options page.
+  const settingsBtn = document.createElement('button');
+  settingsBtn.className = 'open-settings-btn';
+  settingsBtn.textContent = 'Settings';
+  settingsBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (addon.optionsUrl) {
+      try {
+        await browser.tabs.create({ url: addon.optionsUrl });
+      } catch (err) {
+        setStatus('Could not open settings: ' + err.message, true);
+      }
+    } else {
+      setStatus('This add-on does not have a settings page.');
+    }
+  });
+
   const label = document.createElement('div');
   label.style.flex = '1';
   label.style.textAlign = 'left';
   label.append(nameWrap, ' ', versionSpan, ' ', typeSpan);
 
-  row.append(label, moveBtn);
+  row.append(label, settingsBtn, moveBtn);
   return row;
 }
 
