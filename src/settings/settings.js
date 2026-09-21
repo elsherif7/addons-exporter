@@ -13,6 +13,7 @@ const SETTINGS_FILE_FORMAT_VERSION = 1;
 const KNOWN_SETTINGS_KEYS = [
   THEME_STORAGE_KEY,
   EXPORT_FORMAT_STORAGE_KEY,
+  SHORT_NAME_STORAGE_KEY,
 ];
 
 // Builds the settings export object from the current stored values.
@@ -54,6 +55,9 @@ function parseSettingsFile(text) {
   const f = parsed.settings[EXPORT_FORMAT_STORAGE_KEY];
   if (f === 'html' || f === 'json' || f === 'csv') validated[EXPORT_FORMAT_STORAGE_KEY] = f;
 
+  const s = parsed.settings[SHORT_NAME_STORAGE_KEY];
+  if (s === 'on' || s === 'off') validated[SHORT_NAME_STORAGE_KEY] = s;
+
   return { ok: true, settings: validated };
 }
 
@@ -61,6 +65,7 @@ function parseSettingsFile(text) {
 
 const themeRadios = document.querySelectorAll('input[name="theme"]');
 const formatRadios = document.querySelectorAll('input[name="exportFormat"]');
+const shortenRadios = document.querySelectorAll('input[name="shortenNames"]');
 const exportSettingsBtn = document.getElementById('exportSettingsBtn');
 const importSettingsBtn = document.getElementById('importSettingsBtn');
 const settingsFileInput = document.getElementById('settingsFileInput');
@@ -116,6 +121,29 @@ for (const radio of formatRadios) {
   });
 }
 
+async function loadCurrentShortenNames() {
+  let stored;
+  try {
+    stored = await browser.storage.local.get(SHORT_NAME_STORAGE_KEY);
+  } catch {
+    stored = {};
+  }
+  const current = (stored && (stored[SHORT_NAME_STORAGE_KEY] === 'on' ||
+                               stored[SHORT_NAME_STORAGE_KEY] === 'off'))
+    ? stored[SHORT_NAME_STORAGE_KEY]
+    : SHORT_NAME_DEFAULT;
+  for (const radio of shortenRadios) {
+    radio.checked = radio.value === current;
+  }
+}
+
+for (const radio of shortenRadios) {
+  radio.addEventListener('change', async () => {
+    if (!radio.checked) return;
+    await browser.storage.local.set({ [SHORT_NAME_STORAGE_KEY]: radio.value });
+  });
+}
+
 exportSettingsBtn.addEventListener('click', async () => {
   setSettingsStatus('');
   try {
@@ -166,6 +194,7 @@ settingsFileInput.addEventListener('change', async () => {
     // Refresh all radio buttons to reflect the newly applied values.
     await loadCurrentTheme();
     await loadCurrentExportFormat();
+    await loadCurrentShortenNames();
     setSettingsStatus('Settings imported successfully.');
   } catch (err) {
     setSettingsStatus('Import failed: ' + err.message, true);
@@ -174,6 +203,7 @@ settingsFileInput.addEventListener('change', async () => {
 
 loadCurrentTheme();
 loadCurrentExportFormat();
+loadCurrentShortenNames();
 
 // --- Check for updates ---
 
@@ -246,12 +276,13 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function()
     overlay.addEventListener('click', (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
   }).then((confirmed) => {
     if (!confirmed) return;
-    return browser.storage.local.remove([THEME_STORAGE_KEY, EXPORT_FORMAT_STORAGE_KEY])
+    return browser.storage.local.remove([THEME_STORAGE_KEY, EXPORT_FORMAT_STORAGE_KEY, SHORT_NAME_STORAGE_KEY])
       .then(() => {
         applyTheme('light');
         return loadCurrentTheme();
       })
       .then(() => loadCurrentExportFormat())
+      .then(() => loadCurrentShortenNames())
       .then(() => { setSettingsStatus('Settings reset to defaults.'); })
       .catch((err) => { setSettingsStatus('Could not reset settings: ' + err.message, true); });
   });

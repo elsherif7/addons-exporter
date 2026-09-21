@@ -9,6 +9,11 @@ const EXPORT_FORMAT_VERSION = 1;
 const EXPORT_FORMAT_STORAGE_KEY = 'exportFormat';
 const EXPORT_FORMAT_DEFAULT = 'html';
 
+// Storage key for the shorten-add-on-names setting.
+// Valid values: 'on' | 'off'. Defaults to 'on' when unset.
+const SHORT_NAME_STORAGE_KEY = 'shortenNames';
+const SHORT_NAME_DEFAULT = 'on';
+
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'

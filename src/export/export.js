@@ -50,7 +50,7 @@ function updateSelectionCount() {
 // Builds one <div class="addon-row"> via DOM APIs (not innerHTML) so
 // a.name/a.version never pass through HTML parsing - textContent and
 // property assignment don't need escapeHtml the way a template string did.
-function createAddonRow(a, i) {
+function createAddonRow(a, i, shorten) {
   const row = document.createElement('div');
   row.className = 'addon-row';
 
@@ -62,7 +62,7 @@ function createAddonRow(a, i) {
 
   const nameSpan = document.createElement('span');
   nameSpan.className = 'addon-name';
-  nameSpan.textContent = shortName(a.name);
+  nameSpan.textContent = shorten ? shortName(a.name) : a.name;
 
   const versionSpan = document.createElement('span');
   versionSpan.className = 'addon-version';
@@ -91,7 +91,7 @@ function createAddonRow(a, i) {
   return row;
 }
 
-function appendGroup(fragment, title, items, nextIndex) {
+function appendGroup(fragment, title, items, nextIndex, shorten) {
   if (items.length === 0) return;
   const container = document.createElement('div');
   container.className = 'group-container';
@@ -103,7 +103,7 @@ function appendGroup(fragment, title, items, nextIndex) {
   const box = document.createElement('div');
   box.className = 'group-box';
   items.forEach((a) => {
-    box.appendChild(createAddonRow(a, nextIndex()));
+    box.appendChild(createAddonRow(a, nextIndex(), shorten));
   });
 
   container.appendChild(heading);
@@ -111,7 +111,7 @@ function appendGroup(fragment, title, items, nextIndex) {
   fragment.appendChild(container);
 }
 
-function renderList(addons) {
+function renderList(addons, shorten) {
   if (addons.length === 0) {
     listEl.innerHTML = '<p class="placeholder-text">No add-ons found to export.</p>';
     updateSelectionCount();
@@ -125,9 +125,12 @@ function renderList(addons) {
   let idx = 0;
   const nextIndex = () => idx++;
 
+  const outerBox = document.createElement('div');
+  outerBox.className = 'groups-outer-box';
+  appendGroup(outerBox, 'Enabled', enabled, nextIndex, shorten);
+  appendGroup(outerBox, 'Disabled', disabled, nextIndex, shorten);
   const fragment = document.createDocumentFragment();
-  appendGroup(fragment, 'Enabled', enabled, nextIndex);
-  appendGroup(fragment, 'Disabled', disabled, nextIndex);
+  fragment.appendChild(outerBox);
   listEl.replaceChildren(fragment);
   searchInput.style.display = 'block';
 
@@ -140,8 +143,12 @@ function renderList(addons) {
 
 (async () => {
   try {
-    const addons = await browser.runtime.sendMessage({ type: 'listAddons' });
-    renderList(addons);
+    const [addons, stored] = await Promise.all([
+      browser.runtime.sendMessage({ type: 'listAddons' }),
+      browser.storage.local.get(SHORT_NAME_STORAGE_KEY),
+    ]);
+    const shorten = !stored || stored[SHORT_NAME_STORAGE_KEY] !== 'off';
+    renderList(addons, shorten);
   } catch (e) {
     const p = document.createElement('p');
     p.className = 'placeholder-text error';

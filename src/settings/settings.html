@@ -105,8 +105,8 @@
   .about-row:last-child { border-bottom: none; }
   .about-row:hover { background: var(--hover-bg); border-bottom-color: var(--border); transform: scale(1.01); }
   :root[data-theme="dark"] .about-row:hover { background: #2e3340; border-bottom-color: #6b7280; }
-  .about-label { color: var(--text-muted); }
-  .about-value { color: var(--text); font-weight: 600; }
+  .about-label { color: var(--text-muted); font-size: 14px; font-weight: 600; }
+  .about-value { color: var(--text); font-weight: 600; font-size: 14px; }
   .about-value a { color: var(--link-accent); text-decoration: none; font-weight: 600; }
   .about-value a:hover { text-decoration: underline; }
   .about-check-btn {
@@ -129,11 +129,11 @@
       <h2>Appearance</h2>
       <label class="theme-option" for="themeLight">
         <input type="radio" name="theme" id="themeLight" value="light" checked>
-        Light
+        <span style="font-weight:600; color:var(--text); font-size:14px;">Light</span>
       </label>
       <label class="theme-option" for="themeDark">
         <input type="radio" name="theme" id="themeDark" value="dark">
-        Dark
+        <span style="font-weight:600; color:var(--text); font-size:14px;">Dark</span>
       </label>
     </div>
 
@@ -141,15 +141,30 @@
       <h2>Export Format</h2>
       <label class="theme-option" for="formatHtml">
         <input type="radio" name="exportFormat" id="formatHtml" value="html" checked>
-        HTML
+        <span style="font-weight:600; color:var(--text); font-size:14px;">HTML</span>
       </label>
       <label class="theme-option" for="formatJson">
         <input type="radio" name="exportFormat" id="formatJson" value="json">
-        JSON
+        <span style="font-weight:600; color:var(--text); font-size:14px;">JSON</span>
       </label>
       <label class="theme-option" for="formatCsv">
         <input type="radio" name="exportFormat" id="formatCsv" value="csv">
-        CSV
+        <span style="font-weight:600; color:var(--text); font-size:14px;">CSV</span>
+      </label>
+    </div>
+
+    <div class="settings-group">
+      <h2>Display</h2>
+      <label class="theme-option" for="shortenNamesOff">
+        <input type="radio" name="shortenNames" id="shortenNamesOff" value="off">
+        <span style="display:block; font-weight:600; color:var(--text); font-size:14px;">Show full add-on names</span>
+      </label>
+      <label class="theme-option" for="shortenNamesOn">
+        <input type="radio" name="shortenNames" id="shortenNamesOn" value="on" checked>
+        <span>
+          <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Shorten add-on names</span>
+          <span style="font-size:12px; color:var(--text-muted);">Removes text after "–" or ":", e.g. "uBlock Origin – free ad blocker" → "uBlock Origin"</span>
+        </span>
       </label>
     </div>
     <div class="settings-group">
@@ -167,7 +182,7 @@
         <div class="about-row">
           <span style="flex:1;">
             <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Reset Settings</span>
-            <span style="font-size:12px; color:var(--text-muted);">Clears theme and export format back to defaults.</span>
+            <span style="font-size:12px; color:var(--text-muted);">Clears theme, export format, and display settings back to defaults.</span>
           </span>
           <button class="settings-btn settings-btn-danger" id="resetSettingsBtn" style="flex-shrink:0; flex:none; width:auto; padding:6px 14px; margin-left:12px;">Reset</button>
         </div>

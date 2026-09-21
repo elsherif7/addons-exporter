@@ -218,6 +218,14 @@ async function doExport(ids) {
     // keep the default
   }
 
+  let shorten = true;
+  try {
+    const stored = await browser.storage.local.get(SHORT_NAME_STORAGE_KEY);
+    if (stored && stored[SHORT_NAME_STORAGE_KEY] === 'off') shorten = false;
+  } catch {
+    // keep the default
+  }
+
   let content;
   let ext;
   if (exportFormat === 'json') {
@@ -227,7 +235,7 @@ async function doExport(ids) {
     content = buildCsvExport(list);
     ext = 'csv';
   } else {
-    content = buildHtmlReport(list, theme);
+    content = buildHtmlReport(list, theme, shorten);
     ext = 'html';
   }
 

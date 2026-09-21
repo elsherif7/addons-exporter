@@ -236,7 +236,7 @@ function clearAddonList() {
 // a.name/version/matchLabel never pass through HTML parsing - textContent
 // and property assignment don't need escapeHtml the way a template
 // string did.
-function createAddonRow(a, i, isInstalled) {
+function createAddonRow(a, i, isInstalled, shorten) {
   const safe = isSafeUrl(a.link);
   const version = typeof a.version === 'string' ? a.version : '';
   const matchLabel = LINK_TYPE_LABELS[a.linkType] || '';
@@ -254,7 +254,7 @@ function createAddonRow(a, i, isInstalled) {
 
   const nameEl = document.createElement('span');
   nameEl.className = 'addon-name';
-  nameEl.textContent = shortName(a.name);
+  nameEl.textContent = shorten ? shortName(a.name) : a.name;
 
   const amoLink = safe ? (() => {
     const lnk = document.createElement('a');
@@ -302,7 +302,7 @@ function createAddonRow(a, i, isInstalled) {
   return row;
 }
 
-function appendGroup(fragment, title, items, offset, isInstalled) {
+function appendGroup(fragment, title, items, offset, isInstalled, shorten) {
   if (items.length === 0) return;
   const container = document.createElement('div');
   container.className = 'group-container';
@@ -314,7 +314,7 @@ function appendGroup(fragment, title, items, offset, isInstalled) {
   const box = document.createElement('div');
   box.className = 'group-box';
   items.forEach((a, i) => {
-    box.appendChild(createAddonRow(a, offset + i, isInstalled));
+    box.appendChild(createAddonRow(a, offset + i, isInstalled, shorten));
   });
 
   container.appendChild(heading);
@@ -322,7 +322,7 @@ function appendGroup(fragment, title, items, offset, isInstalled) {
   fragment.appendChild(container);
 }
 
-function renderAddonList(addons, installed) {
+function renderAddonList(addons, installed, shorten) {
   const index = buildInstalledIndex(installed);
   const notInstalled = [];
   const alreadyInstalled = [];
@@ -339,9 +339,12 @@ function renderAddonList(addons, installed) {
   alreadyInstalled.sort(byName);
   displayItems = [...notInstalled, ...alreadyInstalled];
 
+  const outerBox = document.createElement('div');
+  outerBox.className = 'groups-outer-box';
+  appendGroup(outerBox, 'Not Installed Yet', notInstalled, 0, false, shorten);
+  appendGroup(outerBox, 'Already Installed', alreadyInstalled, notInstalled.length, true, shorten);
   const fragment = document.createDocumentFragment();
-  appendGroup(fragment, 'Not Installed Yet', notInstalled, 0, false);
-  appendGroup(fragment, 'Already Installed', alreadyInstalled, notInstalled.length, true);
+  fragment.appendChild(outerBox);
   addonListEl.replaceChildren(fragment);
   addonListEl.style.display = 'block';
   checklistBoxEl.style.display = 'block';
@@ -374,8 +377,7 @@ function renderAddonList(addons, installed) {
 // can tell it's stale and not overwrite a newer one.
 let loadGeneration = 0;
 
-async function loadFile(file) {
-  const myGeneration = ++loadGeneration;
+async function loadFile(file) {  const myGeneration = ++loadGeneration;
   clearAddonList();
   setStatus('Reading file...');
   try {
@@ -415,7 +417,12 @@ async function loadFile(file) {
     }
 
     setStatus('');
-    renderAddonList(result.addons, installed);
+    let shorten = true;
+    try {
+      const s = await browser.storage.local.get(SHORT_NAME_STORAGE_KEY);
+      if (s && s[SHORT_NAME_STORAGE_KEY] === 'off') shorten = false;
+    } catch { /* default to true */ }
+    renderAddonList(result.addons, installed, shorten);
   } catch (err) {
     if (myGeneration !== loadGeneration) return;
     setStatus('Error reading file: ' + err.message);

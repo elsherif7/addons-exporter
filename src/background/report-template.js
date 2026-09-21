@@ -51,14 +51,14 @@ function buildCsvExport(list) {
 // viewing the report flip it, and the choice is persisted in
 // localStorage so it survives between opens of the same file.
 // Falls back to the baked-in value if localStorage is unavailable.
-function buildHtmlReport(list, theme) {
+function buildHtmlReport(list, theme, shorten = true) {
   const startingTheme = theme === 'dark' ? 'dark' : 'light';
 
   const row = (a) => {
     const matchLabel = LINK_TYPE_LABELS[a.linkType] || '';
     const matchClass = UNCERTAIN_LINK_TYPES.has(a.linkType) ? ' match-uncertain' : '';
     const match = matchLabel ? `<span class="match-label${matchClass}">${escapeHtml(matchLabel)}</span>` : '';
-    const displayShortName = escapeHtml(shortName(a.name));
+    const displayShortName = escapeHtml(shorten ? shortName(a.name) : a.name);
     const typeLabel = a.type === 'theme' ? 'Theme' : 'Extension';
     return `<div class="addon-row">
       <span class="addon-name">${displayShortName}</span>
@@ -165,9 +165,7 @@ function buildHtmlReport(list, theme) {
   .placeholder-text { padding: 20px; color: var(--text-muted); font-size: 14px; margin: 0; }
   .checklist-box {
     text-align: left;
-    max-height: min(360px, 55vh);
     overflow-x: hidden;
-    overflow-y: auto;
     padding: 4px 0;
     margin-bottom: 20px;
   }
