@@ -4,7 +4,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, makeFakeDom } = require('./helpers');
 
 function makeFakeElement() {
   return {
@@ -473,4 +473,83 @@ test('parseCsvPayload: handles CRLF and LF line endings', () => {
   const result = parseCsvPayload(withLf);
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons.length, 1);
+});
+
+// --- Real DOM: search and Select All against the actual rendered list ---
+// Mirrors the equivalent block in export.test.js: renders import.js's
+// real list (via setSelectedFile -> loadFile -> renderAddonList) against
+// a real element tree with makeFakeDom, then drives the real
+// searchInput/selectAllBtn handlers.
+
+function jsonAddonsFile(addons, formatVersion = EXPORT_FORMAT_VERSION) {
+  return { name: 'addons.json', text: async () => JSON.stringify({ formatVersion, addons }) };
+}
+
+async function renderRealImportList(addons, installed = []) {
+  const { document, elements } = makeFakeDom([
+    'status', 'fileName', 'fileNameRow', 'fileInput', 'picker', 'removeFileBtn',
+    'chooseFileBtn', 'listControls', 'addonList', 'checklistBox', 'selectAllBtn',
+    'deselectAllBtn', 'selectionCount', 'openSelectedBtn', 'compareNote',
+    'searchInput', 'noSearchMatches',
+  ]);
+  const sandbox = {
+    document,
+    URL,
+    browser: {
+      runtime: {
+        sendMessage: async (msg) => (msg.type === 'listAddons' ? installed : undefined),
+        getURL: (p) => p,
+      },
+      storage: { local: { get: async () => ({}) } },
+      tabs: { create: async () => ({}) },
+    },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(commonSrc, sandbox);
+  vm.runInContext(importSrc, sandbox);
+  sandbox.setSelectedFile(jsonAddonsFile(addons));
+  // Let loadFile()'s file read, JSON parse, and listAddons message settle.
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  return elements;
+}
+
+testAsync('import.js real DOM: search hides non-matching rows and their group', async () => {
+  const elements = await renderRealImportList([
+    { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
+    { id: 'b@x', name: 'Beta', version: '2.0', link: 'https://example.com/b' },
+  ]);
+  elements.searchInput.value = 'alpha';
+  elements.searchInput.dispatchEvent('input');
+
+  const rows = elements.addonList.querySelectorAll('.addon-row');
+  const shown = rows.filter((r) => r.style.display !== 'none').map((r) => r.querySelector('.addon-name').textContent);
+  assert.deepStrictEqual(shown, ['Alpha'], 'only the matching row should stay visible');
+  assert.strictEqual(elements.noSearchMatches.style.display, 'none');
+});
+
+testAsync('import.js real DOM: a query matching nothing shows the "no matches" message and hides every row', async () => {
+  const elements = await renderRealImportList([
+    { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
+  ]);
+  elements.searchInput.value = 'zzz-nomatch';
+  elements.searchInput.dispatchEvent('input');
+
+  const rows = elements.addonList.querySelectorAll('.addon-row');
+  assert.ok(rows.every((r) => r.style.display === 'none'));
+  assert.strictEqual(elements.noSearchMatches.style.display, 'block');
+});
+
+testAsync('import.js real DOM: Select All while a search is active only checks the visible row', async () => {
+  const elements = await renderRealImportList([
+    { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
+    { id: 'b@x', name: 'Beta', version: '2.0', link: 'https://example.com/b' },
+  ]);
+  elements.deselectAllBtn.click(); // not-yet-installed rows are checked by default on render - start from a known state
+  elements.searchInput.value = 'alpha';
+  elements.searchInput.dispatchEvent('input');
+  elements.selectAllBtn.click();
+
+  const checked = elements.addonList.querySelectorAll('input[type="checkbox"]:checked');
+  assert.strictEqual(checked.length, 1, 'Select All should only check the row the active search still shows');
+  assert.strictEqual(elements.selectionCount.textContent, '1 of 2 selected');
 });

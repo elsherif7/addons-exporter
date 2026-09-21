@@ -269,25 +269,26 @@ function buildHtmlReport(list, theme, shorten = true) {
     function filterAddonRows(query) {
       var q = query.trim().toLowerCase();
       var anyMatch = false;
-      var children = addonListEl.children;
-      for (var i = 0; i < children.length; i++) {
-        var el = children[i];
-        if (el.classList.contains('group-container')) {
-          var box = el.querySelector('.group-box');
-          var groupHasMatch = false;
-          if (box) {
-            var rows = box.children;
-            for (var j = 0; j < rows.length; j++) {
-              if (rows[j].classList.contains('addon-row')) {
-                var nameEl = rows[j].querySelector('.addon-name');
-                var match = q === '' || (nameEl && nameEl.textContent.toLowerCase().indexOf(q) !== -1);
-                rows[j].style.display = match ? '' : 'none';
-                if (match) { groupHasMatch = true; anyMatch = true; }
-              }
+      // querySelectorAll (not addonListEl.children) so this keeps working
+      // regardless of nesting depth - see the same change in common.js's
+      // filterAddonRows().
+      var groupContainers = addonListEl.querySelectorAll('.group-container');
+      for (var i = 0; i < groupContainers.length; i++) {
+        var el = groupContainers[i];
+        var box = el.querySelector('.group-box');
+        var groupHasMatch = false;
+        if (box) {
+          var rows = box.children;
+          for (var j = 0; j < rows.length; j++) {
+            if (rows[j].classList.contains('addon-row')) {
+              var nameEl = rows[j].querySelector('.addon-name');
+              var match = q === '' || (nameEl && nameEl.textContent.toLowerCase().indexOf(q) !== -1);
+              rows[j].style.display = match ? '' : 'none';
+              if (match) { groupHasMatch = true; anyMatch = true; }
             }
           }
-          el.style.display = groupHasMatch ? '' : 'none';
         }
+        el.style.display = groupHasMatch ? '' : 'none';
       }
       return anyMatch;
     }

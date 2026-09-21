@@ -11,7 +11,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc } = require('./helpers');
+const { test, testAsync, readSrc, makeFakeDom } = require('./helpers');
 
 const commonSrc = readSrc('src/common/common.js');
 const exportSrc = readSrc('src/export/export.js');
@@ -132,4 +132,76 @@ testAsync('export.js click handler: on desktop, does nothing extra since backgro
   });
   assert.strictEqual(appendedLinks.length, 0);
   assert.strictEqual(createdTabUrls.length, 0);
+});
+
+// --- Real DOM: search and Select All against the actual rendered list ---
+// Runs export.js's real top-level bootstrap (listAddons -> renderList())
+// against a real element tree via makeFakeDom, then drives the real
+// searchInput/selectAllBtn handlers - the same regression the A1 fix
+// targets, but through actual rendering rather than a hand-built fixture.
+
+async function renderRealExportList(addons) {
+  const { document, elements } = makeFakeDom([
+    'addonList', 'selectAllBtn', 'deselectAllBtn', 'exportSelectedBtn',
+    'status', 'selectionCount', 'searchInput', 'noSearchMatches', 'exportDesc',
+  ]);
+  const sandbox = {
+    document,
+    URL,
+    browser: {
+      runtime: {
+        sendMessage: async (msg) => (msg.type === 'listAddons' ? addons : undefined),
+        onMessage: { addListener() {} },
+        getURL: (p) => p,
+      },
+      storage: { local: { get: async () => ({}) } },
+    },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(commonSrc, sandbox);
+  vm.runInContext(exportSrc, sandbox);
+  // Let the top-level IIFE's listAddons() message and renderList() settle.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  return elements;
+}
+
+testAsync('export.js real DOM: search hides non-matching rows and their group', async () => {
+  const elements = await renderRealExportList([
+    { id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension' },
+    { id: 'b@x', name: 'Beta', version: '2.0', enabled: true, type: 'extension' },
+  ]);
+  elements.searchInput.value = 'alpha';
+  elements.searchInput.dispatchEvent('input');
+
+  const rows = elements.addonList.querySelectorAll('.addon-row');
+  const shown = rows.filter((r) => r.style.display !== 'none').map((r) => r.querySelector('.addon-name').textContent);
+  assert.deepStrictEqual(shown, ['Alpha'], 'only the matching row should stay visible');
+  assert.strictEqual(elements.noSearchMatches.style.display, 'none');
+});
+
+testAsync('export.js real DOM: a query matching nothing shows the "no matches" message and hides every row', async () => {
+  const elements = await renderRealExportList([
+    { id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension' },
+  ]);
+  elements.searchInput.value = 'zzz-nomatch';
+  elements.searchInput.dispatchEvent('input');
+
+  const rows = elements.addonList.querySelectorAll('.addon-row');
+  assert.ok(rows.every((r) => r.style.display === 'none'));
+  assert.strictEqual(elements.noSearchMatches.style.display, 'block');
+});
+
+testAsync('export.js real DOM: Select All while a search is active only checks the visible row', async () => {
+  const elements = await renderRealExportList([
+    { id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension' },
+    { id: 'b@x', name: 'Beta', version: '2.0', enabled: true, type: 'extension' },
+  ]);
+  elements.deselectAllBtn.click(); // rows are checked by default on render - start from a known state
+  elements.searchInput.value = 'alpha';
+  elements.searchInput.dispatchEvent('input');
+  elements.selectAllBtn.click();
+
+  const checked = elements.addonList.querySelectorAll('input[type="checkbox"]:checked');
+  assert.strictEqual(checked.length, 1, 'Select All should only check the row the active search still shows');
+  assert.strictEqual(elements.selectionCount.textContent, '1 of 2 selected');
 });

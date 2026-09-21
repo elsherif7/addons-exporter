@@ -112,21 +112,33 @@ function filterAddonRows(container, query) {
   const q = query.trim().toLowerCase();
   let anyMatch = false;
 
-  for (const el of container.children) {
-    if (el.classList.contains('group-container')) {
-      const box = el.querySelector('.group-box');
-      let groupHasMatch = false;
-      if (box) {
-        for (const child of box.children) {
-          if (child.classList.contains('addon-row')) {
-            const nameEl = child.querySelector('.addon-name');
-            const match = q === '' || (nameEl && nameEl.textContent.toLowerCase().includes(q));
-            child.style.display = match ? '' : 'none';
-            if (match) { groupHasMatch = true; anyMatch = true; }
-          }
+  // Group containers can sit at any depth - export.js/import.js now wrap
+  // them in an outer .groups-outer-box (see appendGroup()/renderList()/
+  // renderAddonList()), so they're no longer necessarily direct children
+  // of `container`. querySelectorAll finds them regardless of nesting;
+  // container.children below only ever finds true top-level flat
+  // structures, which is why that loop is kept separate rather than
+  // merged into this one.
+  for (const el of container.querySelectorAll('.group-container')) {
+    const box = el.querySelector('.group-box');
+    let groupHasMatch = false;
+    if (box) {
+      for (const child of box.children) {
+        if (child.classList.contains('addon-row')) {
+          const nameEl = child.querySelector('.addon-name');
+          const match = q === '' || (nameEl && nameEl.textContent.toLowerCase().includes(q));
+          child.style.display = match ? '' : 'none';
+          if (match) { groupHasMatch = true; anyMatch = true; }
         }
       }
-      el.style.display = groupHasMatch ? '' : 'none';
+    }
+    el.style.display = groupHasMatch ? '' : 'none';
+  }
+
+  for (const el of container.children) {
+    if (el.classList.contains('group-container')) {
+      // Already handled by the querySelectorAll pass above.
+      continue;
     } else if (el.classList.contains('group-box')) {
       // Legacy flat group-box (report template still uses this).
       let groupHasMatch = false;

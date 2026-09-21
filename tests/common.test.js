@@ -130,6 +130,23 @@ function makeGroupContainer(heading, rows) {
   return { container, box };
 }
 
+// filterAddonRows now finds group-containers via container.querySelectorAll
+// rather than only container.children (see the A1 fix), since export.js/
+// import.js can nest them inside an outer .groups-outer-box. This fixture
+// doesn't nest them, but still needs querySelectorAll to exist - a plain
+// recursive walk by class name is all these fixtures ever need it for.
+function queryAllByClass(root, selector) {
+  const cls = selector.replace(/^\./, '');
+  const out = [];
+  (function walk(node) {
+    for (const child of node.children || []) {
+      if (child.classList && child.classList.contains(cls)) out.push(child);
+      walk(child);
+    }
+  })(root);
+  return out;
+}
+
 function makeContainer() {
   const enabledHeading = makeEl('group-heading');
   const row1 = makeEl('addon-row', 'uBlock Origin', '1.58.0');
@@ -138,8 +155,10 @@ function makeContainer() {
   const row3 = makeEl('addon-row', 'Old Extension', '0.5');
   const { container: enabledBox } = makeGroupContainer(enabledHeading, [row1, row2]);
   const { container: disabledBox } = makeGroupContainer(disabledHeading, [row3]);
+  const container = { children: [enabledBox, disabledBox] };
+  container.querySelectorAll = (sel) => queryAllByClass(container, sel);
   return {
-    container: { children: [enabledBox, disabledBox] },
+    container,
     enabledBox, enabledHeading, row1, row2,
     disabledBox, disabledHeading, row3,
   };
@@ -185,6 +204,77 @@ test('filterAddonRows: common.js and the report\'s inline copy agree on the same
   // Both now use group-container structure — use the same fixture for both.
   const fixtureA = makeContainer();
   const fixtureB = makeContainer();
+
+  const reportFilterAddonRows = loadReportFilterAddonRows(fixtureB.container);
+
+  for (const query of ['dark', '58', '', 'zzz-nomatch']) {
+    const anyMatchA = filterAddonRows(fixtureA.container, query);
+    const anyMatchB = reportFilterAddonRows(query);
+    assert.strictEqual(anyMatchA, anyMatchB, `anyMatch differed for query "${query}"`);
+
+    const rowsA = [fixtureA.row1, fixtureA.row2, fixtureA.row3];
+    const rowsB = [fixtureB.row1, fixtureB.row2, fixtureB.row3];
+    rowsA.forEach((el, i) => {
+      assert.strictEqual(el.style.display, rowsB[i].style.display, `row ${i} display differed for query "${query}"`);
+    });
+  }
+});
+
+// --- filterAddonRows: group-containers nested inside an outer wrapper ---
+// export.js's renderList() and import.js's renderAddonList() both wrap
+// their group-containers in an outer .groups-outer-box (see appendGroup()
+// in each file) rather than appending them straight into the list
+// container. filterAddonRows used to only ever look at container.children,
+// so once that wrapper was introduced it silently stopped finding any
+// group-container at all - search matched nothing and "no matches" showed
+// for every query, including a matching one. This section pins that
+// nested case down directly instead of relying on the flat fixture above.
+
+function makeContainerWithOuterBox() {
+  const { container: flatContainer, ...rest } = makeContainer();
+  const outerBox = {
+    style: { display: '' },
+    classList: { contains: (c) => c === 'groups-outer-box' },
+    querySelector: () => null,
+    children: flatContainer.children,
+  };
+  const container = { children: [outerBox] };
+  container.querySelectorAll = (sel) => queryAllByClass(container, sel);
+  return { container, outerBox, ...rest };
+}
+
+test('filterAddonRows: finds group-containers nested inside an outer wrapper, not just direct children', () => {
+  const { container, enabledBox, row1, row2, disabledBox, row3 } = makeContainerWithOuterBox();
+  const anyMatch = filterAddonRows(container, 'dark');
+  assert.strictEqual(anyMatch, true, 'a query matching a row inside a nested group-container should still report a match');
+  assert.strictEqual(enabledBox.style.display, '');
+  assert.strictEqual(row1.style.display, 'none');
+  assert.strictEqual(row2.style.display, '');
+  assert.strictEqual(disabledBox.style.display, 'none');
+  assert.strictEqual(row3.style.display, 'none');
+});
+
+test('filterAddonRows: nested group-containers - no matches hides everything and returns false', () => {
+  const { container, enabledBox, row1, row2, disabledBox, row3 } = makeContainerWithOuterBox();
+  const anyMatch = filterAddonRows(container, 'zzz-nomatch');
+  assert.strictEqual(anyMatch, false);
+  for (const el of [enabledBox, row1, row2, disabledBox, row3]) {
+    assert.strictEqual(el.style.display, 'none');
+  }
+});
+
+test('filterAddonRows: nested group-containers - empty query shows everything', () => {
+  const { container, enabledBox, row1, row2, disabledBox, row3 } = makeContainerWithOuterBox();
+  const anyMatch = filterAddonRows(container, '');
+  assert.strictEqual(anyMatch, true);
+  for (const el of [enabledBox, row1, row2, disabledBox, row3]) {
+    assert.strictEqual(el.style.display, '');
+  }
+});
+
+test('filterAddonRows: common.js and the report\'s inline copy agree with a nested outer wrapper too', () => {
+  const fixtureA = makeContainerWithOuterBox();
+  const fixtureB = makeContainerWithOuterBox();
 
   const reportFilterAddonRows = loadReportFilterAddonRows(fixtureB.container);
 
