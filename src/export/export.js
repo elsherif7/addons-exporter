@@ -68,9 +68,24 @@ function createAddonRow(a, i) {
   versionSpan.className = 'addon-version';
   versionSpan.textContent = a.version;
 
+  const typeSpan = document.createElement('span');
+  typeSpan.className = 'match-label';
+  typeSpan.textContent = a.type === 'theme' ? 'Theme' : 'Extension';
+
+  const amoLink = document.createElement('a');
+  amoLink.className = 'match-label';
+  amoLink.href = `https://addons.mozilla.org/en-US/firefox/addon/${encodeURIComponent(a.id)}/`;
+  amoLink.target = '_blank';
+  amoLink.rel = 'noopener';
+  amoLink.textContent = 'AMO';
+  amoLink.style.cssText = 'color:var(--link-accent);text-decoration:none;margin-left:6px;';
+  amoLink.addEventListener('mouseover', () => { amoLink.style.textDecoration = 'underline'; });
+  amoLink.addEventListener('mouseout', () => { amoLink.style.textDecoration = 'none'; });
+  amoLink.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); window.open(amoLink.href, '_blank', 'noopener'); });
+
   const label = document.createElement('label');
   label.htmlFor = `cb-${i}`;
-  label.append(nameSpan, ' ', versionSpan);
+  label.append(nameSpan, ' ', versionSpan, ' ', typeSpan, amoLink);
 
   row.append(checkbox, label);
   return row;
@@ -158,6 +173,7 @@ searchInput.addEventListener('input', () => {
 // checkbox, so that path doesn't also fire and double the toggle.
 listEl.addEventListener('click', (e) => {
   if (e.target.matches('input[type="checkbox"]')) return;
+  if (e.target.closest('a')) return;
   const row = e.target.closest('.addon-row');
   if (!row) return;
   const cb = row.querySelector('input[type="checkbox"]');

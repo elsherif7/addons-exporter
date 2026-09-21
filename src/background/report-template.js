@@ -59,9 +59,12 @@ function buildHtmlReport(list, theme) {
     const matchClass = UNCERTAIN_LINK_TYPES.has(a.linkType) ? ' match-uncertain' : '';
     const match = matchLabel ? `<span class="match-label${matchClass}">${escapeHtml(matchLabel)}</span>` : '';
     const displayShortName = escapeHtml(shortName(a.name));
+    const typeLabel = a.type === 'theme' ? 'Theme' : 'Extension';
     return `<div class="addon-row">
-      <a class="addon-name" href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${displayShortName}</a>
+      <span class="addon-name">${displayShortName}</span>
       <span class="addon-version">${escapeHtml(a.version)}</span>
+      <span class="match-label">${escapeHtml(typeLabel)}</span>
+      <a class="match-label" href="${escapeHtml(a.link)}" target="_blank" rel="noopener" style="color:var(--link-accent);text-decoration:none;margin-left:6px;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">AMO</a>
       ${match}
     </div>`;
   };
@@ -185,14 +188,16 @@ function buildHtmlReport(list, theme) {
   .addon-row {
     padding: 10px 14px;
     border-bottom: 1px solid var(--border-soft);
+    user-select: none;
     transition: background 0.12s, transform 0.1s;
   }
   .addon-row:last-child { border-bottom: none; }
   .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
-  .addon-name { font-size: 14px; font-weight: 600; color: var(--link-accent); text-decoration: none; }
-  .addon-name:hover { text-decoration: underline; }
+  :root[data-theme="dark"] .addon-row:hover { background: #2e3340; }
+  .addon-name { font-size: 14px; font-weight: 600; color: var(--text); }
   .addon-version { color: var(--text-faint); font-size: 12px; margin-left: 6px; }
   .match-label { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+  .match-label[href]:hover { text-decoration: underline; }
   .match-uncertain { color: var(--warn-color); font-weight: 600; }
 </style>
 </head>

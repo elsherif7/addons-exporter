@@ -4,9 +4,9 @@
 
 **🦊 Get it on Firefox Add-ons:** [Add-ons Hub on AMO](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/)
 
-> New updates are published on the 1st of odd-numbered months (January, March, May, July, September, November).
+> Updates are released every two months, on the 1st.
 >
-> Security issues or broken/critical bugs are fixed and released immediately, outside that schedule.
+> Security issues and critical bugs are fixed immediately, outside that schedule.
 
 ---
 

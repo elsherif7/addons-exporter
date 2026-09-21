@@ -252,17 +252,37 @@ function createAddonRow(a, i, isInstalled) {
   checkbox.checked = safe && !isInstalled;
   checkbox.disabled = !safe;
 
-  const nameSpan = document.createElement('span');
-  nameSpan.className = 'addon-name';
-  nameSpan.textContent = shortName(a.name);
+  const nameEl = document.createElement('span');
+  nameEl.className = 'addon-name';
+  nameEl.textContent = shortName(a.name);
+
+  const amoLink = safe ? (() => {
+    const lnk = document.createElement('a');
+    lnk.className = 'match-label';
+    lnk.href = a.link;
+    lnk.target = '_blank';
+    lnk.rel = 'noopener';
+    lnk.textContent = 'AMO';
+    lnk.style.cssText = 'color:var(--link-accent);text-decoration:none;margin-left:6px;';
+    lnk.addEventListener('mouseover', () => { lnk.style.textDecoration = 'underline'; });
+    lnk.addEventListener('mouseout', () => { lnk.style.textDecoration = 'none'; });
+    lnk.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); window.open(lnk.href, '_blank', 'noopener'); });
+    return lnk;
+  })() : null;
 
   const versionSpan = document.createElement('span');
   versionSpan.className = 'addon-version';
   versionSpan.textContent = version;
 
+  const typeSpan = document.createElement('span');
+  typeSpan.className = 'match-label';
+  typeSpan.textContent = (a.type === 'theme') ? 'Theme' : 'Extension';
+
   const label = document.createElement('label');
   label.htmlFor = `icb-${i}`;
-  label.append(nameSpan, ' ', versionSpan);
+  const labelChildren = [nameEl, ' ', versionSpan, ' ', typeSpan];
+  if (amoLink) labelChildren.push(amoLink);
+  label.append(...labelChildren);
 
   if (matchLabel) {
     const matchSpan = document.createElement('span');
@@ -476,6 +496,7 @@ searchInput.addEventListener('input', () => {
 // checkbox, so that path doesn't also fire and double the toggle.
 addonListEl.addEventListener('click', (e) => {
   if (e.target.matches('input[type="checkbox"]')) return;
+  if (e.target.closest('a')) return;
   const row = e.target.closest('.addon-row');
   if (!row) return;
   const cb = row.querySelector('input[type="checkbox"]');
