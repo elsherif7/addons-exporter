@@ -3,7 +3,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, readSrc } = require('./helpers');
+const { test, testAsync, readSrc } = require('./helpers');
 
 const commonSrc = readSrc('src/common/common.js');
 const sandbox = { URL };
@@ -346,6 +346,26 @@ test('isPlausibleNameMatch: empty installed or result name is rejected', () => {
   assert.strictEqual(isPlausibleNameMatch('uBlock Origin', ''), false);
 });
 
+// A4: normalize() used to strip everything outside a-z0-9, so even an
+// identical non-Latin name never matched itself - findAmoPage()'s fuzzy
+// search would treat a real match as unrelated for any add-on whose name
+// isn't written in Latin script.
+test('isPlausibleNameMatch: identical names in non-Latin scripts still match', () => {
+  assert.strictEqual(isPlausibleNameMatch('مانع الإعلانات', 'مانع الإعلانات'), true, 'Arabic');
+  assert.strictEqual(isPlausibleNameMatch('广告拦截器', '广告拦截器'), true, 'Chinese');
+  assert.strictEqual(isPlausibleNameMatch('Блокировщик рекламы', 'Блокировщик рекламы'), true, 'Cyrillic');
+});
+
+// A5: the old one-sided "at least half of the installed name's words"
+// threshold let a short, generic name match an unrelated add-on that
+// merely happened to share one word with it.
+test('isPlausibleNameMatch: rejects same-shaped but unrelated add-on names', () => {
+  assert.strictEqual(isPlausibleNameMatch('Dark Mode', 'Dark Reader'), false);
+  assert.strictEqual(isPlausibleNameMatch('Privacy Badger', 'Privacy Possum'), false);
+  assert.strictEqual(isPlausibleNameMatch('uBlock Origin', 'uBlock Origin Lite'), false,
+    'a real product-variant suffix with no tagline separator is a different add-on, not a tagline');
+});
+
 // --- visibleCheckboxes ---
 // Minimal fake checkboxes — visibleCheckboxes only needs cb.closest('.addon-row')
 // and the row's style.display.
@@ -395,4 +415,102 @@ test('shortName: returns full name when no separator found', () => {
 
 test('shortName: truncates at comma', () => {
   assert.strictEqual(shortName('Dark Reader, night mode'), 'Dark Reader');
+});
+
+// --- computeRetryAfterMs ---
+
+test('computeRetryAfterMs: converts seconds to ms', () => {
+  assert.strictEqual(sandbox.computeRetryAfterMs('2'), 2000);
+});
+
+// These mirror AMO_RETRY_AFTER_MAX_MS / AMO_RETRY_AFTER_DEFAULT_MS in
+// common.js as literals - they're declared with const there, so (unlike
+// the function declarations used everywhere else in this file) they
+// never attach to the vm context as sandbox properties to read back.
+const RETRY_AFTER_MAX_MS = 10000;
+const RETRY_AFTER_DEFAULT_MS = 1000;
+
+test('computeRetryAfterMs: caps an absurdly large value', () => {
+  assert.strictEqual(sandbox.computeRetryAfterMs('99999'), RETRY_AFTER_MAX_MS);
+});
+
+test('computeRetryAfterMs: falls back to the default when there\'s no header', () => {
+  assert.strictEqual(sandbox.computeRetryAfterMs(null), RETRY_AFTER_DEFAULT_MS);
+});
+
+test('computeRetryAfterMs: falls back to the default for a non-numeric or negative value', () => {
+  assert.strictEqual(sandbox.computeRetryAfterMs('not-a-number'), RETRY_AFTER_DEFAULT_MS);
+  assert.strictEqual(sandbox.computeRetryAfterMs('-5'), RETRY_AFTER_DEFAULT_MS);
+});
+
+// --- fetchJsonWithTimeout ---
+// A separate, minimal sandbox (own fetch/AbortController/setTimeout) per
+// test rather than reusing the shared `sandbox` above, the same pattern
+// background.test.js uses for its own fetch-dependent tests.
+
+function bootFetchSandbox(fetchImpl) {
+  const fetchSandbox = { URL, AbortController, setTimeout, clearTimeout, fetch: fetchImpl };
+  vm.createContext(fetchSandbox);
+  vm.runInContext(commonSrc, fetchSandbox);
+  return fetchSandbox;
+}
+
+testAsync('fetchJsonWithTimeout: treats 404 as "not found", not a failure', async () => {
+  const fetchSandbox = bootFetchSandbox(async () => ({ ok: false, status: 404, json: async () => ({}) }));
+  const result = await fetchSandbox.fetchJsonWithTimeout('https://example.com/x', 5000);
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.status, 404);
+  assert.strictEqual(result.data, null);
+});
+
+testAsync('fetchJsonWithTimeout: aborts even when only the response body stalls, not just the request', async () => {
+  // fetch() itself resolves right away with a response whose .json()
+  // never settles on its own - only aborting should ever reject it. This
+  // is exactly the case a timer wrapped only around fetch() misses: it's
+  // already been cleared by the time a slow/wedged body would matter.
+  const fetchSandbox = bootFetchSandbox(async (url, opts) => ({
+    ok: true,
+    status: 200,
+    json: () => new Promise((_resolve, reject) => {
+      opts.signal.addEventListener('abort', () => reject(new Error('aborted')));
+    }),
+  }));
+  const start = Date.now();
+  const result = await fetchSandbox.fetchJsonWithTimeout('https://example.com/x', 20);
+  const elapsed = Date.now() - start;
+  assert.strictEqual(result.ok, false);
+  assert.ok(elapsed < 1000, `should have aborted quickly, took ${elapsed}ms`);
+});
+
+testAsync('fetchJsonWithTimeout: retries exactly once on 429, honoring Retry-After', async () => {
+  let calls = 0;
+  const fetchSandbox = bootFetchSandbox(async () => {
+    calls++;
+    if (calls === 1) {
+      return {
+        ok: false,
+        status: 429,
+        headers: { get: (h) => (h === 'Retry-After' ? '0' : null) }, // '0' keeps the test fast
+        json: async () => ({}),
+      };
+    }
+    return { ok: true, status: 200, json: async () => ({ found: true }) };
+  });
+  const result = await fetchSandbox.fetchJsonWithTimeout('https://example.com/x', 5000);
+  assert.strictEqual(calls, 2, 'should retry exactly once');
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.status, 200);
+  assert.strictEqual(result.data.found, true);
+});
+
+testAsync('fetchJsonWithTimeout: a second 429 in a row is not retried again', async () => {
+  let calls = 0;
+  const fetchSandbox = bootFetchSandbox(async () => {
+    calls++;
+    return { ok: false, status: 429, headers: { get: (h) => (h === 'Retry-After' ? '0' : null) }, json: async () => ({}) };
+  });
+  const result = await fetchSandbox.fetchJsonWithTimeout('https://example.com/x', 5000);
+  assert.strictEqual(calls, 2, 'exactly one retry attempt total, not more');
+  assert.strictEqual(result.ok, false);
+  assert.strictEqual(result.status, 429);
 });

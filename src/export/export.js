@@ -2,6 +2,7 @@ const listEl = document.getElementById('addonList');
 const selectAllBtn = document.getElementById('selectAllBtn');
 const deselectAllBtn = document.getElementById('deselectAllBtn');
 const exportBtn = document.getElementById('exportSelectedBtn');
+const cancelExportBtn = document.getElementById('cancelExportBtn');
 const statusEl = document.getElementById('status');
 const selectionCountEl = document.getElementById('selectionCount');
 const searchInput = document.getElementById('searchInput');
@@ -13,6 +14,18 @@ function formatLabel(fmt) {
   if (fmt === 'json') return 'JSON file';
   if (fmt === 'csv') return 'CSV file';
   return 'HTML report';
+}
+
+// Builds the status shown once a desktop export has actually finished.
+// Mentions lookup failures separately (see doExport()'s stats in
+// background.js) so a real AMO outage doesn't look identical to a
+// completely normal export - previously nothing distinguished them.
+function buildExportSuccessStatus(fmt, stats) {
+  let msg = `Export complete. Your ${formatLabel(fmt)} has been saved to the folder you picked.`;
+  if (stats && stats.lookupFailures > 0) {
+    msg += ` ${stats.lookupFailures} of ${stats.total} add-on${stats.total === 1 ? '' : 's'} couldn't be looked up on AMO and got a fallback link instead.`;
+  }
+  return msg;
 }
 
 // Updates the description paragraph to reflect the currently stored format.
@@ -147,6 +160,9 @@ function renderList(addons, shorten) {
       browser.runtime.sendMessage({ type: 'listAddons' }),
       browser.storage.local.get(SHORT_NAME_STORAGE_KEY),
     ]);
+    if (!Array.isArray(addons)) {
+      throw new Error('unexpected response from the extension');
+    }
     const shorten = !stored || stored[SHORT_NAME_STORAGE_KEY] !== 'off';
     renderList(addons, shorten);
   } catch (e) {
@@ -194,10 +210,18 @@ exportBtn.addEventListener('click', async () => {
     .map((cb) => cb.dataset.id);
 
   exportBtn.disabled = true;
+  cancelExportBtn.style.display = '';
+  cancelExportBtn.disabled = false;
   setStatus('Exporting your add-ons, please wait...');
   try {
     const result = await browser.runtime.sendMessage({ type: 'export', ids });
-    if (result) {
+
+    if (result && result.cancelled) {
+      setStatus('Export cancelled.');
+      return;
+    }
+
+    if (result && result.html) {
       // Android: background.js couldn't save the file itself there (its
       // downloads API can't handle client-generated content on Android -
       // see the comment in background.js's message listener), so it
@@ -250,12 +274,20 @@ exportBtn.addEventListener('click', async () => {
     } else {
       // Desktop: background.js already saved the file and opened the
       // confirmation tab itself - this one just reports success and stays open.
-      setStatus('Export complete. Your report has been saved to the folder you picked.');
+      setStatus(buildExportSuccessStatus(result.format, result.stats));
     }
   } catch (e) {
     setStatus('Error: ' + e.message);
+  } finally {
     exportBtn.disabled = false;
+    cancelExportBtn.style.display = 'none';
   }
+});
+
+cancelExportBtn.addEventListener('click', () => {
+  cancelExportBtn.disabled = true;
+  setStatus('Cancelling...');
+  browser.runtime.sendMessage({ type: 'cancelExport' }).catch(() => {});
 });
 
 // background.js broadcasts progress as each link is resolved.

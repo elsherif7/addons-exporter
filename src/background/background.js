@@ -1,13 +1,31 @@
+// Tracks the export currently in progress, if any, so a 'cancelExport'
+// message has something to flip. Only one export realistically runs at a
+// time (one export.html tab drives it), so a single module-level slot is
+// enough - no need for a map keyed by an export id.
+let currentExportCancelToken = null;
+
+function cancelledExportError() {
+  const err = new Error('Export cancelled');
+  err.cancelled = true;
+  return err;
+}
+
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'listAddons') {
     return listInstalledAddons();
   }
+  if (message.type === 'cancelExport') {
+    if (currentExportCancelToken) currentExportCancelToken.cancelled = true;
+    return Promise.resolve({ ok: true });
+  }
   if (message.type === 'export') {
-    return doExport(message.ids).then(async ({ html, filename, format }) => {
+    const cancelToken = { cancelled: false };
+    currentExportCancelToken = cancelToken;
+    return doExport(message.ids, cancelToken).then(async ({ html, filename, format, stats }) => {
       const platform = await browser.runtime.getPlatformInfo();
 
       if (platform.os === 'android') {
-        return { html, filename };
+        return { html, filename, stats };
       }
 
       const blob = new Blob([html], { type: 'text/html' });
@@ -23,6 +41,15 @@ browser.runtime.onMessage.addListener((message) => {
       await browser.tabs.create({
         url: browser.runtime.getURL(`src/confirmation/confirmation.html?from=export&format=${format}`)
       });
+      return { format, stats };
+    }).catch((err) => {
+      // A cancellation isn't a real error - export.js needs to tell it
+      // apart from an actual failure so it can show a plain "cancelled"
+      // status instead of an error message.
+      if (err && err.cancelled) return { cancelled: true };
+      throw err;
+    }).finally(() => {
+      if (currentExportCancelToken === cancelToken) currentExportCancelToken = null;
     });
   }
 });
@@ -30,60 +57,46 @@ browser.runtime.onMessage.addListener((message) => {
 const AMO_API_BASE = 'https://addons.mozilla.org/api/v5';
 const AMO_FETCH_TIMEOUT_MS = 15000;
 
-async function fetchWithTimeout(url, timeoutMs) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    // omit credentials so an AMO login cookie doesn't ride along on what's
-    // meant to be an anonymous lookup.
-    return await fetch(url, { signal: controller.signal, credentials: 'omit' });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 // Tries an exact ID lookup first, then a name search. Returns
-// { url, matchType } or null.
-async function findAmoPage(id, name) {
+// { url, matchType } or null. onFailure(), if given, is called once per
+// genuine failure (network error, timeout, or a non-2xx/404 status) -
+// not for a clean 404 or a search that simply found nothing plausible,
+// since neither of those means anything is actually wrong.
+async function findAmoPage(id, name, onFailure) {
   // 1. Exact lookup by addon ID/GUID
-  try {
-    const res = await fetchWithTimeout(
-      `${AMO_API_BASE}/addons/addon/${encodeURIComponent(id)}/`,
-      AMO_FETCH_TIMEOUT_MS
-    );
-    if (res.ok) {
-      const data = await res.json();
-      if (data.url) return { url: data.url, matchType: 'amo-exact' };
-      console.warn(`[Add-ons Hub] AMO exact lookup for "${name}" (${id}) returned no url field`, data);
-    } else if (res.status !== 404) {
-      // 404 just means it's not on AMO, not worth a warning.
-      console.warn(`[Add-ons Hub] AMO exact lookup for "${name}" (${id}) failed: HTTP ${res.status}`);
+  const exact = await fetchJsonWithTimeout(
+    `${AMO_API_BASE}/addons/addon/${encodeURIComponent(id)}/`,
+    AMO_FETCH_TIMEOUT_MS
+  );
+  if (exact.ok) {
+    if (exact.status !== 404) {
+      if (exact.data && exact.data.url) return { url: exact.data.url, matchType: 'amo-exact' };
+      console.warn(`[Add-ons Hub] AMO exact lookup for "${name}" (${id}) returned no url field`, exact.data);
     }
-  } catch (err) {
-    console.warn(`[Add-ons Hub] AMO exact lookup for "${name}" (${id}) threw:`, err);
+    // A 404 here just means it's not on AMO - not worth a warning, and
+    // not a failure (see the doc comment above).
+  } else {
+    console.warn(`[Add-ons Hub] AMO exact lookup for "${name}" (${id}) failed:`, exact.error || `HTTP ${exact.status}`);
+    if (onFailure) onFailure();
   }
 
   // 2. Fuzzy search by name
-  try {
-    const res = await fetchWithTimeout(
-      `${AMO_API_BASE}/addons/search/?q=${encodeURIComponent(name)}&app=firefox`,
-      AMO_FETCH_TIMEOUT_MS
-    );
-    if (res.ok) {
-      const data = await res.json();
-      const top = data.results && data.results[0];
-      if (top && top.url && isPlausibleNameMatch(name, extractTranslatedField(top.name))) {
-        return { url: top.url, matchType: 'amo-search' };
-      }
-      // Either no results, or the top result's name didn't clear the
-      // relevance bar - don't hand back an unrelated add-on just
-      // because it happened to rank first.
-      console.warn(`[Add-ons Hub] AMO name search for "${name}" (${id}) returned no plausible match`, data);
-    } else {
-      console.warn(`[Add-ons Hub] AMO name search for "${name}" (${id}) failed: HTTP ${res.status}`);
+  const search = await fetchJsonWithTimeout(
+    `${AMO_API_BASE}/addons/search/?q=${encodeURIComponent(name)}&app=firefox`,
+    AMO_FETCH_TIMEOUT_MS
+  );
+  if (search.ok) {
+    const top = search.data && search.data.results && search.data.results[0];
+    if (top && top.url && isPlausibleNameMatch(name, extractTranslatedField(top.name))) {
+      return { url: top.url, matchType: 'amo-search' };
     }
-  } catch (err) {
-    console.warn(`[Add-ons Hub] AMO name search for "${name}" (${id}) threw:`, err);
+    // Either no results, or the top result's name didn't clear the
+    // relevance bar - don't hand back an unrelated add-on just
+    // because it happened to rank first.
+    console.warn(`[Add-ons Hub] AMO name search for "${name}" (${id}) returned no plausible match`, search.data);
+  } else {
+    console.warn(`[Add-ons Hub] AMO name search for "${name}" (${id}) failed:`, search.error || `HTTP ${search.status}`);
+    if (onFailure) onFailure();
   }
 
   return null;
@@ -158,7 +171,21 @@ async function listInstalledAddons() {
 // idle-suspend timer while export.js's sendMessage() call is pending
 // (bug 1851373). A keep-alive timer was tried in an earlier version but
 // the background page was still killed despite it.
-async function doExport(ids) {
+// After this much wall time spent on AMO lookups, stop attempting them
+// and fall back to a homepage/search link for whatever's left - large
+// lists could otherwise take a very long time (up to two 15s lookups per
+// add-on, 5 at a time) with no way to know the export is still moving.
+const AMO_LOOKUP_DEADLINE_MS = 90000;
+// After this many AMO failures in a row (network error, timeout, or a
+// 429 that didn't clear on retry - never a clean "not found"), treat it
+// the same as hitting the deadline: AMO is clearly having a bad time, and
+// hammering it further for every remaining add-on isn't worth it.
+const AMO_LOOKUP_MAX_CONSECUTIVE_FAILURES = 5;
+
+async function doExport(ids, cancelToken = { cancelled: false }, {
+  deadlineMs = AMO_LOOKUP_DEADLINE_MS,
+  maxConsecutiveFailures = AMO_LOOKUP_MAX_CONSECUTIVE_FAILURES,
+} = {}) {
   let extensions = await getExportableAddons();
 
   if (Array.isArray(ids)) {
@@ -178,19 +205,46 @@ async function doExport(ids) {
     browser.runtime.sendMessage({ type: 'exportProgress', done, total }).catch(() => {});
   };
 
+  const deadlineAt = Date.now() + deadlineMs;
+  let consecutiveFailures = 0;
+  const stats = {
+    total, amoExact: 0, amoSearch: 0, homepage: 0, searchFallback: 0,
+    lookupFailures: 0, lookupsSkipped: 0,
+  };
+
   const list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
-    const amoMatch = await findAmoPage(a.id, a.name);
+    if (cancelToken.cancelled) throw cancelledExportError();
+
+    let amoMatch = null;
+    if (Date.now() < deadlineAt && consecutiveFailures < maxConsecutiveFailures) {
+      let lookupFailed = false;
+      amoMatch = await findAmoPage(a.id, a.name, () => { lookupFailed = true; });
+      if (lookupFailed) {
+        consecutiveFailures++;
+        stats.lookupFailures++;
+      } else {
+        consecutiveFailures = 0;
+      }
+    } else {
+      stats.lookupsSkipped++;
+    }
+
+    if (cancelToken.cancelled) throw cancelledExportError();
+
     let link;
     let linkType;
     if (amoMatch && isSafeUrl(amoMatch.url)) {
       link = amoMatch.url;
       linkType = amoMatch.matchType;
+      if (linkType === 'amo-exact') stats.amoExact++; else stats.amoSearch++;
     } else if (a.homepageUrl && isSafeUrl(a.homepageUrl)) {
       link = a.homepageUrl;
       linkType = 'homepage';
+      stats.homepage++;
     } else {
       link = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
       linkType = 'amo-search-fallback';
+      stats.searchFallback++;
     }
     reportProgress();
     return { id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
@@ -240,5 +294,5 @@ async function doExport(ids) {
   }
 
   const filename = `Firefox Add-ons (${formatFilenameTimestamp(new Date())}).${ext}`;
-  return { html: content, filename, format: ext };
+  return { html: content, filename, format: ext, stats };
 }

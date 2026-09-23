@@ -26,7 +26,7 @@ const MESSAGES = {
   },
   import: {
     title: 'Add-ons Importer',
-    message: 'Thanks for using <strong>Add-ons Importer</strong>. Each selected add-on has opened in its own tab \u2014 click <strong>Add to Firefox</strong> on each one to finish installing it.',
+    message: 'Thanks for using <strong>Add-ons Importer</strong>. Each selected add-on is opening in its own tab \u2014 click <strong>Add to Firefox</strong> on each one to finish installing it.',
   },
 };
 

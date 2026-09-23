@@ -420,8 +420,12 @@ async function loadFile(file) {  const myGeneration = ++loadGeneration;
     let shorten = true;
     try {
       const s = await browser.storage.local.get(SHORT_NAME_STORAGE_KEY);
+      if (myGeneration !== loadGeneration) return;
       if (s && s[SHORT_NAME_STORAGE_KEY] === 'off') shorten = false;
-    } catch { /* default to true */ }
+    } catch {
+      if (myGeneration !== loadGeneration) return;
+      /* default to true */
+    }
     renderAddonList(result.addons, installed, shorten);
   } catch (err) {
     if (myGeneration !== loadGeneration) return;
@@ -439,6 +443,11 @@ function setSelectedFile(file) {
     chooseFileBtn.style.display = 'none';
     loadFile(file);
   } else {
+    // Invalidates any load already in flight - without this, removing
+    // the file while a read/listAddons/storage.get was still pending
+    // let that stale load render its results anyway, right after this
+    // branch had just cleared the list.
+    loadGeneration++;
     fileInput.value = '';
     fileNameRow.style.display = 'none';
     chooseFileBtn.style.display = '';
@@ -512,6 +521,10 @@ addonListEl.addEventListener('click', (e) => {
   cb.click();
 });
 
+function pluralTabs(n) {
+  return `${n} tab${n === 1 ? '' : 's'}`;
+}
+
 openSelectedBtn.addEventListener('click', async () => {
   const selected = Array.from(checkboxes())
     .filter((cb) => cb.checked)
@@ -523,34 +536,44 @@ openSelectedBtn.addEventListener('click', async () => {
   }
 
   openSelectedBtn.disabled = true;
-  setStatus(`Opening ${selected.length} tabs...`);
+  setStatus(`Opening ${pluralTabs(selected.length)}...`);
 
-  // Opened first (and becomes the active tab) so it's the thing you see
-  // right away - the add-ons' own pages then open behind it as
-  // background tabs via the loop below.
-  await browser.tabs.create({ url: browser.runtime.getURL('src/confirmation/confirmation.html?from=import') });
-  await delay(TAB_OPEN_DELAY_MS);
-
-  let opened = 0;
-  let failed = 0;
-  for (let i = 0; i < selected.length; i++) {
+  try {
+    // Opened first (and becomes the active tab) so it's the thing you see
+    // right away - the add-ons' own pages then open behind it as
+    // background tabs via the loop below. Wrapped in its own try/catch:
+    // if this fails, still go on and open the add-ons - a missing
+    // confirmation tab is far less bad than the button staying stuck on
+    // "Opening..." forever because this one tab couldn't be created.
     try {
-      // Re-checked here regardless of checkbox state - this is the real
-      // gate, nothing but http/https ever reaches browser.tabs.create.
-      if (!isSafeUrl(selected[i].link)) {
-        throw new Error('unsafe link');
-      }
-      await browser.tabs.create({ url: selected[i].link, active: false });
-      opened++;
+      await browser.tabs.create({ url: browser.runtime.getURL('src/confirmation/confirmation.html?from=import') });
     } catch {
-      failed++;
+      /* not fatal - see comment above */
     }
-    if (i < selected.length - 1) {
-      await delay(TAB_OPEN_DELAY_MS);
+    await delay(TAB_OPEN_DELAY_MS);
+
+    let opened = 0;
+    let failed = 0;
+    for (let i = 0; i < selected.length; i++) {
+      try {
+        // Re-checked here regardless of checkbox state - this is the real
+        // gate, nothing but http/https ever reaches browser.tabs.create.
+        if (!isSafeUrl(selected[i].link)) {
+          throw new Error('unsafe link');
+        }
+        await browser.tabs.create({ url: selected[i].link, active: false });
+        opened++;
+      } catch {
+        failed++;
+      }
+      if (i < selected.length - 1) {
+        await delay(TAB_OPEN_DELAY_MS);
+      }
     }
+    setStatus(failed > 0
+      ? `Opened ${pluralTabs(opened)}, ${failed} failed to open`
+      : `Opened ${pluralTabs(opened)}`);
+  } finally {
+    openSelectedBtn.disabled = false;
   }
-  setStatus(failed > 0
-    ? `Opened ${opened} tabs, ${failed} failed to open`
-    : `Opened ${opened} tabs`);
-  openSelectedBtn.disabled = false;
 });

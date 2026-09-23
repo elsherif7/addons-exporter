@@ -211,7 +211,7 @@ function makeCheckbox({ disabled = false, hidden = false } = {}) {
   };
 }
 
-function captureBulkSelectHandlers(checkboxList) {
+function captureBulkSelectHandlers(checkboxList, { failConfirmation = false } = {}) {
   let selectAllHandler = null;
   let deselectAllHandler = null;
   let openSelectedHandler = null;
@@ -250,7 +250,15 @@ function captureBulkSelectHandlers(checkboxList) {
     document: { getElementById: (id) => elements[id] },
     browser: {
       runtime: { getURL: (path) => `moz-extension://test-id/${path}` },
-      tabs: { create: async (options) => { createdTabUrls.push(options.url); return {}; } },
+      tabs: {
+        create: async (options) => {
+          if (failConfirmation && options.url.includes('confirmation.html')) {
+            throw new Error('tab creation failed');
+          }
+          createdTabUrls.push(options.url);
+          return {};
+        },
+      },
     },
   };
   vm.createContext(sandbox);
@@ -258,7 +266,8 @@ function captureBulkSelectHandlers(checkboxList) {
   vm.runInContext(importSrc, sandbox);
   return {
     selectAllHandler, deselectAllHandler, openSelectedHandler,
-    selectionCountEl: elements.selectionCount, openSelectedBtnEl, createdTabUrls, sandbox,
+    selectionCountEl: elements.selectionCount, statusEl: elements.status,
+    openSelectedBtnEl, createdTabUrls, sandbox, elements,
     getSetTimeoutCallCount: () => setTimeoutCallCount,
   };
 }
@@ -352,6 +361,37 @@ testAsync('openSelectedBtn: still opens the confirmation tab even if every selec
   assert.deepStrictEqual(createdTabUrls, [
     'moz-extension://test-id/src/confirmation/confirmation.html?from=import',
   ]);
+});
+
+testAsync('openSelectedBtn: a failing confirmation tab still opens the add-on tabs and re-enables the button', async () => {
+  const cb1 = makeCheckbox();
+  cb1.checked = true;
+  cb1.dataset = { idx: '0' };
+
+  const { openSelectedHandler, createdTabUrls, openSelectedBtnEl, statusEl, sandbox } =
+    captureBulkSelectHandlers([cb1], { failConfirmation: true });
+  vm.runInContext("displayItems = [{ link: 'https://addons.mozilla.org/a/' }];", sandbox);
+
+  await openSelectedHandler();
+
+  assert.deepStrictEqual(createdTabUrls, ['https://addons.mozilla.org/a/'],
+    'the confirmation tab throwing should not stop the add-on tab from opening');
+  assert.strictEqual(openSelectedBtnEl.disabled, false,
+    'the button must not stay stuck disabled just because the confirmation tab failed');
+  assert.strictEqual(statusEl.textContent, 'Opened 1 tab');
+});
+
+testAsync('openSelectedBtn: status text uses singular "tab" for exactly one', async () => {
+  const cb1 = makeCheckbox();
+  cb1.checked = true;
+  cb1.dataset = { idx: '0' };
+
+  const { openSelectedHandler, statusEl, sandbox } = captureBulkSelectHandlers([cb1]);
+  vm.runInContext("displayItems = [{ link: 'https://addons.mozilla.org/a/' }];", sandbox);
+
+  await openSelectedHandler();
+
+  assert.strictEqual(statusEl.textContent, 'Opened 1 tab', 'not "Opened 1 tabs"');
 });
 
 // --- parseJsonPayload ---
@@ -552,4 +592,70 @@ testAsync('import.js real DOM: Select All while a search is active only checks t
   const checked = elements.addonList.querySelectorAll('input[type="checkbox"]:checked');
   assert.strictEqual(checked.length, 1, 'Select All should only check the row the active search still shows');
   assert.strictEqual(elements.selectionCount.textContent, '1 of 2 selected');
+});
+
+// --- A2: stale-load races ---
+// Bootstraps the same real page as renderRealImportList(), but without
+// auto-driving setSelectedFile, so each test can control the timing of
+// the file read / listAddons / storage.get itself.
+function bootImportSandbox({ installed = [], storageGet } = {}) {
+  const { document, elements } = makeFakeDom([
+    'status', 'fileName', 'fileNameRow', 'fileInput', 'picker', 'removeFileBtn',
+    'chooseFileBtn', 'listControls', 'addonList', 'checklistBox', 'selectAllBtn',
+    'deselectAllBtn', 'selectionCount', 'openSelectedBtn', 'compareNote',
+    'searchInput', 'noSearchMatches',
+  ]);
+  const sandbox = {
+    document,
+    URL,
+    browser: {
+      runtime: {
+        sendMessage: async (msg) => (msg.type === 'listAddons' ? installed : undefined),
+        getURL: (p) => p,
+      },
+      storage: { local: { get: storageGet || (async () => ({})) } },
+      tabs: { create: async () => ({}) },
+    },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(commonSrc, sandbox);
+  vm.runInContext(importSrc, sandbox);
+  return { sandbox, elements };
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+testAsync('import.js: removing the file mid-load leaves the list empty once the stale load finishes', async () => {
+  const { sandbox, elements } = bootImportSandbox();
+  const slowFile = jsonAddonsFile([{ id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' }]);
+  const realText = slowFile.text;
+  slowFile.text = async () => { await sleep(30); return realText(); };
+
+  sandbox.setSelectedFile(slowFile);
+  await sleep(5); // load is in flight (past the start, not past the slow file.text())
+  sandbox.setSelectedFile(null); // user removes the file before it finishes loading
+  await sleep(50); // give the stale load plenty of time to (wrongly) finish and render
+
+  assert.strictEqual(elements.addonList.querySelectorAll('.addon-row').length, 0, 'the stale load should not have rendered anything');
+  assert.strictEqual(elements.fileNameRow.style.display, 'none');
+  assert.strictEqual(elements.chooseFileBtn.style.display, '');
+});
+
+testAsync('import.js: a second file wins even if the first is still awaiting storage.get', async () => {
+  let storageCalls = 0;
+  const { sandbox, elements } = bootImportSandbox({
+    storageGet: async () => {
+      storageCalls++;
+      if (storageCalls === 1) await sleep(40); // only the first (stale) load is slow here
+      return {};
+    },
+  });
+
+  sandbox.setSelectedFile(jsonAddonsFile([{ id: 'a@x', name: 'FirstFileAddon', version: '1', link: 'https://example.com/a' }]));
+  await sleep(10); // first load is now past listAddons and into the slow storage.get
+  sandbox.setSelectedFile(jsonAddonsFile([{ id: 'b@x', name: 'SecondFileAddon', version: '1', link: 'https://example.com/b' }]));
+  await sleep(80); // let both loads fully settle
+
+  const names = elements.addonList.querySelectorAll('.addon-name').map((n) => n.textContent);
+  assert.deepStrictEqual(names, ['SecondFileAddon'], 'the second, faster-to-select file should be what\'s shown, not the first');
 });

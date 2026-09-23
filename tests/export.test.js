@@ -36,6 +36,7 @@ async function captureExportClick({ selectedIds, exportResponse, simulateDownloa
       addEventListener: (ev, fn) => { if (ev === 'click') exportClickHandler = fn; },
       disabled: false,
     },
+    cancelExportBtn: { addEventListener() {}, style: {}, disabled: false },
     status: { textContent: '' },
     selectionCount: { textContent: '' },
     searchInput: { addEventListener() {}, style: {} },
@@ -128,10 +129,131 @@ testAsync('export.js click handler: on Android, still proceeds via the fallback 
 testAsync('export.js click handler: on desktop, does nothing extra since background.js already handled it', async () => {
   const { appendedLinks, createdTabUrls } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
-    exportResponse: undefined,
+    exportResponse: { format: 'html', stats: { total: 1, lookupFailures: 0 } },
   });
   assert.strictEqual(appendedLinks.length, 0);
   assert.strictEqual(createdTabUrls.length, 0);
+});
+
+// --- A14: desktop success re-enables the button and names the format ---
+
+testAsync('export.js click handler: re-enables Export Selected after a successful desktop export', async () => {
+  const { exportBtnEl } = await captureExportClick({
+    selectedIds: ['ext1@example.com'],
+    exportResponse: { format: 'html', stats: { total: 1, lookupFailures: 0 } },
+  });
+  assert.strictEqual(exportBtnEl.disabled, false, 'the button should not stay stuck disabled after success');
+});
+
+testAsync('export.js click handler: success message names a non-HTML format', async () => {
+  const { statusEl } = await captureExportClick({
+    selectedIds: ['ext1@example.com'],
+    exportResponse: { format: 'json', stats: { total: 1, lookupFailures: 0 } },
+  });
+  assert.match(statusEl.textContent, /JSON file/);
+  assert.doesNotMatch(statusEl.textContent, /report/);
+});
+
+testAsync('export.js click handler: success message reports lookup failures when there were any', async () => {
+  const { statusEl } = await captureExportClick({
+    selectedIds: ['ext1@example.com', 'ext2@example.com'],
+    exportResponse: { format: 'html', stats: { total: 2, lookupFailures: 1 } },
+  });
+  assert.match(statusEl.textContent, /1 of 2 add-ons couldn't be looked up on AMO/);
+});
+
+testAsync('export.js click handler: no lookup-failure mention when there weren\'t any', async () => {
+  const { statusEl } = await captureExportClick({
+    selectedIds: ['ext1@example.com'],
+    exportResponse: { format: 'html', stats: { total: 1, lookupFailures: 0 } },
+  });
+  assert.doesNotMatch(statusEl.textContent, /couldn't be looked up/);
+});
+
+// --- A12: Cancel button wiring ---
+
+testAsync('cancelExportBtn: clicking it sends a cancelExport message', async () => {
+  const cancelExportBtnEl = { addEventListener: null, style: {}, disabled: false };
+  cancelExportBtnEl.addEventListener = (ev, fn) => { if (ev === 'click') cancelExportBtnEl._handler = fn; };
+  const sentMessages = [];
+  const listElStub = { querySelectorAll: () => [], addEventListener() {}, replaceChildren() {} };
+  const elements = {
+    addonList: listElStub,
+    selectAllBtn: { addEventListener() {} },
+    deselectAllBtn: { addEventListener() {} },
+    exportSelectedBtn: { addEventListener() {}, disabled: false },
+    cancelExportBtn: cancelExportBtnEl,
+    status: { textContent: '' },
+    selectionCount: { textContent: '' },
+    searchInput: { addEventListener() {}, style: {} },
+    noSearchMatches: { style: {} },
+    exportDesc: { innerHTML: '' },
+  };
+  const exSandbox = {
+    URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
+    setTimeout: (fn) => { fn(); return 0; },
+    clearTimeout() {},
+    document: { getElementById: (id) => elements[id], body: { appendChild() {} } },
+    browser: {
+      runtime: {
+        onMessage: { addListener() {} },
+        sendMessage: async (msg) => { sentMessages.push(msg); return msg.type === 'listAddons' ? [] : { ok: true }; },
+      },
+      storage: { local: { get: async () => ({}) } },
+    },
+  };
+  vm.createContext(exSandbox);
+  vm.runInContext(commonSrc, exSandbox);
+  vm.runInContext(exportSrc, exSandbox);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  cancelExportBtnEl._handler();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  const cancelMsg = sentMessages.find((m) => m.type === 'cancelExport');
+  assert.ok(cancelMsg, 'clicking Cancel should send a cancelExport message');
+  assert.strictEqual(elements.status.textContent, 'Cancelling...');
+  assert.strictEqual(cancelExportBtnEl.disabled, true, 'clicking Cancel once should disable it against double-clicks');
+});
+
+// --- A16: a non-array listAddons response shows a friendly message ---
+
+testAsync('export.js: a non-array listAddons response shows a friendly error, not a raw exception', async () => {
+  const listElStub = { replaceChildren: (...nodes) => { listElStub.children = nodes; }, addEventListener() {} };
+  const elements = {
+    addonList: listElStub,
+    selectAllBtn: { addEventListener() {} },
+    deselectAllBtn: { addEventListener() {} },
+    exportSelectedBtn: { addEventListener() {}, disabled: false },
+    cancelExportBtn: { addEventListener() {}, style: {} },
+    status: { textContent: '' },
+    selectionCount: { textContent: '' },
+    searchInput: { addEventListener() {}, style: {} },
+    noSearchMatches: { style: {} },
+    exportDesc: { innerHTML: '' },
+  };
+  const exSandbox = {
+    URL,
+    setTimeout,
+    clearTimeout,
+    document: {
+      getElementById: (id) => elements[id],
+      createElement: () => ({ className: '', textContent: '' }),
+    },
+    browser: {
+      runtime: { onMessage: { addListener() {} }, sendMessage: async () => undefined },
+      storage: { local: { get: async () => ({}) } },
+    },
+  };
+  vm.createContext(exSandbox);
+  vm.runInContext(commonSrc, exSandbox);
+  vm.runInContext(exportSrc, exSandbox);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.strictEqual(listElStub.children.length, 1);
+  assert.strictEqual(listElStub.children[0].className, 'placeholder-text error');
+  assert.doesNotMatch(listElStub.children[0].textContent, /Cannot read propert/,
+    'should be a plain, friendly message - not a raw JS TypeError');
 });
 
 // --- Real DOM: search and Select All against the actual rendered list ---
