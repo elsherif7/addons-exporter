@@ -30,7 +30,16 @@ function buildJsonExport(list) {
 // quoted and internal quotes are doubled per RFC 4180.
 function buildCsvExport(list) {
   const csvField = (val) => {
-    const s = String(val == null ? '' : val);
+    let s = String(val == null ? '' : val);
+    // A cell starting with =, +, -, @, tab, or CR is read as a formula by
+    // Excel/Sheets/LibreOffice once this file is opened in a spreadsheet -
+    // and an add-on name is attacker-controlled. A leading apostrophe
+    // forces "read as text" in all of them, and disappears from the
+    // visible cell content once opened. parseCsvPayload()'s
+    // stripCsvFormulaGuard() strips exactly one back off on import.
+    if (/^[=+\-@\t\r]/.test(s)) {
+      s = `'${s}`;
+    }
     // Quote the field if it contains a comma, double-quote, or newline.
     return /[,"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };

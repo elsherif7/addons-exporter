@@ -7,8 +7,14 @@ const { test, testAsync, readSrc } = require('./helpers');
 
 const themeSrc = readSrc('src/common/theme.js');
 
-function loadThemeInSandbox(storageGetImpl) {
+function loadThemeInSandbox(storageGetImpl, onChangedImpl) {
   const setAttributeCalls = [];
+  const storage = {
+    local: {
+      get: storageGetImpl || (async () => ({})),
+    },
+  };
+  if (onChangedImpl) storage.onChanged = onChangedImpl;
   const sandbox = {
     document: {
       documentElement: {
@@ -16,13 +22,7 @@ function loadThemeInSandbox(storageGetImpl) {
       },
     },
     localStorage: { getItem() { return null; }, setItem() {} },
-    browser: {
-      storage: {
-        local: {
-          get: storageGetImpl || (async () => ({})),
-        },
-      },
-    },
+    browser: { storage },
   };
   vm.createContext(sandbox);
   vm.runInContext(themeSrc, sandbox);
@@ -62,4 +62,40 @@ testAsync('initTheme: falls back to light if storage.local.get throws', async ()
   });
   await sandbox.initTheme();
   assert.deepStrictEqual(setAttributeCalls[setAttributeCalls.length - 1], ['data-theme', 'light']);
+});
+
+// --- A33: cross-tab theme sync via storage.onChanged ---
+
+test('storage.onChanged: a theme change from another tab is applied here too', () => {
+  let registeredListener = null;
+  const { setAttributeCalls } = loadThemeInSandbox(undefined, {
+    addListener: (fn) => { registeredListener = fn; },
+  });
+  assert.ok(registeredListener, 'a storage.onChanged listener should have been registered');
+  registeredListener({ theme: { newValue: 'dark', oldValue: 'light' } }, 'local');
+  assert.deepStrictEqual(setAttributeCalls[setAttributeCalls.length - 1], ['data-theme', 'dark']);
+});
+
+test('storage.onChanged: a change to an unrelated key is ignored', () => {
+  let registeredListener = null;
+  const { setAttributeCalls } = loadThemeInSandbox(undefined, {
+    addListener: (fn) => { registeredListener = fn; },
+  });
+  const before = setAttributeCalls.length;
+  registeredListener({ someOtherKey: { newValue: 'x' } }, 'local');
+  assert.strictEqual(setAttributeCalls.length, before, 'should not react to a change that isn\'t the theme key');
+});
+
+test('storage.onChanged: a change in a different storage area is ignored', () => {
+  let registeredListener = null;
+  const { setAttributeCalls } = loadThemeInSandbox(undefined, {
+    addListener: (fn) => { registeredListener = fn; },
+  });
+  const before = setAttributeCalls.length;
+  registeredListener({ theme: { newValue: 'dark' } }, 'sync');
+  assert.strictEqual(setAttributeCalls.length, before, 'should only react to the local storage area');
+});
+
+test('loading theme.js with no storage.onChanged at all does not throw', () => {
+  assert.doesNotThrow(() => loadThemeInSandbox());
 });

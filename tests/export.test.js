@@ -327,3 +327,45 @@ testAsync('export.js real DOM: Select All while a search is active only checks t
   assert.strictEqual(checked.length, 1, 'Select All should only check the row the active search still shows');
   assert.strictEqual(elements.selectionCount.textContent, '1 of 2 selected');
 });
+
+// --- A33: cross-tab export-format sync via storage.onChanged ---
+
+testAsync('storage.onChanged: an export-format change from another tab refreshes the description', async () => {
+  let registeredListener = null;
+  let getCallCount = 0;
+  const { document, elements } = makeFakeDom([
+    'addonList', 'selectAllBtn', 'deselectAllBtn', 'exportSelectedBtn',
+    'status', 'selectionCount', 'searchInput', 'noSearchMatches', 'exportDesc',
+  ]);
+  const sandbox = {
+    document,
+    URL,
+    browser: {
+      runtime: { sendMessage: async () => [], onMessage: { addListener() {} }, getURL: (p) => p },
+      storage: {
+        local: {
+          get: async () => {
+            getCallCount++;
+            // Simulates the value having actually changed in storage by
+            // the time the listener re-reads it - the first read (this
+            // page's own initial load) still sees the old default.
+            return getCallCount === 1 ? {} : { exportFormat: 'json' };
+          },
+        },
+        onChanged: { addListener: (fn) => { registeredListener = fn; } },
+      },
+    },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(commonSrc, sandbox);
+  vm.runInContext(exportSrc, sandbox);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.ok(registeredListener, 'a storage.onChanged listener should have been registered');
+  assert.doesNotMatch(elements.exportDesc.innerHTML, /JSON file/);
+
+  registeredListener({ exportFormat: { newValue: 'json' } }, 'local');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.match(elements.exportDesc.innerHTML, /JSON file/);
+});

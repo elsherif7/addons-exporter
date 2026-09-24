@@ -61,6 +61,25 @@ function parseSettingsFile(text) {
   return { ok: true, settings: validated };
 }
 
+// Compares two dot-separated version strings numerically, segment by
+// segment - so "1.10" is correctly newer than "1.9", unlike a plain
+// string/lexicographic comparison (or the strict equality check this
+// replaced, which called anything not byte-identical to the current
+// version "available", even a local build that's actually newer than
+// what's on AMO). A missing trailing segment counts as 0, so "1.2"
+// equals "1.2.0". Returns -1 if a < b, 1 if a > b, 0 if equal.
+function compareVersions(a, b) {
+  const pa = String(a).split('.').map((n) => parseInt(n, 10) || 0);
+  const pb = String(b).split('.').map((n) => parseInt(n, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const na = pa[i] || 0;
+    const nb = pb[i] || 0;
+    if (na !== nb) return na < nb ? -1 : 1;
+  }
+  return 0;
+}
+
 // --- DOM wiring ---
 
 const themeRadios = document.querySelectorAll('input[name="theme"]');
@@ -109,15 +128,25 @@ async function loadCurrentExportFormat() {
 for (const radio of themeRadios) {
   radio.addEventListener('change', async () => {
     if (!radio.checked) return;
-    await browser.storage.local.set({ [THEME_STORAGE_KEY]: radio.value });
-    applyTheme(radio.value);
+    try {
+      await browser.storage.local.set({ [THEME_STORAGE_KEY]: radio.value });
+      applyTheme(radio.value);
+    } catch (err) {
+      setSettingsStatus('Could not save theme: ' + err.message, true);
+      await loadCurrentTheme(); // the write failed - revert the radio to what's actually stored
+    }
   });
 }
 
 for (const radio of formatRadios) {
   radio.addEventListener('change', async () => {
     if (!radio.checked) return;
-    await browser.storage.local.set({ [EXPORT_FORMAT_STORAGE_KEY]: radio.value });
+    try {
+      await browser.storage.local.set({ [EXPORT_FORMAT_STORAGE_KEY]: radio.value });
+    } catch (err) {
+      setSettingsStatus('Could not save export format: ' + err.message, true);
+      await loadCurrentExportFormat();
+    }
   });
 }
 
@@ -140,15 +169,37 @@ async function loadCurrentShortenNames() {
 for (const radio of shortenRadios) {
   radio.addEventListener('change', async () => {
     if (!radio.checked) return;
-    await browser.storage.local.set({ [SHORT_NAME_STORAGE_KEY]: radio.value });
+    try {
+      await browser.storage.local.set({ [SHORT_NAME_STORAGE_KEY]: radio.value });
+    } catch (err) {
+      setSettingsStatus('Could not save the display setting: ' + err.message, true);
+      await loadCurrentShortenNames();
+    }
   });
+}
+
+// Fills in the default value for any of the three known settings that
+// aren't in `stored` yet - a pristine profile has never written any of
+// them, so exporting straight from storage.local.get() produced an empty
+// {} settings object that couldn't be re-imported (nothing in it passed
+// parseSettingsFile's "no recognised settings" check). Only used by the
+// Export handler below - buildSettingsExport() itself is unchanged, and
+// still only writes whatever it's actually given.
+function withSettingsDefaults(stored) {
+  const fmt = stored && stored[EXPORT_FORMAT_STORAGE_KEY];
+  const shorten = stored && stored[SHORT_NAME_STORAGE_KEY];
+  return {
+    [THEME_STORAGE_KEY]: resolveTheme(stored),
+    [EXPORT_FORMAT_STORAGE_KEY]: (fmt === 'html' || fmt === 'json' || fmt === 'csv') ? fmt : EXPORT_FORMAT_DEFAULT,
+    [SHORT_NAME_STORAGE_KEY]: (shorten === 'on' || shorten === 'off') ? shorten : SHORT_NAME_DEFAULT,
+  };
 }
 
 exportSettingsBtn.addEventListener('click', async () => {
   setSettingsStatus('');
   try {
     const stored = await browser.storage.local.get(KNOWN_SETTINGS_KEYS);
-    const json = buildSettingsExport(stored);
+    const json = buildSettingsExport(withSettingsDefaults(stored));
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const pad = (n) => String(n).padStart(2, '0');
@@ -216,6 +267,10 @@ if (versionLink) {
   versionLink.href = `https://github.com/elsherif7/addons-hub/releases/tag/v${CURRENT_VERSION}`;
 }
 const AMO_ADDON_ID = 'addons-exporter@local';
+// Covers the whole request, body read included - fetchJsonWithTimeout()
+// (common.js) is what actually enforces this, unlike the plain fetch()
+// this replaced, which had nothing that could ever time it out.
+const UPDATE_CHECK_TIMEOUT_MS = 15000;
 
 document.getElementById('checkUpdateBtn').addEventListener('click', async () => {
   const btn = document.getElementById('checkUpdateBtn');
@@ -227,22 +282,40 @@ document.getElementById('checkUpdateBtn').addEventListener('click', async () => 
   statusRow.style.display = 'none';
 
   try {
-    const res = await fetch(
+    const result = await fetchJsonWithTimeout(
       `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(AMO_ADDON_ID)}/`,
-      { credentials: 'omit' }
+      UPDATE_CHECK_TIMEOUT_MS
     );
-    if (!res.ok) throw new Error(`AMO returned HTTP ${res.status}`);
-    const data = await res.json();
-    const latest = data.current_version && data.current_version.version;
+    // A 404 here specifically means our own listed add-on ID wasn't
+    // found - unlike background.js's AMO lookups (which have a fallback
+    // link for that), that's a real problem for this one direct check.
+    if (!result.ok || result.status === 404) {
+      throw new Error(result.error || `AMO returned HTTP ${result.status}`);
+    }
+    const latest = result.data && result.data.current_version && result.data.current_version.version;
     if (!latest) throw new Error('Could not read the latest version from AMO.');
 
     statusRow.style.display = '';
-    if (latest === CURRENT_VERSION) {
+    if (compareVersions(CURRENT_VERSION, latest) >= 0) {
+      // Equal or newer (a dev build ahead of the published version)
+      // both count as "up to date" - only a genuinely newer AMO version
+      // should ever say otherwise.
       statusMsg.style.color = 'var(--text-muted)';
       statusMsg.textContent = `You're up to date (version ${CURRENT_VERSION})`;
     } else {
       statusMsg.style.color = 'var(--link-accent)';
-      statusMsg.innerHTML = `Version ${latest} is available. <a href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener" style="color:var(--link-accent);font-weight:600;">Update on Firefox Add-ons</a>`;
+      // Built with textContent/createElement, not innerHTML - `latest`
+      // comes straight from AMO's API response and must never be
+      // treated as markup.
+      statusMsg.textContent = `Version ${latest} is available. `;
+      const link = document.createElement('a');
+      link.href = 'https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/';
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.style.color = 'var(--link-accent)';
+      link.style.fontWeight = '600';
+      link.textContent = 'Update on Firefox Add-ons';
+      statusMsg.appendChild(link);
     }
   } catch (err) {
     statusRow.style.display = '';

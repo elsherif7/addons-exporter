@@ -43,6 +43,16 @@ async function updateExportDesc() {
 
 updateExportDesc();
 
+// Keep the description in sync if the export format is changed from
+// another tab (e.g. the settings page) while this one is still open.
+if (browser.storage && browser.storage.onChanged) {
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes[EXPORT_FORMAT_STORAGE_KEY]) {
+      updateExportDesc();
+    }
+  });
+}
+
 function setStatus(msg) {
   statusEl.textContent = msg;
 }

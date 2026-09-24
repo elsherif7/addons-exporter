@@ -27,10 +27,12 @@ function makeFakeElement() {
 const fakeDocument = { getElementById() { return makeFakeElement(); } };
 
 const commonSrc = readSrc('src/common/common.js');
+const reportTemplateSrc = readSrc('src/background/report-template.js');
 const importSrc = readSrc('src/import/import.js');
 const sandbox = { URL, document: fakeDocument };
 vm.createContext(sandbox);
 vm.runInContext(commonSrc, sandbox);
+vm.runInContext(reportTemplateSrc, sandbox);
 vm.runInContext(importSrc, sandbox);
 
 const {
@@ -41,6 +43,7 @@ const {
   buildInstalledIndex,
   findInstalledMatch,
   migrateAddonsData,
+  buildCsvExport,
 } = sandbox;
 
 // EXPORT_FORMAT_VERSION is declared with top-level `const` in common.js,
@@ -138,6 +141,60 @@ test('parseAddonsPayload: valid file succeeds and returns the parsed addons', ()
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons.length, 1);
   assert.strictEqual(result.addons[0].name, 'uBlock Origin');
+});
+
+// --- A6: a v1.0.0 (bare-array) export is rejected with a clear reason ---
+
+test('parseAddonsPayload: a v1.0.0-style bare array is rejected with a specific message, not "No add-ons found"', () => {
+  // v1.0.0 exported a plain array with no formatVersion/addons wrapper at
+  // all - this is that exact shape.
+  const result = parseAddonsPayload(JSON.stringify([
+    { name: 'uBlock Origin', version: '1.58.0', enabled: true },
+  ]));
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /old, unsupported version/);
+});
+
+// --- A27: stricter formatVersion, type coercion, de-duplication ---
+
+test('parseAddonsPayload: a negative formatVersion is rejected', () => {
+  const result = parseAddonsPayload(JSON.stringify({ formatVersion: -5, addons: [{ name: 'X' }] }));
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /missing its export format version/);
+});
+
+test('parseAddonsPayload: a fractional formatVersion is rejected', () => {
+  const result = parseAddonsPayload(JSON.stringify({ formatVersion: 1.5, addons: [{ name: 'X' }] }));
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /missing its export format version/);
+});
+
+test('parseAddonsPayload: a non-string id/version/link is dropped rather than trusted as-is', () => {
+  const result = parseAddonsPayload(payload([
+    { name: 'Weird Types', id: 12345, version: 5, link: ['not', 'a', 'string'] },
+  ]));
+  assert.strictEqual(result.ok, true);
+  const a = result.addons[0];
+  assert.strictEqual(a.id, undefined);
+  assert.strictEqual(a.version, undefined);
+  assert.strictEqual(a.link, undefined);
+  assert.strictEqual(a.name, 'Weird Types', 'the valid name field should be unaffected');
+});
+
+test('parseAddonsPayload: an exact duplicate entry is de-duplicated', () => {
+  const entry = { id: 'a@x', name: 'Same', version: '1', link: 'https://example.com/a' };
+  const result = parseAddonsPayload(payload([entry, { ...entry }]));
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.addons.length, 1, 'the duplicate entry should not produce a second row');
+});
+
+test('parseAddonsPayload: two different add-ons sharing no id/link are not treated as duplicates', () => {
+  const result = parseAddonsPayload(payload([
+    { name: 'Alpha' },
+    { name: 'Beta' },
+  ]));
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.addons.length, 2);
 });
 
 // --- migrateAddonsData ---
@@ -513,6 +570,86 @@ test('parseCsvPayload: handles CRLF and LF line endings', () => {
   const result = parseCsvPayload(withLf);
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons.length, 1);
+});
+
+// --- A25: whole-text CSV parsing (parseCsvRecords) ---
+
+test('parseCsvRow: a stray character right after a closing quote folds into that field, not a phantom column', () => {
+  assert.deepStrictEqual(Array.from(parseCsvRow('"abc"def,x')), ['abcdef', 'x']);
+});
+
+test('parseCsvPayload: a quoted field containing a real newline stays one field, not two rows', () => {
+  const text = [
+    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
+    'id,name,version,enabled,type,link,linkType',
+    'a@e.com,"Line1\nLine2",1.0,true,extension,https://x.com/,amo-exact',
+  ].join('\r\n');
+  const result = parseCsvPayload(text);
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.addons.length, 1, 'should be one add-on, not two');
+  assert.strictEqual(result.addons[0].name, 'Line1\nLine2');
+});
+
+test('parseCsvPayload: a spreadsheet-padded format-version comment line is still recognised', () => {
+  const text = [
+    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION},,,,,,`,
+    'id,name,version,enabled,type,link,linkType',
+    'a@e.com,X,1.0,true,extension,https://x.com/,amo-exact',
+  ].join('\r\n');
+  const result = parseCsvPayload(text);
+  assert.strictEqual(result.ok, true);
+});
+
+// --- A26: enabled is parsed case-insensitively ---
+
+test('parseCsvPayload: enabled is parsed case-insensitively (a spreadsheet often capitalizes it)', () => {
+  const text = [
+    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
+    'id,name,version,enabled,type,link,linkType',
+    'a@e.com,A,1.0,TRUE,extension,https://x.com/,amo-exact',
+    'b@e.com,B,1.0,False,extension,https://x.com/,amo-exact',
+  ].join('\r\n');
+  const result = parseCsvPayload(text);
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.addons[0].enabled, true);
+  assert.strictEqual(result.addons[1].enabled, false);
+});
+
+// --- A24 (import side): stripping the formula-injection guard ---
+
+test('parseCsvPayload: strips the leading-apostrophe formula guard back off on import', () => {
+  const csv = buildCsvExport([
+    { id: 'x@e.com', name: '=HYPERLINK("https://evil.example","click")', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' },
+  ]);
+  const result = parseCsvPayload(csv);
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.addons[0].name, '=HYPERLINK("https://evil.example","click")',
+    'round-tripping through export+import should restore the original name exactly');
+});
+
+test('parseCsvPayload: a name that genuinely starts with an apostrophe (not our guard) is left alone', () => {
+  const text = [
+    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
+    'id,name,version,enabled,type,link,linkType',
+    `a@e.com,"'Twas Great",1.0,true,extension,https://x.com/,amo-exact`,
+  ].join('\r\n');
+  const result = parseCsvPayload(text);
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.addons[0].name, "'Twas Great");
+});
+
+// --- A27: de-duplication ---
+
+test('parseCsvPayload: an exact duplicate row is de-duplicated', () => {
+  const text = [
+    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
+    'id,name,version,enabled,type,link,linkType',
+    'a@e.com,Same,1.0,true,extension,https://x.com/a,amo-exact',
+    'a@e.com,Same,1.0,true,extension,https://x.com/a,amo-exact',
+  ].join('\r\n');
+  const result = parseCsvPayload(text);
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.addons.length, 1, 'the duplicate row should not produce a second entry');
 });
 
 // --- Real DOM: search and Select All against the actual rendered list ---

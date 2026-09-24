@@ -34,6 +34,16 @@ function applyTheme(theme) {
   try { localStorage.setItem(THEME_CACHE_KEY, t); } catch (e) {}
 }
 
+// Keep this page's theme in sync if it's changed from another tab (e.g.
+// the settings page) while this one is still open.
+if (browser.storage && browser.storage.onChanged) {
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes[THEME_STORAGE_KEY]) {
+      applyTheme(changes[THEME_STORAGE_KEY].newValue);
+    }
+  });
+}
+
 async function initTheme() {
   let stored;
   try {

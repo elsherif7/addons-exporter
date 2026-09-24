@@ -203,6 +203,31 @@ test('buildCsvExport: all seven columns are present on every data row', () => {
   }
 });
 
+// --- A24: CSV/formula-injection guard ---
+
+test('buildCsvExport: a name starting with = gets a leading-apostrophe guard', () => {
+  const list = [{ id: 'x@e.com', name: '=HYPERLINK("https://evil.example","click")', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
+  const csv = buildCsvExport(list);
+  const dataRow = csv.split('\r\n')[2];
+  assert.match(dataRow, /^x@e\.com,"'=HYPERLINK/);
+});
+
+test('buildCsvExport: names starting with +, -, @, or a tab all get the guard', () => {
+  for (const name of ['+SUM(1,1)', '-1+1', '@cmd', '\tstart-with-tab']) {
+    const list = [{ id: 'x@e.com', name, version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
+    const csv = buildCsvExport(list);
+    const dataRow = csv.split('\r\n')[2];
+    assert.ok(dataRow.includes(`'${name}`), `expected a guarded "${name}" in row: ${dataRow}`);
+  }
+});
+
+test('buildCsvExport: an ordinary name is not guarded', () => {
+  const list = [{ id: 'x@e.com', name: 'uBlock Origin', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
+  const csv = buildCsvExport(list);
+  const dataRow = csv.split('\r\n')[2];
+  assert.ok(dataRow.startsWith('x@e.com,uBlock Origin,'), `should not be guarded: ${dataRow}`);
+});
+
 // --- CSS drift-detection: report-template.js vs shared.css ---
 // The report embeds its own copy of shared layout CSS since it's a
 // standalone file. These tests catch drift between the two copies for
