@@ -83,7 +83,7 @@ function buildHtmlReport(list, theme, shorten = true) {
     : '';
 
   return `<!DOCTYPE html>
-<html data-theme="${startingTheme}">
+<html lang="en" data-theme="${startingTheme}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -98,10 +98,11 @@ function buildHtmlReport(list, theme, shorten = true) {
     --bg: #f4f5f7;
     --card-bg: #fff;
     --card-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    --card-border: transparent;
     --text: #222;
     --text-secondary: #444;
     --text-muted: #666;
-    --text-faint: #888;
+    --text-faint: #707070;
     --border: #d0d3d9;
     --border-soft: #e2e4e8;
     --border-faint: #f0f1f3;
@@ -109,15 +110,17 @@ function buildHtmlReport(list, theme, shorten = true) {
     --btn-bg: #1f2937;
     --link-accent: #0060df;
     --warn-color: #b45309;
+    --danger-color: #c0392b;
   }
   :root[data-theme="dark"] {
     --bg: #15171c;
     --card-bg: #1e2128;
     --card-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    --card-border: #2a2e37;
     --text: #e8e9ec;
     --text-secondary: #c3c5ca;
     --text-muted: #9199a3;
-    --text-faint: #7d848f;
+    --text-faint: #8890a0;
     --border: #3a3f4b;
     --border-soft: #2f333c;
     --border-faint: #262932;
@@ -125,12 +128,13 @@ function buildHtmlReport(list, theme, shorten = true) {
     --btn-bg: #374151;
     --link-accent: #6ea8fe;
     --warn-color: #f0a838;
+    --danger-color: #ef6a5e;
   }
   /* Vertical padding uses vmin (not vw) so it also scales down on
      short landscape viewports, where vw alone would keep it large
      even though height is what's actually constrained there. */
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg); margin: 0; padding: clamp(24px, 8vmin, 60px) clamp(14px, 5vw, 20px); color: var(--text); box-sizing: border-box; overflow-wrap: break-word; }
-  .card { position: relative; max-width: 640px; margin: 0 auto; background: var(--card-bg); border-radius: 12px; box-shadow: var(--card-shadow); padding: clamp(20px, 6vmin, 40px); text-align: center; box-sizing: border-box; }
+  .card { position: relative; max-width: 640px; margin: 0 auto; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; box-shadow: var(--card-shadow); padding: clamp(20px, 6vmin, 40px); text-align: center; box-sizing: border-box; }
   h1 { font-size: clamp(22px, 6vw, 28px); margin: 0 0 16px; }
   p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0 28px; }
   .cta-link { color: var(--link-accent); font-weight: bold; text-decoration: none; }
@@ -153,7 +157,7 @@ function buildHtmlReport(list, theme, shorten = true) {
     justify-content: center;
     transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
-  .theme-toggle:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.08); }
+  .theme-toggle:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.02); }
   .theme-toggle:active { transform: scale(0.95); }
   .search-input {
     display: block;
@@ -170,6 +174,7 @@ function buildHtmlReport(list, theme, shorten = true) {
     transition: border-color 0.12s, transform 0.1s;
   }
   .search-input:focus { outline: none; border-color: var(--btn-bg); }
+  .search-input:focus-visible { outline: 2px solid var(--link-accent); outline-offset: 1px; }
   .search-input:hover { border-color: var(--btn-bg); transform: scale(1.01); }
   .placeholder-text { padding: 20px; color: var(--text-muted); font-size: 14px; margin: 0; }
   .checklist-box {
@@ -178,13 +183,22 @@ function buildHtmlReport(list, theme, shorten = true) {
     padding: 4px 0;
     margin-bottom: 20px;
   }
+  .groups-outer-box {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
   .group-container { margin-bottom: 20px; }
   .group-container:last-child { margin-bottom: 0; }
   .group-box {
     border: 1px solid var(--border);
     border-radius: 8px;
+    margin-bottom: 16px;
     overflow: hidden;
   }
+  .group-box:last-child { margin-bottom: 0; }
   .group-heading {
     font-size: 14px;
     font-weight: 700;
@@ -206,6 +220,17 @@ function buildHtmlReport(list, theme, shorten = true) {
   .match-label { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
   .match-label[href]:hover { text-decoration: underline; }
   .match-uncertain { color: var(--warn-color); font-weight: 600; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.001ms !important;
+      animation-duration: 0.001ms !important;
+    }
+    .theme-toggle:hover, .theme-toggle:active,
+    .search-input:hover, .addon-row:hover {
+      transform: none !important;
+    }
+  }
 </style>
 </head>
 <body>
@@ -217,14 +242,16 @@ function buildHtmlReport(list, theme, shorten = true) {
     }
   </button>
   <h1>Add-ons Exporter</h1>
-  <p><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener">Add-ons Hub</a> installed, click its toolbar icon and choose <strong>Add-ons Importer</strong> to open every link below as a tab automatically.</p>
+  <p><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener">Add-ons Hub</a> installed, click its toolbar icon, choose <strong>Add-ons Importer</strong>, and select this file - any add-ons you don't already have will be pre-selected to open.</p>
 
   <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
 
   <div class="checklist-box">
     <div id="addonList">
-      ${section('Enabled', list.filter(a => a.enabled).sort(byName))}
-      ${section('Disabled', list.filter(a => !a.enabled).sort(byName))}
+      <div class="groups-outer-box">
+        ${section('Enabled', list.filter(a => a.enabled).sort(byName))}
+        ${section('Disabled', list.filter(a => !a.enabled).sort(byName))}
+      </div>
     </div>
     <p id="noSearchMatches" class="placeholder-text" style="display:none;">No add-ons match your search.</p>
   </div>

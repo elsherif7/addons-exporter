@@ -68,18 +68,18 @@ test('buildHtmlReport: uses REPORT_ICON_DATA_URI as the page favicon', () => {
 
 test('buildHtmlReport: defaults to light when no theme is given', () => {
   const html = buildHtmlReport(sampleList);
-  assert.match(html, /<html data-theme="light">/);
+  assert.match(html, /<html lang="en" data-theme="light">/);
 });
 
 test('buildHtmlReport: honors an explicit "dark" theme', () => {
   const html = buildHtmlReport(sampleList, 'dark');
-  assert.match(html, /<html data-theme="dark">/);
+  assert.match(html, /<html lang="en" data-theme="dark">/);
 });
 
 test('buildHtmlReport: falls back to light for anything other than exactly "dark"', () => {
-  assert.match(buildHtmlReport(sampleList, 'light'), /<html data-theme="light">/);
-  assert.match(buildHtmlReport(sampleList, 'nonsense'), /<html data-theme="light">/);
-  assert.match(buildHtmlReport(sampleList, undefined), /<html data-theme="light">/);
+  assert.match(buildHtmlReport(sampleList, 'light'), /<html lang="en" data-theme="light">/);
+  assert.match(buildHtmlReport(sampleList, 'nonsense'), /<html lang="en" data-theme="light">/);
+  assert.match(buildHtmlReport(sampleList, undefined), /<html lang="en" data-theme="light">/);
 });
 
 test('buildHtmlReport: includes a theme toggle button matching the starting theme', () => {
@@ -232,7 +232,8 @@ test('buildCsvExport: an ordinary name is not guarded', () => {
 // The report embeds its own copy of shared layout CSS since it's a
 // standalone file. These tests catch drift between the two copies for
 // rules that must stay in sync. Intentional differences are excluded:
-// - CSS custom property blocks (:root / :root[data-theme]) differ by design
+// - --btn-bg-hover/--btn-disabled-bg/--btn-text (VAR_ALLOWLIST below) -
+//   the report has no primary-btn or checkbox-disabled states
 // - Flex/checkbox layout on .addon-row (report rows have no checkboxes)
 // - margin-left on .addon-version (report compensates without flex)
 
@@ -260,6 +261,11 @@ function extractCssProp(src, selector, property) {
 
 // Selectors and properties that must be identical in both files.
 const sharedRules = [
+  ['.card', 'border'],
+  ['.groups-outer-box', 'border'],
+  ['.groups-outer-box', 'border-radius'],
+  ['.groups-outer-box', 'padding'],
+  ['.groups-outer-box', 'margin-bottom'],
   ['.search-input', 'border-radius'],
   ['.search-input', 'padding'],
   ['.search-input', 'font-size'],
@@ -270,6 +276,7 @@ const sharedRules = [
   ['.group-box', 'border'],
   ['.group-box', 'border-radius'],
   ['.group-box', 'overflow'],
+  ['.group-box', 'margin-bottom'],
   ['.group-heading', 'font-size'],
   ['.group-heading', 'font-weight'],
   ['.group-heading', 'letter-spacing'],
@@ -304,3 +311,110 @@ for (const [selector, property] of sharedRules) {
       `"${selector} { ${property} }" differs: shared.css has "${fromShared}", report has "${fromReport}"`);
   });
 }
+
+// --- WP4.1: CSS custom property (variable) drift ---
+// Previously excluded entirely ("CSS custom property blocks differ by
+// design" above) - in practice only a few variables are genuinely
+// report-specific; the rest should match exactly, and didn't (A29).
+
+function extractCssVars(src, rootSelector) {
+  const sel = rootSelector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const blockRe = new RegExp(sel + '\\s*\\{([^}]*)\\}');
+  const block = src.match(blockRe);
+  if (!block) return null;
+  const vars = {};
+  for (const m of block[1].matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) {
+    vars[m[1]] = m[2].trim();
+  }
+  return vars;
+}
+
+// Variables the report genuinely has no use for - it renders no
+// checkboxes and no <button class="primary-btn">, so it never needs a
+// disabled/hover state for either.
+const VAR_ALLOWLIST = new Set(['--btn-bg-hover', '--btn-disabled-bg', '--btn-text']);
+
+for (const [label, rootSelector] of [['light', ':root'], ['dark', ':root[data-theme="dark"]']]) {
+  test(`CSS drift: ${label} theme variables match between shared.css and report-template.js`, () => {
+    const sharedVars = extractCssVars(sharedCssSrc, rootSelector);
+    const reportVars = extractCssVars(reportTemplateSrcRaw, rootSelector);
+    assert.ok(sharedVars, `${rootSelector} not found in shared.css`);
+    assert.ok(reportVars, `${rootSelector} not found in report-template.js`);
+
+    for (const [name, value] of Object.entries(sharedVars)) {
+      if (VAR_ALLOWLIST.has(name)) continue;
+      assert.ok(name in reportVars, `${name} is in shared.css's ${rootSelector} but missing from the report's copy`);
+      assert.strictEqual(reportVars[name], value, `${name} differs in ${rootSelector}: shared.css has "${value}", report has "${reportVars[name]}"`);
+    }
+    for (const name of Object.keys(reportVars)) {
+      if (VAR_ALLOWLIST.has(name)) continue;
+      assert.ok(name in sharedVars, `${name} is in the report's ${rootSelector} but not in shared.css - typo, or shared.css is missing it?`);
+    }
+  });
+}
+
+// --- A18: --text-faint meets WCAG AA contrast against --card-bg ---
+// A17: the search input's :focus-visible outline color meets the 3:1
+// minimum for UI components, in both themes.
+// Reads the actual CSS variable values (via extractCssVars above) rather
+// than hardcoding colors, so this stays honest if the palette changes.
+
+function relLuminance(hex) {
+  hex = hex.replace('#', '');
+  if (hex.length === 3) hex = [...hex].map((c) => c + c).join('');
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function contrastRatio(a, b) {
+  const [hi, lo] = [relLuminance(a), relLuminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+for (const [label, rootSelector] of [['light', ':root'], ['dark', ':root[data-theme="dark"]']]) {
+  test(`A18: --text-faint meets 4.5:1 contrast against --card-bg (${label})`, () => {
+    const vars = extractCssVars(sharedCssSrc, rootSelector);
+    const ratio = contrastRatio(vars['--text-faint'], vars['--card-bg']);
+    assert.ok(ratio >= 4.5, `--text-faint (${vars['--text-faint']}) vs --card-bg (${vars['--card-bg']}) is only ${ratio.toFixed(2)}:1, need 4.5:1`);
+  });
+
+  test(`A17: --link-accent (used for the search input's focus outline) meets 3:1 against --card-bg (${label})`, () => {
+    const vars = extractCssVars(sharedCssSrc, rootSelector);
+    const ratio = contrastRatio(vars['--link-accent'], vars['--card-bg']);
+    assert.ok(ratio >= 3, `--link-accent (${vars['--link-accent']}) vs --card-bg (${vars['--card-bg']}) is only ${ratio.toFixed(2)}:1, need 3:1`);
+  });
+}
+
+test('A17: shared.css defines a :focus-visible outline for .search-input', () => {
+  assert.match(sharedCssSrc, /\.search-input:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--link-accent\)/);
+});
+
+test('A17: the report defines the same :focus-visible outline for .search-input', () => {
+  assert.match(reportTemplateSrcRaw, /\.search-input:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--link-accent\)/);
+});
+
+test('A35: no :has() selector remains in shared.css', () => {
+  assert.doesNotMatch(sharedCssSrc, /:has\(/);
+});
+
+test('A22: shared.css has a prefers-reduced-motion rule', () => {
+  assert.match(sharedCssSrc, /@media \(prefers-reduced-motion: reduce\)/);
+});
+
+test('A22: the report has a prefers-reduced-motion rule', () => {
+  assert.match(reportTemplateSrcRaw, /@media \(prefers-reduced-motion: reduce\)/);
+});
+
+// --- A36: the report's tip no longer overstates what the Importer does ---
+
+test('A36: the report tip does not claim every link opens automatically', () => {
+  const reportTemplateSrc = readSrc('src/background/report-template.js');
+  assert.doesNotMatch(reportTemplateSrc, /open every link below as a tab automatically/);
+});
+
+test('A36: the report tip accurately describes selecting the file and pre-selecting new add-ons', () => {
+  const reportTemplateSrc = readSrc('src/background/report-template.js');
+  assert.match(reportTemplateSrc, /select this file[\s\S]{0,80}pre-selected to open/);
+});

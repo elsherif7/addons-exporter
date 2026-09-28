@@ -19,19 +19,39 @@ const params = new URLSearchParams(location.search);
 const from = params.get('from');
 const format = params.get('format') || 'html';
 
+function buildExportMessage(container) {
+  const label = exportFormatLabel(format);
+  const article = indefiniteArticleFor(label);
+  const exporterStrong = document.createElement('strong');
+  exporterStrong.textContent = 'Add-ons Exporter';
+  const importerStrong = document.createElement('strong');
+  importerStrong.textContent = 'Add-ons Importer';
+  container.append(
+    'Thanks for using ', exporterStrong,
+    `. Your add-ons were exported as ${article} ${label}. On another browser, choose `,
+    importerStrong, ' to select which ones to install.'
+  );
+}
+
+function buildImportMessage(container) {
+  const importerStrong = document.createElement('strong');
+  importerStrong.textContent = 'Add-ons Importer';
+  const addToFirefoxStrong = document.createElement('strong');
+  addToFirefoxStrong.textContent = 'Add to Firefox';
+  container.append(
+    'Thanks for using ', importerStrong,
+    '. Each selected add-on is opening in its own tab \u2014 click ',
+    addToFirefoxStrong, ' on each one to finish installing it.'
+  );
+}
+
 const MESSAGES = {
-  export: {
-    title: 'Add-ons Exporter',
-    message: `Thanks for using <strong>Add-ons Exporter</strong>. Your add-ons were exported as a ${exportFormatLabel(format)}. On another browser, choose <strong>Add-ons Importer</strong> to select which ones to install.`,
-  },
-  import: {
-    title: 'Add-ons Importer',
-    message: 'Thanks for using <strong>Add-ons Importer</strong>. Each selected add-on is opening in its own tab \u2014 click <strong>Add to Firefox</strong> on each one to finish installing it.',
-  },
+  export: { title: 'Add-ons Exporter', build: buildExportMessage },
+  import: { title: 'Add-ons Importer', build: buildImportMessage },
 };
 
-const { title, message } = MESSAGES[from] || MESSAGES.export;
+const { title, build } = MESSAGES[from] || MESSAGES.export;
 
 document.title = title;
 document.getElementById('heading').textContent = title;
-document.getElementById('message').innerHTML = message;
+build(document.getElementById('message'));

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -67,19 +67,19 @@
       <button id="chooseFileBtn">Choose file</button>
       <div id="fileNameRow" style="display:none; margin-top: 12px;">
         <strong id="fileName"></strong>
-        <button id="removeFileBtn">&times;</button>
+        <button id="removeFileBtn" aria-label="Remove selected file">&times;</button>
       </div>
       <span id="compareNote"></span>
     </div>
 
-    <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons..." style="display:none;">
+    <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons..." aria-label="Search add-ons" style="display:none;">
 
     <div class="list-controls" id="listControls" style="display:none;">
       <span>
         <button id="selectAllBtn" type="button">Select all</button>
         <button id="deselectAllBtn" type="button">Deselect all</button>
       </span>
-      <span id="selectionCount"></span>
+      <span id="selectionCount" role="status" aria-live="polite"></span>
     </div>
 
     <div class="checklist-box" id="checklistBox" style="display:none;">
@@ -88,7 +88,7 @@
     </div>
 
     <button id="openSelectedBtn" class="primary-btn" disabled>Open Selected</button>
-    <span id="status"></span>
+    <span id="status" role="status" aria-live="polite"></span>
 
     <input type="file" id="fileInput" accept=".html,.json,.csv" style="display:none">
   </div>

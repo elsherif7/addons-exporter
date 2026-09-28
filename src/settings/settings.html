@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -125,8 +125,8 @@
   <div class="card">
     <h1>Settings</h1>
 
-    <div class="settings-group">
-      <h2>Appearance</h2>
+    <div class="settings-group" role="radiogroup" aria-labelledby="appearanceHeading">
+      <h2 id="appearanceHeading">Appearance</h2>
       <label class="theme-option" for="themeLight">
         <input type="radio" name="theme" id="themeLight" value="light" checked>
         <span style="font-weight:600; color:var(--text); font-size:14px;">Light</span>
@@ -137,8 +137,8 @@
       </label>
     </div>
 
-    <div class="settings-group">
-      <h2>Export Format</h2>
+    <div class="settings-group" role="radiogroup" aria-labelledby="exportFormatHeading">
+      <h2 id="exportFormatHeading">Export Format</h2>
       <label class="theme-option" for="formatHtml">
         <input type="radio" name="exportFormat" id="formatHtml" value="html" checked>
         <span style="font-weight:600; color:var(--text); font-size:14px;">HTML</span>
@@ -153,8 +153,8 @@
       </label>
     </div>
 
-    <div class="settings-group">
-      <h2>Display</h2>
+    <div class="settings-group" role="radiogroup" aria-labelledby="displayHeading">
+      <h2 id="displayHeading">Display</h2>
       <label class="theme-option" for="shortenNamesOff">
         <input type="radio" name="shortenNames" id="shortenNamesOff" value="off">
         <span style="display:block; font-weight:600; color:var(--text); font-size:14px;">Show full add-on names</span>
@@ -173,7 +173,7 @@
         <button class="settings-btn" id="exportSettingsBtn">Export Settings</button>
         <button class="settings-btn" id="importSettingsBtn">Import Settings</button>
       </div>
-      <span id="settingsStatus"></span>
+      <span id="settingsStatus" role="status" aria-live="polite"></span>
     </div>
 
     <div class="settings-group">

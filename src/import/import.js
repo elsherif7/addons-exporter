@@ -347,6 +347,7 @@ function createAddonRow(a, i, isInstalled, shorten) {
 
   const row = document.createElement('div');
   row.className = 'addon-row';
+  if (!safe) row.classList.add('row-disabled');
 
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
@@ -366,10 +367,6 @@ function createAddonRow(a, i, isInstalled, shorten) {
     lnk.target = '_blank';
     lnk.rel = 'noopener';
     lnk.textContent = 'AMO';
-    lnk.style.cssText = 'color:var(--link-accent);text-decoration:none;margin-left:6px;';
-    lnk.addEventListener('mouseover', () => { lnk.style.textDecoration = 'underline'; });
-    lnk.addEventListener('mouseout', () => { lnk.style.textDecoration = 'none'; });
-    lnk.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); window.open(lnk.href, '_blank', 'noopener'); });
     return lnk;
   })() : null;
 
@@ -383,9 +380,7 @@ function createAddonRow(a, i, isInstalled, shorten) {
 
   const label = document.createElement('label');
   label.htmlFor = `icb-${i}`;
-  const labelChildren = [nameEl, ' ', versionSpan, ' ', typeSpan];
-  if (amoLink) labelChildren.push(amoLink);
-  label.append(...labelChildren);
+  label.append(nameEl, ' ', versionSpan, ' ', typeSpan);
 
   if (matchLabel) {
     const matchSpan = document.createElement('span');
@@ -402,6 +397,7 @@ function createAddonRow(a, i, isInstalled, shorten) {
   }
 
   row.append(checkbox, label);
+  if (amoLink) row.append(amoLink);
   return row;
 }
 
@@ -480,6 +476,25 @@ function renderAddonList(addons, installed, shorten) {
 // can tell it's stale and not overwrite a newer one.
 let loadGeneration = 0;
 
+const MAX_IMPORT_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const ACCEPTED_IMPORT_EXTENSIONS = new Set(['html', 'htm', 'json', 'csv']);
+
+// Checked before a file is ever read - lets a wrong-typed or oversized
+// file get a clear, immediate reason instead of failing deep inside
+// parsing (any unrecognised extension used to be silently parsed as
+// HTML), or, for a very large file, reading the whole thing into memory
+// for no reason.
+function validateSelectedFile(file) {
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (!ACCEPTED_IMPORT_EXTENSIONS.has(ext)) {
+    return { ok: false, error: `"${file.name}" isn't a supported file type. Choose an .html, .json, or .csv export.` };
+  }
+  if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_SIZE_BYTES) {
+    return { ok: false, error: `That file is too large (over ${Math.round(MAX_IMPORT_FILE_SIZE_BYTES / (1024 * 1024))} MB) to be a real export.` };
+  }
+  return { ok: true };
+}
+
 async function loadFile(file) {  const myGeneration = ++loadGeneration;
   clearAddonList();
   setStatus('Reading file...');
@@ -538,6 +553,11 @@ async function loadFile(file) {  const myGeneration = ++loadGeneration;
 
 function setSelectedFile(file) {
   if (file) {
+    const validation = validateSelectedFile(file);
+    if (!validation.ok) {
+      setStatus(validation.error);
+      return;
+    }
     fileNameEl.textContent = file.name;
     fileNameRow.style.display = 'flex';
     fileNameRow.style.alignItems = 'center';
@@ -588,6 +608,12 @@ picker.addEventListener('drop', (e) => {
   const file = e.dataTransfer.files[0];
   if (file) setSelectedFile(file);
 });
+
+// Without this, dropping a file anywhere else on the page (outside the
+// picker) falls through to the browser's default behavior - navigating
+// to and displaying the file directly instead of importing it.
+document.addEventListener('dragover', (e) => { e.preventDefault(); });
+document.addEventListener('drop', (e) => { e.preventDefault(); });
 
 // Disabled checkboxes (unsafe links) are skipped by both buttons below -
 // they're not part of the selectable set, same as the row-click handler

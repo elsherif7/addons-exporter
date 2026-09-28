@@ -329,24 +329,66 @@ document.getElementById('checkUpdateBtn').addEventListener('click', async () => 
 
 // --- Reset Settings ---
 
-document.getElementById('resetSettingsBtn').addEventListener('click', function() {
+document.getElementById('resetSettingsBtn').addEventListener('click', function () {
+  const resetBtn = this;
+
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:1000;';
-  overlay.innerHTML = `
-    <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:24px 28px;min-width:300px;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
-      <div style="font-size:18px;font-weight:700;color:var(--text);text-align:center;margin-bottom:16px;">Settings</div>
-      <p style="font-size:14px;color:var(--text-secondary);margin:0 0 18px;">Reset all settings to their defaults? This will clear your theme and export format choices.</p>
-      <div style="display:flex;justify-content:flex-end;gap:10px;">
-        <button id="rsCancel" class="s-modal-btn">Cancel</button>
-        <button id="rsConfirm" class="s-modal-btn s-modal-btn-danger">Reset</button>
-      </div>
-    </div>`;
+
+  const dialog = document.createElement('div');
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-labelledby', 'resetDialogTitle');
+  dialog.style.cssText = 'background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:24px 28px;min-width:300px;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.2);';
+
+  const title = document.createElement('div');
+  title.id = 'resetDialogTitle';
+  title.style.cssText = 'font-size:18px;font-weight:700;color:var(--text);text-align:center;margin-bottom:16px;';
+  title.textContent = 'Settings';
+
+  const message = document.createElement('p');
+  message.style.cssText = 'font-size:14px;color:var(--text-secondary);margin:0 0 18px;';
+  message.textContent = 'Reset all settings to their defaults? This will clear your theme, export format, and display choices.';
+
+  const buttonRow = document.createElement('div');
+  buttonRow.style.cssText = 'display:flex;justify-content:flex-end;gap:10px;';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.id = 'rsCancel';
+  cancelBtn.className = 's-modal-btn';
+  cancelBtn.textContent = 'Cancel';
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.id = 'rsConfirm';
+  confirmBtn.className = 's-modal-btn s-modal-btn-danger';
+  confirmBtn.textContent = 'Reset';
+
+  buttonRow.append(cancelBtn, confirmBtn);
+  dialog.append(title, message, buttonRow);
+  overlay.appendChild(dialog);
   document.body.appendChild(overlay);
 
+  // Makes the rest of the page unreachable by keyboard/assistive tech
+  // while the dialog is open, so Tab can't escape it - simpler and more
+  // robust than intercepting every Tab keypress by hand.
+  const others = Array.from(document.body.children).filter((el) => el !== overlay);
+  others.forEach((el) => { el.inert = true; });
+
+  cancelBtn.focus();
+
   new Promise((resolve) => {
-    overlay.querySelector('#rsCancel').addEventListener('click', () => { overlay.remove(); resolve(false); });
-    overlay.querySelector('#rsConfirm').addEventListener('click', () => { overlay.remove(); resolve(true); });
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+    function close(result) {
+      others.forEach((el) => { el.inert = false; });
+      overlay.remove();
+      resetBtn.focus(); // return focus to what opened the dialog
+      resolve(result);
+    }
+    cancelBtn.addEventListener('click', () => close(false));
+    confirmBtn.addEventListener('click', () => close(true));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
+    overlay.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') close(false);
+    });
   }).then((confirmed) => {
     if (!confirmed) return;
     return browser.storage.local.remove([THEME_STORAGE_KEY, EXPORT_FORMAT_STORAGE_KEY, SHORT_NAME_STORAGE_KEY])

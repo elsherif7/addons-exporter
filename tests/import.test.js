@@ -24,7 +24,7 @@ function makeFakeElement() {
 // stub exists purely to let the file load without throwing - none of the
 // tests below trigger DOM rendering, file reading, or messaging, so a
 // generic fake element for every id is enough.
-const fakeDocument = { getElementById() { return makeFakeElement(); } };
+const fakeDocument = { getElementById() { return makeFakeElement(); }, addEventListener() {} };
 
 const commonSrc = readSrc('src/common/common.js');
 const reportTemplateSrc = readSrc('src/background/report-template.js');
@@ -44,6 +44,7 @@ const {
   findInstalledMatch,
   migrateAddonsData,
   buildCsvExport,
+  validateSelectedFile,
 } = sandbox;
 
 // EXPORT_FORMAT_VERSION is declared with top-level `const` in common.js,
@@ -304,7 +305,7 @@ function captureBulkSelectHandlers(checkboxList, { failConfirmation = false } = 
   const sandbox = {
     URL,
     setTimeout: (fn) => { setTimeoutCallCount++; fn(); return 0; }, // fires the stagger delay immediately - no reason for tests to actually wait
-    document: { getElementById: (id) => elements[id] },
+    document: { getElementById: (id) => elements[id], addEventListener() {} },
     browser: {
       runtime: { getURL: (path) => `moz-extension://test-id/${path}` },
       tabs: {
@@ -795,4 +796,98 @@ testAsync('import.js: a second file wins even if the first is still awaiting sto
 
   const names = elements.addonList.querySelectorAll('.addon-name').map((n) => n.textContent);
   assert.deepStrictEqual(names, ['SecondFileAddon'], 'the second, faster-to-select file should be what\'s shown, not the first');
+});
+
+// --- A35: unsafe-link rows get a class directly, not via :has() ---
+
+testAsync('import.js real DOM: a row with an unsafe link gets the row-disabled class', async () => {
+  const elements = await renderRealImportList([
+    { id: 'a@x', name: 'Safe', version: '1', link: 'https://example.com/a' },
+    { id: 'b@x', name: 'Unsafe', version: '1', link: 'javascript:alert(1)' },
+  ]);
+  const rows = elements.addonList.querySelectorAll('.addon-row');
+  const safeRow = rows.find((r) => r.querySelector('.addon-name').textContent === 'Safe');
+  const unsafeRow = rows.find((r) => r.querySelector('.addon-name').textContent === 'Unsafe');
+  assert.strictEqual(safeRow.classList.contains('row-disabled'), false);
+  assert.strictEqual(unsafeRow.classList.contains('row-disabled'), true);
+});
+
+// --- A21: the AMO link sits outside the label ---
+
+testAsync('import.js real DOM: the AMO link is not nested inside the label', async () => {
+  const elements = await renderRealImportList([
+    { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
+  ]);
+  const row = elements.addonList.querySelector('.addon-row');
+  const link = row.querySelector('a.match-label');
+  const label = row.querySelector('label');
+  assert.ok(link, 'the row should have a match-label link');
+  assert.strictEqual(label.contains(link), false, 'the link must not be inside the label (it would be absorbed into the checkbox\'s accessible name)');
+});
+
+// --- A23: validateSelectedFile ---
+
+test('validateSelectedFile: accepts .html, .htm, .json, and .csv', () => {
+  for (const name of ['export.html', 'export.htm', 'export.json', 'export.csv']) {
+    const result = validateSelectedFile({ name, size: 1000 });
+    assert.strictEqual(result.ok, true, `${name} should be accepted`);
+  }
+});
+
+test('validateSelectedFile: rejects an unrecognised extension', () => {
+  const result = validateSelectedFile({ name: 'notes.txt', size: 1000 });
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /isn't a supported file type/);
+});
+
+test('validateSelectedFile: extension check is case-insensitive', () => {
+  const result = validateSelectedFile({ name: 'Export.HTML', size: 1000 });
+  assert.strictEqual(result.ok, true);
+});
+
+test('validateSelectedFile: rejects a file over the size cap', () => {
+  const result = validateSelectedFile({ name: 'export.json', size: 11 * 1024 * 1024 });
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /too large/);
+});
+
+test('validateSelectedFile: accepts a file right at the size cap', () => {
+  const result = validateSelectedFile({ name: 'export.json', size: 10 * 1024 * 1024 });
+  assert.strictEqual(result.ok, true);
+});
+
+test('validateSelectedFile: a missing/undefined size is not treated as oversized', () => {
+  const result = validateSelectedFile({ name: 'export.json' });
+  assert.strictEqual(result.ok, true);
+});
+
+// --- A23: setSelectedFile rejects an invalid file before loading it ---
+
+testAsync('import.js: selecting a .txt file is rejected before any read is attempted', async () => {
+  const { sandbox, elements } = bootImportSandbox();
+  let readAttempted = false;
+  sandbox.setSelectedFile({ name: 'notes.txt', size: 100, text: async () => { readAttempted = true; return ''; } });
+  await sleep(20);
+
+  assert.strictEqual(readAttempted, false, 'the file should never be read at all');
+  assert.match(elements.status.textContent, /isn't a supported file type/);
+});
+
+testAsync('import.js: selecting an oversized file is rejected before any read is attempted', async () => {
+  const { sandbox, elements } = bootImportSandbox();
+  let readAttempted = false;
+  sandbox.setSelectedFile({ name: 'export.json', size: 50 * 1024 * 1024, text: async () => { readAttempted = true; return ''; } });
+  await sleep(20);
+
+  assert.strictEqual(readAttempted, false);
+  assert.match(elements.status.textContent, /too large/);
+});
+
+// --- A23: drag-drop is guarded at the document level too ---
+
+testAsync('import.js: a drop event on the document (outside the picker) is prevented by default', async () => {
+  const { sandbox } = bootImportSandbox();
+  const event = { type: 'drop', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  sandbox.document.dispatchEvent(event);
+  assert.strictEqual(event.defaultPrevented, true, 'a drop anywhere on the page should be prevented, not just inside the picker');
 });

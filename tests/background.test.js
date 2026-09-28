@@ -381,17 +381,17 @@ async function runDoExportForTheme(storageLocalGetImpl) {
 
 testAsync('doExport: bakes the stored dark theme into the report', async () => {
   const html = await runDoExportForTheme(async () => ({ theme: 'dark' }));
-  assert.match(html, /<html data-theme="dark">/);
+  assert.match(html, /<html lang="en" data-theme="dark">/);
 });
 
 testAsync('doExport: defaults to light when no theme is stored', async () => {
   const html = await runDoExportForTheme(async () => ({}));
-  assert.match(html, /<html data-theme="light">/);
+  assert.match(html, /<html lang="en" data-theme="light">/);
 });
 
 testAsync('doExport: falls back to light if storage.local.get throws', async () => {
   const html = await runDoExportForTheme(async () => { throw new Error('storage unavailable'); });
-  assert.match(html, /<html data-theme="light">/);
+  assert.match(html, /<html lang="en" data-theme="light">/);
 });
 
 // --- background.js: mapWithConcurrency()'s concurrency cap ---

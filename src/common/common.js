@@ -35,6 +35,23 @@ function byName(a, b) {
   return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 }
 
+// "a" or "an" for a label that might start with a capitalized acronym
+// (e.g. "HTML report", "JSON file"). A plain first-letter vowel check
+// gets acronyms wrong: "HTML" is read out letter by letter as
+// "aitch-tee-em-el" - a vowel sound despite H being a consonant letter -
+// so it needs "an", not "a". A few single letters exist whose *name*
+// starts with a vowel sound even though the letter itself doesn't: this
+// covers all of them, not just the ones this extension happens to use
+// today (HTML/JSON/CSV).
+function indefiniteArticleFor(label) {
+  const firstWord = String(label).trim().split(/\s+/)[0] || '';
+  if (/^[A-Z]{2,}$/.test(firstWord)) {
+    const VOWEL_SOUND_INITIALS = new Set(['A', 'E', 'F', 'H', 'I', 'L', 'M', 'N', 'O', 'R', 'S', 'X']);
+    return VOWEL_SOUND_INITIALS.has(firstWord[0]) ? 'an' : 'a';
+  }
+  return /^[aeiou]/i.test(firstWord) ? 'an' : 'a';
+}
+
 // Used when a 429 response gives no Retry-After header.
 const AMO_RETRY_AFTER_DEFAULT_MS = 1000;
 // Caps how long a single retry ever waits, in case a server sends back

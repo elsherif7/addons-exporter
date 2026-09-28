@@ -17,7 +17,7 @@
   --text: #222;
   --text-secondary: #444;
   --text-muted: #666;
-  --text-faint: #888;
+  --text-faint: #707070;
   --border: #d0d3d9;
   --border-soft: #e2e4e8;
   --border-faint: #f0f1f3;
@@ -26,7 +26,7 @@
   --btn-bg-hover: #111827;
   --btn-disabled-bg: #9ca3af;
   --btn-text: #fff;
-  --link-accent: #1a73e8;
+  --link-accent: #0060df;
   --warn-color: #b45309;
   --danger-color: #c0392b;
 }
@@ -38,7 +38,7 @@
   --text: #e8e9ec;
   --text-secondary: #c3c5ca;
   --text-muted: #9199a3;
-  --text-faint: #7d848f;
+  --text-faint: #8890a0;
   --border: #3a3f4b;
   --border-soft: #2f333c;
   --border-faint: #262932;
@@ -120,6 +120,10 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 .search-input:focus {
   outline: none;
   border-color: var(--btn-bg);
+}
+.search-input:focus-visible {
+  outline: 2px solid var(--link-accent);
+  outline-offset: 1px;
 }
 .list-controls {
   display: flex;
@@ -225,12 +229,15 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   color: var(--danger-color);
   font-weight: 600;
 }
-/* Rows with an unsafe link are non-interactive — disable and grey them out. */
-.addon-row:has(input[type="checkbox"]:disabled) {
+/* Rows with an unsafe link are non-interactive — disable and grey them out.
+   A class set directly by the JS that disables the checkbox (rather than
+   the :has selector (with input:disabled), which needs Firefox 121 - past this extension's
+   stated 109/113 minimum, and silently does nothing on older versions). */
+.addon-row.row-disabled {
   opacity: 0.5;
   cursor: default;
 }
-.addon-row:has(input[type="checkbox"]:disabled):hover {
+.addon-row.row-disabled:hover {
   background: none;
   transform: none;
 }
@@ -241,6 +248,10 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   font-size: 12px;
   color: var(--text-muted);
   margin-left: 8px;
+}
+.match-label[href] {
+  color: var(--link-accent);
+  text-decoration: none;
 }
 .match-label[href]:hover { text-decoration: underline; }
 .match-uncertain {
@@ -262,7 +273,7 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s, transform 0.1s;
 }
-.primary-btn:hover:not(:disabled) { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.01); }
+.primary-btn:hover:not(:disabled) { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.02); }
 .primary-btn:active:not(:disabled) { transform: scale(0.99); }
 .primary-btn:disabled { background: var(--card-bg); color: var(--btn-disabled-bg); border-color: var(--border-soft); cursor: not-allowed; }
 #status {
@@ -281,4 +292,17 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 /* Space only shows up when there's actually a note. */
 #compareNote:not(:empty) {
   margin-top: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+  .search-input:hover,
+  .addon-row:hover,
+  .primary-btn:hover,
+  .primary-btn:active {
+    transform: none !important;
+  }
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,14 +13,14 @@
     <h1>Add-ons Exporter</h1>
     <p id="exportDesc">Select the <strong>Add-ons</strong> you want to export, then click <strong>Export Selected</strong> to create an HTML report you can use to reinstall them later on any Firefox&#8209;based&nbsp;browser.</p>
 
-    <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons..." style="display:none;">
+    <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons..." aria-label="Search add-ons" style="display:none;">
 
     <div class="list-controls">
       <span>
         <button id="selectAllBtn" type="button">Select all</button>
         <button id="deselectAllBtn" type="button">Deselect all</button>
       </span>
-      <span id="selectionCount"></span>
+      <span id="selectionCount" role="status" aria-live="polite"></span>
     </div>
 
     <div class="checklist-box">
@@ -32,7 +32,7 @@
 
     <button id="exportSelectedBtn" class="primary-btn" disabled>Export Selected</button>
     <button id="cancelExportBtn" type="button" style="display:none;">Cancel</button>
-    <span id="status"></span>
+    <span id="status" role="status" aria-live="polite"></span>
   </div>
 
   <script src="../common/common.js"></script>

@@ -514,3 +514,22 @@ testAsync('fetchJsonWithTimeout: a second 429 in a row is not retried again', as
   assert.strictEqual(result.ok, false);
   assert.strictEqual(result.status, 429);
 });
+
+// --- A15: indefiniteArticleFor ---
+
+test('indefiniteArticleFor: "HTML report" needs "an" (H is "aitch", a vowel sound)', () => {
+  assert.strictEqual(sandbox.indefiniteArticleFor('HTML report'), 'an');
+});
+
+test('indefiniteArticleFor: "JSON file" needs "a" (J is "jay", a consonant sound)', () => {
+  assert.strictEqual(sandbox.indefiniteArticleFor('JSON file'), 'a');
+});
+
+test('indefiniteArticleFor: "CSV file" needs "a" (C is "see", a consonant sound)', () => {
+  assert.strictEqual(sandbox.indefiniteArticleFor('CSV file'), 'a');
+});
+
+test('indefiniteArticleFor: falls back to ordinary spelling for a non-acronym word', () => {
+  assert.strictEqual(sandbox.indefiniteArticleFor('extension'), 'an');
+  assert.strictEqual(sandbox.indefiniteArticleFor('theme'), 'a');
+});

@@ -41,7 +41,7 @@ async function captureExportClick({ selectedIds, exportResponse, simulateDownloa
     selectionCount: { textContent: '' },
     searchInput: { addEventListener() {}, style: {} },
     noSearchMatches: { style: {} },
-    exportDesc: { innerHTML: '' },
+    exportDesc: { innerHTML: '', textContent: '', append() {} },
   };
   const exSandbox = {
     URL: { createObjectURL: () => 'blob:fake-url', revokeObjectURL() {} },
@@ -187,13 +187,13 @@ testAsync('cancelExportBtn: clicking it sends a cancelExport message', async () 
     selectionCount: { textContent: '' },
     searchInput: { addEventListener() {}, style: {} },
     noSearchMatches: { style: {} },
-    exportDesc: { innerHTML: '' },
+    exportDesc: { innerHTML: '', textContent: '', append() {} },
   };
   const exSandbox = {
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
     setTimeout: (fn) => { fn(); return 0; },
     clearTimeout() {},
-    document: { getElementById: (id) => elements[id], body: { appendChild() {} } },
+    document: { getElementById: (id) => elements[id], body: { appendChild() {} }, createElement: () => ({}) },
     browser: {
       runtime: {
         onMessage: { addListener() {} },
@@ -230,7 +230,7 @@ testAsync('export.js: a non-array listAddons response shows a friendly error, no
     selectionCount: { textContent: '' },
     searchInput: { addEventListener() {}, style: {} },
     noSearchMatches: { style: {} },
-    exportDesc: { innerHTML: '' },
+    exportDesc: { innerHTML: '', textContent: '', append() {} },
   };
   const exSandbox = {
     URL,
@@ -362,10 +362,27 @@ testAsync('storage.onChanged: an export-format change from another tab refreshes
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.ok(registeredListener, 'a storage.onChanged listener should have been registered');
-  assert.doesNotMatch(elements.exportDesc.innerHTML, /JSON file/);
+  assert.doesNotMatch(elements.exportDesc.textContent, /JSON file/);
 
   registeredListener({ exportFormat: { newValue: 'json' } }, 'local');
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  assert.match(elements.exportDesc.innerHTML, /JSON file/);
+  assert.match(elements.exportDesc.textContent, /JSON file/);
+});
+
+// --- A32/A21: the AMO link is a name search, and lives outside the label ---
+
+testAsync('export.js real DOM: the AMO link searches by name (not a guessed id URL) and sits outside the label', async () => {
+  const elements = await renderRealExportList([
+    { id: 'weird@id.example', name: 'Some Theme', version: '1.0', enabled: true, type: 'theme' },
+  ]);
+  const row = elements.addonList.querySelector('.addon-row');
+  const link = row.querySelector('a.match-label');
+  assert.ok(link, 'the row should have a match-label link');
+  assert.strictEqual(link.textContent, 'Search AMO');
+  assert.match(link.href, /\/search\/\?q=Some(%20|\+)Theme/, 'should search by name, not guess an exact-id URL');
+  assert.doesNotMatch(link.href, /weird%40id\.example/, 'should not use the add-on id as a guessed URL');
+
+  const label = row.querySelector('label');
+  assert.strictEqual(label.contains(link), false, 'the link must not be inside the label (it would be absorbed into the checkbox\'s accessible name)');
 });

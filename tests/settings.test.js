@@ -4,7 +4,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, makeFakeDom } = require('./helpers');
 
 const themeSrc = readSrc('src/common/theme.js');
 const commonSrc = readSrc('src/common/common.js');
@@ -426,4 +426,103 @@ testAsync('checkUpdateBtn: a 404 (our own add-on ID not found on AMO) is treated
   await btn._onClick();
   assert.match(statusMsg.textContent, /Could not check for updates/);
   assert.strictEqual(btn.disabled, false);
+});
+
+// --- A20: the Reset dialog's accessibility ---
+// Uses makeFakeDom (S1) rather than the ad hoc fixtures above - the
+// dialog is now built with createElement/append (not innerHTML), so it
+// needs a document that can actually hold and query real child elements.
+
+function makeResetDialogSandbox() {
+  const { document, elements } = makeFakeDom(['resetSettingsBtn', 'settingsStatus']);
+  // A stand-in for the rest of the page's content, to verify it gets
+  // inert-ed while the dialog is open and restored after.
+  const pageContent = document.createElement('div');
+  pageContent.id = 'pageContent';
+  document.body.appendChild(pageContent);
+  document.body.appendChild(elements.resetSettingsBtn);
+
+  const sb = {
+    URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
+    Blob: function Blob() {},
+    setTimeout: () => 0,
+    fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
+    document,
+    browser: {
+      storage: {
+        local: {
+          get: async () => ({}),
+          set: async () => {},
+          remove: async () => {},
+        },
+      },
+      runtime: { getManifest: () => ({ version: '1.2.0' }) },
+    },
+  };
+  vm.createContext(sb);
+  vm.runInContext(themeSrc, sb);
+  vm.runInContext(commonSrc, sb);
+  vm.runInContext(settingsSrc, sb);
+  return { document, elements, pageContent };
+}
+
+function openResetDialog(document, resetBtn) {
+  resetBtn.click();
+  return document.body.querySelector('[role="dialog"]');
+}
+
+test('Reset dialog: has role=dialog, aria-modal, and is labelled by its own title', () => {
+  const { document, elements } = makeResetDialogSandbox();
+  const dialog = openResetDialog(document, elements.resetSettingsBtn);
+  assert.ok(dialog, 'a dialog should have been added to the page');
+  assert.strictEqual(dialog.getAttribute('aria-modal'), 'true');
+  const labelledBy = dialog.getAttribute('aria-labelledby');
+  const titleEl = document.body.querySelector(`#${labelledBy}`);
+  assert.ok(titleEl, 'aria-labelledby should point at a real element');
+  assert.strictEqual(titleEl.textContent, 'Settings');
+});
+
+test('Reset dialog: focus moves to Cancel when it opens, and everything else is made inert', () => {
+  const { document, elements, pageContent } = makeResetDialogSandbox();
+  assert.strictEqual(pageContent.inert, undefined, 'not inert before the dialog opens');
+  openResetDialog(document, elements.resetSettingsBtn);
+  const cancelBtn = document.body.querySelector('#rsCancel');
+  assert.strictEqual(cancelBtn._focused, true, 'focus should move into the dialog (to Cancel) on open');
+  assert.strictEqual(pageContent.inert, true, 'the rest of the page should be inert while the dialog is open');
+});
+
+test('Reset dialog: Cancel closes it, restores focus to the Reset button, and un-inerts the page', () => {
+  const { document, elements, pageContent } = makeResetDialogSandbox();
+  openResetDialog(document, elements.resetSettingsBtn);
+  document.body.querySelector('#rsCancel').click();
+
+  assert.strictEqual(document.body.querySelector('[role="dialog"]'), null, 'the dialog should be removed');
+  assert.strictEqual(elements.resetSettingsBtn._focused, true, 'focus should return to the button that opened it');
+  assert.strictEqual(pageContent.inert, false, 'the page should no longer be inert once the dialog closes');
+});
+
+test('Reset dialog: Escape closes it the same way Cancel does', () => {
+  const { document, elements } = makeResetDialogSandbox();
+  openResetDialog(document, elements.resetSettingsBtn);
+  document.body.querySelector('[role="dialog"]').dispatchEvent({ type: 'keydown', key: 'Escape' });
+
+  assert.strictEqual(document.body.querySelector('[role="dialog"]'), null, 'Escape should close the dialog');
+  assert.strictEqual(elements.resetSettingsBtn._focused, true);
+});
+
+testAsync('Reset dialog: clicking Reset (confirm) also closes the dialog and restores focus', async () => {
+  const { document, elements } = makeResetDialogSandbox();
+  openResetDialog(document, elements.resetSettingsBtn);
+  document.body.querySelector('#rsConfirm').click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.strictEqual(document.body.querySelector('[role="dialog"]'), null, 'the dialog should close on confirm too');
+  assert.strictEqual(elements.resetSettingsBtn._focused, true);
+});
+
+test('Reset dialog: mentions the display setting, which it actually resets', () => {
+  const { document, elements } = makeResetDialogSandbox();
+  const dialog = openResetDialog(document, elements.resetSettingsBtn);
+  const message = dialog.querySelector('p');
+  assert.match(message.textContent, /display/i, 'the dialog text should mention the display setting it also resets');
 });

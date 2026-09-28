@@ -109,12 +109,13 @@ const SELECTOR_RE = /^([a-zA-Z]*)|(\.[\w-]+)|(\[[a-zA-Z-]+=(?:"[^"]*"|'[^']*')\]
 // {tag, classes[], attrs{}, pseudos[]} once, so matching against many
 // elements doesn't re-parse the same selector string repeatedly.
 function parseSelector(selector) {
-  const parsed = { tag: null, classes: [], attrs: {}, pseudos: [] };
-  for (const m of selector.matchAll(/([a-zA-Z][\w-]*)|\.([\w-]+)|\[([a-zA-Z-]+)=("([^"]*)"|'([^']*)')\]|:([a-zA-Z-]+)/g)) {
+  const parsed = { tag: null, id: null, classes: [], attrs: {}, pseudos: [] };
+  for (const m of selector.matchAll(/([a-zA-Z][\w-]*)|#([\w-]+)|\.([\w-]+)|\[([a-zA-Z-]+)=("([^"]*)"|'([^']*)')\]|:([a-zA-Z-]+)/g)) {
     if (m[1]) parsed.tag = m[1].toUpperCase();
-    else if (m[2]) parsed.classes.push(m[2]);
-    else if (m[3]) parsed.attrs[m[3]] = m[5] !== undefined ? m[5] : m[6];
-    else if (m[7]) parsed.pseudos.push(m[7]);
+    else if (m[2]) parsed.id = m[2];
+    else if (m[3]) parsed.classes.push(m[3]);
+    else if (m[4]) parsed.attrs[m[4]] = m[6] !== undefined ? m[6] : m[7];
+    else if (m[8]) parsed.pseudos.push(m[8]);
   }
   return parsed;
 }
@@ -122,6 +123,7 @@ function parseSelector(selector) {
 function elementMatches(el, parsed) {
   if (el.nodeType !== 1) return false;
   if (parsed.tag && el.tagName !== parsed.tag) return false;
+  if (parsed.id && el.id !== parsed.id) return false;
   for (const c of parsed.classes) if (!el.classList.contains(c)) return false;
   for (const [attr, value] of Object.entries(parsed.attrs)) {
     const actual = attr in el ? el[attr] : el.getAttribute(attr);
@@ -249,6 +251,14 @@ class FakeElement {
     }
     return null;
   }
+  contains(node) {
+    let n = node;
+    while (n) {
+      if (n === this) return true;
+      n = n.parentNode;
+    }
+    return false;
+  }
 
   addEventListener(type, fn) {
     (this._listeners[type] = this._listeners[type] || []).push(fn);
@@ -261,7 +271,7 @@ class FakeElement {
     if (!event.target) event.target = this;
     let node = this;
     while (node) {
-      for (const fn of (node._listeners[event.type] || []).slice()) fn(event);
+      for (const fn of (node._listeners[event.type] || []).slice()) fn.call(node, event);
       if (event._stopped) break;
       node = node.parentNode;
     }
@@ -279,6 +289,9 @@ class FakeElement {
       this.dispatchEvent(makeEvent('click', this));
     }
   }
+  // Not real focus management - just enough for tests to verify *which*
+  // element a piece of code intended to focus.
+  focus() { this._focused = true; }
 }
 
 // Returns { document, elements }. `elements` is keyed by id for direct
@@ -295,8 +308,13 @@ function makeFakeDom(ids = []) {
   const document = {
     documentElement: new FakeElement('html'),
     body: new FakeElement('body'),
+    _listeners: {},
     createElement: (tag) => new FakeElement(tag),
     createDocumentFragment: () => new FakeElement('#fragment'),
+    querySelectorAll(selector) {
+      return [...document.documentElement.querySelectorAll(selector), ...document.body.querySelectorAll(selector)];
+    },
+    querySelector(selector) { return document.querySelectorAll(selector)[0] || null; },
     getElementById(id) {
       if (!elements[id]) {
         const el = new FakeElement('div');
@@ -305,7 +323,22 @@ function makeFakeDom(ids = []) {
       }
       return elements[id];
     },
+    addEventListener(type, fn) { (document._listeners[type] = document._listeners[type] || []).push(fn); },
+    removeEventListener(type, fn) {
+      if (document._listeners[type]) document._listeners[type] = document._listeners[type].filter((f) => f !== fn);
+    },
+    dispatchEvent(eventOrType) {
+      const event = typeof eventOrType === 'string' ? makeEvent(eventOrType, document) : eventOrType;
+      for (const fn of (document._listeners[event.type] || []).slice()) fn.call(document, event);
+      return !event.defaultPrevented;
+    },
   };
+  // Real parent chain (body's parent is <html>, whose parent is the
+  // document itself) - lets an event dispatched on any element bubble
+  // all the way up into document's own listeners for free, via
+  // FakeElement.dispatchEvent's existing parentNode walk.
+  document.documentElement.parentNode = document;
+  document.body.parentNode = document.documentElement;
   return { document, elements };
 }
 

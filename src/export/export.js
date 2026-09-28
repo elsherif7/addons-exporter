@@ -38,7 +38,18 @@ async function updateExportDesc() {
   } catch {
     // keep default
   }
-  exportDescEl.innerHTML = `Select the <strong>Add-ons</strong> you want to export, then click <strong>Export Selected</strong> to create a ${formatLabel(fmt)} you can use to reinstall them later on any Firefox&#8209;based&nbsp;browser.`;
+  const label = formatLabel(fmt);
+  const article = indefiniteArticleFor(label);
+
+  exportDescEl.textContent = '';
+  const addonsStrong = document.createElement('strong');
+  addonsStrong.textContent = 'Add-ons';
+  const exportStrong = document.createElement('strong');
+  exportStrong.textContent = 'Export Selected';
+  exportDescEl.append(
+    'Select the ', addonsStrong, ' you want to export, then click ', exportStrong,
+    ` to create ${article} ${label} you can use to reinstall them later on any Firefox\u2011based\u00a0browser.`
+  );
 }
 
 updateExportDesc();
@@ -97,20 +108,25 @@ function createAddonRow(a, i, shorten) {
 
   const amoLink = document.createElement('a');
   amoLink.className = 'match-label';
-  amoLink.href = `https://addons.mozilla.org/en-US/firefox/addon/${encodeURIComponent(a.id)}/`;
+  // A guessed exact-id URL could 404 for a non-AMO add-on or a theme -
+  // a name search always lands somewhere useful instead.
+  amoLink.href = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
   amoLink.target = '_blank';
   amoLink.rel = 'noopener';
-  amoLink.textContent = 'AMO';
-  amoLink.style.cssText = 'color:var(--link-accent);text-decoration:none;margin-left:6px;';
-  amoLink.addEventListener('mouseover', () => { amoLink.style.textDecoration = 'underline'; });
-  amoLink.addEventListener('mouseout', () => { amoLink.style.textDecoration = 'none'; });
-  amoLink.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); window.open(amoLink.href, '_blank', 'noopener'); });
+  amoLink.textContent = 'Search AMO';
 
   const label = document.createElement('label');
   label.htmlFor = `cb-${i}`;
-  label.append(nameSpan, ' ', versionSpan, ' ', typeSpan, amoLink);
+  label.append(nameSpan, ' ', versionSpan, ' ', typeSpan);
 
-  row.append(checkbox, label);
+  // Kept out of the label, as a sibling rather than a child - inside it, a
+  // <label for> makes the checkbox's accessible name absorb the link text
+  // too (e.g. "uBlock Origin 1.0 Extension Search AMO"). Native
+  // target=_blank/rel=noopener already opens it in a new tab, the row's
+  // own click handler already skips anchor clicks, and
+  // .match-label[href]:hover in shared.css already underlines on hover -
+  // none of that needed its own JS here.
+  row.append(checkbox, label, amoLink);
   return row;
 }
 
