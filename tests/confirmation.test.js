@@ -9,8 +9,10 @@ const { test, readSrc, makeFakeDom } = require('./helpers');
 const commonSrc = readSrc('src/common/common.js');
 const confirmationSrc = readSrc('src/confirmation/confirmation.js');
 
-function loadConfirmation(search) {
+function loadConfirmation(search, { prefillMessage } = {}) {
   const { document, elements } = makeFakeDom(['heading', 'message']);
+  // The real confirmation.html ships #message with static fallback text.
+  if (prefillMessage) elements.message.textContent = prefillMessage;
   const sandbox = {
     document,
     location: { search },
@@ -70,4 +72,22 @@ test('the message is built with real <strong> elements, not raw HTML text', () =
 test('document.title is set to the same heading text', () => {
   const { document, elements } = loadConfirmation('?from=import');
   assert.strictEqual(document.title, elements.heading.textContent);
+});
+
+// The real page's #message already contains static text before the script
+// runs. The message must replace it, not be appended after it (which
+// showed the text twice).
+test('the message replaces the static fallback text in the HTML instead of duplicating it', () => {
+  const fallback = 'Thanks for using Add-ons Exporter. Your add-ons were exported as an HTML report. On another browser, choose Add-ons Importer to select which ones to install.';
+  const { elements } = loadConfirmation('?from=export&format=html', { prefillMessage: fallback });
+  const text = elements.message.textContent;
+  assert.strictEqual(text.split('Thanks for using').length - 1, 1, 'the message should appear exactly once');
+});
+
+test('import message replaces the export-worded fallback text, not appended after it', () => {
+  const fallback = 'Thanks for using Add-ons Exporter. Your add-ons were exported as an HTML report.';
+  const { elements } = loadConfirmation('?from=import', { prefillMessage: fallback });
+  const text = elements.message.textContent;
+  assert.doesNotMatch(text, /exported as/, 'the export wording from the fallback must be gone on the import page');
+  assert.match(text, /Each selected add-on is opening/);
 });

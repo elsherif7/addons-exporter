@@ -54,4 +54,9 @@ const { title, build } = MESSAGES[from] || MESSAGES.export;
 
 document.title = title;
 document.getElementById('heading').textContent = title;
-build(document.getElementById('message'));
+// #message ships with static fallback text in the HTML. Cleared first,
+// since build() appends - without this the message showed twice (the
+// old innerHTML assignment replaced it implicitly).
+const messageEl = document.getElementById('message');
+messageEl.textContent = '';
+build(messageEl);
