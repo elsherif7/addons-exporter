@@ -42,7 +42,7 @@ function makeSettingsSandbox() {
     document: fakeDocument,
     browser: {
       storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
-      runtime: { getManifest: () => ({ version: '1.2.0' }) },
+      runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
     },
   };
   vm.createContext(sandbox);
@@ -251,7 +251,7 @@ function makeSettingsSandboxWithRadios(storageSet) {
           remove: async () => {},
         },
       },
-      runtime: { getManifest: () => ({ version: '1.2.0' }) },
+      runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
     },
   };
   vm.createContext(sb);
@@ -359,7 +359,7 @@ function makeUpdateCheckSandbox(fetchImpl, currentVersion) {
     document: fakeDocument,
     browser: {
       storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
-      runtime: { getManifest: () => ({ version: currentVersion }) },
+      runtime: { getManifest: () => ({ version: currentVersion }), id: 'addons-exporter@local' },
     },
   };
   vm.createContext(sb);
@@ -456,7 +456,7 @@ function makeResetDialogSandbox() {
           remove: async () => {},
         },
       },
-      runtime: { getManifest: () => ({ version: '1.2.0' }) },
+      runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
     },
   };
   vm.createContext(sb);
@@ -525,4 +525,14 @@ test('Reset dialog: mentions the display setting, which it actually resets', () 
   const dialog = openResetDialog(document, elements.resetSettingsBtn);
   const message = dialog.querySelector('p');
   assert.match(message.textContent, /display/i, 'the dialog text should mention the display setting it also resets');
+});
+
+testAsync('checkUpdateBtn: the AMO lookup URL uses browser.runtime.id, not a hardcoded duplicate', async () => {
+  let requestedUrl = null;
+  const { btn } = makeUpdateCheckSandbox(
+    async (url) => { requestedUrl = url; return { ok: true, status: 200, json: async () => ({ current_version: { version: '1.0' } }) }; },
+    '1.0'
+  );
+  await btn._onClick();
+  assert.ok(requestedUrl.includes('addons-exporter%40local'), `expected the id in the URL, got: ${requestedUrl}`);
 });

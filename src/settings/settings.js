@@ -266,7 +266,6 @@ if (versionLink) {
   versionLink.textContent = CURRENT_VERSION;
   versionLink.href = `https://github.com/elsherif7/addons-hub/releases/tag/v${CURRENT_VERSION}`;
 }
-const AMO_ADDON_ID = 'addons-exporter@local';
 // Covers the whole request, body read included - fetchJsonWithTimeout()
 // (common.js) is what actually enforces this, unlike the plain fetch()
 // this replaced, which had nothing that could ever time it out.
@@ -283,7 +282,7 @@ document.getElementById('checkUpdateBtn').addEventListener('click', async () => 
 
   try {
     const result = await fetchJsonWithTimeout(
-      `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(AMO_ADDON_ID)}/`,
+      `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(browser.runtime.id)}/`,
       UPDATE_CHECK_TIMEOUT_MS
     );
     // A 404 here specifically means our own listed add-on ID wasn't

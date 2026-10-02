@@ -91,3 +91,12 @@ test('import message replaces the export-worded fallback text, not appended afte
   assert.doesNotMatch(text, /exported as/, 'the export wording from the fallback must be gone on the import page');
   assert.match(text, /Each selected add-on is opening/);
 });
+
+test('a prototype-pollution-shaped ?from= value falls back to the export message safely', () => {
+  // MESSAGES['constructor'] resolves to Object.prototype.constructor (a
+  // function, truthy) via the old `|| MESSAGES.export` fallback, so this
+  // specific value is the one that would have slipped past it.
+  const { elements } = loadConfirmation('?from=constructor');
+  assert.strictEqual(elements.heading.textContent, 'Add-ons Exporter');
+  assert.doesNotMatch(elements.message.textContent, /undefined/);
+});

@@ -59,6 +59,17 @@ test('A19: settings.html\'s #settingsStatus is a live region', () => {
   assert.match(html, /<span id="settingsStatus"[^>]*\brole="status"[^>]*\baria-live="polite"/);
 });
 
+// --- A34: settings.html's static version fallback matches the manifest ---
+
+test('A34 tripwire: settings.html\'s hardcoded version fallback matches manifest.json', () => {
+  const manifest = JSON.parse(readSrc('manifest.json'));
+  const settingsHtml = readSrc('src/settings/settings.html');
+  const versionLinkMatch = settingsHtml.match(/id="versionLink"[^>]*>([^<]+)</);
+  assert.ok(versionLinkMatch, 'could not find the #versionLink element in settings.html');
+  assert.strictEqual(versionLinkMatch[1], manifest.version,
+    `settings.html's static version fallback ("${versionLinkMatch[1]}") is out of sync with manifest.json ("${manifest.version}") - update settings.html`);
+});
+
 // --- A21: radiogroup semantics on the settings radio groups ---
 
 for (const [heading, headingId] of [['Appearance', 'appearanceHeading'], ['Export Format', 'exportFormatHeading'], ['Display', 'displayHeading']]) {

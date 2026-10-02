@@ -9,13 +9,6 @@ const searchInput = document.getElementById('searchInput');
 const noSearchMatchesEl = document.getElementById('noSearchMatches');
 const exportDescEl = document.getElementById('exportDesc');
 
-// Maps the stored exportFormat value to a human-readable file type label.
-function formatLabel(fmt) {
-  if (fmt === 'json') return 'JSON file';
-  if (fmt === 'csv') return 'CSV file';
-  return 'HTML report';
-}
-
 // Builds the status shown once a desktop export has actually finished.
 // Mentions lookup failures separately (see doExport()'s stats in
 // background.js) so a real AMO outage doesn't look identical to a

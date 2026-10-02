@@ -253,32 +253,10 @@ async function doExport(ids, cancelToken = { cancelled: false }, {
   // background.js has no document to apply a theme to, so it doesn't
   // load theme.js - it only needs the resolved value here, to bake into
   // the report's starting state (see report-template.js's
-  // buildHtmlReport). Falls back to light if storage is ever unavailable.
-  let theme = 'light';
-  try {
-    const stored = await browser.storage.local.get('theme');
-    theme = stored.theme === 'dark' ? 'dark' : 'light';
-  } catch {
-    // keep the 'light' default
-  }
-
-  // Read the user's chosen export format, defaulting to HTML.
-  let exportFormat = EXPORT_FORMAT_DEFAULT;
-  try {
-    const stored = await browser.storage.local.get(EXPORT_FORMAT_STORAGE_KEY);
-    const val = stored[EXPORT_FORMAT_STORAGE_KEY];
-    if (val === 'html' || val === 'json' || val === 'csv') exportFormat = val;
-  } catch {
-    // keep the default
-  }
-
-  let shorten = true;
-  try {
-    const stored = await browser.storage.local.get(SHORT_NAME_STORAGE_KEY);
-    if (stored && stored[SHORT_NAME_STORAGE_KEY] === 'off') shorten = false;
-  } catch {
-    // keep the default
-  }
+  // buildHtmlReport). getStoredSettings() (common.js) falls back to every
+  // default if storage is ever unavailable.
+  const { theme, exportFormat, shortenNames } = await getStoredSettings();
+  const shorten = shortenNames !== 'off';
 
   let content;
   let ext;

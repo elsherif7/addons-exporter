@@ -6,21 +6,12 @@
 // For export, a ?format= param carries the file type (html/json/csv)
 // so the message can name the actual format used.
 
-const FORMAT_LABELS = {
-  json: 'JSON file',
-  csv: 'CSV file',
-};
-
-function exportFormatLabel(fmt) {
-  return FORMAT_LABELS[fmt] || 'HTML report';
-}
-
 const params = new URLSearchParams(location.search);
 const from = params.get('from');
 const format = params.get('format') || 'html';
 
 function buildExportMessage(container) {
-  const label = exportFormatLabel(format);
+  const label = formatLabel(format);
   const article = indefiniteArticleFor(label);
   const exporterStrong = document.createElement('strong');
   exporterStrong.textContent = 'Add-ons Exporter';
@@ -50,7 +41,7 @@ const MESSAGES = {
   import: { title: 'Add-ons Importer', build: buildImportMessage },
 };
 
-const { title, build } = MESSAGES[from] || MESSAGES.export;
+const { title, build } = Object.hasOwn(MESSAGES, from) ? MESSAGES[from] : MESSAGES.export;
 
 document.title = title;
 document.getElementById('heading').textContent = title;

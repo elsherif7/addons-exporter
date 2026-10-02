@@ -462,10 +462,7 @@ async function runDoExportForFormat(storageLocalGetImpl) {
 }
 
 testAsync('doExport: produces a .json file when exportFormat is "json"', async () => {
-  const { content, filename } = await runDoExportForFormat(async (key) => {
-    if (key === 'exportFormat') return { exportFormat: 'json' };
-    return {};
-  });
+  const { content, filename } = await runDoExportForFormat(async () => ({ exportFormat: 'json' }));
   assert.match(filename, /\.json$/);
   const parsed = JSON.parse(content);
   assert.strictEqual(typeof parsed.formatVersion, 'number');
@@ -474,10 +471,7 @@ testAsync('doExport: produces a .json file when exportFormat is "json"', async (
 });
 
 testAsync('doExport: produces a .csv file when exportFormat is "csv"', async () => {
-  const { content, filename } = await runDoExportForFormat(async (key) => {
-    if (key === 'exportFormat') return { exportFormat: 'csv' };
-    return {};
-  });
+  const { content, filename } = await runDoExportForFormat(async () => ({ exportFormat: 'csv' }));
   assert.match(filename, /\.csv$/);
   assert.match(content, /^# addons-hub-format-version:/);
   assert.match(content, /id,name,version,enabled,type,link,linkType/);
@@ -491,10 +485,7 @@ testAsync('doExport: defaults to .html when exportFormat is unset', async () => 
 });
 
 testAsync('doExport: defaults to .html when exportFormat is an unrecognised value', async () => {
-  const { content, filename } = await runDoExportForFormat(async (key) => {
-    if (key === 'exportFormat') return { exportFormat: 'xml' };
-    return {};
-  });
+  const { content, filename } = await runDoExportForFormat(async () => ({ exportFormat: 'xml' }));
   assert.match(filename, /\.html$/);
   assert.match(content, /<!DOCTYPE html>/);
 });
@@ -510,19 +501,13 @@ testAsync('doExport: defaults to .html when storage.local.get throws for exportF
 // --- background.js: confirmation URL carries the correct format param ---
 
 testAsync('export message: on desktop with JSON format, confirmation URL has format=json', async () => {
-  const { createdTabUrls } = await captureExportMessageResult('win', async (key) => {
-    if (key === 'exportFormat') return { exportFormat: 'json' };
-    return {};
-  });
+  const { createdTabUrls } = await captureExportMessageResult('win', async () => ({ exportFormat: 'json' }));
   assert.strictEqual(createdTabUrls.length, 1);
   assert.match(createdTabUrls[0], /confirmation\.html\?from=export&format=json$/);
 });
 
 testAsync('export message: on desktop with CSV format, confirmation URL has format=csv', async () => {
-  const { createdTabUrls } = await captureExportMessageResult('win', async (key) => {
-    if (key === 'exportFormat') return { exportFormat: 'csv' };
-    return {};
-  });
+  const { createdTabUrls } = await captureExportMessageResult('win', async () => ({ exportFormat: 'csv' }));
   assert.strictEqual(createdTabUrls.length, 1);
   assert.match(createdTabUrls[0], /confirmation\.html\?from=export&format=csv$/);
 });

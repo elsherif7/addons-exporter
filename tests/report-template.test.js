@@ -232,8 +232,8 @@ test('buildCsvExport: an ordinary name is not guarded', () => {
 // The report embeds its own copy of shared layout CSS since it's a
 // standalone file. These tests catch drift between the two copies for
 // rules that must stay in sync. Intentional differences are excluded:
-// - --btn-bg-hover/--btn-disabled-bg/--btn-text (VAR_ALLOWLIST below) -
-//   the report has no primary-btn or checkbox-disabled states
+// - --btn-bg-hover/--btn-disabled-bg (VAR_ALLOWLIST below) - the report
+//   has no primary-btn or checkbox-disabled states
 // - Flex/checkbox layout on .addon-row (report rows have no checkboxes)
 // - margin-left on .addon-version (report compensates without flex)
 
@@ -332,7 +332,7 @@ function extractCssVars(src, rootSelector) {
 // Variables the report genuinely has no use for - it renders no
 // checkboxes and no <button class="primary-btn">, so it never needs a
 // disabled/hover state for either.
-const VAR_ALLOWLIST = new Set(['--btn-bg-hover', '--btn-disabled-bg', '--btn-text']);
+const VAR_ALLOWLIST = new Set(['--btn-bg-hover', '--btn-disabled-bg']);
 
 for (const [label, rootSelector] of [['light', ':root'], ['dark', ':root[data-theme="dark"]']]) {
   test(`CSS drift: ${label} theme variables match between shared.css and report-template.js`, () => {
@@ -417,4 +417,11 @@ test('A36: the report tip does not claim every link opens automatically', () => 
 test('A36: the report tip accurately describes selecting the file and pre-selecting new add-ons', () => {
   const reportTemplateSrc = readSrc('src/background/report-template.js');
   assert.match(reportTemplateSrc, /select this file[\s\S]{0,80}pre-selected to open/);
+});
+
+// --- A30: dead code cleanup ---
+
+test('A30: --btn-text is gone (it was never actually consumed anywhere)', () => {
+  assert.doesNotMatch(sharedCssSrc, /--btn-text/);
+  assert.doesNotMatch(reportTemplateSrcRaw, /--btn-text/);
 });

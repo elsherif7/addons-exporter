@@ -35,6 +35,55 @@ function byName(a, b) {
   return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 }
 
+// Maps the stored exportFormat value to a human-readable file type label.
+// Shared by export.js (the description text) and confirmation.js (the
+// "done" message) - previously each had its own copy of this.
+function formatLabel(fmt) {
+  if (fmt === 'json') return 'JSON file';
+  if (fmt === 'csv') return 'CSV file';
+  return 'HTML report';
+}
+
+// Shared value-checking for two of the three settings (the third, theme,
+// is already centralized in theme.js's resolveTheme()) - storage can
+// hold anything (a stale value from an older version, or something
+// written directly), so a stored value is checked against its known-good
+// set rather than trusted as-is. Previously each of export.js, settings.js
+// and background.js had its own copy of this same check.
+function isValidExportFormat(val) {
+  return val === 'html' || val === 'json' || val === 'csv';
+}
+function isValidShortenNames(val) {
+  return val === 'on' || val === 'off';
+}
+function resolveExportFormat(val) {
+  return isValidExportFormat(val) ? val : EXPORT_FORMAT_DEFAULT;
+}
+function resolveShortenNames(val) {
+  return isValidShortenNames(val) ? val : SHORT_NAME_DEFAULT;
+}
+
+// Reads all three settings in a single storage.local.get call, applying
+// the same validation each individual reader already did on its own.
+// Falls back to every default if the read itself fails, matching how
+// each site already treated that case before this was consolidated.
+// Written for background.js in particular, which can't load theme.js
+// (it has no document to apply a theme to) - so the theme key here is
+// the literal 'theme' string, not theme.js's THEME_STORAGE_KEY constant.
+// A tripwire test confirms that literal matches theme.js's key.
+async function getStoredSettings() {
+  try {
+    const stored = await browser.storage.local.get(['theme', EXPORT_FORMAT_STORAGE_KEY, SHORT_NAME_STORAGE_KEY]);
+    return {
+      theme: stored.theme === 'dark' ? 'dark' : 'light',
+      exportFormat: resolveExportFormat(stored[EXPORT_FORMAT_STORAGE_KEY]),
+      shortenNames: resolveShortenNames(stored[SHORT_NAME_STORAGE_KEY]),
+    };
+  } catch {
+    return { theme: 'light', exportFormat: EXPORT_FORMAT_DEFAULT, shortenNames: SHORT_NAME_DEFAULT };
+  }
+}
+
 // "a" or "an" for a label that might start with a capitalized acronym
 // (e.g. "HTML report", "JSON file"). A plain first-letter vowel check
 // gets acronyms wrong: "HTML" is read out letter by letter as
@@ -217,13 +266,11 @@ function filterAddonRows(container, query) {
   const q = query.trim().toLowerCase();
   let anyMatch = false;
 
-  // Group containers can sit at any depth - export.js/import.js now wrap
-  // them in an outer .groups-outer-box (see appendGroup()/renderList()/
-  // renderAddonList()), so they're no longer necessarily direct children
-  // of `container`. querySelectorAll finds them regardless of nesting;
-  // container.children below only ever finds true top-level flat
-  // structures, which is why that loop is kept separate rather than
-  // merged into this one.
+  // Group containers can sit at any depth - export.js/import.js/the report
+  // all wrap them in an outer .groups-outer-box (see appendGroup()/
+  // renderList()/renderAddonList()), so they're no longer necessarily
+  // direct children of `container`. querySelectorAll finds them
+  // regardless of nesting.
   for (const el of container.querySelectorAll('.group-container')) {
     const box = el.querySelector('.group-box');
     let groupHasMatch = false;
@@ -240,29 +287,5 @@ function filterAddonRows(container, query) {
     el.style.display = groupHasMatch ? '' : 'none';
   }
 
-  for (const el of container.children) {
-    if (el.classList.contains('group-container')) {
-      // Already handled by the querySelectorAll pass above.
-      continue;
-    } else if (el.classList.contains('group-box')) {
-      // Legacy flat group-box (report template still uses this).
-      let groupHasMatch = false;
-      for (const child of el.children) {
-        if (child.classList.contains('addon-row')) {
-          const nameEl = child.querySelector('.addon-name');
-          const match = q === '' || (nameEl && nameEl.textContent.toLowerCase().includes(q));
-          child.style.display = match ? '' : 'none';
-          if (match) { groupHasMatch = true; anyMatch = true; }
-        }
-      }
-      el.style.display = groupHasMatch ? '' : 'none';
-    } else if (el.classList.contains('addon-row')) {
-      // Fallback: flat structure (e.g. report template).
-      const nameEl = el.querySelector('.addon-name');
-      const match = q === '' || (nameEl && nameEl.textContent.toLowerCase().includes(q));
-      el.style.display = match ? '' : 'none';
-      if (match) anyMatch = true;
-    }
-  }
   return anyMatch;
 }

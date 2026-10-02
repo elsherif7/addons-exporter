@@ -3,7 +3,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext } = require('./helpers');
 
 const commonSrc = readSrc('src/common/common.js');
 const sandbox = { URL };
@@ -532,4 +532,101 @@ test('indefiniteArticleFor: "CSV file" needs "a" (C is "see", a consonant sound)
 test('indefiniteArticleFor: falls back to ordinary spelling for a non-acronym word', () => {
   assert.strictEqual(sandbox.indefiniteArticleFor('extension'), 'an');
   assert.strictEqual(sandbox.indefiniteArticleFor('theme'), 'a');
+});
+
+// --- A30: dead code cleanup ---
+
+test('A30: the legacy flat-structure branches are gone from filterAddonRows', () => {
+  const commonSrcRaw = readSrc('src/common/common.js');
+  assert.doesNotMatch(commonSrcRaw, /Legacy flat group-box/);
+  assert.doesNotMatch(commonSrcRaw, /Fallback: flat structure/);
+});
+
+// --- A34: getStoredSettings ---
+
+function bootSettingsSandbox(storageGetImpl) {
+  const sb = { browser: { storage: { local: { get: storageGetImpl } } } };
+  vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
+  return sb;
+}
+
+testAsync('getStoredSettings: valid stored values are used as-is', async () => {
+  const sb = bootSettingsSandbox(async () => ({ theme: 'dark', exportFormat: 'json', shortenNames: 'off' }));
+  const result = await sb.getStoredSettings();
+  assert.strictEqual(result.theme, 'dark');
+  assert.strictEqual(result.exportFormat, 'json');
+  assert.strictEqual(result.shortenNames, 'off');
+});
+
+testAsync('getStoredSettings: invalid stored values fall back to their defaults', async () => {
+  const sb = bootSettingsSandbox(async () => ({ theme: 'sepia', exportFormat: 'xml', shortenNames: 'maybe' }));
+  const result = await sb.getStoredSettings();
+  assert.strictEqual(result.theme, 'light');
+  assert.strictEqual(result.exportFormat, 'html');
+  assert.strictEqual(result.shortenNames, 'on');
+});
+
+testAsync('getStoredSettings: a pristine (empty) profile gets every default', async () => {
+  const sb = bootSettingsSandbox(async () => ({}));
+  const result = await sb.getStoredSettings();
+  assert.strictEqual(result.theme, 'light');
+  assert.strictEqual(result.exportFormat, 'html');
+  assert.strictEqual(result.shortenNames, 'on');
+});
+
+testAsync('getStoredSettings: a throwing storage.get falls back to every default, not a rejection', async () => {
+  const sb = bootSettingsSandbox(async () => { throw new Error('storage unavailable'); });
+  const result = await sb.getStoredSettings();
+  assert.strictEqual(result.theme, 'light');
+  assert.strictEqual(result.exportFormat, 'html');
+  assert.strictEqual(result.shortenNames, 'on');
+});
+
+testAsync('getStoredSettings: reads all three keys in a single storage.get call', async () => {
+  let callCount = 0;
+  const sb = bootSettingsSandbox(async () => { callCount++; return {}; });
+  await sb.getStoredSettings();
+  assert.strictEqual(callCount, 1, 'should be exactly one storage.get call, not one per setting');
+});
+
+test('resolveExportFormat / resolveShortenNames: valid values pass through, invalid ones fall back', () => {
+  assert.strictEqual(sandbox.resolveExportFormat('json'), 'json');
+  assert.strictEqual(sandbox.resolveExportFormat('xml'), 'html');
+  assert.strictEqual(sandbox.resolveShortenNames('off'), 'off');
+  assert.strictEqual(sandbox.resolveShortenNames('maybe'), 'on');
+});
+
+// A34 tripwire: getStoredSettings() (used by background.js, which can't
+// load theme.js) hardcodes the literal 'theme' key rather than importing
+// theme.js's THEME_STORAGE_KEY constant. If that constant's value is ever
+// changed, this test is what would catch the two falling out of sync.
+test('A34 tripwire: getStoredSettings\' literal theme key matches theme.js\'s THEME_STORAGE_KEY', () => {
+  const themeSrc = readSrc('src/common/theme.js');
+  const themeSandbox = {
+    browser: { storage: { local: { get: async () => ({}) } } },
+    document: { documentElement: { setAttribute() {} } },
+    localStorage: { getItem() { return null; }, setItem() {} },
+  };
+  vm.createContext(themeSandbox);
+  vm.runInContext(themeSrc, themeSandbox);
+  const themeKey = evalInContext(themeSandbox, 'THEME_STORAGE_KEY');
+
+  assert.strictEqual(themeKey, 'theme');
+  assert.match(commonSrc, /storage\.local\.get\(\['theme', EXPORT_FORMAT_STORAGE_KEY/,
+    'getStoredSettings should read the literal \'theme\' key, matching THEME_STORAGE_KEY\'s value above');
+});
+
+test('A34: formatLabel maps each export format to its label', () => {
+  assert.strictEqual(sandbox.formatLabel('json'), 'JSON file');
+  assert.strictEqual(sandbox.formatLabel('csv'), 'CSV file');
+  assert.strictEqual(sandbox.formatLabel('html'), 'HTML report');
+  assert.strictEqual(sandbox.formatLabel('nonsense'), 'HTML report');
+});
+
+test('A34: formatLabel is no longer duplicated in export.js or confirmation.js', () => {
+  const exportSrcRaw = readSrc('src/export/export.js');
+  const confirmationSrcRaw = readSrc('src/confirmation/confirmation.js');
+  assert.doesNotMatch(exportSrcRaw, /function formatLabel/);
+  assert.doesNotMatch(confirmationSrcRaw, /function exportFormatLabel|FORMAT_LABELS/);
 });
