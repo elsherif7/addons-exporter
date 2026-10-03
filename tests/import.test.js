@@ -891,3 +891,46 @@ testAsync('import.js: a drop event on the document (outside the picker) is preve
   sandbox.document.dispatchEvent(event);
   assert.strictEqual(event.defaultPrevented, true, 'a drop anywhere on the page should be prevented, not just inside the picker');
 });
+
+// --- 4.2: compareNote summary line ---
+
+testAsync('import.js real DOM: shows a count note when some are new and some are already installed', async () => {
+  const installed = [{ id: 'b@x', name: 'Beta', version: '2.0', enabled: true, type: 'extension' }];
+  const elements = await renderRealImportList([
+    { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
+    { id: 'b@x', name: 'Beta',  version: '2.0', link: 'https://example.com/b' },
+  ], installed);
+  assert.match(elements.compareNote.textContent, /1 new add-on pre-selected/);
+  assert.match(elements.compareNote.textContent, /1 already-installed add-on shown for reference/);
+});
+
+testAsync('import.js real DOM: count note uses plural when there are multiple new and multiple installed', async () => {
+  const installed = [
+    { id: 'b@x', name: 'Beta',  version: '2.0', enabled: true, type: 'extension' },
+    { id: 'c@x', name: 'Gamma', version: '3.0', enabled: true, type: 'extension' },
+  ];
+  const elements = await renderRealImportList([
+    { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
+    { id: 'd@x', name: 'Delta', version: '4.0', link: 'https://example.com/d' },
+    { id: 'b@x', name: 'Beta',  version: '2.0', link: 'https://example.com/b' },
+    { id: 'c@x', name: 'Gamma', version: '3.0', link: 'https://example.com/c' },
+  ], installed);
+  assert.match(elements.compareNote.textContent, /2 new add-ons pre-selected/);
+  assert.match(elements.compareNote.textContent, /2 already-installed add-ons shown for reference/);
+});
+
+testAsync('import.js real DOM: shows the "already have everything" note when nothing is new', async () => {
+  const installed = [{ id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension' }];
+  const elements = await renderRealImportList([
+    { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
+  ], installed);
+  assert.match(elements.compareNote.textContent, /already have every add-on/);
+  assert.doesNotMatch(elements.compareNote.textContent, /new add-on/);
+});
+
+testAsync('import.js real DOM: no note shown when everything is new and nothing is installed', async () => {
+  const elements = await renderRealImportList([
+    { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
+  ]);
+  assert.strictEqual(elements.compareNote.textContent, '', 'no note needed when all add-ons are new');
+});

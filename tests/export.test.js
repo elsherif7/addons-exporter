@@ -170,6 +170,40 @@ testAsync('export.js click handler: no lookup-failure mention when there weren\'
   assert.doesNotMatch(statusEl.textContent, /couldn't be looked up/);
 });
 
+// --- 4.3: stats breakdown in the success message ---
+
+testAsync('export.js success message: shows "all found on AMO" when all are exact/search matches', async () => {
+  const { statusEl } = await captureExportClick({
+    selectedIds: ['ext1@example.com', 'ext2@example.com'],
+    exportResponse: { format: 'html', stats: { total: 2, amoExact: 1, amoSearch: 1, homepage: 0, searchFallback: 0, lookupFailures: 0, lookupsSkipped: 0 } },
+  });
+  assert.match(statusEl.textContent, /All 2 add-ons found on AMO/);
+});
+
+testAsync('export.js success message: shows mixed breakdown when some are AMO and some are fallback', async () => {
+  const { statusEl } = await captureExportClick({
+    selectedIds: ['ext1@example.com', 'ext2@example.com', 'ext3@example.com'],
+    exportResponse: { format: 'html', stats: { total: 3, amoExact: 2, amoSearch: 0, homepage: 1, searchFallback: 0, lookupFailures: 0, lookupsSkipped: 0 } },
+  });
+  assert.match(statusEl.textContent, /2 found on AMO, 1 got a fallback link/);
+});
+
+testAsync('export.js success message: shows fallback-only message when AMO found nothing', async () => {
+  const { statusEl } = await captureExportClick({
+    selectedIds: ['ext1@example.com'],
+    exportResponse: { format: 'html', stats: { total: 1, amoExact: 0, amoSearch: 0, homepage: 0, searchFallback: 1, lookupFailures: 0, lookupsSkipped: 0 } },
+  });
+  assert.match(statusEl.textContent, /1 add-on got a fallback link \(AMO had no match\)/);
+});
+
+testAsync('export.js success message: shows skipped-lookups note when deadline was hit', async () => {
+  const { statusEl } = await captureExportClick({
+    selectedIds: ['ext1@example.com', 'ext2@example.com'],
+    exportResponse: { format: 'html', stats: { total: 2, amoExact: 1, amoSearch: 0, homepage: 0, searchFallback: 1, lookupFailures: 0, lookupsSkipped: 1 } },
+  });
+  assert.match(statusEl.textContent, /1 add-on skipped AMO \(deadline reached\)/);
+});
+
 // --- A12: Cancel button wiring ---
 
 testAsync('cancelExportBtn: clicking it sends a cancelExport message', async () => {

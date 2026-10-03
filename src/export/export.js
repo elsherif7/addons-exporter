@@ -10,13 +10,43 @@ const noSearchMatchesEl = document.getElementById('noSearchMatches');
 const exportDescEl = document.getElementById('exportDesc');
 
 // Builds the status shown once a desktop export has actually finished.
-// Mentions lookup failures separately (see doExport()'s stats in
-// background.js) so a real AMO outage doesn't look identical to a
-// completely normal export - previously nothing distinguished them.
+// Mentions the AMO lookup breakdown so the user knows how many links are
+// confirmed exact matches vs fallbacks, and flags lookup failures
+// separately (see doExport()'s stats in background.js) so a real AMO
+// outage doesn't look identical to a completely normal export.
 function buildExportSuccessStatus(fmt, stats) {
   let msg = `Export complete. Your ${formatLabel(fmt)} has been saved to the folder you picked.`;
-  if (stats && stats.lookupFailures > 0) {
-    msg += ` ${stats.lookupFailures} of ${stats.total} add-on${stats.total === 1 ? '' : 's'} couldn't be looked up on AMO and got a fallback link instead.`;
+  if (stats) {
+    const total = stats.total || 0;
+    const failures = stats.lookupFailures || 0;
+    const skipped = stats.lookupsSkipped || 0;
+    // amoExact/amoSearch/homepage/searchFallback are only present when the
+    // full stats object was returned (desktop path). Only show the breakdown
+    // when at least one of those counters is explicitly present.
+    const hasBreakdown = 'amoExact' in stats;
+    const amoFound = hasBreakdown ? (stats.amoExact || 0) + (stats.amoSearch || 0) : 0;
+    const fallback = hasBreakdown ? (stats.homepage || 0) + (stats.searchFallback || 0) : 0;
+
+    if (total > 0) {
+      if (failures === 0 && skipped === 0 && hasBreakdown) {
+        // All lookups attempted and none failed — show the breakdown.
+        if (fallback === 0) {
+          msg += ` All ${total} add-on${total === 1 ? '' : 's'} found on AMO.`;
+        } else if (amoFound === 0) {
+          msg += ` ${fallback} add-on${fallback === 1 ? '' : 's'} got a fallback link (AMO had no match).`;
+        } else {
+          msg += ` ${amoFound} found on AMO, ${fallback} got a fallback link.`;
+        }
+      } else {
+        // Failures or skips — note them instead of the full breakdown.
+        if (failures > 0) {
+          msg += ` ${failures} of ${total} add-on${total === 1 ? '' : 's'} couldn't be looked up on AMO and got a fallback link instead.`;
+        }
+        if (skipped > 0) {
+          msg += ` ${skipped} add-on${skipped === 1 ? '' : 's'} skipped AMO (deadline reached) and got a fallback link.`;
+        }
+      }
+    }
   }
   return msg;
 }
@@ -273,9 +303,16 @@ exportBtn.addEventListener('click', async () => {
       await new Promise((resolve) => {
         let settled = false;
         let fallbackTimer;
+        // After a short wait with no onCreated signal, show a hint so the
+        // user knows something is expected of them (Android's download
+        // prompt may need a tap to confirm).
+        const hintTimer = setTimeout(() => {
+          setStatus('Saving\u2014tap \u201cDownload\u201d in the prompt if asked\u2026');
+        }, 1500);
         const proceed = () => {
           if (settled) return;
           settled = true;
+          clearTimeout(hintTimer);
           browser.downloads.onCreated.removeListener(onCreated);
           clearTimeout(fallbackTimer);
           resolve();

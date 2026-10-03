@@ -230,9 +230,15 @@ exportSettingsBtn.addEventListener('click', async () => {
         await new Promise((resolve) => {
           let settled = false;
           let fallbackTimer;
+          // After a short wait with no onCreated signal, show a hint so
+          // the user knows something may be expected of them.
+          const hintTimer = setTimeout(() => {
+            setSettingsStatus('Saving\u2014tap \u201cDownload\u201d in the prompt if asked\u2026');
+          }, 1500);
           const proceed = () => {
             if (settled) return;
             settled = true;
+            clearTimeout(hintTimer);
             browser.downloads.onCreated.removeListener(onCreated);
             clearTimeout(fallbackTimer);
             resolve();

@@ -451,11 +451,13 @@ function renderAddonList(addons, installed, shorten) {
   searchInput.style.display = 'block';
   noSearchMatchesEl.style.display = 'none';
 
-  // Only note when everything from this file is already installed - a
-  // count of extra add-ons installed since doesn't lead anywhere useful.
   const notes = [];
   if (notInstalled.length === 0 && alreadyInstalled.length > 0) {
     notes.push('You already have every add-on from this export installed.');
+  } else if (notInstalled.length > 0 && alreadyInstalled.length > 0) {
+    const newWord = notInstalled.length === 1 ? 'add-on' : 'add-ons';
+    const instWord = alreadyInstalled.length === 1 ? 'add-on' : 'add-ons';
+    notes.push(`${notInstalled.length} new ${newWord} pre-selected, ${alreadyInstalled.length} already-installed ${instWord} shown for reference.`);
   }
   const noteFragment = document.createDocumentFragment();
   notes.forEach((n) => {
