@@ -259,6 +259,7 @@ function buildHtmlReport(list, theme, shorten = true) {
 
   <script type="application/json" id="addons-exporter-data">${safeJsonForScriptTag({ formatVersion: EXPORT_FORMAT_VERSION, addons: list })}</script>
   <script>
+    // @inline-script-start
     // Self-contained - this file has no access to the extension's own
     // scripts or APIs once it's saved and opened on its own.
     var addonListEl = document.getElementById('addonList');

@@ -18,9 +18,15 @@ const { escapeHtml, isSafeUrl, byName, filterAddonRows, visibleCheckboxes, extra
 // report-template.js - not a hand-copied snapshot - so a future edit to
 // one copy and not the other gets caught here instead of silently drifting.
 const reportTemplateSrc = readSrc('src/background/report-template.js');
-const reportScriptMatch = reportTemplateSrc.match(/<script>([\s\S]*?)<\/script>/);
+// Extract the inline <script> block by its named marker comment rather than
+// by a bare /<script>/ tag match. The report template has two <script> tags
+// (a JSON data tag and the logic block); a tag-only regex would pick the
+// wrong one if their order ever changed, or if a third tag was added before
+// it. The marker pins extraction to exactly the right block regardless of
+// what else is in the template.
+const reportScriptMatch = reportTemplateSrc.match(/\/\/ @inline-script-start([\s\S]*?)<\/script>/);
 if (!reportScriptMatch) {
-  throw new Error("Could not find the report's inline <script> block in report-template.js - update this extraction if the report template changed.");
+  throw new Error("Could not find the '// @inline-script-start' marker in report-template.js - add it back to the report's inline <script> block.");
 }
 const reportInlineScript = reportScriptMatch[1];
 

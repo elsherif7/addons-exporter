@@ -536,3 +536,150 @@ testAsync('checkUpdateBtn: the AMO lookup URL uses browser.runtime.id, not a har
   await btn._onClick();
   assert.ok(requestedUrl.includes('addons-exporter%40local'), `expected the id in the URL, got: ${requestedUrl}`);
 });
+
+// --- 2.1: exportSettingsBtn — Android vs desktop path ---
+// The export handler now detects the platform and uses a plain <a download>
+// click on Android (where downloads.download({saveAs}) silently fails with
+// a blob: URL) instead of the saveAs dialog used on desktop.
+
+function makeExportSettingsSandbox({ platformOs, simulateDownloadCreated = false }) {
+  const exportBtnEl = { addEventListener(ev, fn) { if (ev === 'click') this._onClick = fn; } };
+  const statusEl = { textContent: '', className: '' };
+  const appendedLinks = [];
+  const downloadCalls = [];
+  const bodyStub = {
+    appendChild: (el) => appendedLinks.push(el),
+    children: [],
+  };
+  const fakeDocument = {
+    querySelectorAll: () => [],
+    getElementById: (id) => {
+      if (id === 'exportSettingsBtn') return exportBtnEl;
+      if (id === 'settingsStatus') return statusEl;
+      return makeFakeElement();
+    },
+    body: bodyStub,
+    createElement: () => ({
+      style: {},
+      href: '',
+      download: '',
+      click() { this.clicked = true; },
+      remove() { this.removed = true; },
+    }),
+    documentElement: { setAttribute() {} },
+  };
+  const sb = {
+    URL: { createObjectURL: () => 'blob:fake-url', revokeObjectURL() {} },
+    Blob: function Blob() {},
+    setTimeout: (fn) => { fn(); return 0; },
+    clearTimeout() {},
+    fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
+    document: fakeDocument,
+    browser: {
+      runtime: {
+        getManifest: () => ({ version: '1.2.0' }),
+        id: 'addons-exporter@local',
+        getPlatformInfo: async () => ({ os: platformOs }),
+      },
+      storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
+      downloads: {
+        download: async (opts) => { downloadCalls.push(opts); return 1; },
+        onCreated: {
+          addListener: (fn) => { if (simulateDownloadCreated) fn({}); },
+          removeListener() {},
+        },
+      },
+    },
+  };
+  vm.createContext(sb);
+  sb.makeFakeElement = makeFakeElement;
+  vm.runInContext(themeSrc, sb);
+  vm.runInContext(commonSrc, sb);
+  vm.runInContext(settingsSrc, sb);
+  return { exportBtnEl, statusEl, appendedLinks, downloadCalls };
+}
+
+testAsync('exportSettingsBtn: on desktop, uses downloads.download with saveAs and shows success', async () => {
+  const { exportBtnEl, statusEl, appendedLinks, downloadCalls } = makeExportSettingsSandbox({ platformOs: 'win' });
+  await exportBtnEl._onClick();
+  assert.strictEqual(downloadCalls.length, 1, 'should call downloads.download once on desktop');
+  assert.strictEqual(downloadCalls[0].saveAs, true);
+  assert.match(downloadCalls[0].filename, /^Add-ons Hub Settings \(.+\)\.json$/);
+  assert.strictEqual(appendedLinks.length, 0, 'should not create an <a> link on desktop');
+  assert.strictEqual(statusEl.textContent, 'Settings exported.');
+  assert.strictEqual(statusEl.className, '');
+});
+
+testAsync('exportSettingsBtn: on Android, uses <a download> click instead of downloads.download saveAs', async () => {
+  const { exportBtnEl, statusEl, appendedLinks, downloadCalls } = makeExportSettingsSandbox({
+    platformOs: 'android',
+    simulateDownloadCreated: true,
+  });
+  await exportBtnEl._onClick();
+  assert.strictEqual(downloadCalls.length, 0, 'should not call downloads.download on Android');
+  assert.strictEqual(appendedLinks.length, 1, 'should create an <a> link on Android');
+  assert.strictEqual(appendedLinks[0].href, 'blob:fake-url');
+  assert.match(appendedLinks[0].download, /^Add-ons Hub Settings \(.+\)\.json$/);
+  assert.strictEqual(appendedLinks[0].clicked, true);
+  assert.strictEqual(appendedLinks[0].removed, true);
+  assert.strictEqual(statusEl.textContent, 'Settings exported.');
+});
+
+testAsync('exportSettingsBtn: on Android, still succeeds via the fallback timer if onCreated never fires', async () => {
+  const { exportBtnEl, statusEl } = makeExportSettingsSandbox({
+    platformOs: 'android',
+    simulateDownloadCreated: false, // fallback setTimeout fires immediately in this sandbox
+  });
+  await exportBtnEl._onClick();
+  assert.strictEqual(statusEl.textContent, 'Settings exported.');
+});
+
+testAsync('exportSettingsBtn: a getPlatformInfo failure falls back to the desktop path gracefully', async () => {
+  // If getPlatformInfo rejects (shouldn't happen in practice, but guards
+  // against a future API change), the catch gives os: 'unknown', which
+  // takes the desktop (saveAs) path rather than throwing altogether.
+  const { exportBtnEl, statusEl, downloadCalls } = makeExportSettingsSandbox({ platformOs: 'win' });
+  // Swap getPlatformInfo to a throwing version via the already-created sandbox's browser object.
+  // Re-create the sandbox with a throwing getPlatformInfo instead.
+  const exportBtnEl2 = { addEventListener(ev, fn) { if (ev === 'click') this._onClick = fn; } };
+  const statusEl2 = { textContent: '', className: '' };
+  const downloadCalls2 = [];
+  const fakeDocument2 = {
+    querySelectorAll: () => [],
+    getElementById: (id) => {
+      if (id === 'exportSettingsBtn') return exportBtnEl2;
+      if (id === 'settingsStatus') return statusEl2;
+      return makeFakeElement();
+    },
+    body: { appendChild() {}, children: [] },
+    createElement: () => ({ style: {}, href: '', download: '', click() {}, remove() {} }),
+    documentElement: { setAttribute() {} },
+  };
+  const sb2 = {
+    URL: { createObjectURL: () => 'blob:fake-url', revokeObjectURL() {} },
+    Blob: function Blob() {},
+    setTimeout: (fn) => { fn(); return 0; },
+    clearTimeout() {},
+    fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
+    document: fakeDocument2,
+    browser: {
+      runtime: {
+        getManifest: () => ({ version: '1.2.0' }),
+        id: 'addons-exporter@local',
+        getPlatformInfo: async () => { throw new Error('API unavailable'); },
+      },
+      storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
+      downloads: {
+        download: async (opts) => { downloadCalls2.push(opts); return 1; },
+        onCreated: { addListener() {}, removeListener() {} },
+      },
+    },
+  };
+  vm.createContext(sb2);
+  vm.runInContext(themeSrc, sb2);
+  vm.runInContext(commonSrc, sb2);
+  vm.runInContext(settingsSrc, sb2);
+  await exportBtnEl2._onClick();
+  assert.strictEqual(downloadCalls2.length, 1, 'should fall back to the desktop (saveAs) path when getPlatformInfo throws');
+  assert.strictEqual(statusEl2.textContent, 'Settings exported.');
+});

@@ -167,10 +167,34 @@ async function listInstalledAddons() {
   }));
 }
 
-// Don't add a setInterval() keep-alive here. Firefox already resets the
-// idle-suspend timer while export.js's sendMessage() call is pending
-// (bug 1851373). A keep-alive timer was tried in an earlier version but
-// the background page was still killed despite it.
+// Background worker suspension note:
+//
+// Firefox MV3 uses an event page (not a service worker), and kills it after
+// ~30 seconds of inactivity. Two mechanisms already keep it alive during an
+// export:
+//   1. export.js's sendMessage() call stays open for the duration of the
+//      export, and Firefox resets the idle timer while a message port is
+//      held open (bug 1851373).
+//   2. The fetch calls inside mapWithConcurrency() count as ongoing network
+//      activity, each resetting the timer on their own.
+//
+// A plain setInterval() keep-alive was tried in an earlier version but the
+// background page was still killed despite it - a bare timer with no
+// browser.* API call inside doesn't count as "activity" to the event page
+// lifetime tracker.
+//
+// A known workaround (confirmed working as of 2025) is to call any
+// browser.* API on a short interval, e.g.:
+//   self.setInterval(() => browser.runtime.getPlatformInfo(), 20000)
+// This converts the event page into an effectively persistent background
+// script. It has not been adopted here because the existing two mechanisms
+// above already cover the normal export window (up to the 90s deadline
+// below), and making the background unconditionally persistent would prevent
+// Firefox from ever reclaiming its memory between sessions. If future testing
+// shows exports are still being killed despite those two mechanisms (e.g. on
+// a very slow connection with a huge add-on list), the getPlatformInfo
+// interval is the recommended fix - scoped to the duration of doExport()
+// only, not the lifetime of the background script.
 // After this much wall time spent on AMO lookups, stop attempting them
 // and fall back to a homepage/search link for whatever's left - large
 // lists could otherwise take a very long time (up to two 15s lookups per

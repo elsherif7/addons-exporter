@@ -206,11 +206,54 @@ exportSettingsBtn.addEventListener('click', async () => {
     const d = new Date();
     const timestamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
     const filename = `Add-ons Hub Settings (${timestamp}).json`;
+
+    let platform;
     try {
-      await browser.downloads.download({ url, filename, saveAs: true });
-    } finally {
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      platform = await browser.runtime.getPlatformInfo();
+    } catch {
+      platform = { os: 'unknown' };
     }
+
+    if (platform.os === 'android') {
+      // Android's downloads.download() can't handle blob: URLs, and there
+      // is no saveAs dialog. Trigger the save with a plain <a download>
+      // click instead - the same approach export.js uses for the add-ons
+      // export on Android. Wait for downloads.onCreated (the real signal
+      // that the browser has accepted the download) or fall back to a
+      // short timeout so we don't hang indefinitely.
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      try {
+        await new Promise((resolve) => {
+          let settled = false;
+          let fallbackTimer;
+          const proceed = () => {
+            if (settled) return;
+            settled = true;
+            browser.downloads.onCreated.removeListener(onCreated);
+            clearTimeout(fallbackTimer);
+            resolve();
+          };
+          const onCreated = () => proceed();
+          browser.downloads.onCreated.addListener(onCreated);
+          fallbackTimer = setTimeout(proceed, 5000);
+          link.click();
+        });
+      } finally {
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      }
+    } else {
+      try {
+        await browser.downloads.download({ url, filename, saveAs: true });
+      } finally {
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      }
+    }
+
     setSettingsStatus('Settings exported.');
   } catch (err) {
     setSettingsStatus('Export failed: ' + err.message, true);
