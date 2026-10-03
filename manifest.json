@@ -28,11 +28,11 @@
     }
   },
   "icons": {
-    "16": "src/icons/icon16.png",
-    "32": "src/icons/icon32.png",
-    "48": "src/icons/icon48.png",
-    "96": "src/icons/icon96.png",
-    "128": "src/icons/icon128.png"
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "96": "icons/icon96.png",
+    "128": "icons/icon128.png"
   },
   "background": {
     "scripts": ["src/common/common.js", "src/background/report-template.js", "src/background/background.js"]
@@ -41,9 +41,9 @@
     "default_title": "Add-ons Hub",
     "default_popup": "src/popup/popup.html",
     "default_icon": {
-      "16": "src/icons/icon16.png",
-      "32": "src/icons/icon32.png",
-      "48": "src/icons/icon48.png"
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
     }
   }
 }

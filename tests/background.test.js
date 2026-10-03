@@ -159,7 +159,7 @@ async function runDoExportWithFetch(addon, fetchImpl) {
   return JSON.parse(dataMatch[1]).addons[0];
 }
 
-async function runDoExportWithOptions(addons, fetchImpl, cancelToken, options) {
+async function runDoExportWithOptions(addons, fetchImpl, options) {
   const bgSandbox = {
     URL,
     AbortController,
@@ -176,7 +176,7 @@ async function runDoExportWithOptions(addons, fetchImpl, cancelToken, options) {
   vm.runInContext(commonSrc, bgSandbox);
   vm.runInContext(reportTemplateSrc, bgSandbox);
   vm.runInContext(backgroundSrc, bgSandbox);
-  return bgSandbox.doExport(addons.map((a) => a.id), cancelToken, options);
+  return bgSandbox.doExport(addons.map((a) => a.id), options);
 }
 
 testAsync('doExport: uses the exact AMO match when found', async () => {
@@ -236,64 +236,6 @@ testAsync('doExport: an unsafe homepage URL is rejected in favor of the search-r
   assert.strictEqual(result.linkType, 'amo-search-fallback');
 });
 
-// --- A12: cancelling an export, and its deadline/failure safety net ---
-
-testAsync('cancelExport: cancelling mid-run resolves to {cancelled: true} and saves nothing', async () => {
-  let messageListener;
-  const downloadCalls = [];
-  const tabCalls = [];
-  const bgSandbox = {
-    URL, Blob, AbortController, setTimeout, clearTimeout,
-    console: { warn() {}, debug() {}, log() {}, error() {} },
-    // A little real latency on every lookup call, so there's a window
-    // between "export started" and "the in-flight lookup finishes" for
-    // the test to send cancelExport into.
-    fetch: async () => { await new Promise((r) => setTimeout(r, 15)); return { ok: false, status: 404, json: async () => ({}) }; },
-    browser: {
-      runtime: {
-        onMessage: { addListener: (fn) => { messageListener = fn; } },
-        getPlatformInfo: async () => ({ os: 'win' }),
-        getURL: (p) => `moz-extension://test-id/${p}`,
-        sendMessage: async () => {},
-      },
-      management: { getAll: async () => [{ id: 'a@x', name: 'Addon A', version: '1', enabled: true, type: 'extension' }] },
-      storage: { local: { get: async () => ({}) } },
-      downloads: { download: async (o) => { downloadCalls.push(o); return 1; } },
-      tabs: { create: async (o) => { tabCalls.push(o.url); return {}; } },
-    },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
-
-  const exportPromise = messageListener({ type: 'export', ids: ['a@x'] });
-  await new Promise((r) => setTimeout(r, 5)); // mid-flight, before the (15ms) lookup calls resolve
-  const cancelResult = await messageListener({ type: 'cancelExport' });
-  const result = await exportPromise;
-
-  assert.strictEqual(cancelResult.ok, true);
-  assert.strictEqual(result.cancelled, true);
-  assert.strictEqual(downloadCalls.length, 0, 'a cancelled export must not save a file');
-  assert.strictEqual(tabCalls.length, 0, 'a cancelled export must not open a confirmation tab');
-});
-
-testAsync('cancelExport: sending it with no export in progress is a harmless no-op', async () => {
-  let messageListener;
-  const bgSandbox = {
-    URL, AbortController, setTimeout, clearTimeout,
-    console: { warn() {}, debug() {}, log() {}, error() {} },
-    fetch: async () => ({ ok: false, status: 404, json: async () => ({}) }),
-    browser: { runtime: { onMessage: { addListener: (fn) => { messageListener = fn; } } } },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
-  const result = await messageListener({ type: 'cancelExport' });
-  assert.strictEqual(result.ok, true);
-});
-
 testAsync('doExport: past its lookup deadline, stops trying AMO and falls back for what\'s left', async () => {
   let fetchCallCount = 0;
   const fetchImpl = async () => {
@@ -307,7 +249,7 @@ testAsync('doExport: past its lookup deadline, stops trying AMO and falls back f
   // deadlineMs: -1 means "already past the deadline" from the very first
   // item - simulates a big export that's been running a while, without
   // an actual 90-second wait in the test.
-  const result = await runDoExportWithOptions(addons, fetchImpl, undefined, { deadlineMs: -1 });
+  const result = await runDoExportWithOptions(addons, fetchImpl, { deadlineMs: -1 });
   assert.strictEqual(fetchCallCount, 0, 'no AMO lookups should have been attempted at all');
   assert.strictEqual(result.stats.lookupsSkipped, 2);
   assert.strictEqual(result.stats.searchFallback, 2);
@@ -319,7 +261,7 @@ testAsync('doExport: stops attempting AMO lookups after enough consecutive failu
   const addons = Array.from({ length: 6 }, (_, i) => (
     { id: `a${i}@x`, name: `Addon ${i}`, version: '1', enabled: true, type: 'extension' }
   ));
-  const result = await runDoExportWithOptions(addons, fetchImpl, undefined, { maxConsecutiveFailures: 2 });
+  const result = await runDoExportWithOptions(addons, fetchImpl, { maxConsecutiveFailures: 2 });
   assert.ok(result.stats.lookupsSkipped > 0, 'later add-ons should have skipped the lookup once the breaker tripped');
   // Each attempted lookup makes up to 2 fetch calls (exact + search); with
   // the breaker capped at 2 consecutive failures out of 6 add-ons, far
@@ -338,7 +280,7 @@ testAsync('doExport: stats reflect a mix of exact, homepage, and fallback outcom
     if (url.includes('/addons/addon/')) return { ok: false, status: 404, json: async () => ({}) };
     return { ok: true, status: 200, json: async () => ({ results: [] }) };
   };
-  const result = await runDoExportWithOptions(addons, fetchImpl, undefined, {});
+  const result = await runDoExportWithOptions(addons, fetchImpl, {});
   assert.strictEqual(result.stats.total, 3);
   assert.strictEqual(result.stats.amoExact, 1);
   assert.strictEqual(result.stats.homepage, 1);

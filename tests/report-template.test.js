@@ -104,13 +104,13 @@ test('safeJsonForScriptTag: escapes "</" so an add-on name can\'t close the scri
 // real value from the actual loaded report-template.js (not a copy),
 // compared here byte-for-byte against the real icon32.png file on disk.
 
-test('REPORT_ICON_DATA_URI: matches src/icons/icon32.png byte-for-byte', () => {
+test('REPORT_ICON_DATA_URI: matches icons/icon32.png byte-for-byte', () => {
   const base64Payload = REPORT_ICON_DATA_URI.slice('data:image/png;base64,'.length);
   const embeddedBytes = Buffer.from(base64Payload, 'base64');
-  const iconBytes = fs.readFileSync(path.join(__dirname, '..', 'src/icons/icon32.png'));
+  const iconBytes = fs.readFileSync(path.join(__dirname, '..', 'icons/icon32.png'));
   assert.ok(
     embeddedBytes.equals(iconBytes),
-    'REPORT_ICON_DATA_URI no longer matches src/icons/icon32.png - re-encode it if the icon changed intentionally'
+    'REPORT_ICON_DATA_URI no longer matches icons/icon32.png - re-encode it if the icon changed intentionally'
   );
 });
 

@@ -45,7 +45,7 @@
        not width, is what's actually constrained there. */
     body.android { width: 100%; max-width: min(92vw, 480px); margin: 0 auto; padding: clamp(20px, 6vmin, 36px) clamp(16px, 5vw, 24px); }
     body.android h3 { font-size: clamp(16px, 4.5vw, 20px); }
-    body.android button { padding: clamp(10px, 3vw, 14px); font-size: clamp(14px, 3.5vw, 16px); }
+    body.android .hub-btn { padding: clamp(10px, 3vw, 14px); font-size: clamp(14px, 3.5vw, 16px); }
     .card {
       background: var(--card-bg);
       border-radius: 12px;
@@ -53,7 +53,10 @@
       text-align: center;
     }
     h3 { margin-top: 0; margin-bottom: 14px; }
-    button {
+    /* hub-btn: local copy of the shared button base (popup.html is
+       self-contained and does not load shared.css). Keep in sync with
+       .hub-btn in src/common/shared.css. */
+    .hub-btn {
       width: 100%;
       padding: 10px;
       border: 1px solid var(--border);
@@ -66,17 +69,17 @@
       font-weight: 600;
       transition: background 0.12s, border-color 0.12s, transform 0.1s;
     }
-    button:last-of-type { margin-bottom: 0; }
-    button:hover { background: var(--hover-bg); border-color: var(--btn-bg-hover); transform: scale(1.02); }
-    button:active { transform: scale(0.98); }
+    .hub-btn:last-of-type { margin-bottom: 0; }
+    .hub-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg-hover); transform: scale(1.02); }
+    .hub-btn:active { transform: scale(0.98); }
   </style>
 </head>
 <body>
   <div class="card">
     <h3>Add-ons Hub</h3>
-    <button id="exportBtn">Add-ons Exporter</button>
-    <button id="importBtn">Add-ons Importer</button>
-    <button id="settingsBtn">Settings</button>
+    <button id="exportBtn" class="hub-btn">Add-ons Exporter</button>
+    <button id="importBtn" class="hub-btn">Add-ons Importer</button>
+    <button id="settingsBtn" class="hub-btn">Settings</button>
   </div>
   <script src="popup.js"></script>
 </body>

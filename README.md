@@ -11,6 +11,7 @@
 ```
 addons-hub/
 ├── manifest.json         # Extension manifest: config, permissions, and background script list
+├── icons/                 # Toolbar and extension icons in several standard sizes
 ├── tests/                 # Plain Node.js test suite, run via `npm test`
 │   ├── run.js                   # Requires every test file, then prints the combined summary
 │   ├── helpers.js               # Shared test()/testAsync() harness plus vm-loading and sandbox utilities
@@ -47,7 +48,6 @@ addons-hub/
     ├── confirmation/
     │   ├── confirmation.html  # Tab shown after Add-ons Exporter or Add-ons Importer finishes
     │   └── confirmation.js    # Sets the heading/message based on which tool opened this tab
-    └── icons/             # Toolbar and extension icons in several standard sizes
 ```
 
 > **Note:** `manifest.json`'s `browser_specific_settings.gecko.id` is
@@ -146,7 +146,7 @@ npm test
 
 **Updating the report icon**
 
-If you replace `src/icons/icon32.png`, run:
+If you replace `icons/icon32.png`, run:
 
 ```
 npm run build

@@ -23,17 +23,7 @@
   }
   #chooseFileBtn {
     padding: 12px 20px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--card-bg);
-    color: var(--text);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
-  #chooseFileBtn:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.02); }
-  #chooseFileBtn:active { transform: scale(0.98); }
   #fileName {
     display: block;
     font-size: 14px;
@@ -64,7 +54,7 @@
     <p><strong>Note:</strong> Firefox doesn't allow any extension, including this one, to&nbsp;automatically install other add-ons. It can only open each add-on's page as&nbsp;a tab for you. You'll still need to click <strong>Add&nbsp;to&nbsp;Firefox</strong> yourself on each one.</p>
 
     <div class="picker" id="picker">
-      <button id="chooseFileBtn">Choose file</button>
+      <button id="chooseFileBtn" class="hub-btn">Choose file</button>
       <div id="fileNameRow" style="display:none; margin-top: 12px;">
         <strong id="fileName"></strong>
         <button id="removeFileBtn" aria-label="Remove selected file">&times;</button>
@@ -87,7 +77,7 @@
       <p id="noSearchMatches" class="placeholder-text" style="display:none;">No add-ons match your search.</p>
     </div>
 
-    <button id="openSelectedBtn" class="primary-btn" disabled>Open Selected</button>
+    <button id="openSelectedBtn" class="primary-btn hub-btn" disabled>Open Selected</button>
     <span id="status" role="status" aria-live="polite"></span>
 
     <input type="file" id="fileInput" accept=".html,.json,.csv" style="display:none">

@@ -256,20 +256,31 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   color: var(--warn-color);
   font-weight: 600;
 }
+/* Canonical shared button base used by every action button in the
+   extension: primary-btn (Export/Open Selected), settings-btn
+   (Export/Import/Reset Settings), chooseFileBtn (Choose file), and
+   the modal buttons (Cancel/Reset dialog).
+   Per-button overrides (sizing, layout, danger color) live in their
+   own classes on top of this base. */
+.hub-btn {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, transform 0.1s;
+}
+.hub-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.02); }
+.hub-btn:active { transform: scale(0.99); }
 .primary-btn {
   display: block;
   width: 85%;
   max-width: 560px;
   margin: 0 auto;
   padding: 8px 20px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--text);
   font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, transform 0.1s;
 }
 .primary-btn:hover:not(:disabled) { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.02); }
 .primary-btn:active:not(:disabled) { transform: scale(0.99); }
@@ -299,6 +310,8 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   }
   .search-input:hover,
   .addon-row:hover,
+  .hub-btn:hover,
+  .hub-btn:active,
   .primary-btn:hover,
   .primary-btn:active {
     transform: none !important;

@@ -347,12 +347,12 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
 
   const cancelBtn = document.createElement('button');
   cancelBtn.id = 'rsCancel';
-  cancelBtn.className = 's-modal-btn';
+  cancelBtn.className = 's-modal-btn hub-btn';
   cancelBtn.textContent = 'Cancel';
 
   const confirmBtn = document.createElement('button');
   confirmBtn.id = 'rsConfirm';
-  confirmBtn.className = 's-modal-btn s-modal-btn-danger';
+  confirmBtn.className = 's-modal-btn s-modal-btn-danger hub-btn';
   confirmBtn.textContent = 'Reset';
 
   buttonRow.append(cancelBtn, confirmBtn);

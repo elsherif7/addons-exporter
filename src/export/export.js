@@ -2,7 +2,6 @@ const listEl = document.getElementById('addonList');
 const selectAllBtn = document.getElementById('selectAllBtn');
 const deselectAllBtn = document.getElementById('deselectAllBtn');
 const exportBtn = document.getElementById('exportSelectedBtn');
-const cancelExportBtn = document.getElementById('cancelExportBtn');
 const statusEl = document.getElementById('status');
 const selectionCountEl = document.getElementById('selectionCount');
 const searchInput = document.getElementById('searchInput');
@@ -259,16 +258,9 @@ exportBtn.addEventListener('click', async () => {
     .map((cb) => cb.dataset.id);
 
   exportBtn.disabled = true;
-  cancelExportBtn.style.display = '';
-  cancelExportBtn.disabled = false;
   setStatus('Exporting your add-ons, please wait...');
   try {
     const result = await browser.runtime.sendMessage({ type: 'export', ids });
-
-    if (result && result.cancelled) {
-      setStatus('Export cancelled.');
-      return;
-    }
 
     if (result && result.html) {
       // Android: background.js couldn't save the file itself there (its
@@ -336,14 +328,7 @@ exportBtn.addEventListener('click', async () => {
     setStatus('Error: ' + e.message);
   } finally {
     exportBtn.disabled = false;
-    cancelExportBtn.style.display = 'none';
   }
-});
-
-cancelExportBtn.addEventListener('click', () => {
-  cancelExportBtn.disabled = true;
-  setStatus('Cancelling...');
-  browser.runtime.sendMessage({ type: 'cancelExport' }).catch(() => {});
 });
 
 // background.js broadcasts progress as each link is resolved.

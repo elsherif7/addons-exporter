@@ -1,11 +1,11 @@
-// Reads src/icons/icon32.png, base64-encodes it, and rewrites the
+// Reads icons/icon32.png, base64-encodes it, and rewrites the
 // REPORT_ICON_DATA_URI constant in src/background/report-template.js.
 //
 // Run with: npm run embed-icon
 //
-// When to run: after replacing or updating src/icons/icon32.png. The
+// When to run: after replacing or updating icons/icon32.png. The
 // existing test (report-template.test.js: "REPORT_ICON_DATA_URI: matches
-// src/icons/icon32.png byte-for-byte") will fail until you do.
+// icons/icon32.png byte-for-byte") will fail until you do.
 
 'use strict';
 
@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const ICON_PATH = path.join(ROOT, 'src', 'icons', 'icon32.png');
+const ICON_PATH = path.join(ROOT, 'icons', 'icon32.png');
 const TEMPLATE_PATH = path.join(ROOT, 'src', 'background', 'report-template.js');
 
 const iconBytes = fs.readFileSync(ICON_PATH);

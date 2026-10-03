@@ -36,7 +36,6 @@ async function captureExportClick({ selectedIds, exportResponse, simulateDownloa
       addEventListener: (ev, fn) => { if (ev === 'click') exportClickHandler = fn; },
       disabled: false,
     },
-    cancelExportBtn: { addEventListener() {}, style: {}, disabled: false },
     status: { textContent: '' },
     selectionCount: { textContent: '' },
     searchInput: { addEventListener() {}, style: {} },
@@ -204,52 +203,6 @@ testAsync('export.js success message: shows skipped-lookups note when deadline w
   assert.match(statusEl.textContent, /1 add-on skipped AMO \(deadline reached\)/);
 });
 
-// --- A12: Cancel button wiring ---
-
-testAsync('cancelExportBtn: clicking it sends a cancelExport message', async () => {
-  const cancelExportBtnEl = { addEventListener: null, style: {}, disabled: false };
-  cancelExportBtnEl.addEventListener = (ev, fn) => { if (ev === 'click') cancelExportBtnEl._handler = fn; };
-  const sentMessages = [];
-  const listElStub = { querySelectorAll: () => [], addEventListener() {}, replaceChildren() {} };
-  const elements = {
-    addonList: listElStub,
-    selectAllBtn: { addEventListener() {} },
-    deselectAllBtn: { addEventListener() {} },
-    exportSelectedBtn: { addEventListener() {}, disabled: false },
-    cancelExportBtn: cancelExportBtnEl,
-    status: { textContent: '' },
-    selectionCount: { textContent: '' },
-    searchInput: { addEventListener() {}, style: {} },
-    noSearchMatches: { style: {} },
-    exportDesc: { innerHTML: '', textContent: '', append() {} },
-  };
-  const exSandbox = {
-    URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
-    setTimeout: (fn) => { fn(); return 0; },
-    clearTimeout() {},
-    document: { getElementById: (id) => elements[id], body: { appendChild() {} }, createElement: () => ({}) },
-    browser: {
-      runtime: {
-        onMessage: { addListener() {} },
-        sendMessage: async (msg) => { sentMessages.push(msg); return msg.type === 'listAddons' ? [] : { ok: true }; },
-      },
-      storage: { local: { get: async () => ({}) } },
-    },
-  };
-  vm.createContext(exSandbox);
-  vm.runInContext(commonSrc, exSandbox);
-  vm.runInContext(exportSrc, exSandbox);
-  await new Promise((resolve) => setTimeout(resolve, 0));
-
-  cancelExportBtnEl._handler();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-
-  const cancelMsg = sentMessages.find((m) => m.type === 'cancelExport');
-  assert.ok(cancelMsg, 'clicking Cancel should send a cancelExport message');
-  assert.strictEqual(elements.status.textContent, 'Cancelling...');
-  assert.strictEqual(cancelExportBtnEl.disabled, true, 'clicking Cancel once should disable it against double-clicks');
-});
-
 // --- A16: a non-array listAddons response shows a friendly message ---
 
 testAsync('export.js: a non-array listAddons response shows a friendly error, not a raw exception', async () => {
@@ -259,7 +212,6 @@ testAsync('export.js: a non-array listAddons response shows a friendly error, no
     selectAllBtn: { addEventListener() {} },
     deselectAllBtn: { addEventListener() {} },
     exportSelectedBtn: { addEventListener() {}, disabled: false },
-    cancelExportBtn: { addEventListener() {}, style: {} },
     status: { textContent: '' },
     selectionCount: { textContent: '' },
     searchInput: { addEventListener() {}, style: {} },

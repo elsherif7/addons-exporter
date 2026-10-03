@@ -1,27 +1,9 @@
-// Tracks the export currently in progress, if any, so a 'cancelExport'
-// message has something to flip. Only one export realistically runs at a
-// time (one export.html tab drives it), so a single module-level slot is
-// enough - no need for a map keyed by an export id.
-let currentExportCancelToken = null;
-
-function cancelledExportError() {
-  const err = new Error('Export cancelled');
-  err.cancelled = true;
-  return err;
-}
-
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'listAddons') {
     return listInstalledAddons();
   }
-  if (message.type === 'cancelExport') {
-    if (currentExportCancelToken) currentExportCancelToken.cancelled = true;
-    return Promise.resolve({ ok: true });
-  }
   if (message.type === 'export') {
-    const cancelToken = { cancelled: false };
-    currentExportCancelToken = cancelToken;
-    return doExport(message.ids, cancelToken).then(async ({ html, filename, format, stats }) => {
+    return doExport(message.ids).then(async ({ html, filename, format, stats }) => {
       const platform = await browser.runtime.getPlatformInfo();
 
       if (platform.os === 'android') {
@@ -42,14 +24,6 @@ browser.runtime.onMessage.addListener((message) => {
         url: browser.runtime.getURL(`src/confirmation/confirmation.html?from=export&format=${format}`)
       });
       return { format, stats };
-    }).catch((err) => {
-      // A cancellation isn't a real error - export.js needs to tell it
-      // apart from an actual failure so it can show a plain "cancelled"
-      // status instead of an error message.
-      if (err && err.cancelled) return { cancelled: true };
-      throw err;
-    }).finally(() => {
-      if (currentExportCancelToken === cancelToken) currentExportCancelToken = null;
     });
   }
 });
@@ -206,7 +180,7 @@ const AMO_LOOKUP_DEADLINE_MS = 90000;
 // hammering it further for every remaining add-on isn't worth it.
 const AMO_LOOKUP_MAX_CONSECUTIVE_FAILURES = 5;
 
-async function doExport(ids, cancelToken = { cancelled: false }, {
+async function doExport(ids, {
   deadlineMs = AMO_LOOKUP_DEADLINE_MS,
   maxConsecutiveFailures = AMO_LOOKUP_MAX_CONSECUTIVE_FAILURES,
 } = {}) {
@@ -237,8 +211,6 @@ async function doExport(ids, cancelToken = { cancelled: false }, {
   };
 
   const list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
-    if (cancelToken.cancelled) throw cancelledExportError();
-
     let amoMatch = null;
     if (Date.now() < deadlineAt && consecutiveFailures < maxConsecutiveFailures) {
       let lookupFailed = false;
@@ -252,8 +224,6 @@ async function doExport(ids, cancelToken = { cancelled: false }, {
     } else {
       stats.lookupsSkipped++;
     }
-
-    if (cancelToken.cancelled) throw cancelledExportError();
 
     let link;
     let linkType;

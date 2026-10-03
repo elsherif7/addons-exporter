@@ -20,7 +20,13 @@
     color: var(--text-muted);
     margin: 0 0 10px;
   }
-  .theme-option {
+  /* Canonical shared row used by every Settings option:
+     radio rows (Appearance / Export Format / Display)
+     and action rows (Reset Settings).
+     The element type differs — radio rows use <label> so the
+     click target covers the whole row; action rows use <div> —
+     but the border, spacing, hover, and transition are identical. */
+  .settings-option-row {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -28,35 +34,36 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     margin-bottom: 8px;
-    cursor: pointer;
+    font-size: 14px;
     user-select: none;
     transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
-  .theme-option:last-child { margin-bottom: 0; }
-  .theme-option input { margin: 0; }
-  .theme-option { font-size: 14px; }
-  .theme-option:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.01); }
-  :root[data-theme="dark"] .theme-option:hover { background: #2e3340; border-color: #6b7280; }
-  :root[data-theme="dark"] .settings-btn:hover { background: #2e3340; border-color: #6b7280; }
+  .settings-option-row:last-child { margin-bottom: 0; }
+  /* Radio rows are <label> elements — cursor pointer makes the whole
+     row feel clickable. Action rows are <div> — no pointer cursor
+     since the button inside is the interactive target. */
+  label.settings-option-row { cursor: pointer; }
+  label.settings-option-row input { margin: 0; }
+  .settings-option-row:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.01); }
+  :root[data-theme="dark"] .settings-option-row:hover { background: #2e3340; border-color: #6b7280; }
+  /* Action rows (e.g. Reset Settings) lay out their content
+     space-between so the title/description sits left and the
+     button sits right, matching the original Reset row layout. */
+  div.settings-option-row { justify-content: space-between; }
   .settings-action-group {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
   }
+  /* .settings-btn and .s-modal-btn extend hub-btn (shared.css).
+     Only layout/sizing/scale overrides live here. */
   .settings-btn {
     flex: 1;
     padding: 9px 14px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--card-bg);
-    color: var(--text);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
     text-align: center;
-    transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
-  .settings-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg-hover); transform: scale(1.01); }
+  .settings-btn:hover { border-color: var(--btn-bg-hover); transform: scale(1.01); }
+  :root[data-theme="dark"] .settings-btn:hover { background: #2e3340; border-color: #6b7280; }
   .settings-btn:active { transform: scale(0.99); }
   .settings-btn-danger { border-color: var(--danger-color); color: var(--danger-color); }
   .settings-btn-danger:hover { background: #fef2f2; border-color: var(--danger-color); }
@@ -66,15 +73,8 @@
   .s-modal-btn {
     padding: 7px 20px;
     border-radius: 7px;
-    border: 1px solid var(--border);
-    background: var(--card-bg);
-    color: var(--text);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
-  .s-modal-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.04); }
+  .s-modal-btn:hover { transform: scale(1.04); }
   .s-modal-btn:active { transform: scale(0.97); }
   .s-modal-btn-danger { color: var(--danger-color); border-color: var(--danger-color); }
   .s-modal-btn-danger:hover { background: #fef2f2; border-color: var(--danger-color); }
@@ -117,11 +117,11 @@
 
     <div class="settings-group" role="radiogroup" aria-labelledby="appearanceHeading">
       <h2 id="appearanceHeading">Appearance</h2>
-      <label class="theme-option" for="themeLight">
+      <label class="settings-option-row" for="themeLight">
         <input type="radio" name="theme" id="themeLight" value="light" checked>
         <span style="font-weight:600; color:var(--text); font-size:14px;">Light</span>
       </label>
-      <label class="theme-option" for="themeDark">
+      <label class="settings-option-row" for="themeDark">
         <input type="radio" name="theme" id="themeDark" value="dark">
         <span style="font-weight:600; color:var(--text); font-size:14px;">Dark</span>
       </label>
@@ -129,21 +129,21 @@
 
     <div class="settings-group" role="radiogroup" aria-labelledby="exportFormatHeading">
       <h2 id="exportFormatHeading">Export Format</h2>
-      <label class="theme-option" for="formatHtml">
+      <label class="settings-option-row" for="formatHtml">
         <input type="radio" name="exportFormat" id="formatHtml" value="html">
         <span>
           <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">HTML</span>
           <span style="font-size:12px; color:var(--text-muted);">Human-readable report. Re-importable by Add-ons Importer.</span>
         </span>
       </label>
-      <label class="theme-option" for="formatJson">
+      <label class="settings-option-row" for="formatJson">
         <input type="radio" name="exportFormat" id="formatJson" value="json">
         <span>
           <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">JSON</span>
           <span style="font-size:12px; color:var(--text-muted);">Machine-readable. Re-importable by Add-ons Importer.</span>
         </span>
       </label>
-      <label class="theme-option" for="formatCsv">
+      <label class="settings-option-row" for="formatCsv">
         <input type="radio" name="exportFormat" id="formatCsv" value="csv">
         <span>
           <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">CSV</span>
@@ -154,14 +154,14 @@
 
     <div class="settings-group" role="radiogroup" aria-labelledby="displayHeading">
       <h2 id="displayHeading">Display</h2>
-      <label class="theme-option" for="shortenNamesOn">
+      <label class="settings-option-row" for="shortenNamesOn">
         <input type="radio" name="shortenNames" id="shortenNamesOn" value="on">
         <span>
           <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Shorten add-on names</span>
           <span style="font-size:12px; color:var(--text-muted);">Removes text after "–" or ":", e.g. "uBlock Origin – free ad blocker" → "uBlock Origin"</span>
         </span>
       </label>
-      <label class="theme-option" for="shortenNamesOff">
+      <label class="settings-option-row" for="shortenNamesOff">
         <input type="radio" name="shortenNames" id="shortenNamesOff" value="off">
         <span>
           <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Show full add-on names</span>
@@ -173,22 +173,20 @@
     <div class="settings-group">
       <h2>Settings Backup</h2>
       <div class="settings-action-group">
-        <button class="settings-btn" id="exportSettingsBtn">Export Settings</button>
-        <button class="settings-btn" id="importSettingsBtn">Import Settings</button>
+        <button class="settings-btn hub-btn" id="exportSettingsBtn">Export Settings</button>
+        <button class="settings-btn hub-btn" id="importSettingsBtn">Import Settings</button>
       </div>
       <span id="settingsStatus" role="status" aria-live="polite"></span>
     </div>
 
     <div class="settings-group">
       <h2>Reset</h2>
-      <div class="about-block">
-        <div class="about-row">
-          <span style="flex:1;">
-            <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Reset Settings</span>
-            <span style="font-size:12px; color:var(--text-muted);">Clears theme, export format, and display settings back to defaults.</span>
-          </span>
-          <button class="settings-btn settings-btn-danger" id="resetSettingsBtn" style="flex-shrink:0; flex:none; width:auto; padding:6px 14px; margin-left:12px;">Reset</button>
-        </div>
+      <div class="settings-option-row">
+        <span style="flex:1;">
+          <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Reset Settings</span>
+          <span style="font-size:12px; color:var(--text-muted);">Clears theme, export format, and display settings back to defaults.</span>
+        </span>
+        <button class="settings-btn settings-btn-danger hub-btn" id="resetSettingsBtn" style="flex-shrink:0; flex:none; width:auto; padding:6px 14px; margin-left:12px;">Reset</button>
       </div>
     </div>
 
