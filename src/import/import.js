@@ -495,7 +495,8 @@ function validateSelectedFile(file) {
   return { ok: true };
 }
 
-async function loadFile(file) {  const myGeneration = ++loadGeneration;
+async function loadFile(file) {
+  const myGeneration = ++loadGeneration;
   clearAddonList();
   setStatus('Reading file...');
   try {
