@@ -109,16 +109,6 @@
   .about-value { color: var(--text); font-weight: 600; font-size: 14px; }
   .about-value a { color: var(--link-accent); text-decoration: none; font-weight: 600; }
   .about-value a:hover { text-decoration: underline; }
-  .about-check-btn {
-    border: none;
-    background: none;
-    color: var(--link-accent);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 0;
-  }
-  .about-check-btn:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -140,7 +130,7 @@
     <div class="settings-group" role="radiogroup" aria-labelledby="exportFormatHeading">
       <h2 id="exportFormatHeading">Export Format</h2>
       <label class="theme-option" for="formatHtml">
-        <input type="radio" name="exportFormat" id="formatHtml" value="html" checked>
+        <input type="radio" name="exportFormat" id="formatHtml" value="html">
         <span>
           <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">HTML</span>
           <span style="font-size:12px; color:var(--text-muted);">Human-readable report. Re-importable by Add-ons Importer.</span>
@@ -164,18 +154,22 @@
 
     <div class="settings-group" role="radiogroup" aria-labelledby="displayHeading">
       <h2 id="displayHeading">Display</h2>
-      <label class="theme-option" for="shortenNamesOff">
-        <input type="radio" name="shortenNames" id="shortenNamesOff" value="off">
-        <span style="display:block; font-weight:600; color:var(--text); font-size:14px;">Show full add-on names</span>
-      </label>
       <label class="theme-option" for="shortenNamesOn">
-        <input type="radio" name="shortenNames" id="shortenNamesOn" value="on" checked>
+        <input type="radio" name="shortenNames" id="shortenNamesOn" value="on">
         <span>
           <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Shorten add-on names</span>
           <span style="font-size:12px; color:var(--text-muted);">Removes text after "–" or ":", e.g. "uBlock Origin – free ad blocker" → "uBlock Origin"</span>
         </span>
       </label>
+      <label class="theme-option" for="shortenNamesOff">
+        <input type="radio" name="shortenNames" id="shortenNamesOff" value="off">
+        <span>
+          <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Show full add-on names</span>
+          <span style="font-size:12px; color:var(--text-muted);">Keeps the original name exactly as installed, e.g. "uBlock Origin – free ad blocker"</span>
+        </span>
+      </label>
     </div>
+    <script src="settings-init.js"></script>
     <div class="settings-group">
       <h2>Settings Backup</h2>
       <div class="settings-action-group">
@@ -210,16 +204,8 @@
           <!-- href and textContent are set dynamically by settings.js from browser.runtime.getManifest().version -->
           <span class="about-value"><a id="versionLink" href="https://github.com/elsherif7/addons-hub/releases" target="_blank" rel="noopener"></a></span>
         </div>
-        <div class="about-row" style="display:block; padding-top:6px; padding-bottom:10px;">
-          <span style="font-size:12px; color:var(--text-muted); line-height:1.6; display:block;">
-            Updates are released every two months, on the 1st.
-          </span>
-          <span style="font-size:12px; color:var(--text-muted); line-height:1.6; display:block; margin-top:4px;">
-            Security issues and critical bugs are fixed immediately, outside that schedule.
-          </span>
-        </div>
         <div class="about-row">
-          <span class="about-label">Rate this extension</span>
+          <span class="about-label">Rate this add-on</span>
           <span class="about-value"><a href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener">Firefox Add-ons</a></span>
         </div>
         <div class="about-row">
@@ -229,13 +215,6 @@
         <div class="about-row">
           <span class="about-label">GitHub Repository</span>
           <span class="about-value"><a href="https://github.com/elsherif7/addons-hub" target="_blank" rel="noopener">elsherif7/addons-hub</a></span>
-        </div>
-        <div class="about-row">
-          <span class="about-label">Check for updates</span>
-          <span class="about-value"><button class="about-check-btn" id="checkUpdateBtn">Check now</button></span>
-        </div>
-        <div class="about-row" id="updateStatusRow" style="display:none;">
-          <span id="updateStatusMsg" style="font-size:13px;"></span>
         </div>
       </div>
     </div>

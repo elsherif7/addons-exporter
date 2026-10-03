@@ -61,25 +61,6 @@ function parseSettingsFile(text) {
   return { ok: true, settings: validated };
 }
 
-// Compares two dot-separated version strings numerically, segment by
-// segment - so "1.10" is correctly newer than "1.9", unlike a plain
-// string/lexicographic comparison (or the strict equality check this
-// replaced, which called anything not byte-identical to the current
-// version "available", even a local build that's actually newer than
-// what's on AMO). A missing trailing segment counts as 0, so "1.2"
-// equals "1.2.0". Returns -1 if a < b, 1 if a > b, 0 if equal.
-function compareVersions(a, b) {
-  const pa = String(a).split('.').map((n) => parseInt(n, 10) || 0);
-  const pb = String(b).split('.').map((n) => parseInt(n, 10) || 0);
-  const len = Math.max(pa.length, pb.length);
-  for (let i = 0; i < len; i++) {
-    const na = pa[i] || 0;
-    const nb = pb[i] || 0;
-    if (na !== nb) return na < nb ? -1 : 1;
-  }
-  return 0;
-}
-
 // --- DOM wiring ---
 
 const themeRadios = document.querySelectorAll('input[name="theme"]');
@@ -123,8 +104,10 @@ async function loadCurrentExportFormat() {
   for (const radio of formatRadios) {
     radio.checked = radio.value === current;
   }
+  // Keep the localStorage cache in sync so settings-init.js can apply
+  // the correct value before the first paint on the next page open.
+  try { localStorage.setItem('addons-hub-settings-exportFormat', current); } catch (e) {}
 }
-
 for (const radio of themeRadios) {
   radio.addEventListener('change', async () => {
     if (!radio.checked) return;
@@ -164,6 +147,9 @@ async function loadCurrentShortenNames() {
   for (const radio of shortenRadios) {
     radio.checked = radio.value === current;
   }
+  // Keep the localStorage cache in sync so settings-init.js can apply
+  // the correct value before the first paint on the next page open.
+  try { localStorage.setItem('addons-hub-settings-shortenNames', current); } catch (e) {}
 }
 
 for (const radio of shortenRadios) {
@@ -301,9 +287,26 @@ settingsFileInput.addEventListener('change', async () => {
   }
 });
 
-loadCurrentTheme();
-loadCurrentExportFormat();
-loadCurrentShortenNames();
+// Load all three settings in a single storage read so they're all
+// applied at once — one round-trip instead of three sequential ones,
+// which reduces the window where the hardcoded HTML defaults are visible.
+(async () => {
+  const { theme, exportFormat, shortenNames } = await getStoredSettings();
+  for (const radio of themeRadios) {
+    radio.checked = radio.value === theme;
+  }
+  applyTheme(theme);
+  for (const radio of formatRadios) {
+    radio.checked = radio.value === exportFormat;
+  }
+  for (const radio of shortenRadios) {
+    radio.checked = radio.value === shortenNames;
+  }
+  // Write the confirmed values to the localStorage cache so settings-init.js
+  // can pre-apply them synchronously before the first paint on the next open.
+  try { localStorage.setItem('addons-hub-settings-exportFormat', exportFormat); } catch (e) {}
+  try { localStorage.setItem('addons-hub-settings-shortenNames', shortenNames); } catch (e) {}
+})();
 
 // --- Check for updates ---
 
@@ -315,65 +318,6 @@ if (versionLink) {
   versionLink.textContent = CURRENT_VERSION;
   versionLink.href = `https://github.com/elsherif7/addons-hub/releases/tag/v${CURRENT_VERSION}`;
 }
-// Covers the whole request, body read included - fetchJsonWithTimeout()
-// (common.js) is what actually enforces this, unlike the plain fetch()
-// this replaced, which had nothing that could ever time it out.
-const UPDATE_CHECK_TIMEOUT_MS = 15000;
-
-document.getElementById('checkUpdateBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('checkUpdateBtn');
-  const statusRow = document.getElementById('updateStatusRow');
-  const statusMsg = document.getElementById('updateStatusMsg');
-
-  btn.disabled = true;
-  btn.textContent = 'Checking...';
-  statusRow.style.display = 'none';
-
-  try {
-    const result = await fetchJsonWithTimeout(
-      `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(browser.runtime.id)}/`,
-      UPDATE_CHECK_TIMEOUT_MS
-    );
-    // A 404 here specifically means our own listed add-on ID wasn't
-    // found - unlike background.js's AMO lookups (which have a fallback
-    // link for that), that's a real problem for this one direct check.
-    if (!result.ok || result.status === 404) {
-      throw new Error(result.error || `AMO returned HTTP ${result.status}`);
-    }
-    const latest = result.data && result.data.current_version && result.data.current_version.version;
-    if (!latest) throw new Error('Could not read the latest version from AMO.');
-
-    statusRow.style.display = '';
-    if (compareVersions(CURRENT_VERSION, latest) >= 0) {
-      // Equal or newer (a dev build ahead of the published version)
-      // both count as "up to date" - only a genuinely newer AMO version
-      // should ever say otherwise.
-      statusMsg.style.color = 'var(--text-muted)';
-      statusMsg.textContent = `You're up to date (version ${CURRENT_VERSION})`;
-    } else {
-      statusMsg.style.color = 'var(--link-accent)';
-      // Built with textContent/createElement, not innerHTML - `latest`
-      // comes straight from AMO's API response and must never be
-      // treated as markup.
-      statusMsg.textContent = `Version ${latest} is available. `;
-      const link = document.createElement('a');
-      link.href = 'https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/';
-      link.target = '_blank';
-      link.rel = 'noopener';
-      link.style.color = 'var(--link-accent)';
-      link.style.fontWeight = '600';
-      link.textContent = 'Update on Firefox Add-ons';
-      statusMsg.appendChild(link);
-    }
-  } catch (err) {
-    statusRow.style.display = '';
-    statusMsg.style.color = 'var(--danger-color)';
-    statusMsg.textContent = 'Could not check for updates: ' + err.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Check now';
-  }
-});
 
 // --- Reset Settings ---
 

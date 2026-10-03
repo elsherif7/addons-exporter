@@ -309,124 +309,6 @@ testAsync('shortenNames radio: a storage write failure shows an error and revert
   assert.strictEqual(shortenRadioEls[1].checked, false, 'off should be reverted since the write failed');
 });
 
-// --- A10: compareVersions ---
-
-const { compareVersions } = sandbox;
-
-test('compareVersions: equal versions', () => {
-  assert.strictEqual(compareVersions('1.2.0', '1.2.0'), 0);
-});
-
-test('compareVersions: a missing trailing segment counts as 0', () => {
-  assert.strictEqual(compareVersions('1.2', '1.2.0'), 0);
-});
-
-test('compareVersions: simple newer/older', () => {
-  assert.strictEqual(compareVersions('1.3.0', '1.2.0'), 1);
-  assert.strictEqual(compareVersions('1.2.0', '1.3.0'), -1);
-});
-
-test('compareVersions: numeric, not lexicographic - "1.10" is newer than "1.9"', () => {
-  assert.strictEqual(compareVersions('1.10', '1.9'), 1);
-  assert.strictEqual(compareVersions('1.9', '1.10'), -1);
-});
-
-// --- A8/A9/A10: the checkUpdateBtn click handler ---
-
-function makeUpdateCheckSandbox(fetchImpl, currentVersion) {
-  const btn = { disabled: false, textContent: '', addEventListener(ev, fn) { if (ev === 'click') this._onClick = fn; } };
-  const statusRow = { style: {} };
-  const statusMsg = { textContent: '', style: {}, _children: [], appendChild(node) { this._children.push(node); } };
-  const elements = {
-    checkUpdateBtn: btn,
-    updateStatusRow: statusRow,
-    updateStatusMsg: statusMsg,
-  };
-  const fakeDocument = {
-    querySelectorAll: () => [],
-    getElementById: (id) => elements[id] || makeFakeElement(),
-    body: { appendChild() {} },
-    createElement: () => ({ style: {}, textContent: '', href: '', target: '', rel: '' }),
-    documentElement: { setAttribute() {} },
-  };
-  const sb = {
-    URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
-    Blob: function Blob() {},
-    AbortController,
-    setTimeout,
-    clearTimeout,
-    fetch: fetchImpl,
-    document: fakeDocument,
-    browser: {
-      storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
-      runtime: { getManifest: () => ({ version: currentVersion }), id: 'addons-exporter@local' },
-    },
-  };
-  vm.createContext(sb);
-  vm.runInContext(themeSrc, sb);
-  vm.runInContext(commonSrc, sb);
-  vm.runInContext(settingsSrc, sb);
-  return { btn, statusRow, statusMsg };
-}
-
-testAsync('checkUpdateBtn: shows "up to date" when the local version matches AMO', async () => {
-  const { btn, statusMsg } = makeUpdateCheckSandbox(
-    async () => ({ ok: true, status: 200, json: async () => ({ current_version: { version: '1.2.0' } }) }),
-    '1.2.0'
-  );
-  await btn._onClick();
-  assert.match(statusMsg.textContent, /up to date/);
-  assert.strictEqual(btn.disabled, false);
-  assert.strictEqual(btn.textContent, 'Check now');
-});
-
-testAsync('checkUpdateBtn: a local version newer than AMO also counts as up to date', async () => {
-  const { btn, statusMsg } = makeUpdateCheckSandbox(
-    async () => ({ ok: true, status: 200, json: async () => ({ current_version: { version: '1.1.0' } }) }),
-    '1.2.0'
-  );
-  await btn._onClick();
-  assert.match(statusMsg.textContent, /up to date/, 'a dev build ahead of the published version should not say an update is available');
-});
-
-testAsync('checkUpdateBtn: "1.10" is correctly treated as newer than "1.9" (not a string comparison)', async () => {
-  const { btn, statusMsg } = makeUpdateCheckSandbox(
-    async () => ({ ok: true, status: 200, json: async () => ({ current_version: { version: '1.10' } }) }),
-    '1.9'
-  );
-  await btn._onClick();
-  assert.doesNotMatch(statusMsg.textContent, /up to date/);
-  assert.match(statusMsg.textContent, /Version 1\.10 is available/);
-});
-
-testAsync('checkUpdateBtn: an AMO-supplied version string is never treated as HTML', async () => {
-  const { btn, statusMsg } = makeUpdateCheckSandbox(
-    async () => ({ ok: true, status: 200, json: async () => ({ current_version: { version: '9.9 <img src=x onerror=alert(1)>' } }) }),
-    '1.0'
-  );
-  await btn._onClick();
-  assert.strictEqual(statusMsg._children.length, 1, 'only the real update link should be a child element - nothing from the AMO string');
-  assert.ok(statusMsg._children[0].href.includes('addons.mozilla.org'), 'the one real child should be the actual update link');
-  assert.ok(statusMsg.textContent.includes('9.9 <img src=x onerror=alert(1)>'), 'the raw AMO string should appear as plain text, not be parsed');
-});
-
-testAsync('checkUpdateBtn: a network failure shows an error and re-enables the button', async () => {
-  const { btn, statusMsg } = makeUpdateCheckSandbox(async () => { throw new Error('network unreachable'); }, '1.0');
-  await btn._onClick();
-  assert.match(statusMsg.textContent, /Could not check for updates/);
-  assert.strictEqual(btn.disabled, false, 'the button must not stay stuck disabled');
-  assert.strictEqual(btn.textContent, 'Check now');
-});
-
-testAsync('checkUpdateBtn: a 404 (our own add-on ID not found on AMO) is treated as a failure, not a silent no-op', async () => {
-  const { btn, statusMsg } = makeUpdateCheckSandbox(
-    async () => ({ ok: false, status: 404, json: async () => ({}) }),
-    '1.0'
-  );
-  await btn._onClick();
-  assert.match(statusMsg.textContent, /Could not check for updates/);
-  assert.strictEqual(btn.disabled, false);
-});
 
 // --- A20: the Reset dialog's accessibility ---
 // Uses makeFakeDom (S1) rather than the ad hoc fixtures above - the
@@ -525,16 +407,6 @@ test('Reset dialog: mentions the display setting, which it actually resets', () 
   const dialog = openResetDialog(document, elements.resetSettingsBtn);
   const message = dialog.querySelector('p');
   assert.match(message.textContent, /display/i, 'the dialog text should mention the display setting it also resets');
-});
-
-testAsync('checkUpdateBtn: the AMO lookup URL uses browser.runtime.id, not a hardcoded duplicate', async () => {
-  let requestedUrl = null;
-  const { btn } = makeUpdateCheckSandbox(
-    async (url) => { requestedUrl = url; return { ok: true, status: 200, json: async () => ({ current_version: { version: '1.0' } }) }; },
-    '1.0'
-  );
-  await btn._onClick();
-  assert.ok(requestedUrl.includes('addons-exporter%40local'), `expected the id in the URL, got: ${requestedUrl}`);
 });
 
 // --- 2.1: exportSettingsBtn — Android vs desktop path ---
@@ -682,4 +554,219 @@ testAsync('exportSettingsBtn: a getPlatformInfo failure falls back to the deskto
   await exportBtnEl2._onClick();
   assert.strictEqual(downloadCalls2.length, 1, 'should fall back to the desktop (saveAs) path when getPlatformInfo throws');
   assert.strictEqual(statusEl2.textContent, 'Settings exported.');
+});
+
+// --- settings-init.js: localStorage startup cache ---
+// Loads the real settings-init.js via vm with a fake document and
+// localStorage, and verifies it pre-applies cached radio states before
+// the first paint (simulated by checking .checked immediately after the
+// script runs, with no async gap).
+
+const settingsInitSrc = readSrc('src/settings/settings-init.js');
+
+function makeSettingsInitDom(cachedFormat, cachedShorten) {
+  // Minimal fake elements — only the six radio inputs settings-init.js
+  // touches, plus getElementById to resolve them.
+  function makeRadio(id, value, defaultChecked) {
+    return { id, value, checked: defaultChecked };
+  }
+  const radios = {
+    formatHtml:      makeRadio('formatHtml',      'html', false),
+    formatJson:      makeRadio('formatJson',      'json', false),
+    formatCsv:       makeRadio('formatCsv',       'csv',  false),
+    shortenNamesOn:  makeRadio('shortenNamesOn',  'on',   false),
+    shortenNamesOff: makeRadio('shortenNamesOff', 'off',  false),
+  };
+  const document = {
+    getElementById: (id) => radios[id] || null,
+  };
+  const cache = {};
+  if (cachedFormat !== undefined) cache['addons-hub-settings-exportFormat'] = cachedFormat;
+  if (cachedShorten !== undefined) cache['addons-hub-settings-shortenNames'] = cachedShorten;
+  const localStorage = {
+    getItem: (key) => Object.prototype.hasOwnProperty.call(cache, key) ? cache[key] : null,
+  };
+  const sb = { document, localStorage };
+  vm.createContext(sb);
+  vm.runInContext(settingsInitSrc, sb);
+  return radios;
+}
+
+test('settings-init: cache hit "json" checks the JSON radio and unchecks HTML', () => {
+  const radios = makeSettingsInitDom('json', undefined);
+  assert.strictEqual(radios.formatJson.checked, true,  'json should be checked');
+  assert.strictEqual(radios.formatHtml.checked, false, 'html should be unchecked');
+  assert.strictEqual(radios.formatCsv.checked,  false, 'csv should be unchecked');
+});
+
+test('settings-init: cache hit "csv" checks the CSV radio', () => {
+  const radios = makeSettingsInitDom('csv', undefined);
+  assert.strictEqual(radios.formatCsv.checked,  true);
+  assert.strictEqual(radios.formatHtml.checked, false);
+  assert.strictEqual(radios.formatJson.checked, false);
+});
+
+test('settings-init: cache hit "html" keeps HTML checked (matches default)', () => {
+  const radios = makeSettingsInitDom('html', undefined);
+  assert.strictEqual(radios.formatHtml.checked, true);
+  assert.strictEqual(radios.formatJson.checked, false);
+  assert.strictEqual(radios.formatCsv.checked,  false);
+});
+
+test('settings-init: cache miss applies defaults (html / on)', () => {
+  // No cache key set — should apply the hardcoded defaults.
+  const radios = makeSettingsInitDom(undefined, undefined);
+  assert.strictEqual(radios.formatHtml.checked, true,  'html default should be applied');
+  assert.strictEqual(radios.formatJson.checked, false);
+  assert.strictEqual(radios.formatCsv.checked,  false);
+  assert.strictEqual(radios.shortenNamesOn.checked,  true,  'on default should be applied');
+  assert.strictEqual(radios.shortenNamesOff.checked, false);
+});
+
+test('settings-init: invalid cache value falls back to defaults', () => {
+  const radios = makeSettingsInitDom('xml', 'maybe');
+  assert.strictEqual(radios.formatHtml.checked, true,  'invalid format falls back to html default');
+  assert.strictEqual(radios.shortenNamesOn.checked, true, 'invalid shorten falls back to on default');
+});
+
+test('settings-init: cache hit "off" checks Show Full and unchecks Shorten', () => {
+  const radios = makeSettingsInitDom(undefined, 'off');
+  assert.strictEqual(radios.shortenNamesOff.checked, true,  'off should be checked');
+  assert.strictEqual(radios.shortenNamesOn.checked,  false, 'on should be unchecked');
+});
+
+test('settings-init: cache hit "on" keeps Shorten checked (matches default)', () => {
+  const radios = makeSettingsInitDom(undefined, 'on');
+  assert.strictEqual(radios.shortenNamesOn.checked,  true);
+  assert.strictEqual(radios.shortenNamesOff.checked, false);
+});
+
+test('settings-init: localStorage throwing still applies defaults', () => {
+  const radios = {
+    formatHtml:      { checked: false },
+    formatJson:      { checked: false },
+    formatCsv:       { checked: false },
+    shortenNamesOn:  { checked: false },
+    shortenNamesOff: { checked: false },
+  };
+  const sb = {
+    document: { getElementById: (id) => radios[id] || null },
+    localStorage: { getItem() { throw new Error('storage unavailable'); } },
+  };
+  vm.createContext(sb);
+  assert.doesNotThrow(() => vm.runInContext(settingsInitSrc, sb));
+  assert.strictEqual(radios.formatHtml.checked,    true,  'html default applied after localStorage error');
+  assert.strictEqual(radios.shortenNamesOn.checked, true,  'on default applied after localStorage error');
+});
+
+test('settings-init: null getElementById (element not found) does not throw', () => {
+  // Simulates an element being absent from the DOM — should degrade gracefully.
+  const sb = {
+    document: { getElementById: () => null },
+    localStorage: { getItem: () => 'json' },
+  };
+  vm.createContext(sb);
+  assert.doesNotThrow(() => vm.runInContext(settingsInitSrc, sb));
+});
+
+// Verify that settings.js writes the localStorage cache keys from the
+// batched init IIFE so the cache is ready for the next page open.
+
+testAsync('settings.js batched init writes exportFormat to the localStorage cache', async () => {
+  const cacheStore = {};
+  const allRadios = [
+    { value: 'light', checked: false, addEventListener() {} },
+    { value: 'dark',  checked: false, addEventListener() {} },
+    { value: 'html',  checked: false, addEventListener() {} },
+    { value: 'json',  checked: false, addEventListener() {} },
+    { value: 'csv',   checked: false, addEventListener() {} },
+    { value: 'on',    checked: false, addEventListener() {} },
+    { value: 'off',   checked: false, addEventListener() {} },
+  ];
+  const fakeDoc = {
+    querySelectorAll: (sel) => {
+      if (sel.includes('"theme"'))        return allRadios.slice(0, 2);
+      if (sel.includes('"exportFormat"')) return allRadios.slice(2, 5);
+      if (sel.includes('"shortenNames"')) return allRadios.slice(5, 7);
+      return [];
+    },
+    getElementById: () => ({ textContent: '', className: '', addEventListener() {} }),
+    body: { appendChild() {} },
+    createElement: () => ({ style: {}, textContent: '', href: '' }),
+    documentElement: { setAttribute() {} },
+  };
+  const sb = {
+    URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
+    Blob: function Blob() {},
+    setTimeout: () => 0,
+    fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
+    document: fakeDoc,
+    localStorage: { getItem: () => null, setItem: (k, v) => { cacheStore[k] = v; } },
+    browser: {
+      storage: {
+        local: {
+          // getStoredSettings reads all three keys at once as an array.
+          get: async () => ({ theme: 'light', exportFormat: 'csv', shortenNames: 'on' }),
+          set: async () => {}, remove: async () => {},
+        },
+      },
+      runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
+    },
+  };
+  vm.createContext(sb);
+  vm.runInContext(themeSrc, sb);
+  vm.runInContext(commonSrc, sb);
+  vm.runInContext(settingsSrc, sb);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.strictEqual(cacheStore['addons-hub-settings-exportFormat'], 'csv',
+    'the batched init should write the confirmed exportFormat to localStorage');
+});
+
+testAsync('settings.js batched init writes shortenNames to the localStorage cache', async () => {
+  const cacheStore = {};
+  const allRadios = [
+    { value: 'light', checked: false, addEventListener() {} },
+    { value: 'dark',  checked: false, addEventListener() {} },
+    { value: 'html',  checked: false, addEventListener() {} },
+    { value: 'json',  checked: false, addEventListener() {} },
+    { value: 'csv',   checked: false, addEventListener() {} },
+    { value: 'on',    checked: false, addEventListener() {} },
+    { value: 'off',   checked: false, addEventListener() {} },
+  ];
+  const fakeDoc = {
+    querySelectorAll: (sel) => {
+      if (sel.includes('"theme"'))        return allRadios.slice(0, 2);
+      if (sel.includes('"exportFormat"')) return allRadios.slice(2, 5);
+      if (sel.includes('"shortenNames"')) return allRadios.slice(5, 7);
+      return [];
+    },
+    getElementById: () => ({ textContent: '', className: '', addEventListener() {} }),
+    body: { appendChild() {} },
+    createElement: () => ({ style: {}, textContent: '', href: '' }),
+    documentElement: { setAttribute() {} },
+  };
+  const sb = {
+    URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
+    Blob: function Blob() {},
+    setTimeout: () => 0,
+    fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
+    document: fakeDoc,
+    localStorage: { getItem: () => null, setItem: (k, v) => { cacheStore[k] = v; } },
+    browser: {
+      storage: {
+        local: {
+          get: async () => ({ theme: 'light', exportFormat: 'html', shortenNames: 'off' }),
+          set: async () => {}, remove: async () => {},
+        },
+      },
+      runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
+    },
+  };
+  vm.createContext(sb);
+  vm.runInContext(themeSrc, sb);
+  vm.runInContext(commonSrc, sb);
+  vm.runInContext(settingsSrc, sb);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.strictEqual(cacheStore['addons-hub-settings-shortenNames'], 'off',
+    'the batched init should write the confirmed shortenNames to localStorage');
 });

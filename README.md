@@ -4,10 +4,6 @@
 
 **🦊 Get it on Firefox Add-ons:** [Add-ons Hub on AMO](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/)
 
-> Updates are released every two months, on the 1st.
->
-> Security issues and critical bugs are fixed immediately, outside that schedule.
-
 ---
 
 ## Structure
