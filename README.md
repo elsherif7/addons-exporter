@@ -15,7 +15,7 @@
 ```
 addons-hub/
 ├── manifest.json         # Extension manifest: config, permissions, and background script list
-├── tests/                 # Plain Node.js test suite, run via node tests/run.js
+├── tests/                 # Plain Node.js test suite, run via `npm test`
 │   ├── run.js                   # Requires every test file, then prints the combined summary
 │   ├── helpers.js               # Shared test()/testAsync() harness plus vm-loading and sandbox utilities
 │   ├── common.test.js           # Unit tests covering every helper function in common.js
@@ -140,6 +140,22 @@ This extension does not collect, store, or transmit any personal data. Your them
 ## Contributing
 
 Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/elsherif7/addons-hub/issues).
+
+**Running the tests**
+
+```
+npm test
+```
+
+**Updating the report icon**
+
+If you replace `src/icons/icon32.png`, run:
+
+```
+npm run embed-icon
+```
+
+This re-encodes the icon as a base64 data URI and writes it into `src/background/report-template.js` (the report is a standalone file and can't reference the icon by path once saved). The test suite will fail with a mismatch error until you do.
 
 ---
 
