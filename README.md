@@ -24,7 +24,9 @@ addons-hub/
 │   ├── report-template.test.js  # Tests for the standalone HTML report template builder
 │   ├── background.test.js       # Tests covering messaging, AMO lookups, and export logic
 │   ├── export.test.js           # Tests covering the export page's picker and click logic
-│   └── settings.test.js         # Tests for the settings export/import logic
+│   ├── settings.test.js         # Tests for the settings page: backup/restore, reset, update check
+│   ├── confirmation.test.js     # Tests for the confirmation tab's heading/message logic
+│   └── structure.test.js        # Cross-page checks: lang attributes, ARIA roles, version consistency
 └── src/
     ├── common/
     │   ├── common.js   # Shared helper functions used across every page and script
@@ -90,27 +92,30 @@ Both are opened from the toolbar icon's popup.
 
 ### Add-ons Exporter
 
-Creates a checklist of every installed extension and theme, split into Enabled/Disabled groups with a search box to filter by name. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage, and finally a plain AMO search link if none of those find anything), and the result is saved as a file in whichever format you've chosen in Settings — **HTML** (default, human-readable with the data embedded for re-import), **JSON**, or **CSV**. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on. The HTML report opens in whichever theme Settings is currently set to, and has its own light/dark toggle in the corner — the toggle choice is remembered in `localStorage` so it persists across opens of the same file.
+Creates a checklist of every installed extension and theme, split into Enabled/Disabled groups with a search box to filter by name. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage, and finally a plain AMO search link if none of those find anything), and the result is saved as a file in whichever format you've chosen in Settings — **HTML** (default, human-readable with the data embedded for re-import), **JSON**, or **CSV**. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on. A **Cancel** button appears while an export is running; if AMO itself seems to be having trouble (repeated failures, or the lookups are taking a long time), the remaining add-ons get a fallback link instead of hanging indefinitely, and the final status says how many, if any, couldn't be looked up. The HTML report opens in whichever theme Settings is currently set to, and has its own light/dark toggle in the corner — the toggle choice is remembered in `localStorage` so it persists across opens of the same file.
 
 ### Add-ons Importer
 
-Reads a previously exported file (HTML, JSON, or CSV), chosen or dragged in, validating it automatically and rejecting anything with a missing or unsupported format version rather than guessing. It compares the file against what's currently installed (matched by add-on ID, falling back to name for older exports), splitting the checklist into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference) — so you never need to reopen things you already have. It opens each pick as a tab rather than installing it directly, which is the workaround for a real limitation: Firefox doesn't allow any extension to install other extensions automatically — a deliberate security restriction, not a limitation of these tools.
+Reads a previously exported file (`.html`/`.htm`, `.json`, or `.csv`, up to 10 MB), chosen or dragged in. The file is validated before anything is read from it: an unrecognised extension or an oversized file is rejected immediately with a plain explanation, and a file with a missing, non-numeric, or unsupported format version is rejected the same way — including an export from the original v1.0.0 release, whose file shape predates this version check entirely. A duplicate entry in the file (the same add-on listed twice) is merged into one row. It compares the file against what's currently installed, matching by add-on ID when the file has one, and falling back to matching by name otherwise (or when the id in the file doesn't match anything installed) — splitting the checklist into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference) — so you never need to reopen things you already have. It opens each pick as a tab rather than installing it directly, which is the workaround for a real limitation: Firefox doesn't allow any extension to install other extensions automatically — a deliberate security restriction, not a limitation of these tools.
 
-### Settings Backup
+### Settings
 
-The Settings page has **Export Settings** and **Import Settings** buttons at the bottom.
+The Settings page controls **Appearance** (light/dark theme), **Export Format** (HTML/JSON/CSV), and **Display** (whether long add-on names are shortened for readability), plus a few other things below.
 
-**Export Settings** saves your current Add-ons Hub settings (theme and export format) to a small JSON file — `addons-hub-settings.json`. You can use it to carry your preferences to another browser or device.
+**Export Settings** and **Import Settings**, at the bottom of the page, back up and restore all three of the settings above. Export saves them to a small JSON file named `Add-ons Hub Settings (<timestamp>).json`, which you can use to carry your preferences to another browser or device. Import reads a previously exported settings file, validates it, and applies the recognised settings immediately — unknown keys from a future version are silently ignored, so a newer export still applies whatever it can.
 
-**Import Settings** reads a previously exported settings file, validates it, and applies the recognised settings immediately. Unknown keys from future versions are silently ignored, so a file exported by a newer version will still apply whatever it can.
+**Reset** clears all three settings back to their defaults, after a confirmation dialog.
+
+**Check now**, under About, checks whether a newer version is listed on AMO than the one currently installed, and links to it if so.
 
 #### A few other things worth knowing
 
 - On desktop, the confirmation tab opens from the background script itself once the file downloads, not from the popup — so it still appears even if the popup's own tab has already closed. On Firefox for Android, the platform doesn't allow the background script to trigger the download itself, so Add-ons Exporter does it directly and opens the confirmation tab once the download is picked up.
 - Add-ons Importer opens its own confirmation tab too — first, as the active tab, with the selected add-ons' pages then opening behind it as background tabs.
-- AMO lookups are capped at 15 seconds each and 5 in flight at once, so a slow AMO response can't stall an export, and a large add-on collection can't trip AMO's rate limiting.
+- AMO lookups are capped at 15 seconds each and 5 in flight at once, so a single slow response can't stall an export. If AMO responds with a rate-limit (429), that one lookup is retried once after a short wait. If lookups keep failing, or the export has been running for 90 seconds, the remaining add-ons skip straight to a fallback link instead of continuing to retry against a struggling API.
 - Firefox's own bundled built-ins (New Tab page, default themes) and spell-check dictionaries/language packs are excluded, since they aren't real installed add-ons and have no matching store listing. On Firefox for Android, its own bundled components (ad-blocking telemetry, reader view, etc.) are excluded the same way.
 - Add-ons Importer only ever opens http/https links; anything else is flagged and left unselected, since an export file's data isn't inherently trusted.
+- A CSV export guards against formula injection: an add-on name starting with a character a spreadsheet would read as a formula (`=`, `+`, `-`, `@`) gets a leading apostrophe added so it's treated as plain text instead. Add-ons Importer strips that apostrophe back off, so the name round-trips correctly.
 - If every add-on in the file is already installed, Add-ons Importer shows a short note about it — informational only, since there's nothing to open.
 
 ---
@@ -128,7 +133,7 @@ The Settings page has **Export Settings** and **Import Settings** buttons at the
 
 ## Privacy
 
-This extension does not collect, store, or transmit any personal data. The only network requests it makes are to `addons.mozilla.org`'s public API, to look up each installed add-on's official listing page.
+This extension does not collect, store, or transmit any personal data. Your theme, export format, and display preferences are saved locally in your browser profile (never sent anywhere) so they persist between sessions. The only network requests it makes are to `addons.mozilla.org`'s public API: to look up each installed add-on's official listing page during an export, and, if you use **Check now** in Settings, to check the extension's own latest version.
 
 ---
 
