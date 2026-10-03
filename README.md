@@ -35,6 +35,7 @@ addons-hub/
     ├── background/
     │   ├── background.js       # Handles messaging, AMO lookups, and export orchestration logic
     │   └── report-template.js  # Builds the self-contained HTML report returned by doExport()
+    │   └── report.css          # Source CSS for the report's inline <style> block; inlined by `npm run build`
     ├── popup/
     │   ├── popup.html  # Markup for the small toolbar popup interface
     │   └── popup.js    # Handles clicks on the popup's export, import, and settings buttons
@@ -152,10 +153,20 @@ npm test
 If you replace `src/icons/icon32.png`, run:
 
 ```
-npm run embed-icon
+npm run build
 ```
 
 This re-encodes the icon as a base64 data URI and writes it into `src/background/report-template.js` (the report is a standalone file and can't reference the icon by path once saved). The test suite will fail with a mismatch error until you do.
+
+**Editing the report's CSS**
+
+The exported HTML report embeds its own CSS since it's a standalone file. Edit `src/background/report.css` directly rather than the embedded string inside `report-template.js`, then run:
+
+```
+npm run build
+```
+
+The build script inlines `report.css` into `report-template.js`. The test suite will fail with a sync error until you do.
 
 ---
 

@@ -4,7 +4,8 @@
   "description": "A Firefox WebExtension for managing your installed add-ons.",
   "private": true,
   "scripts": {
-    "pretest": "node scripts/check-syntax.js",
+    "build": "node scripts/build-report-css.js && node scripts/embed-icon.js",
+    "pretest": "npm run build && node scripts/check-syntax.js",
     "test": "node tests/run.js",
     "embed-icon": "node scripts/embed-icon.js"
   },

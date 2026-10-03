@@ -425,3 +425,18 @@ test('A30: --btn-text is gone (it was never actually consumed anywhere)', () => 
   assert.doesNotMatch(sharedCssSrc, /--btn-text/);
   assert.doesNotMatch(reportTemplateSrcRaw, /--btn-text/);
 });
+
+// --- 5.1: report.css is the source of truth for the report's inline CSS ---
+// src/background/report.css is the editable source; scripts/build-report-css.js
+// inlines it into the <style> block of report-template.js. This test catches
+// the case where report.css was edited but `npm run build` wasn't re-run.
+
+test('report.css is in sync with the <style> block in report-template.js', () => {
+  const reportCss = fs.readFileSync(path.join(__dirname, '..', 'src', 'background', 'report.css'), 'utf8');
+  const styleMatch = reportTemplateSrcRaw.match(/<style>\n([\s\S]*?)\n<\/style>/);
+  assert.ok(styleMatch, 'could not find <style>...</style> block in report-template.js');
+  assert.strictEqual(
+    styleMatch[1], reportCss,
+    'report-template.js\'s <style> block is out of sync with report.css — run `npm run build` to update it'
+  );
+});
