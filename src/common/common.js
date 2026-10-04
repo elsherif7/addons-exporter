@@ -1,5 +1,5 @@
 // Shared helpers used by background.js, report-template.js, export.js,
-// and import.js.
+// import.js, confirmation.js, and settings.js.
 
 // Bump if the exported JSON shape ever changes.
 const EXPORT_FORMAT_VERSION = 1;
@@ -288,4 +288,46 @@ function filterAddonRows(container, query) {
   }
 
   return anyMatch;
+}
+
+// Used by export.js and import.js when they finish: the page fades out
+// and is replaced, in the same tab, by the confirmation page (instead of
+// opening a second tab next to it). The fade uses the Web Animations API
+// on the page's .card and is skipped when that isn't available or the
+// user has asked for reduced motion, so callers can always just await it.
+const PAGE_FADE_MS = 220;
+
+// Resolves once the card has faded out, with the animation (held at its
+// final frame) so the caller can undo it, or null if nothing was animated.
+async function fadeOutPage() {
+  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return null;
+  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return null;
+  const card = document.querySelector('.card');
+  if (!card || typeof card.animate !== 'function') return null;
+  try {
+    const anim = card.animate(
+      [
+        { opacity: 1, transform: 'none' },
+        { opacity: 0, transform: 'translateY(-12px) scale(0.98)' },
+      ],
+      { duration: PAGE_FADE_MS, easing: 'ease-in', fill: 'forwards' }
+    );
+    await anim.finished;
+    return anim;
+  } catch {
+    return null; // cosmetic only - never block the hand-off
+  }
+}
+
+// `query` is the confirmation page's query string, e.g. 'from=export&format=csv'.
+// location.replace (not assign) so the back button doesn't return to a
+// finished export/import page.
+async function goToConfirmation(query) {
+  const anim = await fadeOutPage();
+  try {
+    location.replace(browser.runtime.getURL(`src/confirmation/confirmation.html?${query}`));
+  } catch (e) {
+    if (anim) { try { anim.cancel(); } catch { /* already gone */ } }
+    throw e;
+  }
 }

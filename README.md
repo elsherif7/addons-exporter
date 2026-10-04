@@ -22,7 +22,7 @@ addons-hub/
 │   ├── background.test.js       # Tests covering messaging, AMO lookups, and export logic
 │   ├── export.test.js           # Tests covering the export page's picker and click logic
 │   ├── settings.test.js         # Tests for the settings page: backup/restore, reset, update check
-│   ├── confirmation.test.js     # Tests for the confirmation tab's heading/message logic
+│   ├── confirmation.test.js     # Tests for the confirmation page's heading/message logic
 │   └── structure.test.js        # Cross-page checks: lang attributes, ARIA roles, version consistency
 └── src/
     ├── common/
@@ -46,8 +46,8 @@ addons-hub/
     │   ├── settings.html  # Settings page, opened from the popup or the browser's own menu
     │   └── settings.js    # Settings page logic
     ├── confirmation/
-    │   ├── confirmation.html  # Tab shown after Add-ons Exporter or Add-ons Importer finishes
-    │   └── confirmation.js    # Sets the heading/message based on which tool opened this tab
+    │   ├── confirmation.html  # Page shown after Add-ons Exporter or Add-ons Importer finishes
+    │   └── confirmation.js    # Sets the heading/message based on which tool sent you here
 ```
 
 > **Note:** `manifest.json`'s `browser_specific_settings.gecko.id` is
@@ -107,8 +107,8 @@ The Settings page controls **Appearance** (light/dark theme), **Export Format** 
 
 #### A few other things worth knowing
 
-- On desktop, the confirmation tab opens from the background script itself once the file downloads, not from the popup — so it still appears even if the popup's own tab has already closed. On Firefox for Android, the platform doesn't allow the background script to trigger the download itself, so Add-ons Exporter does it directly and opens the confirmation tab once the download is picked up.
-- Add-ons Importer opens its own confirmation tab too — first, as the active tab, with the selected add-ons' pages then opening behind it as background tabs.
+- When the export finishes, the Exporter page fades out and is replaced by the confirmation page in the same tab, rather than opening a second tab. On desktop the background script saves the file first; on Firefox for Android the platform doesn't allow the background script to trigger the download itself, so Add-ons Exporter does it directly and moves on to the confirmation page once the download is picked up.
+- Add-ons Importer opens the selected add-ons' pages as background tabs, then fades out and is replaced by the confirmation page in the same tab. If some pages fail to open, the confirmation page says how many; if none open, the Importer stays put and shows the error.
 - AMO lookups are capped at 15 seconds each and 5 in flight at once, so a single slow response can't stall an export. If AMO responds with a rate-limit (429), that one lookup is retried once after a short wait. If lookups keep failing, or the export has been running for 90 seconds, the remaining add-ons skip straight to a fallback link instead of continuing to retry against a struggling API.
 - Firefox's own bundled built-ins (New Tab page, default themes) and spell-check dictionaries/language packs are excluded, since they aren't real installed add-ons and have no matching store listing. On Firefox for Android, its own bundled components (ad-blocking telemetry, reader view, etc.) are excluded the same way.
 - Add-ons Importer only ever opens http/https links; anything else is flagged and left unselected, since an export file's data isn't inherently trusted.

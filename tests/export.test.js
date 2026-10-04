@@ -1,7 +1,7 @@
 // Tests for src/export/export.js's click handler.
-// On desktop, background.js already saves the file and opens
-// confirmation.html itself, so export.js's handler does nothing beyond
-// showing status text. On Android, background.js hands the report back
+// On desktop, background.js already saves the file, so export.js's
+// handler just replaces its own page with confirmation.html (same tab,
+// no second tab). On Android, background.js hands the report back
 // instead (see background.test.js), and export.js must trigger the
 // actual save right here, synchronously within this same click - not
 // after another message hop - for it to have a chance of being treated
@@ -27,6 +27,7 @@ async function captureExportClick({ selectedIds, exportResponse, simulateDownloa
   const appendedLinks = [];
   const bodyStub = { appendChild: (el) => appendedLinks.push(el) };
   const createdTabUrls = [];
+  const navigatedUrls = [];
   const sentMessages = [];
   const elements = {
     addonList: listElStub,
@@ -52,6 +53,8 @@ async function captureExportClick({ selectedIds, exportResponse, simulateDownloa
     // export.js means only one path actually resolves things either way.
     setTimeout: (fn) => { fn(); return 0; },
     clearTimeout() {},
+    // export.js finishes by replacing its own page with confirmation.html
+    location: { replace: (url) => navigatedUrls.push(url) },
     document: {
       getElementById: (id) => elements[id],
       body: bodyStub,
@@ -89,11 +92,11 @@ async function captureExportClick({ selectedIds, exportResponse, simulateDownloa
   // even exists to be clicked.
   await new Promise((resolve) => setTimeout(resolve, 0));
   await exportClickHandler();
-  return { sentMessages, appendedLinks, createdTabUrls, statusEl: elements.status, exportBtnEl: elements.exportSelectedBtn };
+  return { sentMessages, appendedLinks, createdTabUrls, navigatedUrls, statusEl: elements.status, exportBtnEl: elements.exportSelectedBtn };
 }
 
 testAsync('export.js click handler: on Android, proceeds to confirmation.html once downloads.onCreated fires', async () => {
-  const { sentMessages, appendedLinks, createdTabUrls, exportBtnEl } = await captureExportClick({
+  const { sentMessages, appendedLinks, createdTabUrls, navigatedUrls, exportBtnEl } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
     exportResponse: { html: '<html>Test Addon report</html>', filename: 'Firefox Add-ons (test).html' },
     simulateDownloadCreated: true,
@@ -110,28 +113,43 @@ testAsync('export.js click handler: on Android, proceeds to confirmation.html on
   assert.strictEqual(appendedLinks[0].clicked, true);
   assert.strictEqual(appendedLinks[0].removed, true);
   // Both onCreated and the (immediate, mocked) fallback timer fire here -
-  // the "settled" guard in export.js should mean only one tab opens.
-  assert.strictEqual(createdTabUrls.length, 1);
-  assert.match(createdTabUrls[0], /confirmation\.html\?from=export&format=html$/);
+  // the "settled" guard in export.js should mean the page only navigates
+  // once - and in place, never by opening another tab.
+  assert.strictEqual(createdTabUrls.length, 0);
+  assert.strictEqual(navigatedUrls.length, 1);
+  assert.strictEqual(navigatedUrls[0], 'moz-extension://test-id/src/confirmation/confirmation.html?from=export&format=html');
 });
 
 testAsync('export.js click handler: on Android, still proceeds via the fallback timer if onCreated never fires', async () => {
-  const { createdTabUrls } = await captureExportClick({
+  const { navigatedUrls } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
     exportResponse: { html: '<html>Test Addon report</html>', filename: 'Firefox Add-ons (test).html' },
     simulateDownloadCreated: false,
   });
-  assert.strictEqual(createdTabUrls.length, 1);
-  assert.match(createdTabUrls[0], /confirmation\.html\?from=export&format=html$/);
+  assert.strictEqual(navigatedUrls.length, 1);
+  assert.match(navigatedUrls[0], /confirmation\.html\?from=export&format=html$/);
 });
 
-testAsync('export.js click handler: on desktop, does nothing extra since background.js already handled it', async () => {
-  const { appendedLinks, createdTabUrls } = await captureExportClick({
+testAsync('export.js click handler: on desktop, saves nothing itself and replaces its page with confirmation.html', async () => {
+  const { appendedLinks, createdTabUrls, navigatedUrls } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
     exportResponse: { format: 'html', stats: { total: 1, lookupFailures: 0 } },
   });
   assert.strictEqual(appendedLinks.length, 0);
-  assert.strictEqual(createdTabUrls.length, 0);
+  assert.strictEqual(createdTabUrls.length, 0, 'no second tab');
+  assert.deepStrictEqual(navigatedUrls, [
+    'moz-extension://test-id/src/confirmation/confirmation.html?from=export&format=html',
+  ]);
+});
+
+testAsync('export.js click handler: on desktop, the confirmation URL carries the format that was exported', async () => {
+  for (const format of ['json', 'csv']) {
+    const { navigatedUrls } = await captureExportClick({
+      selectedIds: ['ext1@example.com'],
+      exportResponse: { format, stats: { total: 1, lookupFailures: 0 } },
+    });
+    assert.match(navigatedUrls[0], new RegExp(`confirmation\\.html\\?from=export&format=${format}$`));
+  }
 });
 
 // --- A14: desktop success re-enables the button and names the format ---

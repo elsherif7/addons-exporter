@@ -263,7 +263,7 @@ exportSettingsBtn.addEventListener('click', async () => {
           let settled = false;
           let fallbackTimer;
           const hintTimer = setTimeout(() => {
-            setSettingsStatus('Saving\u2014tap \u201cDownload\u201d in the prompt if asked\u2026');
+            setSettingsStatus('Saving. Tap \u201cDownload\u201d in the prompt if asked\u2026');
           }, 1500);
           const proceed = () => {
             if (settled) return;

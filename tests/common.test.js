@@ -636,3 +636,84 @@ test('A34: formatLabel is no longer duplicated in export.js or confirmation.js',
   assert.doesNotMatch(exportSrcRaw, /function formatLabel/);
   assert.doesNotMatch(confirmationSrcRaw, /function exportFormatLabel|FORMAT_LABELS/);
 });
+
+// --- common.js: fadeOutPage() / goToConfirmation() ---
+// Cosmetic fade before the page is replaced by the confirmation page.
+// Must be a safe no-op wherever animation isn't available, and must
+// never block the caller.
+function makeFadeSandbox({ card, reducedMotion = false, replaceImpl } = {}) {
+  const navigated = [];
+  const sb = {
+    URL,
+    document: { querySelector: (sel) => (sel === '.card' ? card : null) },
+    matchMedia: () => ({ matches: reducedMotion }),
+    location: { replace: replaceImpl || ((url) => navigated.push(url)) },
+    browser: { runtime: { getURL: (p) => `moz-extension://test-id/${p}` } },
+  };
+  vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
+  return { sb, navigated };
+}
+
+function makeAnimatedCard() {
+  const card = { calls: [], cancelled: false };
+  card.animate = (frames, opts) => {
+    card.calls.push({ frames, opts });
+    return { finished: Promise.resolve(), cancel() { card.cancelled = true; } };
+  };
+  return card;
+}
+
+testAsync('fadeOutPage: animates the .card out and holds the final frame', async () => {
+  const card = makeAnimatedCard();
+  const { sb } = makeFadeSandbox({ card });
+  const anim = await sb.fadeOutPage();
+  assert.ok(anim, 'returns the animation so a caller can undo it');
+  assert.strictEqual(card.calls.length, 1);
+  assert.strictEqual(card.calls[0].frames[1].opacity, 0);
+  assert.strictEqual(card.calls[0].opts.fill, 'forwards');
+  assert.strictEqual(card.cancelled, false);
+});
+
+testAsync('fadeOutPage: does nothing when the user prefers reduced motion', async () => {
+  const card = makeAnimatedCard();
+  const { sb } = makeFadeSandbox({ card, reducedMotion: true });
+  assert.strictEqual(await sb.fadeOutPage(), null);
+  assert.strictEqual(card.calls.length, 0);
+});
+
+testAsync('fadeOutPage: safe no-op when there is no .card, no animate(), or no document', async () => {
+  assert.strictEqual(await makeFadeSandbox({ card: null }).sb.fadeOutPage(), null);
+  assert.strictEqual(await makeFadeSandbox({ card: {} }).sb.fadeOutPage(), null);
+  const bare = { URL };
+  vm.createContext(bare);
+  vm.runInContext(commonSrc, bare);
+  assert.strictEqual(await bare.fadeOutPage(), null);
+});
+
+testAsync('fadeOutPage: a throwing animation never blocks the caller', async () => {
+  const card = { animate() { throw new Error('boom'); } };
+  const { sb } = makeFadeSandbox({ card });
+  assert.strictEqual(await sb.fadeOutPage(), null);
+});
+
+testAsync('goToConfirmation: fades out, then replaces this page (not a new tab) with the confirmation URL', async () => {
+  const card = makeAnimatedCard();
+  const { sb, navigated } = makeFadeSandbox({ card });
+  await sb.goToConfirmation('from=import&failed=2');
+  assert.strictEqual(card.calls.length, 1);
+  assert.deepStrictEqual(navigated, ['moz-extension://test-id/src/confirmation/confirmation.html?from=import&failed=2']);
+});
+
+testAsync('goToConfirmation: still navigates when nothing can animate', async () => {
+  const { sb, navigated } = makeFadeSandbox({ card: null });
+  await sb.goToConfirmation('from=export&format=csv');
+  assert.deepStrictEqual(navigated, ['moz-extension://test-id/src/confirmation/confirmation.html?from=export&format=csv']);
+});
+
+testAsync('goToConfirmation: if navigation throws, the card is brought back and the error propagates', async () => {
+  const card = makeAnimatedCard();
+  const { sb } = makeFadeSandbox({ card, replaceImpl: () => { throw new Error('nav failed'); } });
+  await assert.rejects(() => sb.goToConfirmation('from=export'), /nav failed/);
+  assert.strictEqual(card.cancelled, true, 'card must not stay invisible after a failed navigation');
+});

@@ -672,19 +672,10 @@ openSelectedBtn.addEventListener('click', async () => {
   setStatus(`Opening ${pluralTabs(selected.length)}...`);
 
   try {
-    // Opened first (and becomes the active tab) so it's the thing you see
-    // right away - the add-ons' own pages then open behind it as
-    // background tabs via the loop below. Wrapped in its own try/catch:
-    // if this fails, still go on and open the add-ons - a missing
-    // confirmation tab is far less bad than the button staying stuck on
-    // "Opening..." forever because this one tab couldn't be created.
-    try {
-      await browser.tabs.create({ url: browser.runtime.getURL('src/confirmation/confirmation.html?from=import') });
-    } catch {
-      /* not fatal - see comment above */
-    }
-    await delay(TAB_OPEN_DELAY_MS);
-
+    // The add-ons' own pages open first, as background tabs. This page
+    // stays put (showing the status above) until they're all open, then
+    // replaces itself with the confirmation page - nothing here could keep
+    // running once the page has navigated away.
     let opened = 0;
     let failed = 0;
     for (let i = 0; i < selected.length; i++) {
@@ -706,6 +697,11 @@ openSelectedBtn.addEventListener('click', async () => {
     setStatus(failed > 0
       ? `Opened ${pluralTabs(opened)}, ${failed} failed to open`
       : `Opened ${pluralTabs(opened)}`);
+    // Nothing opened means there's nothing to confirm - stay here so the
+    // status above (all failed) is what the user sees.
+    if (opened > 0) {
+      await goToConfirmation(failed > 0 ? `from=import&failed=${failed}` : 'from=import');
+    }
   } finally {
     openSelectedBtn.disabled = false;
   }

@@ -9,11 +9,31 @@
 <title>Add-ons Exporter</title>
 <style>
   /* .about-block and .about-row come from shared.css */
+
+  /* Entrance animation: this page opens as a new tab right after the user
+     clicks Export Selected / Open Selected, so the card fades and rises
+     into place, then the heading, message and links follow in turn.
+     prefers-reduced-motion is handled globally in shared.css. */
+  @keyframes confirm-card-in {
+    from { opacity: 0; transform: translateY(18px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes confirm-item-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .card { animation: confirm-card-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  #heading, #message, .about-block {
+    animation: confirm-item-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  #heading { animation-delay: 0.1s; }
+  #message { animation-delay: 0.2s; }
+  .about-block { animation-delay: 0.3s; }
 </style></head>
 <body>
   <div class="card">
     <h1 id="heading">Add-ons Exporter</h1>
-    <p id="message">Thanks for using <strong>Add-ons Exporter</strong>. Your add-ons were exported as an HTML report. On another browser, choose <strong>Add-ons Importer</strong> to select which ones to install.</p>
+    <p id="message">Thanks for using <strong>Add-ons Exporter</strong>. Your add-ons were exported as an <strong>HTML report</strong>. On another browser, choose <strong>Add-ons Importer</strong> to select which ones to install.</p>
 
     <div class="about-block">
       <div class="about-row">

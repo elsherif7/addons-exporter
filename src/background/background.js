@@ -18,11 +18,8 @@ browser.runtime.onMessage.addListener((message) => {
         setTimeout(() => URL.revokeObjectURL(url), 30000);
       }
 
-      // Opened from here, not the popup - the popup can close early once
-      // the native Save dialog steals focus.
-      await browser.tabs.create({
-        url: browser.runtime.getURL(`src/confirmation/confirmation.html?from=export&format=${format}`)
-      });
+      // No tab is opened from here: export.js replaces its own page with
+      // the confirmation page once it gets this result back.
       return { format, stats };
     });
   }

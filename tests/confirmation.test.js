@@ -100,3 +100,26 @@ test('a prototype-pollution-shaped ?from= value falls back to the export message
   assert.strictEqual(elements.heading.textContent, 'Add-ons Exporter');
   assert.doesNotMatch(elements.message.textContent, /undefined/);
 });
+
+test('import: ?failed=N adds how many add-ons could not be opened', () => {
+  const { elements } = loadConfirmation('?from=import&failed=2');
+  assert.match(elements.message.textContent, /2 add-ons could not be opened\./);
+});
+
+test('import: ?failed=1 uses the singular', () => {
+  const { elements } = loadConfirmation('?from=import&failed=1');
+  assert.match(elements.message.textContent, /1 add-on could not be opened\./);
+});
+
+test('import: a missing, zero, or junk ?failed= value adds nothing', () => {
+  for (const q of ['?from=import', '?from=import&failed=0', '?from=import&failed=abc', '?from=import&failed=-3', '?from=import&failed=1.5', '?from=import&failed=99999']) {
+    const { elements } = loadConfirmation(q);
+    assert.doesNotMatch(elements.message.textContent, /could not be opened/, q);
+  }
+});
+
+test('export: ?failed= is ignored (only the Importer reports it)', () => {
+  const { elements } = loadConfirmation('?from=export&format=csv&failed=3');
+  assert.doesNotMatch(elements.message.textContent, /could not be opened/);
+});
+

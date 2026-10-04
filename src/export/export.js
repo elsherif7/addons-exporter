@@ -63,9 +63,12 @@ async function updateExportDesc() {
   addonsStrong.textContent = 'Add-ons';
   const exportStrong = document.createElement('strong');
   exportStrong.textContent = 'Export Selected';
+  const labelStrong = document.createElement('strong');
+  labelStrong.textContent = label;
   exportDescEl.append(
     'Select the ', addonsStrong, ' you want to export, then click ', exportStrong,
-    ` to create ${article} ${label} you can use to reinstall them later on any Firefox\u2011based\u00a0browser.`
+    ` to create ${article} `, labelStrong,
+    ' you can use to reinstall them later on any Firefox\u2011based\u00a0browser.'
   );
 }
 
@@ -295,7 +298,7 @@ exportBtn.addEventListener('click', async () => {
         // user knows something is expected of them (Android's download
         // prompt may need a tap to confirm).
         const hintTimer = setTimeout(() => {
-          setStatus('Saving\u2014tap \u201cDownload\u201d in the prompt if asked\u2026');
+          setStatus('Saving. Tap \u201cDownload\u201d in the prompt if asked\u2026');
         }, 1500);
         const proceed = () => {
           if (settled) return;
@@ -314,11 +317,12 @@ exportBtn.addEventListener('click', async () => {
       link.remove();
       setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
       const fmt = result.filename.split('.').pop().toLowerCase() || 'html';
-      await browser.tabs.create({ url: browser.runtime.getURL(`src/confirmation/confirmation.html?from=export&format=${fmt}`) });
+      await goToConfirmation(`from=export&format=${fmt}`);
     } else {
-      // Desktop: background.js already saved the file and opened the
-      // confirmation tab itself - this one just reports success and stays open.
+      // Desktop: background.js already saved the file, so this page just
+      // becomes the confirmation page.
       setStatus(buildExportSuccessStatus(result.format, result.stats));
+      await goToConfirmation(`from=export&format=${result.format}`);
     }
   } catch (e) {
     setStatus('Error: ' + e.message);
