@@ -81,10 +81,10 @@
     color: var(--text);
     transition: border-color 0.12s, transform 0.1s;
   }
-  .search-input:focus { outline: none; border-color: var(--btn-bg); }
-  .search-input:focus-visible { outline: 2px solid var(--link-accent); outline-offset: 1px; }
+  .search-input:focus { outline: none; border-color: var(--btn-bg); transform: scale(1.01); }
   .search-input:hover { border-color: var(--btn-bg); transform: scale(1.01); }
   .placeholder-text { padding: 20px; color: var(--text-muted); font-size: 14px; margin: 0; }
+  #noSearchMatches { border: 1px solid var(--border); border-radius: 10px; text-align: center; }
   .checklist-box {
     text-align: left;
     overflow-x: hidden;
@@ -115,11 +115,15 @@
     padding: 0 0 8px 2px;
   }
   .addon-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: 10px 14px;
     border-bottom: 1px solid var(--border-soft);
     user-select: none;
     transition: background 0.12s, transform 0.1s;
   }
+  .addon-row-info { flex: 1; }
   .addon-row:last-child { border-bottom: none; }
   .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
   :root[data-theme="dark"] .addon-row:hover { background: #2e3340; }

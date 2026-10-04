@@ -28,7 +28,7 @@
      but the border, spacing, hover, and transition are identical. */
   .settings-option-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
     padding: 10px 12px;
     border: 1px solid var(--border);
@@ -43,22 +43,21 @@
      row feel clickable. Action rows are <div> — no pointer cursor
      since the button inside is the interactive target. */
   label.settings-option-row { cursor: pointer; }
-  label.settings-option-row input { margin: 0; }
+  label.settings-option-row input { margin: 0; margin-top: 3px; }
+  /* Action rows use <div> — center button vertically, push it right,
+     and use slightly less padding since two-line content already makes
+     them taller than single-line radio rows. */
+  div.settings-option-row { align-items: center; justify-content: space-between; padding: 8px 12px; margin-bottom: 0; }
   .settings-option-row:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.01); }
   :root[data-theme="dark"] .settings-option-row:hover { background: #2e3340; border-color: #6b7280; }
-  /* Action rows (e.g. Reset Settings) lay out their content
-     space-between so the title/description sits left and the
-     button sits right, matching the original Reset row layout. */
-  div.settings-option-row { justify-content: space-between; }
   .settings-action-group {
     display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 8px;
   }
   /* .settings-btn and .s-modal-btn extend hub-btn (shared.css).
      Only layout/sizing/scale overrides live here. */
   .settings-btn {
-    flex: 1;
     padding: 9px 14px;
     text-align: center;
   }
@@ -82,33 +81,19 @@
   #settingsStatus {
     display: block;
     font-size: 13px;
-    margin-top: 10px;
-    min-height: 18px;
+    margin-top: 0;
+    min-height: 0;
     color: var(--text-muted);
     text-align: center;
+    padding: 0 10px;
+    box-sizing: border-box;
+  }
+  #settingsStatus:not(:empty) {
+    margin-top: 10px;
+    margin-bottom: 2px;
   }
   #settingsStatus.error { color: var(--danger-color); }
-  .about-block {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  .about-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 14px;
-    font-size: 14px;
-    border-bottom: 1px solid var(--border-soft);
-    transition: background 0.12s, border-color 0.12s, transform 0.1s;
-  }
-  .about-row:last-child { border-bottom: none; }
-  .about-row:hover { background: var(--hover-bg); border-bottom-color: var(--border); transform: scale(1.01); }
-  :root[data-theme="dark"] .about-row:hover { background: #2e3340; border-bottom-color: #6b7280; }
-  .about-label { color: var(--text-muted); font-size: 14px; font-weight: 600; }
-  .about-value { color: var(--text); font-weight: 600; font-size: 14px; }
-  .about-value a { color: var(--link-accent); text-decoration: none; font-weight: 600; }
-  .about-value a:hover { text-decoration: underline; }
+  /* .about-block, .about-row, .about-label, .about-value come from shared.css */
 </style>
 </head>
 <body>
@@ -173,10 +158,23 @@
     <div class="settings-group">
       <h2>Settings Backup</h2>
       <div class="settings-action-group">
-        <button class="settings-btn hub-btn" id="exportSettingsBtn">Export Settings</button>
-        <button class="settings-btn hub-btn" id="importSettingsBtn">Import Settings</button>
+        <div class="settings-option-row">
+          <span style="flex:1;">
+            <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Export Settings</span>
+            <span id="exportSettingsDesc" style="font-size:12px; color:var(--text-muted);">Save your current settings to a file.</span>
+            <span id="exportSettingsStatus" style="font-size:12px; display:none;"></span>
+          </span>
+          <button class="settings-btn hub-btn" id="exportSettingsBtn" style="flex-shrink:0; flex:none; width:auto; min-width:80px; padding:6px 14px; margin-left:12px;">Export</button>
+        </div>
+        <div class="settings-option-row">
+          <span style="flex:1;">
+            <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Import Settings</span>
+            <span id="importSettingsDesc" style="font-size:12px; color:var(--text-muted);">Restore settings from a previously exported file.</span>
+            <span id="importSettingsStatus" style="font-size:12px; display:none;"></span>
+          </span>
+          <button class="settings-btn hub-btn" id="importSettingsBtn" style="flex-shrink:0; flex:none; width:auto; min-width:80px; padding:6px 14px; margin-left:12px;">Import</button>
+        </div>
       </div>
-      <span id="settingsStatus" role="status" aria-live="polite"></span>
     </div>
 
     <div class="settings-group">
@@ -184,10 +182,12 @@
       <div class="settings-option-row">
         <span style="flex:1;">
           <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Reset Settings</span>
-          <span style="font-size:12px; color:var(--text-muted);">Clears theme, export format, and display settings back to defaults.</span>
+          <span id="resetSettingsDesc" style="font-size:12px; color:var(--text-muted);">Clears theme, export format, and display settings back to defaults.</span>
+          <span id="resetSettingsStatus" style="font-size:12px; display:none;"></span>
         </span>
-        <button class="settings-btn settings-btn-danger hub-btn" id="resetSettingsBtn" style="flex-shrink:0; flex:none; width:auto; padding:6px 14px; margin-left:12px;">Reset</button>
+        <button class="settings-btn settings-btn-danger hub-btn" id="resetSettingsBtn" style="flex-shrink:0; flex:none; width:auto; min-width:80px; padding:6px 14px; margin-left:12px;">Reset</button>
       </div>
+      <span id="settingsStatus" role="status" aria-live="polite"></span>
     </div>
 
     <div class="settings-group">

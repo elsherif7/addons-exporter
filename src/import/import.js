@@ -633,6 +633,7 @@ deselectAllBtn.addEventListener('click', () => {
 
 searchInput.addEventListener('input', () => {
   const anyMatch = filterAddonRows(addonListEl, searchInput.value);
+  addonListEl.style.display = anyMatch ? 'block' : 'none';
   noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
 });
 

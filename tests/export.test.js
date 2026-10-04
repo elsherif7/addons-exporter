@@ -158,7 +158,7 @@ testAsync('export.js click handler: success message reports lookup failures when
     selectedIds: ['ext1@example.com', 'ext2@example.com'],
     exportResponse: { format: 'html', stats: { total: 2, lookupFailures: 1 } },
   });
-  assert.match(statusEl.textContent, /1 of 2 add-ons couldn't be looked up on AMO/);
+  assert.match(statusEl.textContent, /1 of 2 add\u2011ons couldn\u2019t be looked up on AMO/);
 });
 
 testAsync('export.js click handler: no lookup-failure mention when there weren\'t any', async () => {
@@ -176,7 +176,7 @@ testAsync('export.js success message: shows "all found on AMO" when all are exac
     selectedIds: ['ext1@example.com', 'ext2@example.com'],
     exportResponse: { format: 'html', stats: { total: 2, amoExact: 1, amoSearch: 1, homepage: 0, searchFallback: 0, lookupFailures: 0, lookupsSkipped: 0 } },
   });
-  assert.match(statusEl.textContent, /All 2 add-ons found on AMO/);
+  assert.match(statusEl.textContent, /All 2 add\u2011ons found on AMO/);
 });
 
 testAsync('export.js success message: shows mixed breakdown when some are AMO and some are fallback', async () => {
@@ -192,7 +192,7 @@ testAsync('export.js success message: shows fallback-only message when AMO found
     selectedIds: ['ext1@example.com'],
     exportResponse: { format: 'html', stats: { total: 1, amoExact: 0, amoSearch: 0, homepage: 0, searchFallback: 1, lookupFailures: 0, lookupsSkipped: 0 } },
   });
-  assert.match(statusEl.textContent, /1 add-on got a fallback link \(AMO had no match\)/);
+  assert.match(statusEl.textContent, /1 add\u2011on got a fallback link \(AMO had no match\)/);
 });
 
 testAsync('export.js success message: shows skipped-lookups note when deadline was hit', async () => {
@@ -200,7 +200,7 @@ testAsync('export.js success message: shows skipped-lookups note when deadline w
     selectedIds: ['ext1@example.com', 'ext2@example.com'],
     exportResponse: { format: 'html', stats: { total: 2, amoExact: 1, amoSearch: 0, homepage: 0, searchFallback: 1, lookupFailures: 0, lookupsSkipped: 1 } },
   });
-  assert.match(statusEl.textContent, /1 add-on skipped AMO \(deadline reached\)/);
+  assert.match(statusEl.textContent, /1 add\u2011on skipped AMO \(deadline reached\)/);
 });
 
 // --- A16: a non-array listAddons response shows a friendly message ---
@@ -365,7 +365,7 @@ testAsync('export.js real DOM: the AMO link searches by name (not a guessed id U
   const row = elements.addonList.querySelector('.addon-row');
   const link = row.querySelector('a.match-label');
   assert.ok(link, 'the row should have a match-label link');
-  assert.strictEqual(link.textContent, 'Search AMO');
+  assert.strictEqual(link.textContent, 'AMO');
   assert.match(link.href, /\/search\/\?q=Some(%20|\+)Theme/, 'should search by name, not guess an exact-id URL');
   assert.doesNotMatch(link.href, /weird%40id\.example/, 'should not use the add-on id as a guessed URL');
 

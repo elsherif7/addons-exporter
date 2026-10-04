@@ -70,11 +70,11 @@ function buildHtmlReport(list, theme, shorten = true) {
     const displayShortName = escapeHtml(shorten ? shortName(a.name) : a.name);
     const typeLabel = a.type === 'theme' ? 'Theme' : 'Extension';
     return `<div class="addon-row">
-      <span class="addon-name">${displayShortName}</span>
+      <span class="addon-row-info"><span class="addon-name">${displayShortName}</span>
       <span class="addon-version">${escapeHtml(a.version)}</span>
       <span class="match-label">${escapeHtml(typeLabel)}</span>
-      <a class="match-label" href="${escapeHtml(a.link)}" target="_blank" rel="noopener" style="color:var(--link-accent);text-decoration:none;margin-left:6px;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">AMO</a>
-      ${match}
+      ${match}</span>
+      <a class="match-label" href="${escapeHtml(a.link)}" target="_blank" rel="noopener" style="color:var(--link-accent);text-decoration:none;flex-shrink:0;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">AMO</a>
     </div>`;
   };
 
@@ -173,10 +173,10 @@ function buildHtmlReport(list, theme, shorten = true) {
     color: var(--text);
     transition: border-color 0.12s, transform 0.1s;
   }
-  .search-input:focus { outline: none; border-color: var(--btn-bg); }
-  .search-input:focus-visible { outline: 2px solid var(--link-accent); outline-offset: 1px; }
+  .search-input:focus { outline: none; border-color: var(--btn-bg); transform: scale(1.01); }
   .search-input:hover { border-color: var(--btn-bg); transform: scale(1.01); }
   .placeholder-text { padding: 20px; color: var(--text-muted); font-size: 14px; margin: 0; }
+  #noSearchMatches { border: 1px solid var(--border); border-radius: 10px; text-align: center; }
   .checklist-box {
     text-align: left;
     overflow-x: hidden;
@@ -207,11 +207,15 @@ function buildHtmlReport(list, theme, shorten = true) {
     padding: 0 0 8px 2px;
   }
   .addon-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: 10px 14px;
     border-bottom: 1px solid var(--border-soft);
     user-select: none;
     transition: background 0.12s, transform 0.1s;
   }
+  .addon-row-info { flex: 1; }
   .addon-row:last-child { border-bottom: none; }
   .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
   :root[data-theme="dark"] .addon-row:hover { background: #2e3340; }
@@ -332,6 +336,7 @@ function buildHtmlReport(list, theme, shorten = true) {
 
     document.getElementById('searchInput').addEventListener('input', function (e) {
       var anyMatch = filterAddonRows(e.target.value);
+      addonListEl.style.display = anyMatch ? '' : 'none';
       noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
     });
   </script>

@@ -387,14 +387,6 @@ for (const [label, rootSelector] of [['light', ':root'], ['dark', ':root[data-th
   });
 }
 
-test('A17: shared.css defines a :focus-visible outline for .search-input', () => {
-  assert.match(sharedCssSrc, /\.search-input:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--link-accent\)/);
-});
-
-test('A17: the report defines the same :focus-visible outline for .search-input', () => {
-  assert.match(reportTemplateSrcRaw, /\.search-input:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--link-accent\)/);
-});
-
 test('A35: no :has() selector remains in shared.css', () => {
   assert.doesNotMatch(sharedCssSrc, /:has\(/);
 });

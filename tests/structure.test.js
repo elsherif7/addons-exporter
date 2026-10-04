@@ -127,11 +127,12 @@ test('settings-option-row: radio rows are <label> elements (not <div>)', () => {
 
 test('settings-option-row: Reset Settings uses a native <button> (not a radio input)', () => {
   // The reset row must contain a <button>, never an <input type="radio">.
-  const resetRowMatch = settingsHtml.match(/<div class="settings-option-row">([\s\S]*?)<\/div>/);
-  assert.ok(resetRowMatch, 'could not find <div class="settings-option-row">');
-  assert.match(resetRowMatch[1], /<button[^>]+id="resetSettingsBtn"/,
+  // Find the div.settings-option-row that contains resetSettingsBtn specifically.
+  const resetRowMatch = settingsHtml.match(/<div class="settings-option-row">(?:(?!<div class="settings-option-row">)[\s\S])*?id="resetSettingsBtn"[\s\S]*?<\/div>/);
+  assert.ok(resetRowMatch, 'could not find <div class="settings-option-row"> containing resetSettingsBtn');
+  assert.match(resetRowMatch[0], /<button[^>]+id="resetSettingsBtn"/,
     'Reset Settings row must contain a native <button>');
-  assert.doesNotMatch(resetRowMatch[1], /<input type="radio"/,
+  assert.doesNotMatch(resetRowMatch[0], /<input type="radio"/,
     'Reset Settings row must not contain a radio input');
 });
 

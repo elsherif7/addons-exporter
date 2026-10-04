@@ -417,6 +417,7 @@ test('Reset dialog: mentions the display setting, which it actually resets', () 
 function makeExportSettingsSandbox({ platformOs, simulateDownloadCreated = false }) {
   const exportBtnEl = { addEventListener(ev, fn) { if (ev === 'click') this._onClick = fn; } };
   const statusEl = { textContent: '', className: '' };
+  const exportStatusEl = { textContent: '', style: { display: 'none', color: '' } };
   const appendedLinks = [];
   const downloadCalls = [];
   const bodyStub = {
@@ -428,6 +429,7 @@ function makeExportSettingsSandbox({ platformOs, simulateDownloadCreated = false
     getElementById: (id) => {
       if (id === 'exportSettingsBtn') return exportBtnEl;
       if (id === 'settingsStatus') return statusEl;
+      if (id === 'exportSettingsStatus') return exportStatusEl;
       return makeFakeElement();
     },
     body: bodyStub,
@@ -468,22 +470,22 @@ function makeExportSettingsSandbox({ platformOs, simulateDownloadCreated = false
   vm.runInContext(themeSrc, sb);
   vm.runInContext(commonSrc, sb);
   vm.runInContext(settingsSrc, sb);
-  return { exportBtnEl, statusEl, appendedLinks, downloadCalls };
+  return { exportBtnEl, statusEl, exportStatusEl, appendedLinks, downloadCalls };
 }
 
 testAsync('exportSettingsBtn: on desktop, uses downloads.download with saveAs and shows success', async () => {
-  const { exportBtnEl, statusEl, appendedLinks, downloadCalls } = makeExportSettingsSandbox({ platformOs: 'win' });
+  const { exportBtnEl, statusEl, exportStatusEl, appendedLinks, downloadCalls } = makeExportSettingsSandbox({ platformOs: 'win' });
   await exportBtnEl._onClick();
   assert.strictEqual(downloadCalls.length, 1, 'should call downloads.download once on desktop');
   assert.strictEqual(downloadCalls[0].saveAs, true);
   assert.match(downloadCalls[0].filename, /^Add-ons Hub Settings \(.+\)\.json$/);
   assert.strictEqual(appendedLinks.length, 0, 'should not create an <a> link on desktop');
-  assert.strictEqual(statusEl.textContent, 'Settings exported.');
+  assert.strictEqual(exportStatusEl.textContent, 'Settings exported.');
   assert.strictEqual(statusEl.className, '');
 });
 
 testAsync('exportSettingsBtn: on Android, uses <a download> click instead of downloads.download saveAs', async () => {
-  const { exportBtnEl, statusEl, appendedLinks, downloadCalls } = makeExportSettingsSandbox({
+  const { exportBtnEl, statusEl, exportStatusEl, appendedLinks, downloadCalls } = makeExportSettingsSandbox({
     platformOs: 'android',
     simulateDownloadCreated: true,
   });
@@ -494,33 +496,35 @@ testAsync('exportSettingsBtn: on Android, uses <a download> click instead of dow
   assert.match(appendedLinks[0].download, /^Add-ons Hub Settings \(.+\)\.json$/);
   assert.strictEqual(appendedLinks[0].clicked, true);
   assert.strictEqual(appendedLinks[0].removed, true);
-  assert.strictEqual(statusEl.textContent, 'Settings exported.');
+  assert.strictEqual(exportStatusEl.textContent, 'Settings exported.');
 });
 
 testAsync('exportSettingsBtn: on Android, still succeeds via the fallback timer if onCreated never fires', async () => {
-  const { exportBtnEl, statusEl } = makeExportSettingsSandbox({
+  const { exportBtnEl, statusEl, exportStatusEl } = makeExportSettingsSandbox({
     platformOs: 'android',
     simulateDownloadCreated: false, // fallback setTimeout fires immediately in this sandbox
   });
   await exportBtnEl._onClick();
-  assert.strictEqual(statusEl.textContent, 'Settings exported.');
+  assert.strictEqual(exportStatusEl.textContent, 'Settings exported.');
 });
 
 testAsync('exportSettingsBtn: a getPlatformInfo failure falls back to the desktop path gracefully', async () => {
   // If getPlatformInfo rejects (shouldn't happen in practice, but guards
   // against a future API change), the catch gives os: 'unknown', which
   // takes the desktop (saveAs) path rather than throwing altogether.
-  const { exportBtnEl, statusEl, downloadCalls } = makeExportSettingsSandbox({ platformOs: 'win' });
+  const { exportBtnEl, statusEl, exportStatusEl, downloadCalls } = makeExportSettingsSandbox({ platformOs: 'win' });
   // Swap getPlatformInfo to a throwing version via the already-created sandbox's browser object.
   // Re-create the sandbox with a throwing getPlatformInfo instead.
   const exportBtnEl2 = { addEventListener(ev, fn) { if (ev === 'click') this._onClick = fn; } };
   const statusEl2 = { textContent: '', className: '' };
+  const exportStatusEl2 = { textContent: '', style: { display: 'none', color: '' } };
   const downloadCalls2 = [];
   const fakeDocument2 = {
     querySelectorAll: () => [],
     getElementById: (id) => {
       if (id === 'exportSettingsBtn') return exportBtnEl2;
       if (id === 'settingsStatus') return statusEl2;
+      if (id === 'exportSettingsStatus') return exportStatusEl2;
       return makeFakeElement();
     },
     body: { appendChild() {}, children: [] },
@@ -553,7 +557,7 @@ testAsync('exportSettingsBtn: a getPlatformInfo failure falls back to the deskto
   vm.runInContext(settingsSrc, sb2);
   await exportBtnEl2._onClick();
   assert.strictEqual(downloadCalls2.length, 1, 'should fall back to the desktop (saveAs) path when getPlatformInfo throws');
-  assert.strictEqual(statusEl2.textContent, 'Settings exported.');
+  assert.strictEqual(exportStatusEl2.textContent, 'Settings exported.');
 });
 
 // --- settings-init.js: localStorage startup cache ---

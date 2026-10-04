@@ -71,9 +71,60 @@ const importSettingsBtn = document.getElementById('importSettingsBtn');
 const settingsFileInput = document.getElementById('settingsFileInput');
 const settingsStatusEl = document.getElementById('settingsStatus');
 
+// ---------------------------------------------------------------------------
+// ActionRow — shared system for the three action rows (Export / Import / Reset).
+// Each row has a description <span> and an inline status <span>. Activating a
+// row hides its description and shows a status message in its place. Calling
+// restore() on any row (or clearAllRows()) brings the description back.
+// ---------------------------------------------------------------------------
+function ActionRow(descId, statusId) {
+  const descEl   = document.getElementById(descId);
+  const statusEl = document.getElementById(statusId);
+
+  return {
+    // Hide description, show msg in its place (empty msg = just hide desc).
+    activate(msg, isError) {
+      if (descEl)   descEl.style.display = 'none';
+      if (statusEl) {
+        statusEl.textContent   = msg || '';
+        statusEl.style.color   = isError ? 'var(--danger-color)' : 'var(--text-muted)';
+        statusEl.style.display = msg ? '' : 'none';
+      }
+    },
+    // Show msg, keeping description hidden (used after async work completes).
+    setMsg(msg, isError) {
+      if (statusEl) {
+        statusEl.textContent   = msg;
+        statusEl.style.color   = isError ? 'var(--danger-color)' : 'var(--text-muted)';
+        statusEl.style.display = msg ? '' : 'none';
+      }
+    },
+    // Restore description, clear status.
+    restore() {
+      if (statusEl) { statusEl.style.display = 'none'; statusEl.textContent = ''; }
+      if (descEl)   descEl.style.display = '';
+    },
+    isActive() {
+      return statusEl && statusEl.style.display !== 'none';
+    },
+  };
+}
+
+const exportRow = ActionRow('exportSettingsDesc', 'exportSettingsStatus');
+const importRow = ActionRow('importSettingsDesc', 'importSettingsStatus');
+const resetRow  = ActionRow('resetSettingsDesc',  'resetSettingsStatus');
+
+function clearAllRows() {
+  exportRow.restore();
+  importRow.restore();
+  resetRow.restore();
+  settingsStatusEl.textContent = '';
+  settingsStatusEl.className   = '';
+}
+
 function setSettingsStatus(msg, isError = false) {
   settingsStatusEl.textContent = msg;
-  settingsStatusEl.className = isError ? 'error' : '';
+  settingsStatusEl.className   = isError ? 'error' : '';
 }
 
 async function loadCurrentTheme() {
@@ -182,7 +233,8 @@ function withSettingsDefaults(stored) {
 }
 
 exportSettingsBtn.addEventListener('click', async () => {
-  setSettingsStatus('');
+  clearAllRows();
+  exportRow.activate('');
   try {
     const stored = await browser.storage.local.get(KNOWN_SETTINGS_KEYS);
     const json = buildSettingsExport(withSettingsDefaults(stored));
@@ -201,12 +253,6 @@ exportSettingsBtn.addEventListener('click', async () => {
     }
 
     if (platform.os === 'android') {
-      // Android's downloads.download() can't handle blob: URLs, and there
-      // is no saveAs dialog. Trigger the save with a plain <a download>
-      // click instead - the same approach export.js uses for the add-ons
-      // export on Android. Wait for downloads.onCreated (the real signal
-      // that the browser has accepted the download) or fall back to a
-      // short timeout so we don't hang indefinitely.
       const link = document.createElement('a');
       link.href = url;
       link.download = filename;
@@ -216,8 +262,6 @@ exportSettingsBtn.addEventListener('click', async () => {
         await new Promise((resolve) => {
           let settled = false;
           let fallbackTimer;
-          // After a short wait with no onCreated signal, show a hint so
-          // the user knows something may be expected of them.
           const hintTimer = setTimeout(() => {
             setSettingsStatus('Saving\u2014tap \u201cDownload\u201d in the prompt if asked\u2026');
           }, 1500);
@@ -246,44 +290,53 @@ exportSettingsBtn.addEventListener('click', async () => {
       }
     }
 
-    setSettingsStatus('Settings exported.');
+    exportRow.setMsg('Settings exported.');
   } catch (err) {
-    setSettingsStatus('Export failed: ' + err.message, true);
+    exportRow.setMsg('Export failed: ' + err.message, true);
   }
 });
 
 importSettingsBtn.addEventListener('click', () => {
-  setSettingsStatus('');
+  clearAllRows();
+  importRow.activate('');
   settingsFileInput.click();
+});
+
+// `cancel` fires when the user dismisses the file dialog without choosing
+// a file — restore the Import row description in that case.
+settingsFileInput.addEventListener('cancel', () => {
+  importRow.restore();
 });
 
 settingsFileInput.addEventListener('change', async () => {
   const file = settingsFileInput.files[0];
   settingsFileInput.value = '';
-  if (!file) return;
+  if (!file) {
+    // Fallback for browsers that don't fire `cancel`.
+    importRow.restore();
+    return;
+  }
   try {
     const text = await file.text();
     const result = parseSettingsFile(text);
     if (!result.ok) {
-      setSettingsStatus(result.error, true);
+      importRow.setMsg(result.error, true);
       return;
     }
     if (Object.keys(result.settings).length === 0) {
-      setSettingsStatus('No recognised settings found in that file.', true);
+      importRow.setMsg('No recognised settings found in that file.', true);
       return;
     }
     await browser.storage.local.set(result.settings);
-    // Re-apply theme immediately if it was in the file.
     if (result.settings[THEME_STORAGE_KEY]) {
       applyTheme(result.settings[THEME_STORAGE_KEY]);
     }
-    // Refresh all radio buttons to reflect the newly applied values.
     await loadCurrentTheme();
     await loadCurrentExportFormat();
     await loadCurrentShortenNames();
-    setSettingsStatus('Settings imported successfully.');
+    importRow.setMsg('Settings imported successfully.');
   } catch (err) {
-    setSettingsStatus('Import failed: ' + err.message, true);
+    importRow.setMsg('Import failed: ' + err.message, true);
   }
 });
 
@@ -323,6 +376,8 @@ if (versionLink) {
 
 document.getElementById('resetSettingsBtn').addEventListener('click', function () {
   const resetBtn = this;
+  clearAllRows();
+  resetRow.activate('');
 
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:1000;';
@@ -382,7 +437,10 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
       if (e.key === 'Escape') close(false);
     });
   }).then((confirmed) => {
-    if (!confirmed) return;
+    if (!confirmed) {
+      resetRow.restore();
+      return;
+    }
     return browser.storage.local.remove([THEME_STORAGE_KEY, EXPORT_FORMAT_STORAGE_KEY, SHORT_NAME_STORAGE_KEY])
       .then(() => {
         applyTheme('light');
@@ -390,7 +448,22 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
       })
       .then(() => loadCurrentExportFormat())
       .then(() => loadCurrentShortenNames())
-      .then(() => { setSettingsStatus('Settings reset to defaults.'); })
-      .catch((err) => { setSettingsStatus('Could not reset settings: ' + err.message, true); });
+      .then(() => { resetRow.setMsg('Settings reset to defaults.'); })
+      .catch((err) => { resetRow.setMsg('Could not reset settings: ' + err.message, true); });
   });
 });
+
+// Clear the settings status message whenever the user interacts with
+// anything on the page — radio change, button click, file input — so it
+// doesn't linger after they've moved on to something else.
+// The export/import handlers already call setSettingsStatus('') at the
+// start of each action, so this is just a safety net for everything else.
+if (document.addEventListener) {
+  document.addEventListener('click', (e) => {
+    if (e.target === exportSettingsBtn || e.target === importSettingsBtn) return;
+    if (e.target === document.getElementById('resetSettingsBtn')) return;
+    const anyActive = exportRow.isActive() || importRow.isActive() || resetRow.isActive() ||
+      settingsStatusEl.textContent !== '';
+    if (anyActive) clearAllRows();
+  });
+}

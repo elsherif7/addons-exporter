@@ -19,30 +19,25 @@ function buildExportSuccessStatus(fmt, stats) {
     const total = stats.total || 0;
     const failures = stats.lookupFailures || 0;
     const skipped = stats.lookupsSkipped || 0;
-    // amoExact/amoSearch/homepage/searchFallback are only present when the
-    // full stats object was returned (desktop path). Only show the breakdown
-    // when at least one of those counters is explicitly present.
     const hasBreakdown = 'amoExact' in stats;
     const amoFound = hasBreakdown ? (stats.amoExact || 0) + (stats.amoSearch || 0) : 0;
     const fallback = hasBreakdown ? (stats.homepage || 0) + (stats.searchFallback || 0) : 0;
 
     if (total > 0) {
       if (failures === 0 && skipped === 0 && hasBreakdown) {
-        // All lookups attempted and none failed — show the breakdown.
         if (fallback === 0) {
-          msg += ` All ${total} add-on${total === 1 ? '' : 's'} found on AMO.`;
+          msg += ` All ${total} add\u2011on${total === 1 ? '' : 's'} found on AMO.`;
         } else if (amoFound === 0) {
-          msg += ` ${fallback} add-on${fallback === 1 ? '' : 's'} got a fallback link (AMO had no match).`;
+          msg += ` ${fallback} add\u2011on${fallback === 1 ? '' : 's'} got a fallback link (AMO had no match).`;
         } else {
           msg += ` ${amoFound} found on AMO, ${fallback} got a fallback link.`;
         }
       } else {
-        // Failures or skips — note them instead of the full breakdown.
         if (failures > 0) {
-          msg += ` ${failures} of ${total} add-on${total === 1 ? '' : 's'} couldn't be looked up on AMO and got a fallback link instead.`;
+          msg += ` ${failures} of ${total} add\u2011on${total === 1 ? '' : 's'} couldn\u2019t be looked up on AMO and got a fallback link instead.`;
         }
         if (skipped > 0) {
-          msg += ` ${skipped} add-on${skipped === 1 ? '' : 's'} skipped AMO (deadline reached) and got a fallback link.`;
+          msg += ` ${skipped} add\u2011on${skipped === 1 ? '' : 's'} skipped AMO (deadline reached) and got a fallback link.`;
         }
       }
     }
@@ -135,7 +130,7 @@ function createAddonRow(a, i, shorten) {
   amoLink.href = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
   amoLink.target = '_blank';
   amoLink.rel = 'noopener';
-  amoLink.textContent = 'Search AMO';
+  amoLink.textContent = 'AMO';
 
   const label = document.createElement('label');
   label.htmlFor = `cb-${i}`;
@@ -233,6 +228,7 @@ deselectAllBtn.addEventListener('click', () => {
 
 searchInput.addEventListener('input', () => {
   const anyMatch = filterAddonRows(listEl, searchInput.value);
+  listEl.style.display = anyMatch ? '' : 'none';
   noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
 });
 
