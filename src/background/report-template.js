@@ -90,7 +90,7 @@ function buildHtmlReport(list, theme, shorten = true) {
 <title>Add-ons Exporter</title>
 <link rel="icon" href="${REPORT_ICON_DATA_URI}">
 <style>
-﻿  /* Same variable names/values as shared.css, duplicated here since
+  /* Same variable names/values as shared.css, duplicated here since
      the report is a standalone file with no access to that file once
      saved. Accent colors (link/warning) get their own lighter
      dark-mode values for contrast, same reasoning as shared.css. */
