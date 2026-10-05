@@ -19,5 +19,8 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 
 document.getElementById('settingsBtn').addEventListener('click', async () => {
   await browser.runtime.openOptionsPage();
+  // An already-open Settings tab is reused rather than reloaded, so ask it
+  // to play its entrance again. Harmless if it was just opened.
+  try { await browser.runtime.sendMessage({ type: 'replaySettingsEntrance' }); } catch { /* nothing listening */ }
   window.close();
 });

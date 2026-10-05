@@ -100,20 +100,27 @@ test('loading theme.js with no storage.onChanged at all does not throw', () => {
   assert.doesNotThrow(() => loadThemeInSandbox());
 });
 
-// --- smooth light/dark switch (.theme-switching) ---
+// --- view-transition switch (with the color glide as the fallback) ---
 
-function loadThemeWithClassList() {
+function loadThemeForSwitch({ reducedMotion = false, withViewTransitions = true } = {}) {
+  const transitions = [];
   const classes = new Set();
   const timers = [];
   let attr = null;
-  const sandbox = {
-    document: {
-      documentElement: {
-        setAttribute: (name, value) => { if (name === 'data-theme') attr = value; },
-        getAttribute: (name) => (name === 'data-theme' ? attr : null),
-        classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c) },
-      },
+  const document = {
+    documentElement: {
+      setAttribute: (name, value) => { if (name === 'data-theme') attr = value; },
+      getAttribute: (name) => (name === 'data-theme' ? attr : null),
+      classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c) },
     },
+  };
+  if (withViewTransitions) {
+    // Real browsers call the update callback for us once the old frame is captured.
+    document.startViewTransition = (cb) => { transitions.push(cb); };
+  }
+  const sandbox = {
+    document,
+    matchMedia: () => ({ matches: reducedMotion }),
     localStorage: { getItem() { return null; }, setItem() {} },
     setTimeout: (fn) => { timers.push(fn); return timers.length; },
     clearTimeout() {},
@@ -121,26 +128,49 @@ function loadThemeWithClassList() {
   };
   vm.createContext(sandbox);
   vm.runInContext(themeSrc, sandbox);
-  return { sandbox, classes, timers };
+  return { sandbox, transitions, classes, timers, getAttr: () => attr };
 }
 
-testAsync('theme: the first apply on page load never animates', async () => {
-  const { sandbox, classes } = loadThemeWithClassList();
-  await sandbox.initTheme();
-  sandbox.applyTheme('dark'); // after init: this one may animate
-  assert.strictEqual(classes.has('theme-switching'), true);
-  const fresh = loadThemeWithClassList();
-  fresh.sandbox.applyTheme('dark'); // before init finishes: must not animate
-  assert.strictEqual(fresh.classes.has('theme-switching'), false);
+testAsync('theme: with view transitions, a real change is wrapped in startViewTransition (and the attribute set inside it)', async () => {
+  const ctx = loadThemeForSwitch();
+  await ctx.sandbox.initTheme(); // settles on light
+  ctx.sandbox.applyTheme('dark');
+  assert.strictEqual(ctx.transitions.length, 1);
+  assert.strictEqual(ctx.getAttr(), 'light', 'the theme must only flip inside the transition callback');
+  ctx.transitions[0]();
+  assert.strictEqual(ctx.getAttr(), 'dark');
+  assert.strictEqual(ctx.classes.has('theme-switching'), false, 'no color glide on top of the view transition');
 });
 
-testAsync('theme: a real change adds .theme-switching and a timer removes it; same theme does nothing', async () => {
-  const { sandbox, classes, timers } = loadThemeWithClassList();
-  await sandbox.initTheme(); // applies light
-  sandbox.applyTheme('light');
-  assert.strictEqual(classes.has('theme-switching'), false, 'no change, no animation');
-  sandbox.applyTheme('dark');
-  assert.strictEqual(classes.has('theme-switching'), true);
-  timers[timers.length - 1]();
-  assert.strictEqual(classes.has('theme-switching'), false, 'cleaned up after the transition');
+testAsync('theme: the first apply on page load never animates', async () => {
+  const ctx = loadThemeForSwitch();
+  ctx.sandbox.applyTheme('dark'); // before initTheme finishes
+  assert.strictEqual(ctx.transitions.length, 0);
+  assert.strictEqual(ctx.getAttr(), 'dark', 'applied immediately');
+  assert.strictEqual(ctx.classes.has('theme-switching'), false);
+});
+
+testAsync('theme: without view transitions, colors glide via .theme-switching, removed by a timer', async () => {
+  const ctx = loadThemeForSwitch({ withViewTransitions: false });
+  await ctx.sandbox.initTheme();
+  ctx.sandbox.applyTheme('dark');
+  assert.strictEqual(ctx.getAttr(), 'dark');
+  assert.strictEqual(ctx.classes.has('theme-switching'), true);
+  ctx.timers[ctx.timers.length - 1]();
+  assert.strictEqual(ctx.classes.has('theme-switching'), false);
+});
+
+testAsync('theme: no animation when the theme does not change, or when reduced motion is on', async () => {
+  const same = loadThemeForSwitch();
+  await same.sandbox.initTheme();
+  same.sandbox.applyTheme('light');
+  assert.strictEqual(same.transitions.length, 0);
+  assert.strictEqual(same.classes.has('theme-switching'), false);
+
+  const reduced = loadThemeForSwitch({ reducedMotion: true });
+  await reduced.sandbox.initTheme();
+  reduced.sandbox.applyTheme('dark');
+  assert.strictEqual(reduced.transitions.length, 0);
+  assert.strictEqual(reduced.classes.has('theme-switching'), false);
+  assert.strictEqual(reduced.getAttr(), 'dark', 'still switches, just instantly');
 });

@@ -29,12 +29,24 @@
   --warn-color: #b45309;
   --danger-color: #c0392b;
 
-  /* Motion: subtle and fast (roughly 0.2-0.45s end to end). Everything
-     below uses these so the whole extension moves the same way. */
-  --motion-fast: 0.15s;
-  --motion-normal: 0.25s;
-  --motion-slow: 0.35s;
+  /* Motion: clearly visible, springy entrances. Everything below uses
+     these so the whole extension moves the same way - change them here to
+     make it faster or slower everywhere. --motion-search is kept shorter
+     because it replays on every keystroke. --motion-spring overshoots and
+     settles (a real spring curve where linear() is supported, a plain
+     overshoot curve otherwise). */
+  --motion-fast: 0.2s;
+  --motion-normal: 0.4s;
+  --motion-slow: 0.6s;
+  --motion-search: 0.3s;
+  --motion-theme: 0.6s;
   --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+@supports (animation-timing-function: linear(0, 1)) {
+  :root {
+    --motion-spring: linear(0, 0.046, 0.163, 0.321, 0.495, 0.666, 0.819, 0.946, 1.042, 1.109, 1.147, 1.162, 1.159, 1.143, 1.118, 1.09, 1.062, 1.036, 1.014, 0.997, 0.985, 0.977, 0.974, 0.974, 0.976, 0.979, 0.984, 0.989, 1);
+  }
 }
 :root[data-theme="dark"] {
   --bg: #15171c;
@@ -104,18 +116,18 @@ body {
   box-sizing: border-box;
 }
 
-/* Entrance animations. The card fades and rises in, then its direct
-   children follow one after another (capped at six so a long page never
-   takes longer than ~0.45s in total).
-   IMPORTANT: these use `backwards` fill, never `both`/`forwards`. A held
-   final keyframe would override the :hover transform on buttons and
-   inputs that are direct children of the card. */
+/* Entrance animations. The card springs up into place, then its direct
+   children follow one after another (delays capped at the sixth child, so
+   a long page still finishes in about a second).
+   IMPORTANT: these use backwards fill, never both/forwards. A held final
+   keyframe would override the :hover transform on buttons and inputs that
+   are direct children of the card. */
 @keyframes hub-card-in {
-  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  from { opacity: 0; transform: translateY(44px) scale(0.92); }
   to   { opacity: 1; transform: none; }
 }
 @keyframes hub-rise-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(30px); }
   to   { opacity: 1; transform: none; }
 }
 @keyframes hub-fade-in {
@@ -123,19 +135,23 @@ body {
   to   { opacity: 1; }
 }
 @keyframes hub-pop {
-  from { transform: scale(0.7); }
+  from { transform: scale(0.4); }
   to   { transform: none; }
 }
-.card { animation: hub-card-in 0.3s var(--motion-ease) backwards; }
-.card > * { animation: hub-rise-in 0.28s var(--motion-ease) backwards; }
-.card > :nth-child(2) { animation-delay: 0.03s; }
-.card > :nth-child(3) { animation-delay: 0.06s; }
-.card > :nth-child(4) { animation-delay: 0.09s; }
-.card > :nth-child(5) { animation-delay: 0.12s; }
-.card > :nth-child(n+6) { animation-delay: 0.15s; }
+.card { animation: hub-card-in 0.7s var(--motion-spring) backwards; }
+.card > * { animation: hub-rise-in 0.6s var(--motion-spring) backwards; }
+.card > :nth-child(1) { animation-delay: 0.08s; }
+.card > :nth-child(2) { animation-delay: 0.16s; }
+.card > :nth-child(3) { animation-delay: 0.24s; }
+.card > :nth-child(4) { animation-delay: 0.32s; }
+.card > :nth-child(5) { animation-delay: 0.4s; }
+.card > :nth-child(n+6) { animation-delay: 0.48s; }
 /* Parts of a page that are revealed later (after a file is chosen, or once
    the list has loaded) animate in at once instead of waiting their turn. */
 #searchInput, #listControls, #checklistBox, #fileNameRow { animation-delay: 0s; }
+/* replayEntrance() (common.js) adds this for one frame to restart the
+   entrance animations, e.g. when an already-open Settings tab is shown again. */
+.replay-reset, .replay-reset > * { animation: none !important; }
 /* Status/notes fade in when they first get text. */
 #status:not(:empty), #compareNote:not(:empty) { animation: hub-fade-in var(--motion-normal) ease backwards; }
 h1 { font-size: clamp(22px, 6vw, 28px); margin: 0 0 16px; }
@@ -222,10 +238,10 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 /* The add-on list box appears once it's been rendered (export) or a file
    has been chosen (import). Kept after the base rule above on purpose: the
    report drift tests read the first .groups-outer-box block. */
-.groups-outer-box { animation: hub-rise-in var(--motion-normal) var(--motion-ease) backwards; }
+.groups-outer-box { animation: hub-rise-in var(--motion-slow) var(--motion-spring) backwards; }
 .group-container {
   margin-bottom: 20px;
-  transition: opacity var(--motion-normal) ease, display var(--motion-normal) allow-discrete;
+  transition: opacity var(--motion-search) ease, display var(--motion-search) allow-discrete;
 }
 .group-container:last-child { margin-bottom: 0; }
 .group-box {
@@ -248,7 +264,7 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
      that don't understand `allow-discrete` (they drop this whole
      declaration and keep the one above - rows just appear/disappear). */
   transition: background 0.12s, border-color 0.12s, transform 0.1s,
-    opacity var(--motion-normal) ease, display var(--motion-normal) allow-discrete;
+    opacity var(--motion-search) ease, display var(--motion-search) allow-discrete;
 }
 .addon-row:last-child { border-bottom: none; }
 .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
@@ -306,7 +322,7 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 .addon-row.is-filtered,
 .group-container.is-filtered,
 #addonList.is-filtered { opacity: 0; }
-#addonList { transition: opacity var(--motion-normal) ease, display var(--motion-normal) allow-discrete; }
+#addonList { transition: opacity var(--motion-search) ease, display var(--motion-search) allow-discrete; }
 /* A row/group inserted into the page starts transparent and fades in. */
 @starting-style {
   .addon-row, .group-container, #addonList { opacity: 0; }
@@ -411,16 +427,32 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 .about-value a { color: var(--link-accent); text-decoration: none; font-weight: 600; }
 .about-value a:hover { text-decoration: underline; }
 
-/* Smooth light/dark switch. theme.js adds .theme-switching to <html> for a
-   moment around the change (never on first load), so colors glide instead
-   of snapping. It deliberately overrides every other transition for that
-   brief window. */
+/* Light/dark switch. Where the browser supports view transitions
+   (Firefox 144+), theme.js wraps the theme change in
+   document.startViewTransition(): the old page stays fully visible while
+   the new theme fades in on top of it - a plain, clean cross-fade, with no
+   blur or zoom. Everywhere else, theme.js adds .theme-switching to <html>
+   for a moment instead, and every color glides from one theme to the
+   other. Neither runs on first page load. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  mix-blend-mode: normal;
+  animation-duration: var(--motion-theme);
+  animation-timing-function: ease-in-out;
+}
+::view-transition-old(root) { animation: none; z-index: 1; }
+::view-transition-new(root) { animation-name: hub-theme-in; z-index: 2; }
+@keyframes hub-theme-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
 :root.theme-switching,
 :root.theme-switching *,
 :root.theme-switching *::before,
 :root.theme-switching *::after {
-  transition: background-color var(--motion-normal) ease, color var(--motion-normal) ease,
-    border-color var(--motion-normal) ease, box-shadow var(--motion-normal) ease !important;
+  transition: background-color var(--motion-theme) ease-in-out, color var(--motion-theme) ease-in-out,
+    border-color var(--motion-theme) ease-in-out, box-shadow var(--motion-theme) ease-in-out,
+    fill var(--motion-theme) ease-in-out, stroke var(--motion-theme) ease-in-out !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

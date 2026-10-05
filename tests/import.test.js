@@ -269,13 +269,15 @@ function makeCheckbox({ disabled = false, hidden = false } = {}) {
   };
 }
 
-function captureBulkSelectHandlers(checkboxList, { failNavigation = false } = {}) {
+function captureBulkSelectHandlers(checkboxList, { failNavigation = false, failSendMessage = false, failTabUrls = [] } = {}) {
   let selectAllHandler = null;
   let deselectAllHandler = null;
   let openSelectedHandler = null;
   let setTimeoutCallCount = 0;
   const createdTabUrls = [];
   const navigatedUrls = [];
+  const sentMessages = [];
+  const order = []; // interleaved log of tab creation / message / navigation
   const addonListElStub = {
     querySelectorAll: (sel) => (sel.includes(':checked') ? checkboxList.filter((cb) => cb.checked) : checkboxList),
     addEventListener() {},
@@ -311,13 +313,25 @@ function captureBulkSelectHandlers(checkboxList, { failNavigation = false } = {}
     location: {
       replace: (url) => {
         if (failNavigation) throw new Error('navigation failed');
+        order.push('navigate');
         navigatedUrls.push(url);
       },
     },
     browser: {
-      runtime: { getURL: (path) => `moz-extension://test-id/${path}` },
+      runtime: {
+        getURL: (path) => `moz-extension://test-id/${path}`,
+        // The Importer hands every tab after the first to background.js.
+        sendMessage: async (msg) => {
+          if (failSendMessage) throw new Error('Could not establish connection');
+          order.push('message');
+          sentMessages.push(msg);
+          return { queued: msg.urls.length };
+        },
+      },
       tabs: {
         create: async (options) => {
+          if (failTabUrls.includes(options.url)) throw new Error('tab creation failed');
+          order.push('tab');
           createdTabUrls.push(options.url);
           return {};
         },
@@ -330,7 +344,7 @@ function captureBulkSelectHandlers(checkboxList, { failNavigation = false } = {}
   return {
     selectAllHandler, deselectAllHandler, openSelectedHandler,
     selectionCountEl: elements.selectionCount, statusEl: elements.status,
-    openSelectedBtnEl, createdTabUrls, navigatedUrls, sandbox, elements,
+    openSelectedBtnEl, createdTabUrls, navigatedUrls, sentMessages, order, sandbox, elements,
     getSetTimeoutCallCount: () => setTimeoutCallCount,
   };
 }
@@ -380,102 +394,123 @@ test('deselectAllBtn: unchecks visible enabled rows, leaves disabled rows alone'
 // so it's set here via vm.runInContext() directly against the returned
 // sandbox, in the same lexical scope where it was declared.
 
-testAsync('openSelectedBtn: opens each selected link (staggered), then replaces this page with the confirmation page', async () => {
-  const cb1 = makeCheckbox();
-  cb1.checked = true;
-  cb1.dataset = { idx: '0' };
-  const cb2 = makeCheckbox();
-  cb2.checked = true;
-  cb2.dataset = { idx: '1' };
+// Objects built inside the vm sandbox have a different Object prototype, so
+// deepStrictEqual needs them copied into this realm first.
+const plain = (v) => JSON.parse(JSON.stringify(v));
 
-  const { openSelectedHandler, createdTabUrls, navigatedUrls, sandbox, getSetTimeoutCallCount } = captureBulkSelectHandlers([cb1, cb2]);
-  vm.runInContext(
-    "displayItems = [{ link: 'https://addons.mozilla.org/a/' }, { link: 'https://addons.mozilla.org/b/' }];",
-    sandbox
-  );
+function selectItems(links) {
+  const boxes = links.map((_, i) => {
+    const cb = makeCheckbox();
+    cb.checked = true;
+    cb.dataset = { idx: String(i) };
+    return cb;
+  });
+  const items = links.map((link) => ({ link }));
+  return { boxes, itemsJs: `displayItems = ${JSON.stringify(items)};` };
+}
 
-  await openSelectedHandler();
+testAsync('openSelectedBtn: opens only the FIRST add-on itself, hands the rest to background.js, then shows the confirmation page', async () => {
+  const { boxes, itemsJs } = selectItems(['https://addons.mozilla.org/a/', 'https://addons.mozilla.org/b/', 'https://addons.mozilla.org/c/']);
+  const ctx = captureBulkSelectHandlers(boxes);
+  vm.runInContext(itemsJs, ctx.sandbox);
 
-  // Only the add-ons get their own tabs - the confirmation is not one.
-  assert.deepStrictEqual(createdTabUrls, [
-    'https://addons.mozilla.org/a/',
-    'https://addons.mozilla.org/b/',
+  await ctx.openSelectedHandler();
+
+  assert.deepStrictEqual(ctx.createdTabUrls, ['https://addons.mozilla.org/a/'], 'only the first tab is opened from the page');
+  assert.deepStrictEqual(plain(ctx.sentMessages), [
+    { type: 'openTabs', urls: ['https://addons.mozilla.org/b/', 'https://addons.mozilla.org/c/'] },
   ]);
-  assert.deepStrictEqual(navigatedUrls, [
+  assert.deepStrictEqual(ctx.navigatedUrls, [
     'moz-extension://test-id/src/confirmation/confirmation.html?from=import',
   ]);
-  // One stagger delay between the two tabs (none needed after the last).
-  assert.strictEqual(getSetTimeoutCallCount(), 1);
+  // The confirmation page must not wait for the later add-ons.
+  assert.deepStrictEqual(ctx.order, ['tab', 'message', 'navigate']);
+  assert.strictEqual(ctx.getSetTimeoutCallCount(), 0, 'no stagger delay here - background.js does that');
+  assert.strictEqual(ctx.statusEl.textContent, 'Opened 3 tabs');
+});
+
+testAsync('openSelectedBtn: a single selected add-on needs no hand-off at all', async () => {
+  const { boxes, itemsJs } = selectItems(['https://addons.mozilla.org/a/']);
+  const ctx = captureBulkSelectHandlers(boxes);
+  vm.runInContext(itemsJs, ctx.sandbox);
+
+  await ctx.openSelectedHandler();
+
+  assert.deepStrictEqual(ctx.createdTabUrls, ['https://addons.mozilla.org/a/']);
+  assert.deepStrictEqual(plain(ctx.sentMessages), []);
+  assert.deepStrictEqual(ctx.order, ['tab', 'navigate']);
+  assert.strictEqual(ctx.statusEl.textContent, 'Opened 1 tab', 'not "Opened 1 tabs"');
 });
 
 testAsync('openSelectedBtn: stays on the page (no confirmation) if every selected link fails to open', async () => {
-  const cb1 = makeCheckbox();
-  cb1.checked = true;
-  cb1.dataset = { idx: '0' };
-
-  const { openSelectedHandler, createdTabUrls, navigatedUrls, statusEl, openSelectedBtnEl, sandbox } = captureBulkSelectHandlers([cb1]);
+  const { boxes, itemsJs } = selectItems(['javascript:alert(1)']);
+  const ctx = captureBulkSelectHandlers(boxes);
   // Re-validated at open time regardless of how it got selected - see
   // isSafeUrl's use in the real handler.
-  vm.runInContext("displayItems = [{ link: 'javascript:alert(1)' }];", sandbox);
+  vm.runInContext(itemsJs, ctx.sandbox);
 
-  await openSelectedHandler();
+  await ctx.openSelectedHandler();
 
-  assert.deepStrictEqual(createdTabUrls, []);
-  assert.deepStrictEqual(navigatedUrls, [], 'nothing opened, so there is nothing to confirm');
-  assert.match(statusEl.textContent, /1 failed to open/);
-  assert.strictEqual(openSelectedBtnEl.disabled, false);
+  assert.deepStrictEqual(ctx.createdTabUrls, []);
+  assert.deepStrictEqual(plain(ctx.sentMessages), []);
+  assert.deepStrictEqual(ctx.navigatedUrls, [], 'nothing opened, so there is nothing to confirm');
+  assert.match(ctx.statusEl.textContent, /1 failed to open/);
+  assert.strictEqual(ctx.openSelectedBtnEl.disabled, false);
 });
 
-testAsync('openSelectedBtn: when some links fail, the confirmation page is told how many', async () => {
-  const cb1 = makeCheckbox();
-  cb1.checked = true;
-  cb1.dataset = { idx: '0' };
-  const cb2 = makeCheckbox();
-  cb2.checked = true;
-  cb2.dataset = { idx: '1' };
+testAsync('openSelectedBtn: unsafe links are skipped and counted; the confirmation page is told how many', async () => {
+  const { boxes, itemsJs } = selectItems(['javascript:alert(1)', 'https://addons.mozilla.org/a/', 'https://addons.mozilla.org/b/']);
+  const ctx = captureBulkSelectHandlers(boxes);
+  vm.runInContext(itemsJs, ctx.sandbox);
 
-  const { openSelectedHandler, createdTabUrls, navigatedUrls, sandbox } = captureBulkSelectHandlers([cb1, cb2]);
-  vm.runInContext(
-    "displayItems = [{ link: 'https://addons.mozilla.org/a/' }, { link: 'javascript:alert(1)' }];",
-    sandbox
-  );
+  await ctx.openSelectedHandler();
 
-  await openSelectedHandler();
-
-  assert.deepStrictEqual(createdTabUrls, ['https://addons.mozilla.org/a/']);
-  assert.deepStrictEqual(navigatedUrls, [
+  assert.deepStrictEqual(ctx.createdTabUrls, ['https://addons.mozilla.org/a/']);
+  assert.deepStrictEqual(plain(ctx.sentMessages), [{ type: 'openTabs', urls: ['https://addons.mozilla.org/b/'] }]);
+  assert.deepStrictEqual(ctx.navigatedUrls, [
     'moz-extension://test-id/src/confirmation/confirmation.html?from=import&failed=1',
   ]);
 });
 
-testAsync('openSelectedBtn: a failing navigation still leaves the add-on tabs open and re-enables the button', async () => {
-  const cb1 = makeCheckbox();
-  cb1.checked = true;
-  cb1.dataset = { idx: '0' };
+testAsync('openSelectedBtn: if the first tab cannot be created, the next one is the "first" and the failure is counted', async () => {
+  const { boxes, itemsJs } = selectItems(['https://addons.mozilla.org/a/', 'https://addons.mozilla.org/b/', 'https://addons.mozilla.org/c/']);
+  const ctx = captureBulkSelectHandlers(boxes, { failTabUrls: ['https://addons.mozilla.org/a/'] });
+  vm.runInContext(itemsJs, ctx.sandbox);
 
-  const { openSelectedHandler, createdTabUrls, openSelectedBtnEl, statusEl, sandbox } =
-    captureBulkSelectHandlers([cb1], { failNavigation: true });
-  vm.runInContext("displayItems = [{ link: 'https://addons.mozilla.org/a/' }];", sandbox);
+  await ctx.openSelectedHandler();
 
-  await assert.rejects(() => openSelectedHandler(), /navigation failed/);
-
-  assert.deepStrictEqual(createdTabUrls, ['https://addons.mozilla.org/a/']);
-  assert.strictEqual(openSelectedBtnEl.disabled, false,
-    'the button must not stay stuck disabled just because the page could not be replaced');
-  assert.strictEqual(statusEl.textContent, 'Opened 1 tab');
+  assert.deepStrictEqual(ctx.createdTabUrls, ['https://addons.mozilla.org/b/']);
+  assert.deepStrictEqual(plain(ctx.sentMessages), [{ type: 'openTabs', urls: ['https://addons.mozilla.org/c/'] }]);
+  assert.match(ctx.navigatedUrls[0], /from=import&failed=1$/);
 });
 
-testAsync('openSelectedBtn: status text uses singular "tab" for exactly one', async () => {
-  const cb1 = makeCheckbox();
-  cb1.checked = true;
-  cb1.dataset = { idx: '0' };
+testAsync('openSelectedBtn: if background.js cannot be reached, the page opens the rest itself (staggered) before moving on', async () => {
+  const { boxes, itemsJs } = selectItems(['https://addons.mozilla.org/a/', 'https://addons.mozilla.org/b/', 'https://addons.mozilla.org/c/']);
+  const ctx = captureBulkSelectHandlers(boxes, { failSendMessage: true });
+  vm.runInContext(itemsJs, ctx.sandbox);
 
-  const { openSelectedHandler, statusEl, sandbox } = captureBulkSelectHandlers([cb1]);
-  vm.runInContext("displayItems = [{ link: 'https://addons.mozilla.org/a/' }];", sandbox);
+  await ctx.openSelectedHandler();
 
-  await openSelectedHandler();
+  assert.deepStrictEqual(ctx.createdTabUrls, [
+    'https://addons.mozilla.org/a/', 'https://addons.mozilla.org/b/', 'https://addons.mozilla.org/c/',
+  ]);
+  assert.strictEqual(ctx.getSetTimeoutCallCount(), 2, 'one stagger delay before each fallback tab');
+  assert.deepStrictEqual(ctx.navigatedUrls, [
+    'moz-extension://test-id/src/confirmation/confirmation.html?from=import',
+  ]);
+});
 
-  assert.strictEqual(statusEl.textContent, 'Opened 1 tab', 'not "Opened 1 tabs"');
+testAsync('openSelectedBtn: a failing navigation still leaves the add-on tabs open and re-enables the button', async () => {
+  const { boxes, itemsJs } = selectItems(['https://addons.mozilla.org/a/']);
+  const ctx = captureBulkSelectHandlers(boxes, { failNavigation: true });
+  vm.runInContext(itemsJs, ctx.sandbox);
+
+  await assert.rejects(() => ctx.openSelectedHandler(), /navigation failed/);
+
+  assert.deepStrictEqual(ctx.createdTabUrls, ['https://addons.mozilla.org/a/']);
+  assert.strictEqual(ctx.openSelectedBtnEl.disabled, false,
+    'the button must not stay stuck disabled just because the page could not be replaced');
+  assert.strictEqual(ctx.statusEl.textContent, 'Opened 1 tab');
 });
 
 // --- parseJsonPayload ---

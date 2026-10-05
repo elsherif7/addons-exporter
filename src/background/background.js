@@ -2,6 +2,9 @@ browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'listAddons') {
     return listInstalledAddons();
   }
+  if (message.type === 'openTabs') {
+    return Promise.resolve(queueTabOpens(message.urls));
+  }
   if (message.type === 'export') {
     return doExport(message.ids).then(async ({ html, filename, format, stats }) => {
       const platform = await browser.runtime.getPlatformInfo();
@@ -24,6 +27,34 @@ browser.runtime.onMessage.addListener((message) => {
     });
   }
 });
+
+// The Importer opens the first add-on's page itself, then hands the rest
+// here and immediately replaces its own page with the confirmation page -
+// a page that has navigated away can't keep a loop running, this script
+// can. Opens each as a background tab, one after another with the shared
+// stagger, starting right away. Returns at once ({ queued }) rather than
+// waiting for them all, so the page isn't held up; each tabs.create call
+// is also activity that keeps this event page alive until the queue is
+// done. Re-validates every URL (this message could come from anywhere in
+// the extension) and caps the batch.
+const MAX_QUEUED_TABS = 500;
+
+function queueTabOpens(urls) {
+  const safe = (Array.isArray(urls) ? urls : [])
+    .filter((url) => typeof url === 'string' && isSafeUrl(url))
+    .slice(0, MAX_QUEUED_TABS);
+  (async () => {
+    for (let i = 0; i < safe.length; i++) {
+      if (i > 0) await new Promise((resolve) => setTimeout(resolve, TAB_OPEN_DELAY_MS));
+      try {
+        await browser.tabs.create({ url: safe[i], active: false });
+      } catch {
+        /* one tab failing shouldn't stop the rest */
+      }
+    }
+  })();
+  return { queued: safe.length };
+}
 
 const AMO_API_BASE = 'https://addons.mozilla.org/api/v5';
 const AMO_FETCH_TIMEOUT_MS = 15000;

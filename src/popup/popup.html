@@ -18,6 +18,14 @@
       --btn-bg-hover: #111827;
       --border: #d0d3d9;
       --hover-bg: #fafbfc;
+      /* Spring easing: a real spring curve where linear() is supported,
+         a plain overshoot curve otherwise. */
+      --spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+    }
+    @supports (animation-timing-function: linear(0, 1)) {
+      :root {
+        --spring: linear(0, 0.046, 0.163, 0.321, 0.495, 0.666, 0.819, 0.946, 1.042, 1.109, 1.147, 1.162, 1.159, 1.143, 1.118, 1.09, 1.062, 1.036, 1.014, 0.997, 0.985, 0.977, 0.974, 0.974, 0.976, 0.979, 0.984, 0.989, 1);
+      }
     }
     :root[data-theme="dark"] {
       --bg: #1a1c21;
@@ -74,28 +82,54 @@
     .hub-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg-hover); transform: scale(1.02); }
     .hub-btn:active { transform: scale(0.98); }
 
-    /* Entrance: shorter and quieter than the full pages, since the popup
-       opens constantly and a long animation would feel slow. backwards
-       fill on purpose - a held final keyframe would override :hover. */
-    @keyframes popup-in {
-      from { opacity: 0; transform: translateY(6px); }
+    /* Entrance: the card drops in from the toolbar button with a springy
+       overshoot, then the title and the three buttons spring up one after
+       another (about a second in total). backwards fill on purpose - a
+       held final keyframe would override :hover. */
+    @keyframes popup-card-in {
+      from { opacity: 0; transform: translateY(-30px) scale(0.8); }
       to   { opacity: 1; transform: none; }
     }
-    .card { animation: popup-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
-    h3, .hub-btn { animation: popup-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
-    #exportBtn { animation-delay: 0.03s; }
-    #importBtn { animation-delay: 0.06s; }
-    #settingsBtn { animation-delay: 0.09s; }
+    @keyframes popup-in {
+      from { opacity: 0; transform: translateY(34px) scale(0.88); }
+      to   { opacity: 1; transform: none; }
+    }
+    .card {
+      transform-origin: top center;
+      animation: popup-card-in 0.65s var(--spring) backwards;
+    }
+    h3, .hub-btn { animation: popup-in 0.6s var(--spring) backwards; }
+    h3 { animation-delay: 0.12s; }
+    #exportBtn { animation-delay: 0.22s; }
+    #importBtn { animation-delay: 0.32s; }
+    #settingsBtn { animation-delay: 0.42s; }
 
-    /* Smooth light/dark switch - theme.js adds .theme-switching to <html>
-       for a moment around the change (never on first load). Keep in sync
-       with shared.css. */
+    /* Light/dark switch (keep in sync with shared.css). Where the browser
+       supports view transitions (Firefox 144+), theme.js wraps the theme
+       change in document.startViewTransition(): the old page stays fully
+       visible while the new theme fades in on top of it - a plain, clean
+       cross-fade, with no blur or zoom. Everywhere else, theme.js adds
+       .theme-switching to <html> for a moment instead, and every color
+       glides from one theme to the other. Neither runs on first page load. */
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      mix-blend-mode: normal;
+      animation-duration: 0.6s;
+      animation-timing-function: ease-in-out;
+    }
+    ::view-transition-old(root) { animation: none; z-index: 1; }
+    ::view-transition-new(root) { animation-name: hub-theme-in; z-index: 2; }
+    @keyframes hub-theme-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
     :root.theme-switching,
     :root.theme-switching *,
     :root.theme-switching *::before,
     :root.theme-switching *::after {
-      transition: background-color 0.25s ease, color 0.25s ease,
-        border-color 0.25s ease, box-shadow 0.25s ease !important;
+      transition: background-color 0.6s ease-in-out, color 0.6s ease-in-out,
+        border-color 0.6s ease-in-out, box-shadow 0.6s ease-in-out,
+        fill 0.6s ease-in-out, stroke 0.6s ease-in-out !important;
     }
 
     @media (prefers-reduced-motion: reduce) {

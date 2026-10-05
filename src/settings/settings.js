@@ -455,6 +455,48 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
   });
 });
 
+// Firefox reuses an already-open Settings tab (runtime.openOptionsPage just
+// switches to it), so the page never reloads and its entrance animation
+// would not play again. Replay it whenever the tab is brought back to the
+// front, and when the popup asks for it (covers a Settings tab that is
+// already visible in another window; it also scrolls back to the top). The time check keeps a brand-new
+// tab, which is already playing its own entrance, from restarting it.
+let lastEntranceAt = Date.now();
+
+// Pressing Settings again also takes you back to the top of the page,
+// however far down you had scrolled (smoothly, or instantly with reduced
+// motion). Only done for that explicit request from the popup - not every
+// time the tab is merely switched back to, which would throw away your
+// scroll position.
+function scrollSettingsToTop() {
+  if (typeof window === 'undefined' || typeof window.scrollTo !== 'function') return;
+  const reduced = typeof matchMedia === 'function' &&
+    matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({ top: 0, left: 0, behavior: reduced ? 'auto' : 'smooth' });
+}
+
+function replayEntranceIfIdle() {
+  const now = Date.now();
+  if (now - lastEntranceAt < 1500) return;
+  lastEntranceAt = now;
+  replayEntrance();
+}
+if (document.addEventListener) {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') replayEntranceIfIdle();
+  });
+}
+if (browser.runtime.onMessage) {
+  browser.runtime.onMessage.addListener((message) => {
+    if (message && message.type === 'replaySettingsEntrance') {
+      // Always scroll up, even if the tab-visible replay just above already
+      // ran (and so this call's replay is skipped by the time check).
+      scrollSettingsToTop();
+      replayEntranceIfIdle();
+    }
+  });
+}
+
 // Clear the settings status message whenever the user interacts with
 // anything on the page — radio change, button click, file input — so it
 // doesn't linger after they've moved on to something else.

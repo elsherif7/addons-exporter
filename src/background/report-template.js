@@ -111,10 +111,18 @@ function buildHtmlReport(list, theme, shorten = true) {
     --link-accent: #0060df;
     --warn-color: #b45309;
     --danger-color: #c0392b;
-    --motion-fast: 0.15s;
-    --motion-normal: 0.25s;
-    --motion-slow: 0.35s;
+    --motion-fast: 0.2s;
+    --motion-normal: 0.4s;
+    --motion-slow: 0.6s;
+    --motion-search: 0.3s;
+    --motion-theme: 0.6s;
     --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --motion-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+  @supports (animation-timing-function: linear(0, 1)) {
+    :root {
+      --motion-spring: linear(0, 0.046, 0.163, 0.321, 0.495, 0.666, 0.819, 0.946, 1.042, 1.109, 1.147, 1.162, 1.159, 1.143, 1.118, 1.09, 1.062, 1.036, 1.014, 0.997, 0.985, 0.977, 0.974, 0.974, 0.976, 0.979, 0.984, 0.989, 1);
+    }
   }
   :root[data-theme="dark"] {
     --bg: #15171c;
@@ -146,24 +154,25 @@ function buildHtmlReport(list, theme, shorten = true) {
      fill on purpose: a held final keyframe would override :hover
      transforms on children. */
   @keyframes hub-card-in {
-    from { opacity: 0; transform: translateY(14px) scale(0.985); }
+    from { opacity: 0; transform: translateY(44px) scale(0.92); }
     to   { opacity: 1; transform: none; }
   }
   @keyframes hub-rise-in {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(30px); }
     to   { opacity: 1; transform: none; }
   }
   @keyframes hub-fade-in {
     from { opacity: 0; }
     to   { opacity: 1; }
   }
-  .card { animation: hub-card-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
-  .card > * { animation: hub-rise-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
-  .card > :nth-child(2) { animation-delay: 0.03s; }
-  .card > :nth-child(3) { animation-delay: 0.06s; }
-  .card > :nth-child(4) { animation-delay: 0.09s; }
-  .card > :nth-child(5) { animation-delay: 0.12s; }
-  .card > :nth-child(n+6) { animation-delay: 0.15s; }
+  .card { animation: hub-card-in 0.7s var(--motion-spring) backwards; }
+  .card > * { animation: hub-rise-in 0.6s var(--motion-spring) backwards; }
+  .card > :nth-child(1) { animation-delay: 0.08s; }
+  .card > :nth-child(2) { animation-delay: 0.16s; }
+  .card > :nth-child(3) { animation-delay: 0.24s; }
+  .card > :nth-child(4) { animation-delay: 0.32s; }
+  .card > :nth-child(5) { animation-delay: 0.4s; }
+  .card > :nth-child(n+6) { animation-delay: 0.48s; }
   /* The theme toggle is absolutely positioned inside the card; don't let
      the staggered rise move it independently of the card itself. */
   .card > .theme-toggle { animation: none; }
@@ -206,7 +215,7 @@ function buildHtmlReport(list, theme, shorten = true) {
   .search-input:focus { outline: none; border-color: var(--btn-bg); transform: scale(1.01); }
   .search-input:hover { border-color: var(--btn-bg); transform: scale(1.01); }
   .placeholder-text { padding: 20px; color: var(--text-muted); font-size: 14px; margin: 0; }
-  #noSearchMatches { border: 1px solid var(--border); border-radius: 10px; text-align: center; animation: hub-fade-in 0.25s ease backwards; }
+  #noSearchMatches { border: 1px solid var(--border); border-radius: 10px; text-align: center; animation: hub-fade-in var(--motion-normal) ease backwards; }
   .checklist-box {
     text-align: left;
     overflow-x: hidden;
@@ -247,14 +256,14 @@ function buildHtmlReport(list, theme, shorten = true) {
     /* Search fade (see .is-filtered below). The line above is the
        fallback for Firefox versions that don't understand allow-discrete. */
     transition: background 0.12s, transform 0.1s,
-      opacity 0.25s ease, display 0.25s allow-discrete;
+      opacity var(--motion-search) ease, display var(--motion-search) allow-discrete;
   }
   .addon-row-info { flex: 1; }
   .addon-row:last-child { border-bottom: none; }
   .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
   :root[data-theme="dark"] .addon-row:hover { background: #2e3340; }
-  .group-container { transition: opacity 0.25s ease, display 0.25s allow-discrete; }
-  #addonList { transition: opacity 0.25s ease, display 0.25s allow-discrete; }
+  .group-container { transition: opacity var(--motion-search) ease, display var(--motion-search) allow-discrete; }
+  #addonList { transition: opacity var(--motion-search) ease, display var(--motion-search) allow-discrete; }
   /* Search filtering: the inline script sets display:none AND .is-filtered
      when a row or group stops matching (and removes both when it matches
      again), which the transitions above turn into a fade out / fade in.
@@ -269,15 +278,40 @@ function buildHtmlReport(list, theme, shorten = true) {
   .match-label[href]:hover { text-decoration: underline; }
   .match-uncertain { color: var(--warn-color); font-weight: 600; }
 
-  /* Smooth light/dark switch: the script adds .theme-switching to <html>
-     for a moment around the change (never on first load). */
+  /* Light/dark switch. Where the browser supports view transitions
+     (Firefox 144+), theme.js wraps the theme change in
+     document.startViewTransition(): the old page stays fully visible while
+     the new theme fades in on top of it - a plain, clean cross-fade, with no
+     blur or zoom. Everywhere else, theme.js adds .theme-switching to <html>
+     for a moment instead, and every color glides from one theme to the
+     other. Neither runs on first page load. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    mix-blend-mode: normal;
+    animation-duration: var(--motion-theme);
+    animation-timing-function: ease-in-out;
+  }
+  ::view-transition-old(root) { animation: none; z-index: 1; }
+  ::view-transition-new(root) { animation-name: hub-theme-in; z-index: 2; }
+  @keyframes hub-theme-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
   :root.theme-switching,
   :root.theme-switching *,
   :root.theme-switching *::before,
   :root.theme-switching *::after {
-    transition: background-color 0.25s ease, color 0.25s ease,
-      border-color 0.25s ease, box-shadow 0.25s ease !important;
+    transition: background-color var(--motion-theme) ease-in-out, color var(--motion-theme) ease-in-out,
+      border-color var(--motion-theme) ease-in-out, box-shadow var(--motion-theme) ease-in-out,
+      fill var(--motion-theme) ease-in-out, stroke var(--motion-theme) ease-in-out !important;
   }
+
+  /* The sun/moon icon spins and pops in each time it is swapped. */
+  @keyframes hub-icon-spin {
+    from { opacity: 0; transform: rotate(-200deg) scale(0.3); }
+    to   { opacity: 1; transform: none; }
+  }
+  .theme-toggle svg { animation: hub-icon-spin 0.7s var(--motion-spring) backwards; }
 
   /* Nothing should be caught mid-fade when the report is printed or saved
      as a PDF. */
@@ -354,16 +388,29 @@ function buildHtmlReport(list, theme, shorten = true) {
     // only for changes after the page has loaded, never the first paint.
     var themeSwitchTimer = null;
     var themeReady = false;
+
+    // Mirrors applyTheme() in theme.js: view transitions (new theme fades
+    // in over the old one) where supported, a color glide otherwise,
+    // nothing on first load or for reduced motion.
     function applyTheme(theme) {
       var root = document.documentElement;
-      if (themeReady && root.getAttribute('data-theme') !== theme) {
-        root.classList.add('theme-switching');
-        clearTimeout(themeSwitchTimer);
-        themeSwitchTimer = setTimeout(function () { root.classList.remove('theme-switching'); }, 350);
+      var changing = themeReady && root.getAttribute('data-theme') !== theme;
+      var reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      function update() {
+        root.setAttribute('data-theme', theme);
+        themeToggleEl.innerHTML = theme === 'dark' ? SUN_SVG : MOON_SVG;
+        themeToggleEl.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
       }
-      root.setAttribute('data-theme', theme);
-      themeToggleEl.innerHTML = theme === 'dark' ? SUN_SVG : MOON_SVG;
-      themeToggleEl.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+      if (changing && !reduced && document.startViewTransition) {
+        document.startViewTransition(update);
+      } else {
+        if (changing && !reduced) {
+          root.classList.add('theme-switching');
+          clearTimeout(themeSwitchTimer);
+          themeSwitchTimer = setTimeout(function () { root.classList.remove('theme-switching'); }, 800);
+        }
+        update();
+      }
     }
 
     var themeToggleEl = document.getElementById('themeToggle');

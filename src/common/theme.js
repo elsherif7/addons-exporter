@@ -26,22 +26,34 @@ function resolveTheme(stored) {
   return stored && stored[THEME_STORAGE_KEY] === 'dark' ? 'dark' : 'light';
 }
 
-// Colors glide between themes (see .theme-switching in shared.css), but
-// only for changes made after the page has finished its first apply -
-// never on page load, so there's no animated flash of the wrong theme.
+// The switch is animated, but only for changes made after the page has
+// finished its first apply - never on page load, so there's no animated
+// flash of the wrong theme. With view transitions (Firefox 144+) the old
+// look drifts away and the new one fades in over it (see the
+// ::view-transition rules in shared.css); without them, .theme-switching
+// makes every color glide instead. Skipped for reduced motion.
 let themeReady = false;
 let themeSwitchTimer = null;
 
 function applyTheme(theme) {
   const t = theme === 'dark' ? 'dark' : 'light';
   const root = document.documentElement;
-  if (themeReady && root.classList && typeof root.getAttribute === 'function' &&
-      root.getAttribute('data-theme') !== t && typeof setTimeout === 'function') {
-    root.classList.add('theme-switching');
-    clearTimeout(themeSwitchTimer);
-    themeSwitchTimer = setTimeout(() => root.classList.remove('theme-switching'), 350);
+  const changing = themeReady && typeof root.getAttribute === 'function' &&
+    root.getAttribute('data-theme') !== t;
+  const reduced = typeof matchMedia === 'function' &&
+    matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const setTheme = () => root.setAttribute('data-theme', t);
+
+  if (changing && !reduced && typeof document.startViewTransition === 'function') {
+    document.startViewTransition(setTheme);
+  } else {
+    if (changing && !reduced && root.classList && typeof setTimeout === 'function') {
+      root.classList.add('theme-switching');
+      clearTimeout(themeSwitchTimer);
+      themeSwitchTimer = setTimeout(() => root.classList.remove('theme-switching'), 800);
+    }
+    setTheme();
   }
-  root.setAttribute('data-theme', t);
   // Keep localStorage cache in sync so the next page load can apply
   // the theme synchronously before the async storage read resolves.
   try { localStorage.setItem(THEME_CACHE_KEY, t); } catch (e) {}

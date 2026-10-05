@@ -356,7 +356,7 @@ test('motion: shared.css, the popup and the report all define the .theme-switchi
 
 test('motion: entrance animations use backwards fill (a held final keyframe would override :hover transforms)', () => {
   for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
-    const entrance = src.match(/animation:\s*(?:hub-card-in|hub-rise-in|popup-in)[^;]*;/g) || [];
+    const entrance = src.match(/animation:\s*(?:hub-card-in|hub-rise-in|popup-card-in|popup-in)[^;]*;/g) || [];
     assert.ok(entrance.length > 0, `${name} has no entrance animation`);
     for (const decl of entrance) {
       assert.match(decl, /backwards/, `${name}: "${decl}" must use backwards fill`);
@@ -382,3 +382,49 @@ test('motion: the report only animates theme changes after first paint', () => {
   assert.match(src, /var themeReady = false;/);
   assert.match(src, /applyTheme\(loadPersistedTheme\(\)\);\s*themeReady = true;/);
 });
+
+test('motion: shared.css, the popup and the report all define the view-transition theme switch', () => {
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
+    assert.match(src, /::view-transition-old\(root\)/, `${name} is missing the old-snapshot rule`);
+    assert.match(src, /::view-transition-new\(root\)/, `${name} is missing the new-snapshot rule`);
+    assert.match(src, /@keyframes hub-theme-in/, `${name} is missing hub-theme-in`);
+    assert.match(src, /::view-transition-old\(root\)\s*\{\s*animation:\s*none/, `${name}: the old page should stay put under the fade`);
+  }
+});
+
+test('motion: the theme switch is a plain cross-fade (no blur, no zoom)', () => {
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
+    const kf = src.match(/@keyframes hub-theme-in\s*\{[^}]*\}[^}]*\}/);
+    assert.ok(kf, `${name}: hub-theme-in keyframes not found`);
+    assert.doesNotMatch(kf[0], /blur|scale|transform/, `${name}: the theme fade must be opacity only`);
+  }
+});
+
+test('motion: nothing leaves a full-screen overlay behind (the old .theme-flash veil is gone)', () => {
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
+    assert.doesNotMatch(src, /\.theme-flash/, `${name} still has .theme-flash`);
+  }
+});
+
+test('motion: shared.css has the .replay-reset rule replayEntrance() depends on', () => {
+  assert.match(sharedCssForMotion, /\.replay-reset,\s*\.replay-reset > \*\s*\{\s*animation:\s*none/);
+});
+
+test('motion: popup Settings button asks an already-open Settings tab to replay its entrance', () => {
+  const popupJs = readSrc('src/popup/popup.js');
+  assert.match(popupJs, /openOptionsPage\(\)[\s\S]*replaySettingsEntrance/);
+  assert.match(readSrc('src/settings/settings.js'), /replaySettingsEntrance/);
+});
+
+test('settings: pressing Settings again (popup message) scrolls to the top, but a plain tab switch does not', () => {
+  const src = readSrc('src/settings/settings.js');
+  assert.match(src, /function scrollSettingsToTop\(\)[\s\S]*window\.scrollTo\(\{ top: 0/);
+  // Only the popup's message scrolls; the visibilitychange handler must not.
+  const onMessage = src.match(/message\.type === 'replaySettingsEntrance'\) \{([\s\S]*?)\n    \}/);
+  assert.ok(onMessage, 'message handler not found');
+  assert.match(onMessage[1], /scrollSettingsToTop\(\)/);
+  const onVisible = src.match(/addEventListener\('visibilitychange'[\s\S]*?\}\);/);
+  assert.ok(onVisible, 'visibilitychange handler not found');
+  assert.doesNotMatch(onVisible[0], /scrollSettingsToTop/);
+});
+

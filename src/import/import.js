@@ -14,10 +14,7 @@ function migrateAddonsData(addons, formatVersion) {
   return addons;
 }
 
-// Stagger between opening tabs so dozens of add-ons don't all burst open
-// at once.
-const TAB_OPEN_DELAY_MS = 150;
-
+// TAB_OPEN_DELAY_MS (the stagger between opened tabs) lives in common.js.
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function buildInstalledIndex(installed) {
@@ -672,36 +669,61 @@ openSelectedBtn.addEventListener('click', async () => {
   setStatus(`Opening ${pluralTabs(selected.length)}...`);
 
   try {
-    // The add-ons' own pages open first, as background tabs. This page
-    // stays put (showing the status above) until they're all open, then
-    // replaces itself with the confirmation page - nothing here could keep
-    // running once the page has navigated away.
-    let opened = 0;
-    let failed = 0;
-    for (let i = 0; i < selected.length; i++) {
+    // Only http/https links ever reach browser.tabs.create. Re-checked here
+    // regardless of checkbox state - this is the real gate.
+    const links = selected.map((item) => item.link);
+    const safeLinks = links.filter((link) => isSafeUrl(link));
+    let failed = links.length - safeLinks.length;
+
+    // Open the first add-on's page right here, as a background tab (the
+    // first one that actually opens - a failure just moves on to the next).
+    let firstIdx = -1;
+    for (let i = 0; i < safeLinks.length; i++) {
       try {
-        // Re-checked here regardless of checkbox state - this is the real
-        // gate, nothing but http/https ever reaches browser.tabs.create.
-        if (!isSafeUrl(selected[i].link)) {
-          throw new Error('unsafe link');
-        }
-        await browser.tabs.create({ url: selected[i].link, active: false });
-        opened++;
+        await browser.tabs.create({ url: safeLinks[i], active: false });
+        firstIdx = i;
+        break;
       } catch {
         failed++;
       }
-      if (i < selected.length - 1) {
-        await delay(TAB_OPEN_DELAY_MS);
+    }
+
+    // Nothing opened means there's nothing to confirm - stay here so the
+    // status (all failed) is what the user sees.
+    if (firstIdx === -1) {
+      setStatus(`Opened 0 tabs, ${failed} failed to open`);
+      return;
+    }
+
+    // The confirmation page replaces this page right after the first tab
+    // opens, and a page that has navigated away can't keep running a loop.
+    // So the remaining add-ons are handed to background.js, which opens
+    // them one after another (starting at once) while the confirmation
+    // page is already on screen.
+    const rest = safeLinks.slice(firstIdx + 1);
+    let opened = 1;
+    if (rest.length > 0) {
+      try {
+        await browser.runtime.sendMessage({ type: 'openTabs', urls: rest });
+        opened += rest.length; // queued: background.js opens them from here
+      } catch {
+        // Background unreachable: open them from here instead, then go on.
+        for (let i = 0; i < rest.length; i++) {
+          await delay(TAB_OPEN_DELAY_MS);
+          try {
+            await browser.tabs.create({ url: rest[i], active: false });
+            opened++;
+          } catch {
+            failed++;
+          }
+        }
       }
     }
+
     setStatus(failed > 0
       ? `Opened ${pluralTabs(opened)}, ${failed} failed to open`
       : `Opened ${pluralTabs(opened)}`);
-    // Nothing opened means there's nothing to confirm - stay here so the
-    // status above (all failed) is what the user sees.
-    if (opened > 0) {
-      await goToConfirmation(failed > 0 ? `from=import&failed=${failed}` : 'from=import');
-    }
+    await goToConfirmation(failed > 0 ? `from=import&failed=${failed}` : 'from=import');
   } finally {
     openSelectedBtn.disabled = false;
   }

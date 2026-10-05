@@ -499,3 +499,89 @@ testAsync('browser.management.uninstall: can be called and resolves', async () =
   vm.runInContext(backgroundSrc, bgSandbox);
   assert.ok(typeof bgSandbox.browser.management.getAll === 'function');
 });
+
+// --- background.js: openTabs (the Importer hands every tab after the first to us) ---
+
+// Objects built inside the vm sandbox have a different Object prototype, so
+// deepStrictEqual needs them copied into this realm first.
+const plain = (v) => JSON.parse(JSON.stringify(v));
+
+function loadBackgroundForOpenTabs({ failUrls = [] } = {}) {
+  let messageListener = null;
+  const created = [];
+  let timeoutCalls = 0;
+  const sb = {
+    URL, Blob, AbortController,
+    setTimeout: (fn) => { timeoutCalls++; fn(); return 0; },
+    clearTimeout() {},
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    fetch: async () => ({ ok: false, status: 404, json: async () => ({}) }),
+    browser: {
+      runtime: {
+        onMessage: { addListener: (fn) => { messageListener = fn; } },
+        getURL: (path) => `moz-extension://test-id/${path}`,
+      },
+      tabs: {
+        create: async (options) => {
+          if (failUrls.includes(options.url)) throw new Error('tab creation failed');
+          created.push(options);
+          return {};
+        },
+      },
+    },
+  };
+  vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
+  vm.runInContext(reportTemplateSrc, sb);
+  vm.runInContext(backgroundSrc, sb);
+  return { send: (msg) => messageListener(msg), created, getTimeoutCalls: () => timeoutCalls };
+}
+
+// The queue runs in the background after the reply; let it drain.
+const settleQueue = () => new Promise((resolve) => setImmediate(resolve));
+
+testAsync('openTabs: replies at once with how many are queued, then opens each as a background tab', async () => {
+  const ctx = loadBackgroundForOpenTabs();
+  const reply = await ctx.send({ type: 'openTabs', urls: ['https://addons.mozilla.org/b/', 'https://addons.mozilla.org/c/'] });
+  assert.deepStrictEqual(plain(reply), { queued: 2 });
+  await settleQueue();
+  assert.deepStrictEqual(plain(ctx.created), [
+    { url: 'https://addons.mozilla.org/b/', active: false },
+    { url: 'https://addons.mozilla.org/c/', active: false },
+  ]);
+  assert.strictEqual(ctx.getTimeoutCalls(), 1, 'the first opens immediately; one stagger delay before the second');
+});
+
+testAsync('openTabs: drops anything that is not an http/https string (this message is re-validated)', async () => {
+  const ctx = loadBackgroundForOpenTabs();
+  const reply = await ctx.send({
+    type: 'openTabs',
+    urls: ['javascript:alert(1)', 'file:///etc/passwd', 42, null, 'https://addons.mozilla.org/ok/'],
+  });
+  assert.deepStrictEqual(plain(reply), { queued: 1 });
+  await settleQueue();
+  assert.deepStrictEqual(ctx.created.map((o) => o.url), ['https://addons.mozilla.org/ok/']);
+});
+
+testAsync('openTabs: a missing or non-array urls value queues nothing and does not throw', async () => {
+  const ctx = loadBackgroundForOpenTabs();
+  assert.deepStrictEqual(plain(await ctx.send({ type: 'openTabs' })), { queued: 0 });
+  assert.deepStrictEqual(plain(await ctx.send({ type: 'openTabs', urls: 'https://addons.mozilla.org/x/' })), { queued: 0 });
+  await settleQueue();
+  assert.strictEqual(ctx.created.length, 0);
+});
+
+testAsync('openTabs: one tab failing to open does not stop the rest', async () => {
+  const ctx = loadBackgroundForOpenTabs({ failUrls: ['https://addons.mozilla.org/b/'] });
+  await ctx.send({ type: 'openTabs', urls: ['https://addons.mozilla.org/b/', 'https://addons.mozilla.org/c/'] });
+  await settleQueue();
+  assert.deepStrictEqual(ctx.created.map((o) => o.url), ['https://addons.mozilla.org/c/']);
+});
+
+testAsync('openTabs: caps a single batch at 500 tabs', async () => {
+  const ctx = loadBackgroundForOpenTabs();
+  const urls = Array.from({ length: 600 }, (_, i) => `https://addons.mozilla.org/a${i}/`);
+  const reply = await ctx.send({ type: 'openTabs', urls });
+  assert.deepStrictEqual(plain(reply), { queued: 500 });
+});
+

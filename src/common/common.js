@@ -306,7 +306,7 @@ function filterAddonRows(container, query) {
 // opening a second tab next to it). The fade uses the Web Animations API
 // on the page's .card and is skipped when that isn't available or the
 // user has asked for reduced motion, so callers can always just await it.
-const PAGE_FADE_MS = 220;
+const PAGE_FADE_MS = 380;
 
 // Resolves once the card has faded out, with the animation (held at its
 // final frame) so the caller can undo it, or null if nothing was animated.
@@ -319,7 +319,7 @@ async function fadeOutPage() {
     const anim = card.animate(
       [
         { opacity: 1, transform: 'none' },
-        { opacity: 0, transform: 'translateY(-12px) scale(0.98)' },
+        { opacity: 0, transform: 'translateY(-24px) scale(0.95)' },
       ],
       { duration: PAGE_FADE_MS, easing: 'ease-in', fill: 'forwards' }
     );
@@ -342,3 +342,23 @@ async function goToConfirmation(query) {
     throw e;
   }
 }
+
+// Restarts the page's entrance animation (the .card and its children
+// spring in again). Used when an already-open tab is brought back to the
+// front - e.g. Settings, which Firefox reuses instead of reopening - so it
+// gets the same entrance as a freshly opened page. shared.css's
+// .replay-reset switches the animations off for one frame; forcing a
+// reflow in between makes them start over.
+function replayEntrance() {
+  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
+  const card = document.querySelector('.card');
+  if (!card || !card.classList) return;
+  card.classList.add('replay-reset');
+  void card.offsetWidth;
+  card.classList.remove('replay-reset');
+}
+
+// Stagger between opening add-on tabs, so dozens of add-ons don't all burst
+// open at once. Used by import.js (fallback) and background.js.
+const TAB_OPEN_DELAY_MS = 150;
+

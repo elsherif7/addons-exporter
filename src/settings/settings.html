@@ -94,14 +94,14 @@
   }
   #settingsStatus.error { color: var(--danger-color); }
   /* Small pop when a radio becomes selected. */
-  .settings-option-row input[type="radio"]:checked { animation: hub-pop var(--motion-fast) var(--motion-ease); }
+  .settings-option-row input[type="radio"]:checked { animation: hub-pop var(--motion-normal) var(--motion-spring); }
   /* Inline row messages fade in each time they're shown (display toggles). */
   #exportSettingsDesc, #importSettingsDesc, #resetSettingsDesc,
   #exportSettingsStatus, #importSettingsStatus, #resetSettingsStatus,
   #settingsStatus:not(:empty) { animation: hub-fade-in var(--motion-normal) ease backwards; }
   /* Reset dialog: backdrop fades in, the dialog rises in. */
   .s-overlay { animation: hub-fade-in var(--motion-fast) ease backwards; }
-  .s-dialog { animation: hub-card-in var(--motion-normal) var(--motion-ease) backwards; }
+  .s-dialog { animation: hub-card-in var(--motion-slow) var(--motion-spring) backwards; }
   /* .about-block, .about-row, .about-label, .about-value come from shared.css */
 </style>
 </head>

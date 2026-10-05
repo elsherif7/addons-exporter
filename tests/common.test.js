@@ -767,3 +767,34 @@ test('filterAddonRows: rows and groups that stop matching get .is-filtered, and 
   }
 });
 
+// --- replayEntrance ---
+
+test('replayEntrance: adds .replay-reset, forces a reflow, then removes it so the animation restarts', () => {
+  const log = [];
+  const classes = new Set();
+  const card = {
+    classList: {
+      add: (c) => { classes.add(c); log.push('add:' + c); },
+      remove: (c) => { classes.delete(c); log.push('remove:' + c); },
+    },
+    get offsetWidth() { log.push('reflow'); return 100; },
+  };
+  const sb = { URL, document: { querySelector: (sel) => (sel === '.card' ? card : null) } };
+  vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
+  sb.replayEntrance();
+  assert.deepStrictEqual(log, ['add:replay-reset', 'reflow', 'remove:replay-reset']);
+  assert.strictEqual(classes.size, 0);
+});
+
+test('replayEntrance: safe no-op without a document or .card', () => {
+  const bare = { URL };
+  vm.createContext(bare);
+  vm.runInContext(commonSrc, bare);
+  bare.replayEntrance();
+  const sb = { URL, document: { querySelector: () => null } };
+  vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
+  sb.replayEntrance();
+});
+
