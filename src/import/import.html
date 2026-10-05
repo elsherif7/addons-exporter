@@ -15,12 +15,15 @@
     margin-bottom: 20px;
     text-align: center;
     background: var(--hover-bg);
-    transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.15s, background 0.15s, transform 0.15s;
   }
   .picker.dragover {
     border-color: var(--btn-bg);
     background: var(--border-soft);
+    transform: scale(1.01);
   }
+  /* The chosen-file chip slides in each time it's shown. */
+  #fileNameRow { animation: hub-rise-in var(--motion-normal) var(--motion-ease) backwards; }
   #chooseFileBtn {
     padding: 12px 20px;
   }

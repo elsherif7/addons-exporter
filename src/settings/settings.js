@@ -380,9 +380,11 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
   resetRow.activate('');
 
   const overlay = document.createElement('div');
+  overlay.className = 's-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:1000;';
 
   const dialog = document.createElement('div');
+  dialog.className = 's-dialog';
   dialog.setAttribute('role', 'dialog');
   dialog.setAttribute('aria-modal', 'true');
   dialog.setAttribute('aria-labelledby', 'resetDialogTitle');

@@ -99,3 +99,48 @@ test('storage.onChanged: a change in a different storage area is ignored', () =>
 test('loading theme.js with no storage.onChanged at all does not throw', () => {
   assert.doesNotThrow(() => loadThemeInSandbox());
 });
+
+// --- smooth light/dark switch (.theme-switching) ---
+
+function loadThemeWithClassList() {
+  const classes = new Set();
+  const timers = [];
+  let attr = null;
+  const sandbox = {
+    document: {
+      documentElement: {
+        setAttribute: (name, value) => { if (name === 'data-theme') attr = value; },
+        getAttribute: (name) => (name === 'data-theme' ? attr : null),
+        classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c) },
+      },
+    },
+    localStorage: { getItem() { return null; }, setItem() {} },
+    setTimeout: (fn) => { timers.push(fn); return timers.length; },
+    clearTimeout() {},
+    browser: { storage: { local: { get: async () => ({}) } } },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(themeSrc, sandbox);
+  return { sandbox, classes, timers };
+}
+
+testAsync('theme: the first apply on page load never animates', async () => {
+  const { sandbox, classes } = loadThemeWithClassList();
+  await sandbox.initTheme();
+  sandbox.applyTheme('dark'); // after init: this one may animate
+  assert.strictEqual(classes.has('theme-switching'), true);
+  const fresh = loadThemeWithClassList();
+  fresh.sandbox.applyTheme('dark'); // before init finishes: must not animate
+  assert.strictEqual(fresh.classes.has('theme-switching'), false);
+});
+
+testAsync('theme: a real change adds .theme-switching and a timer removes it; same theme does nothing', async () => {
+  const { sandbox, classes, timers } = loadThemeWithClassList();
+  await sandbox.initTheme(); // applies light
+  sandbox.applyTheme('light');
+  assert.strictEqual(classes.has('theme-switching'), false, 'no change, no animation');
+  sandbox.applyTheme('dark');
+  assert.strictEqual(classes.has('theme-switching'), true);
+  timers[timers.length - 1]();
+  assert.strictEqual(classes.has('theme-switching'), false, 'cleaned up after the transition');
+});

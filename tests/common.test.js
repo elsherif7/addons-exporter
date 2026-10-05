@@ -104,11 +104,21 @@ test('byName sorts case-insensitively', () => {
 // against. Name and version are modeled as separate sub-elements, same as
 // the real .addon-name / .addon-version markup, so tests can tell them apart.
 
+// classList stand-in: reports its base class, and records the
+// .is-filtered class that setFilterVisible() toggles for the search fade.
+function fakeClassList(baseCls) {
+  const extra = new Set();
+  return {
+    contains: (c) => c === baseCls || extra.has(c),
+    toggle: (c, force) => { if (force) extra.add(c); else extra.delete(c); return !!force; },
+  };
+}
+
 function makeEl(cls, nameText, versionText) {
   const nameEl = nameText != null ? { textContent: nameText } : null;
   return {
     style: { display: '' },
-    classList: { contains: (c) => c === cls },
+    classList: fakeClassList(cls),
     querySelector: (sel) => (sel === '.addon-name' ? nameEl : null),
     textContent: [nameText, versionText].filter((t) => t != null).join(' '),
     children: [],
@@ -118,7 +128,7 @@ function makeEl(cls, nameText, versionText) {
 function makeGroupBox(heading, rows) {
   const box = {
     style: { display: '' },
-    classList: { contains: (c) => c === 'group-box' },
+    classList: fakeClassList('group-box'),
     querySelector: () => null,
     children: [heading, ...rows],
   };
@@ -129,7 +139,7 @@ function makeGroupContainer(heading, rows) {
   const box = makeGroupBox(heading, rows);
   const container = {
     style: { display: '' },
-    classList: { contains: (c) => c === 'group-container' },
+    classList: fakeClassList('group-container'),
     querySelector: (sel) => sel === '.group-box' ? box : null,
     children: [heading, box],
   };
@@ -717,3 +727,43 @@ testAsync('goToConfirmation: if navigation throws, the card is brought back and 
   await assert.rejects(() => sb.goToConfirmation('from=export'), /nav failed/);
   assert.strictEqual(card.cancelled, true, 'card must not stay invisible after a failed navigation');
 });
+
+// --- setFilterVisible / the search fade hooks ---
+
+test('setFilterVisible: hiding sets display:none and adds .is-filtered; showing clears both', () => {
+  const el = { style: { display: '' }, classList: fakeClassList('x') };
+  sandbox.setFilterVisible(el, false);
+  assert.strictEqual(el.style.display, 'none');
+  assert.strictEqual(el.classList.contains('is-filtered'), true);
+  sandbox.setFilterVisible(el, true);
+  assert.strictEqual(el.style.display, '');
+  assert.strictEqual(el.classList.contains('is-filtered'), false);
+});
+
+test('setFilterVisible: uses shownDisplay when visible, and tolerates an element with no classList', () => {
+  const el = { style: { display: 'none' } };
+  sandbox.setFilterVisible(el, true, 'block');
+  assert.strictEqual(el.style.display, 'block');
+  sandbox.setFilterVisible(el, false);
+  assert.strictEqual(el.style.display, 'none');
+});
+
+test('filterAddonRows: rows and groups that stop matching get .is-filtered, and lose it when they match again', () => {
+  // makeContainer(): Enabled group = uBlock Origin + Dark Reader,
+  // Disabled group = Old Extension.
+  const { container, enabledBox, disabledBox, row1, row2, row3 } = makeContainer();
+
+  filterAddonRows(container, 'dark');
+  assert.strictEqual(row2.classList.contains('is-filtered'), false);
+  assert.strictEqual(row1.classList.contains('is-filtered'), true);
+  assert.strictEqual(row3.classList.contains('is-filtered'), true);
+  assert.strictEqual(enabledBox.classList.contains('is-filtered'), false);
+  assert.strictEqual(disabledBox.classList.contains('is-filtered'), true, 'an emptied group fades out too');
+
+  filterAddonRows(container, '');
+  for (const el of [row1, row2, row3, enabledBox, disabledBox]) {
+    assert.strictEqual(el.classList.contains('is-filtered'), false);
+    assert.strictEqual(el.style.display, '');
+  }
+});
+

@@ -334,3 +334,51 @@ test('hub-btn: popup.html local .hub-btn copy declares the core shared propertie
   assert.match(block, /\bcursor\s*:/, 'popup .hub-btn missing cursor');
   assert.match(block, /\btransition\s*:/, 'popup .hub-btn missing transition');
 });
+
+// --- Animations: shared rules every surface must keep ---
+// The popup and the report can't load shared.css, so each carries its own
+// copy of the motion rules. These pin the parts that are easy to lose.
+
+const sharedCssForMotion = readSrc('src/common/shared.css');
+const reportCssForMotion = readSrc('src/background/report.css');
+
+test('motion: shared.css, the popup and the report all honor prefers-reduced-motion', () => {
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
+    assert.match(src, /@media \(prefers-reduced-motion: reduce\)/, `${name} is missing its reduced-motion rule`);
+  }
+});
+
+test('motion: shared.css, the popup and the report all define the .theme-switching color transition', () => {
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
+    assert.match(src, /:root\.theme-switching/, `${name} is missing the theme transition`);
+  }
+});
+
+test('motion: entrance animations use backwards fill (a held final keyframe would override :hover transforms)', () => {
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
+    const entrance = src.match(/animation:\s*(?:hub-card-in|hub-rise-in|popup-in)[^;]*;/g) || [];
+    assert.ok(entrance.length > 0, `${name} has no entrance animation`);
+    for (const decl of entrance) {
+      assert.match(decl, /backwards/, `${name}: "${decl}" must use backwards fill`);
+      assert.doesNotMatch(decl, /\b(both|forwards)\b/, `${name}: "${decl}" must not hold its last frame`);
+    }
+  }
+});
+
+test('motion: search fade rules (.is-filtered + allow-discrete) exist in shared.css and the report', () => {
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['report.css', reportCssForMotion]]) {
+    assert.match(src, /\.addon-row\.is-filtered/, `${name}: missing .is-filtered rule`);
+    assert.match(src, /allow-discrete/, `${name}: missing the display transition`);
+    assert.match(src, /@starting-style/, `${name}: missing @starting-style (fade-in)`);
+  }
+});
+
+test('motion: the report switches animations off when printing', () => {
+  assert.match(reportCssForMotion, /@media print\s*\{[\s\S]*animation:\s*none/);
+});
+
+test('motion: the report only animates theme changes after first paint', () => {
+  const src = readSrc('src/background/report-template.js');
+  assert.match(src, /var themeReady = false;/);
+  assert.match(src, /applyTheme\(loadPersistedTheme\(\)\);\s*themeReady = true;/);
+});

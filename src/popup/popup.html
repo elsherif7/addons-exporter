@@ -68,11 +68,43 @@
       font-size: 14px;
       font-weight: 600;
       user-select: none;
-      transition: background 0.12s, border-color 0.12s, transform 0.1s;
+      transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.1s;
     }
     .hub-btn:last-of-type { margin-bottom: 0; }
     .hub-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg-hover); transform: scale(1.02); }
     .hub-btn:active { transform: scale(0.98); }
+
+    /* Entrance: shorter and quieter than the full pages, since the popup
+       opens constantly and a long animation would feel slow. backwards
+       fill on purpose - a held final keyframe would override :hover. */
+    @keyframes popup-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .card { animation: popup-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+    h3, .hub-btn { animation: popup-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+    #exportBtn { animation-delay: 0.03s; }
+    #importBtn { animation-delay: 0.06s; }
+    #settingsBtn { animation-delay: 0.09s; }
+
+    /* Smooth light/dark switch - theme.js adds .theme-switching to <html>
+       for a moment around the change (never on first load). Keep in sync
+       with shared.css. */
+    :root.theme-switching,
+    :root.theme-switching *,
+    :root.theme-switching *::before,
+    :root.theme-switching *::after {
+      transition: background-color 0.25s ease, color 0.25s ease,
+        border-color 0.25s ease, box-shadow 0.25s ease !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        transition-duration: 0.001ms !important;
+        animation-duration: 0.001ms !important;
+      }
+      .hub-btn:hover, .hub-btn:active { transform: none !important; }
+    }
   </style>
 </head>
 <body>

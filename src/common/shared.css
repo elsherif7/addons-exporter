@@ -28,6 +28,13 @@
   --link-accent: #0060df;
   --warn-color: #b45309;
   --danger-color: #c0392b;
+
+  /* Motion: subtle and fast (roughly 0.2-0.45s end to end). Everything
+     below uses these so the whole extension moves the same way. */
+  --motion-fast: 0.15s;
+  --motion-normal: 0.25s;
+  --motion-slow: 0.35s;
+  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 :root[data-theme="dark"] {
   --bg: #15171c;
@@ -96,6 +103,41 @@ body {
   text-align: center;
   box-sizing: border-box;
 }
+
+/* Entrance animations. The card fades and rises in, then its direct
+   children follow one after another (capped at six so a long page never
+   takes longer than ~0.45s in total).
+   IMPORTANT: these use `backwards` fill, never `both`/`forwards`. A held
+   final keyframe would override the :hover transform on buttons and
+   inputs that are direct children of the card. */
+@keyframes hub-card-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes hub-rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes hub-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes hub-pop {
+  from { transform: scale(0.7); }
+  to   { transform: none; }
+}
+.card { animation: hub-card-in 0.3s var(--motion-ease) backwards; }
+.card > * { animation: hub-rise-in 0.28s var(--motion-ease) backwards; }
+.card > :nth-child(2) { animation-delay: 0.03s; }
+.card > :nth-child(3) { animation-delay: 0.06s; }
+.card > :nth-child(4) { animation-delay: 0.09s; }
+.card > :nth-child(5) { animation-delay: 0.12s; }
+.card > :nth-child(n+6) { animation-delay: 0.15s; }
+/* Parts of a page that are revealed later (after a file is chosen, or once
+   the list has loaded) animate in at once instead of waiting their turn. */
+#searchInput, #listControls, #checklistBox, #fileNameRow { animation-delay: 0s; }
+/* Status/notes fade in when they first get text. */
+#status:not(:empty), #compareNote:not(:empty) { animation: hub-fade-in var(--motion-normal) ease backwards; }
 h1 { font-size: clamp(22px, 6vw, 28px); margin: 0 0 16px; }
 p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0 28px; }
 
@@ -160,6 +202,8 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   border: 1px solid var(--border);
   border-radius: 10px;
   text-align: center;
+  /* Plays each time the box is shown (display: none -> block). */
+  animation: hub-fade-in var(--motion-normal) ease backwards;
 }
 .group-heading {
   font-size: 14px;
@@ -175,8 +219,13 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   margin-bottom: 16px;
   overflow: hidden;
 }
+/* The add-on list box appears once it's been rendered (export) or a file
+   has been chosen (import). Kept after the base rule above on purpose: the
+   report drift tests read the first .groups-outer-box block. */
+.groups-outer-box { animation: hub-rise-in var(--motion-normal) var(--motion-ease) backwards; }
 .group-container {
   margin-bottom: 20px;
+  transition: opacity var(--motion-normal) ease, display var(--motion-normal) allow-discrete;
 }
 .group-container:last-child { margin-bottom: 0; }
 .group-box {
@@ -195,6 +244,11 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   cursor: pointer;
   user-select: none;
   transition: background 0.12s, border-color 0.12s, transform 0.1s;
+  /* Search fade. The line above is the fallback for Firefox versions
+     that don't understand `allow-discrete` (they drop this whole
+     declaration and keep the one above - rows just appear/disappear). */
+  transition: background 0.12s, border-color 0.12s, transform 0.1s,
+    opacity var(--motion-normal) ease, display var(--motion-normal) allow-discrete;
 }
 .addon-row:last-child { border-bottom: none; }
 .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
@@ -244,6 +298,19 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 .addon-row input[type="checkbox"]:disabled {
   cursor: not-allowed;
 }
+/* Search filtering. filterAddonRows() (common.js) sets display:none AND
+   adds .is-filtered when a row or group stops matching, and removes both
+   when it matches again. The opacity change plus the display transition
+   above turn that into a fade out / fade in; where unsupported it is
+   simply instant. Placed after .row-disabled so it wins over its opacity. */
+.addon-row.is-filtered,
+.group-container.is-filtered,
+#addonList.is-filtered { opacity: 0; }
+#addonList { transition: opacity var(--motion-normal) ease, display var(--motion-normal) allow-discrete; }
+/* A row/group inserted into the page starts transparent and fades in. */
+@starting-style {
+  .addon-row, .group-container, #addonList { opacity: 0; }
+}
 .match-label {
   font-size: 12px;
   color: var(--text-muted);
@@ -273,7 +340,7 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   font-weight: 600;
   cursor: pointer;
   user-select: none;
-  transition: background 0.12s, border-color 0.12s, transform 0.1s;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.1s;
 }
 .hub-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.02); }
 .hub-btn:active { transform: scale(0.99); }
@@ -343,6 +410,18 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 .about-value { color: var(--text); font-weight: 600; font-size: 14px; }
 .about-value a { color: var(--link-accent); text-decoration: none; font-weight: 600; }
 .about-value a:hover { text-decoration: underline; }
+
+/* Smooth light/dark switch. theme.js adds .theme-switching to <html> for a
+   moment around the change (never on first load), so colors glide instead
+   of snapping. It deliberately overrides every other transition for that
+   brief window. */
+:root.theme-switching,
+:root.theme-switching *,
+:root.theme-switching *::before,
+:root.theme-switching *::after {
+  transition: background-color var(--motion-normal) ease, color var(--motion-normal) ease,
+    border-color var(--motion-normal) ease, box-shadow var(--motion-normal) ease !important;
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

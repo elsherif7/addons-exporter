@@ -259,9 +259,20 @@ const UNCERTAIN_LINK_TYPES = new Set(['amo-search', 'amo-search-fallback']);
 // .group-box if none of its rows still match. Returns true if
 // anything's visible.
 //
+// Shows or hides `el` the way search filtering does: display plus an
+// .is-filtered class, which shared.css turns into a fade out / fade in
+// (and which is simply instant where that CSS isn't supported).
+// `shownDisplay` is what display becomes when visible ('' = stylesheet
+// default).
+function setFilterVisible(el, visible, shownDisplay = '') {
+  el.style.display = visible ? shownDisplay : 'none';
+  if (el.classList) el.classList.toggle('is-filtered', !visible);
+}
+
 // NOTE: report-template.js's buildHtmlReport() has its own copy of this
-// inlined into the exported report (it can't load common.js once saved
-// elsewhere). Keep both copies in sync if you change this.
+// (and of setFilterVisible above) inlined into the exported report (it
+// can't load common.js once saved elsewhere). Keep both copies in sync if
+// you change this.
 function filterAddonRows(container, query) {
   const q = query.trim().toLowerCase();
   let anyMatch = false;
@@ -279,12 +290,12 @@ function filterAddonRows(container, query) {
         if (child.classList.contains('addon-row')) {
           const nameEl = child.querySelector('.addon-name');
           const match = q === '' || (nameEl && nameEl.textContent.toLowerCase().includes(q));
-          child.style.display = match ? '' : 'none';
+          setFilterVisible(child, match);
           if (match) { groupHasMatch = true; anyMatch = true; }
         }
       }
     }
-    el.style.display = groupHasMatch ? '' : 'none';
+    setFilterVisible(el, groupHasMatch);
   }
 
   return anyMatch;

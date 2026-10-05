@@ -19,6 +19,10 @@
     --link-accent: #0060df;
     --warn-color: #b45309;
     --danger-color: #c0392b;
+    --motion-fast: 0.15s;
+    --motion-normal: 0.25s;
+    --motion-slow: 0.35s;
+    --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   :root[data-theme="dark"] {
     --bg: #15171c;
@@ -45,6 +49,32 @@
   .card { position: relative; max-width: 640px; margin: 0 auto; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; box-shadow: var(--card-shadow); padding: clamp(20px, 6vmin, 40px); text-align: center; box-sizing: border-box; }
   h1 { font-size: clamp(22px, 6vw, 28px); margin: 0 0 16px; }
   p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0 28px; }
+  /* Entrance: card fades and rises in, then its direct children follow.
+     Same motion as shared.css (this file can't load it). backwards
+     fill on purpose: a held final keyframe would override :hover
+     transforms on children. */
+  @keyframes hub-card-in {
+    from { opacity: 0; transform: translateY(14px) scale(0.985); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes hub-rise-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes hub-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .card { animation: hub-card-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+  .card > * { animation: hub-rise-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+  .card > :nth-child(2) { animation-delay: 0.03s; }
+  .card > :nth-child(3) { animation-delay: 0.06s; }
+  .card > :nth-child(4) { animation-delay: 0.09s; }
+  .card > :nth-child(5) { animation-delay: 0.12s; }
+  .card > :nth-child(n+6) { animation-delay: 0.15s; }
+  /* The theme toggle is absolutely positioned inside the card; don't let
+     the staggered rise move it independently of the card itself. */
+  .card > .theme-toggle { animation: none; }
   .cta-link { color: var(--link-accent); font-weight: bold; text-decoration: none; }
   .cta-link:hover { text-decoration: underline; }
   .theme-toggle {
@@ -84,7 +114,7 @@
   .search-input:focus { outline: none; border-color: var(--btn-bg); transform: scale(1.01); }
   .search-input:hover { border-color: var(--btn-bg); transform: scale(1.01); }
   .placeholder-text { padding: 20px; color: var(--text-muted); font-size: 14px; margin: 0; }
-  #noSearchMatches { border: 1px solid var(--border); border-radius: 10px; text-align: center; }
+  #noSearchMatches { border: 1px solid var(--border); border-radius: 10px; text-align: center; animation: hub-fade-in 0.25s ease backwards; }
   .checklist-box {
     text-align: left;
     overflow-x: hidden;
@@ -122,16 +152,50 @@
     border-bottom: 1px solid var(--border-soft);
     user-select: none;
     transition: background 0.12s, transform 0.1s;
+    /* Search fade (see .is-filtered below). The line above is the
+       fallback for Firefox versions that don't understand allow-discrete. */
+    transition: background 0.12s, transform 0.1s,
+      opacity 0.25s ease, display 0.25s allow-discrete;
   }
   .addon-row-info { flex: 1; }
   .addon-row:last-child { border-bottom: none; }
   .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
   :root[data-theme="dark"] .addon-row:hover { background: #2e3340; }
+  .group-container { transition: opacity 0.25s ease, display 0.25s allow-discrete; }
+  #addonList { transition: opacity 0.25s ease, display 0.25s allow-discrete; }
+  /* Search filtering: the inline script sets display:none AND .is-filtered
+     when a row or group stops matching (and removes both when it matches
+     again), which the transitions above turn into a fade out / fade in.
+     Where unsupported it is simply instant. */
+  .addon-row.is-filtered, .group-container.is-filtered, #addonList.is-filtered { opacity: 0; }
+  @starting-style {
+    .addon-row, .group-container, #addonList { opacity: 0; }
+  }
   .addon-name { font-size: 14px; font-weight: 600; color: var(--text); }
   .addon-version { color: var(--text-faint); font-size: 12px; margin-left: 6px; }
   .match-label { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
   .match-label[href]:hover { text-decoration: underline; }
   .match-uncertain { color: var(--warn-color); font-weight: 600; }
+
+  /* Smooth light/dark switch: the script adds .theme-switching to <html>
+     for a moment around the change (never on first load). */
+  :root.theme-switching,
+  :root.theme-switching *,
+  :root.theme-switching *::before,
+  :root.theme-switching *::after {
+    transition: background-color 0.25s ease, color 0.25s ease,
+      border-color 0.25s ease, box-shadow 0.25s ease !important;
+  }
+
+  /* Nothing should be caught mid-fade when the report is printed or saved
+     as a PDF. */
+  @media print {
+    *, *::before, *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+    .addon-row, .group-container, #addonList { opacity: 1 !important; }
+  }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {

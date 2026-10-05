@@ -231,7 +231,7 @@ deselectAllBtn.addEventListener('click', () => {
 
 searchInput.addEventListener('input', () => {
   const anyMatch = filterAddonRows(listEl, searchInput.value);
-  listEl.style.display = anyMatch ? '' : 'none';
+  setFilterVisible(listEl, anyMatch);
   noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
 });
 

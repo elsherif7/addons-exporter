@@ -111,6 +111,10 @@ function buildHtmlReport(list, theme, shorten = true) {
     --link-accent: #0060df;
     --warn-color: #b45309;
     --danger-color: #c0392b;
+    --motion-fast: 0.15s;
+    --motion-normal: 0.25s;
+    --motion-slow: 0.35s;
+    --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   :root[data-theme="dark"] {
     --bg: #15171c;
@@ -137,6 +141,32 @@ function buildHtmlReport(list, theme, shorten = true) {
   .card { position: relative; max-width: 640px; margin: 0 auto; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; box-shadow: var(--card-shadow); padding: clamp(20px, 6vmin, 40px); text-align: center; box-sizing: border-box; }
   h1 { font-size: clamp(22px, 6vw, 28px); margin: 0 0 16px; }
   p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0 28px; }
+  /* Entrance: card fades and rises in, then its direct children follow.
+     Same motion as shared.css (this file can't load it). backwards
+     fill on purpose: a held final keyframe would override :hover
+     transforms on children. */
+  @keyframes hub-card-in {
+    from { opacity: 0; transform: translateY(14px) scale(0.985); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes hub-rise-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes hub-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .card { animation: hub-card-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+  .card > * { animation: hub-rise-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+  .card > :nth-child(2) { animation-delay: 0.03s; }
+  .card > :nth-child(3) { animation-delay: 0.06s; }
+  .card > :nth-child(4) { animation-delay: 0.09s; }
+  .card > :nth-child(5) { animation-delay: 0.12s; }
+  .card > :nth-child(n+6) { animation-delay: 0.15s; }
+  /* The theme toggle is absolutely positioned inside the card; don't let
+     the staggered rise move it independently of the card itself. */
+  .card > .theme-toggle { animation: none; }
   .cta-link { color: var(--link-accent); font-weight: bold; text-decoration: none; }
   .cta-link:hover { text-decoration: underline; }
   .theme-toggle {
@@ -176,7 +206,7 @@ function buildHtmlReport(list, theme, shorten = true) {
   .search-input:focus { outline: none; border-color: var(--btn-bg); transform: scale(1.01); }
   .search-input:hover { border-color: var(--btn-bg); transform: scale(1.01); }
   .placeholder-text { padding: 20px; color: var(--text-muted); font-size: 14px; margin: 0; }
-  #noSearchMatches { border: 1px solid var(--border); border-radius: 10px; text-align: center; }
+  #noSearchMatches { border: 1px solid var(--border); border-radius: 10px; text-align: center; animation: hub-fade-in 0.25s ease backwards; }
   .checklist-box {
     text-align: left;
     overflow-x: hidden;
@@ -214,16 +244,50 @@ function buildHtmlReport(list, theme, shorten = true) {
     border-bottom: 1px solid var(--border-soft);
     user-select: none;
     transition: background 0.12s, transform 0.1s;
+    /* Search fade (see .is-filtered below). The line above is the
+       fallback for Firefox versions that don't understand allow-discrete. */
+    transition: background 0.12s, transform 0.1s,
+      opacity 0.25s ease, display 0.25s allow-discrete;
   }
   .addon-row-info { flex: 1; }
   .addon-row:last-child { border-bottom: none; }
   .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
   :root[data-theme="dark"] .addon-row:hover { background: #2e3340; }
+  .group-container { transition: opacity 0.25s ease, display 0.25s allow-discrete; }
+  #addonList { transition: opacity 0.25s ease, display 0.25s allow-discrete; }
+  /* Search filtering: the inline script sets display:none AND .is-filtered
+     when a row or group stops matching (and removes both when it matches
+     again), which the transitions above turn into a fade out / fade in.
+     Where unsupported it is simply instant. */
+  .addon-row.is-filtered, .group-container.is-filtered, #addonList.is-filtered { opacity: 0; }
+  @starting-style {
+    .addon-row, .group-container, #addonList { opacity: 0; }
+  }
   .addon-name { font-size: 14px; font-weight: 600; color: var(--text); }
   .addon-version { color: var(--text-faint); font-size: 12px; margin-left: 6px; }
   .match-label { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
   .match-label[href]:hover { text-decoration: underline; }
   .match-uncertain { color: var(--warn-color); font-weight: 600; }
+
+  /* Smooth light/dark switch: the script adds .theme-switching to <html>
+     for a moment around the change (never on first load). */
+  :root.theme-switching,
+  :root.theme-switching *,
+  :root.theme-switching *::before,
+  :root.theme-switching *::after {
+    transition: background-color 0.25s ease, color 0.25s ease,
+      border-color 0.25s ease, box-shadow 0.25s ease !important;
+  }
+
+  /* Nothing should be caught mid-fade when the report is printed or saved
+     as a PDF. */
+  @media print {
+    *, *::before, *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+    .addon-row, .group-container, #addonList { opacity: 1 !important; }
+  }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -286,8 +350,18 @@ function buildHtmlReport(list, theme, shorten = true) {
     var SUN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
     var MOON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path transform="scale(-1,1) translate(-24,0)" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
 
+    // Colors glide between themes (see .theme-switching in the CSS), but
+    // only for changes after the page has loaded, never the first paint.
+    var themeSwitchTimer = null;
+    var themeReady = false;
     function applyTheme(theme) {
-      document.documentElement.setAttribute('data-theme', theme);
+      var root = document.documentElement;
+      if (themeReady && root.getAttribute('data-theme') !== theme) {
+        root.classList.add('theme-switching');
+        clearTimeout(themeSwitchTimer);
+        themeSwitchTimer = setTimeout(function () { root.classList.remove('theme-switching'); }, 350);
+      }
+      root.setAttribute('data-theme', theme);
       themeToggleEl.innerHTML = theme === 'dark' ? SUN_SVG : MOON_SVG;
       themeToggleEl.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
     }
@@ -296,6 +370,7 @@ function buildHtmlReport(list, theme, shorten = true) {
 
     // Apply persisted theme on load (may differ from the baked-in default).
     applyTheme(loadPersistedTheme());
+    themeReady = true;
 
     themeToggleEl.addEventListener('click', function () {
       var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -304,9 +379,14 @@ function buildHtmlReport(list, theme, shorten = true) {
       try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
     });
 
-    // NOTE: mirrors filterAddonRows() in common.js. Duplicated here
+    // NOTE: mirrors setFilterVisible() and filterAddonRows() in common.js. Duplicated here
     // because this report is self-contained and can't load common.js
     // once saved elsewhere. Keep both copies in sync if you change this.
+    function setFilterVisible(el, visible) {
+      el.style.display = visible ? '' : 'none';
+      if (el.classList) el.classList.toggle('is-filtered', !visible);
+    }
+
     function filterAddonRows(query) {
       var q = query.trim().toLowerCase();
       var anyMatch = false;
@@ -324,19 +404,19 @@ function buildHtmlReport(list, theme, shorten = true) {
             if (rows[j].classList.contains('addon-row')) {
               var nameEl = rows[j].querySelector('.addon-name');
               var match = q === '' || (nameEl && nameEl.textContent.toLowerCase().indexOf(q) !== -1);
-              rows[j].style.display = match ? '' : 'none';
+              setFilterVisible(rows[j], !!match);
               if (match) { groupHasMatch = true; anyMatch = true; }
             }
           }
         }
-        el.style.display = groupHasMatch ? '' : 'none';
+        setFilterVisible(el, groupHasMatch);
       }
       return anyMatch;
     }
 
     document.getElementById('searchInput').addEventListener('input', function (e) {
       var anyMatch = filterAddonRows(e.target.value);
-      addonListEl.style.display = anyMatch ? '' : 'none';
+      setFilterVisible(addonListEl, anyMatch);
       noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
     });
   </script>
