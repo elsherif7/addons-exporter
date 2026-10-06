@@ -18,6 +18,8 @@
       --btn-bg-hover: #111827;
       --border: #d0d3d9;
       --hover-bg: #fafbfc;
+      /* Click/tap feedback ring (press.js). */
+      --press-ring: rgba(0, 96, 223, 0.4);
       /* Spring easing: a real spring curve where linear() is supported,
          a plain overshoot curve otherwise. */
       --spring: cubic-bezier(0.34, 1.4, 0.64, 1);
@@ -35,6 +37,7 @@
       --btn-bg-hover: #4b5563;
       --border: #3a3f4b;
       --hover-bg: #262a33;
+      --press-ring: rgba(110, 168, 254, 0.5);
     }
     /* body's light-mode #eff1f3 background is intentional, not drift -
        the popup was never meant to match the #f4f5f7 used on
@@ -76,33 +79,52 @@
       font-size: 14px;
       font-weight: 600;
       user-select: none;
-      transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.1s;
+      /* The transform part is a springy release: pressed in quickly (see
+         :active below), it bounces back out when let go. */
+      transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.35s var(--spring);
     }
     .hub-btn:last-of-type { margin-bottom: 0; }
     .hub-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg-hover); transform: scale(1.02); }
-    .hub-btn:active { transform: scale(0.98); }
+    .hub-btn:active { transform: scale(0.95); transition-duration: 0.08s; }
 
-    /* Entrance: the card drops in from the toolbar button with a springy
-       overshoot, then the title and the three buttons spring up one after
-       another (about a second in total). backwards fill on purpose - a
-       held final keyframe would override :hover. */
+    /* Opening reveal, one step after another (same idea as the Settings
+       page, just quicker because the popup opens all the time): first only
+       the popup background, then the empty card unfolds downward with a
+       springy settle, then the title settles in as its letters tighten up,
+       then the three buttons open outward from their centre one by one,
+       top to bottom (about 1.4 seconds in total). backwards fill on
+       purpose - everything stays hidden until its turn, and a held final
+       keyframe would override :hover. */
     @keyframes popup-card-in {
-      from { opacity: 0; transform: translateY(-30px) scale(0.8); }
-      to   { opacity: 1; transform: none; }
+      from { opacity: 0; transform: translateY(-16px) scale(0.9); clip-path: inset(0 0 100% 0 round 12px); }
+      to   { opacity: 1; transform: none; clip-path: inset(-30px round 12px); }
+    }
+    @keyframes popup-title-in {
+      from { opacity: 0; transform: translateY(10px); letter-spacing: 0.16em; }
+      to   { opacity: 1; transform: none; letter-spacing: 0em; }
     }
     @keyframes popup-in {
-      from { opacity: 0; transform: translateY(34px) scale(0.88); }
-      to   { opacity: 1; transform: none; }
+      from { opacity: 0; transform: scale(0.94); clip-path: inset(0 50% 0 50% round 8px); }
+      to   { opacity: 1; transform: none; clip-path: inset(-6px round 8px); }
     }
     .card {
       transform-origin: top center;
-      animation: popup-card-in 0.65s var(--spring) backwards;
+      animation: popup-card-in 0.55s var(--spring) backwards;
+      animation-delay: 0.12s;
     }
-    h3, .hub-btn { animation: popup-in 0.6s var(--spring) backwards; }
-    h3 { animation-delay: 0.12s; }
-    #exportBtn { animation-delay: 0.22s; }
-    #importBtn { animation-delay: 0.32s; }
-    #settingsBtn { animation-delay: 0.42s; }
+    h3 { animation: popup-title-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+    .hub-btn { animation: popup-in 0.55s var(--spring) backwards; }
+    h3 { animation-delay: 0.45s; }
+    #exportBtn { animation-delay: 0.65s; }
+    #importBtn { animation-delay: 0.8s; }
+    #settingsBtn { animation-delay: 0.95s; }
+    /* While things slide into place they can briefly stick out past the
+       popup's edge, which flashed a scrollbar. Hide overflow for just the
+       length of the reveal; it goes back to normal afterwards. */
+    @keyframes popup-no-scroll {
+      from, to { overflow: hidden; }
+    }
+    html { animation: popup-no-scroll 1.6s; }
 
     /* Light/dark switch (keep in sync with shared.css). Where the browser
        supports view transitions (Firefox 144+), theme.js wraps the theme
@@ -136,6 +158,7 @@
       *, *::before, *::after {
         transition-duration: 0.001ms !important;
         animation-duration: 0.001ms !important;
+        animation-delay: 0s !important;
       }
       .hub-btn:hover, .hub-btn:active { transform: none !important; }
     }
@@ -148,6 +171,7 @@
     <button id="importBtn" class="hub-btn">Add-ons Importer</button>
     <button id="settingsBtn" class="hub-btn">Settings</button>
   </div>
+  <script src="../common/press.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

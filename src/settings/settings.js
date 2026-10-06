@@ -77,32 +77,92 @@ const settingsStatusEl = document.getElementById('settingsStatus');
 // row hides its description and shows a status message in its place. Calling
 // restore() on any row (or clearAllRows()) brings the description back.
 // ---------------------------------------------------------------------------
+// Row feedback, all done with element.animate() so the row's own CSS
+// animations are left alone, and all skipped for reduced motion:
+//  - a finished export / import / reset flashes its row green and slides the
+//    message in (see .is-success in settings.html);
+//  - a cancelled one (dismissed file dialog, cancelled save dialog, Cancel in
+//    the reset dialog) flashes the row soft grey and slides its description
+//    back in from the left.
+const SUCCESS_FLASH = 'rgba(46, 160, 67, 0.32)';
+const CANCEL_FLASH = 'rgba(128, 128, 128, 0.3)';
+
+function motionAllowed(el) {
+  if (!el || typeof el.animate !== 'function') return false;
+  return !(typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+function flashRow(el, color, delayMs = 0) {
+  if (!motionAllowed(el)) return;
+  el.animate(
+    [{ boxShadow: 'inset 0 0 0 999px ' + color }, { boxShadow: 'inset 0 0 0 999px transparent' }],
+    { duration: 1000, delay: delayMs, easing: 'ease-out' }
+  );
+}
+
+function flashSuccess(el, delayMs = 0) { flashRow(el, SUCCESS_FLASH, delayMs); }
+function flashCancel(el) { flashRow(el, CANCEL_FLASH); }
+
+function slideBackIn(el) {
+  if (!motionAllowed(el)) return;
+  el.animate(
+    [{ opacity: 0, transform: 'translateX(-16px)' }, { opacity: 1, transform: 'none' }],
+    { duration: 450, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }
+  );
+}
+
+// After an import, flashes the selected option in each group (appearance,
+// export format, display) one after another, top to bottom, so you can see
+// what the imported file just set.
+function flashSelectedOptions() {
+  const rows = Array.from(document.querySelectorAll('label.settings-option-row'))
+    .filter((row) => typeof row.querySelector === 'function' && row.querySelector('input:checked'));
+  rows.forEach((row, i) => flashSuccess(row, 250 + i * 140));
+}
+
 function ActionRow(descId, statusId) {
   const descEl   = document.getElementById(descId);
   const statusEl = document.getElementById(statusId);
+
+  function show(msg, isError) {
+    statusEl.textContent   = msg || '';
+    statusEl.style.color   = isError ? 'var(--danger-color)' : 'var(--success-color, var(--text-muted))';
+    statusEl.style.display = msg ? '' : 'none';
+    if (statusEl.classList) statusEl.classList.toggle('is-success', !!msg && !isError);
+  }
+
+  // Restore description, clear status.
+  function restore() {
+    if (statusEl) {
+      statusEl.style.display = 'none';
+      statusEl.textContent = '';
+      if (statusEl.classList) statusEl.classList.remove('is-success');
+    }
+    if (descEl)   descEl.style.display = '';
+  }
 
   return {
     // Hide description, show msg in its place (empty msg = just hide desc).
     activate(msg, isError) {
       if (descEl)   descEl.style.display = 'none';
-      if (statusEl) {
-        statusEl.textContent   = msg || '';
-        statusEl.style.color   = isError ? 'var(--danger-color)' : 'var(--text-muted)';
-        statusEl.style.display = msg ? '' : 'none';
-      }
+      if (statusEl) show(msg, isError);
     },
     // Show msg, keeping description hidden (used after async work completes).
     setMsg(msg, isError) {
-      if (statusEl) {
-        statusEl.textContent   = msg;
-        statusEl.style.color   = isError ? 'var(--danger-color)' : 'var(--text-muted)';
-        statusEl.style.display = msg ? '' : 'none';
+      if (!statusEl) return;
+      show(msg, isError);
+      if (msg && !isError && typeof statusEl.closest === 'function') {
+        flashSuccess(statusEl.closest('.settings-option-row'));
       }
     },
-    // Restore description, clear status.
-    restore() {
-      if (statusEl) { statusEl.style.display = 'none'; statusEl.textContent = ''; }
-      if (descEl)   descEl.style.display = '';
+    restore,
+    // The user backed out: restore the description, with the cancel feedback.
+    cancelled() {
+      restore();
+      if (descEl) {
+        slideBackIn(descEl);
+        if (typeof descEl.closest === 'function') flashCancel(descEl.closest('.settings-option-row'));
+      }
     },
     isActive() {
       return statusEl && statusEl.style.display !== 'none';
@@ -292,6 +352,12 @@ exportSettingsBtn.addEventListener('click', async () => {
 
     exportRow.setMsg('Settings exported.');
   } catch (err) {
+    // Dismissing the save dialog makes downloads.download reject with a
+    // "canceled" error - that's the user backing out, not a failure.
+    if (/cancel/i.test(err && err.message ? err.message : '')) {
+      exportRow.cancelled();
+      return;
+    }
     exportRow.setMsg('Export failed: ' + err.message, true);
   }
 });
@@ -305,7 +371,7 @@ importSettingsBtn.addEventListener('click', () => {
 // `cancel` fires when the user dismisses the file dialog without choosing
 // a file — restore the Import row description in that case.
 settingsFileInput.addEventListener('cancel', () => {
-  importRow.restore();
+  importRow.cancelled();
 });
 
 settingsFileInput.addEventListener('change', async () => {
@@ -313,7 +379,7 @@ settingsFileInput.addEventListener('change', async () => {
   settingsFileInput.value = '';
   if (!file) {
     // Fallback for browsers that don't fire `cancel`.
-    importRow.restore();
+    importRow.cancelled();
     return;
   }
   try {
@@ -335,6 +401,7 @@ settingsFileInput.addEventListener('change', async () => {
     await loadCurrentExportFormat();
     await loadCurrentShortenNames();
     importRow.setMsg('Settings imported successfully.');
+    flashSelectedOptions();
   } catch (err) {
     importRow.setMsg('Import failed: ' + err.message, true);
   }
@@ -381,7 +448,10 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
 
   const overlay = document.createElement('div');
   overlay.className = 's-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:1000;';
+  // Fills the whole viewport and centres the dialog in it, however far down
+  // the page is scrolled. The tint and blur live in settings.html (.s-overlay)
+  // so the page behind stays visible, just softened.
+  overlay.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:16px;z-index:1000;';
 
   const dialog = document.createElement('div');
   dialog.className = 's-dialog';
@@ -425,11 +495,42 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
 
   cancelBtn.focus();
 
+  // The page behind stays visible (blurred) and scrollable while the dialog
+  // is open. Scrolling is forwarded by hand so it works no matter how the
+  // browser treats wheel events over a fixed overlay on top of inert content.
+  overlay.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const unit = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? window.innerHeight : 1;
+    window.scrollBy(e.deltaX * unit, e.deltaY * unit);
+  }, { passive: false });
+
   new Promise((resolve) => {
+    let closed = false;
     function close(result) {
-      others.forEach((el) => { el.inert = false; });
-      overlay.remove();
-      resetBtn.focus(); // return focus to what opened the dialog
+      if (closed) return;
+      closed = true;
+      const finish = () => {
+        others.forEach((el) => { el.inert = false; });
+        overlay.remove();
+        // Return focus to what opened the dialog, without scrolling back to
+        // it - after a reset the page has just been taken to the top.
+        resetBtn.focus({ preventScroll: true });
+      };
+      // The dialog leaves the way it came in: it shrinks and fades while the
+      // blurred backdrop clears. Skipped (removed at once) when animation is
+      // unavailable or reduced motion is on.
+      const reduced = typeof matchMedia === 'function' &&
+        matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!reduced && typeof overlay.animate === 'function' && typeof dialog.animate === 'function') {
+        dialog.animate(
+          [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(12px) scale(0.94)' }],
+          { duration: 220, easing: 'ease-in', fill: 'forwards' }
+        );
+        overlay.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: 'ease-in', fill: 'forwards' })
+          .finished.then(finish, finish);
+      } else {
+        finish();
+      }
       resolve(result);
     }
     cancelBtn.addEventListener('click', () => close(false));
@@ -440,9 +541,11 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
     });
   }).then((confirmed) => {
     if (!confirmed) {
-      resetRow.restore();
+      resetRow.cancelled();
       return;
     }
+    // Take the user back to the top right away while the dialog fades out.
+    scrollSettingsToTop();
     return browser.storage.local.remove([THEME_STORAGE_KEY, EXPORT_FORMAT_STORAGE_KEY, SHORT_NAME_STORAGE_KEY])
       .then(() => {
         applyTheme('light');
@@ -450,24 +553,28 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
       })
       .then(() => loadCurrentExportFormat())
       .then(() => loadCurrentShortenNames())
-      .then(() => { resetRow.setMsg('Settings reset to defaults.'); })
+      .then(() => {
+        resetRow.setMsg('Settings reset to defaults.');
+        // Play the whole opening reveal again from the top, now showing the
+        // defaults, so the reset feels like the page being set up afresh.
+        lastEntranceAt = Date.now();
+        replayEntrance();
+      })
       .catch((err) => { resetRow.setMsg('Could not reset settings: ' + err.message, true); });
   });
 });
 
 // Firefox reuses an already-open Settings tab (runtime.openOptionsPage just
-// switches to it), so the page never reloads and its entrance animation
-// would not play again. Replay it whenever the tab is brought back to the
-// front, and when the popup asks for it (covers a Settings tab that is
-// already visible in another window; it also scrolls back to the top). The time check keeps a brand-new
-// tab, which is already playing its own entrance, from restarting it.
+// switches to it), so the page never reloads and its opening animation would
+// not play again. The popup's Settings button sends a message after opening
+// it, and this plays the whole reveal again and scrolls back to the top
+// (smoothly, or instantly with reduced motion). Deliberately NOT triggered
+// by merely switching back to the tab: the reveal takes about two seconds,
+// and replaying it every time would hide the page and lose your scroll
+// position. The time check keeps a brand-new tab, which is already playing
+// its own reveal, from restarting it.
 let lastEntranceAt = Date.now();
 
-// Pressing Settings again also takes you back to the top of the page,
-// however far down you had scrolled (smoothly, or instantly with reduced
-// motion). Only done for that explicit request from the popup - not every
-// time the tab is merely switched back to, which would throw away your
-// scroll position.
 function scrollSettingsToTop() {
   if (typeof window === 'undefined' || typeof window.scrollTo !== 'function') return;
   const reduced = typeof matchMedia === 'function' &&
@@ -477,20 +584,14 @@ function scrollSettingsToTop() {
 
 function replayEntranceIfIdle() {
   const now = Date.now();
-  if (now - lastEntranceAt < 1500) return;
+  if (now - lastEntranceAt < 2500) return;
   lastEntranceAt = now;
   replayEntrance();
 }
-if (document.addEventListener) {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') replayEntranceIfIdle();
-  });
-}
+
 if (browser.runtime.onMessage) {
   browser.runtime.onMessage.addListener((message) => {
     if (message && message.type === 'replaySettingsEntrance') {
-      // Always scroll up, even if the tab-visible replay just above already
-      // ran (and so this call's replay is skipped by the time check).
       scrollSettingsToTop();
       replayEntranceIfIdle();
     }

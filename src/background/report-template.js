@@ -111,6 +111,7 @@ function buildHtmlReport(list, theme, shorten = true) {
     --link-accent: #0060df;
     --warn-color: #b45309;
     --danger-color: #c0392b;
+    --press-ring: rgba(0, 96, 223, 0.4);
     --motion-fast: 0.2s;
     --motion-normal: 0.4s;
     --motion-slow: 0.6s;
@@ -141,6 +142,7 @@ function buildHtmlReport(list, theme, shorten = true) {
     --link-accent: #6ea8fe;
     --warn-color: #f0a838;
     --danger-color: #ef6a5e;
+    --press-ring: rgba(110, 168, 254, 0.5);
   }
   /* Vertical padding uses vmin (not vw) so it also scales down on
      short landscape viewports, where vw alone would keep it large
@@ -197,7 +199,7 @@ function buildHtmlReport(list, theme, shorten = true) {
     transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
   .theme-toggle:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.02); }
-  .theme-toggle:active { transform: scale(0.95); }
+  .theme-toggle:active { transform: scale(0.9); }
   .search-input {
     display: block;
     width: 100%;
@@ -261,6 +263,7 @@ function buildHtmlReport(list, theme, shorten = true) {
   .addon-row-info { flex: 1; }
   .addon-row:last-child { border-bottom: none; }
   .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
+  .addon-row:active { transform: scale(0.985); }
   :root[data-theme="dark"] .addon-row:hover { background: #2e3340; }
   .group-container { transition: opacity var(--motion-search) ease, display var(--motion-search) allow-discrete; }
   #addonList { transition: opacity var(--motion-search) ease, display var(--motion-search) allow-discrete; }
@@ -327,6 +330,7 @@ function buildHtmlReport(list, theme, shorten = true) {
     *, *::before, *::after {
       transition-duration: 0.001ms !important;
       animation-duration: 0.001ms !important;
+      animation-delay: 0s !important;
     }
     .theme-toggle:hover, .theme-toggle:active,
     .search-input:hover, .addon-row:hover {
@@ -466,6 +470,45 @@ function buildHtmlReport(list, theme, shorten = true) {
       setFilterVisible(addonListEl, anyMatch);
       noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
     });
+
+    // Click/tap feedback: a ring (or, for rows, a tinted flash) bursts out
+    // of whatever is pressed. Mirrors src/common/press.js, which a saved
+    // report can't load. Uses element.animate() so the page's own CSS
+    // animations are never restarted by a press.
+    (function () {
+      var ROW = '.addon-row';
+      var TARGET = '.theme-toggle, a[href]';
+      function ringColor() {
+        try {
+          var v = getComputedStyle(document.documentElement).getPropertyValue('--press-ring').trim();
+          return v || 'rgba(0, 96, 223, 0.4)';
+        } catch (e) { return 'rgba(0, 96, 223, 0.4)'; }
+      }
+      function pulse(el) {
+        if (!el || typeof el.animate !== 'function') return;
+        if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        var c = ringColor();
+        el.animate(
+          el.matches(ROW)
+            ? [{ boxShadow: 'inset 0 0 0 999px ' + c }, { boxShadow: 'inset 0 0 0 999px transparent' }]
+            : [{ boxShadow: '0 0 0 0 ' + c }, { boxShadow: '0 0 0 12px transparent' }],
+          { duration: 520, easing: 'ease-out' }
+        );
+      }
+      function findTarget(node) {
+        if (!node || typeof node.closest !== 'function') return null;
+        return node.closest(ROW) || node.closest(TARGET);
+      }
+      if (document.addEventListener) {
+        document.addEventListener('pointerdown', function (e) {
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
+          pulse(findTarget(e.target));
+        }, true);
+        document.addEventListener('click', function (e) {
+          if (e.detail === 0) pulse(findTarget(e.target));
+        }, true);
+      }
+    })();
   </script>
 </body>
 </html>`;

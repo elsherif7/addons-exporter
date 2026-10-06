@@ -19,6 +19,7 @@
     --link-accent: #0060df;
     --warn-color: #b45309;
     --danger-color: #c0392b;
+    --press-ring: rgba(0, 96, 223, 0.4);
     --motion-fast: 0.2s;
     --motion-normal: 0.4s;
     --motion-slow: 0.6s;
@@ -49,6 +50,7 @@
     --link-accent: #6ea8fe;
     --warn-color: #f0a838;
     --danger-color: #ef6a5e;
+    --press-ring: rgba(110, 168, 254, 0.5);
   }
   /* Vertical padding uses vmin (not vw) so it also scales down on
      short landscape viewports, where vw alone would keep it large
@@ -105,7 +107,7 @@
     transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
   .theme-toggle:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.02); }
-  .theme-toggle:active { transform: scale(0.95); }
+  .theme-toggle:active { transform: scale(0.9); }
   .search-input {
     display: block;
     width: 100%;
@@ -169,6 +171,7 @@
   .addon-row-info { flex: 1; }
   .addon-row:last-child { border-bottom: none; }
   .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
+  .addon-row:active { transform: scale(0.985); }
   :root[data-theme="dark"] .addon-row:hover { background: #2e3340; }
   .group-container { transition: opacity var(--motion-search) ease, display var(--motion-search) allow-discrete; }
   #addonList { transition: opacity var(--motion-search) ease, display var(--motion-search) allow-discrete; }
@@ -235,6 +238,7 @@
     *, *::before, *::after {
       transition-duration: 0.001ms !important;
       animation-duration: 0.001ms !important;
+      animation-delay: 0s !important;
     }
     .theme-toggle:hover, .theme-toggle:active,
     .search-input:hover, .addon-row:hover {

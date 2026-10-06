@@ -28,6 +28,7 @@ addons-hub/
     ├── common/
     │   ├── common.js   # Shared helper functions used across every page and script
     │   ├── theme.js    # Applies the stored light/dark theme on page load
+    │   ├── press.js    # Click/tap feedback: a ring (or row flash) bursts out of whatever you press
     │   └── shared.css  # Shared styles used by export, import, settings, and confirmation pages
     ├── background/
     │   ├── background.js       # Handles messaging, AMO lookups, and export orchestration logic

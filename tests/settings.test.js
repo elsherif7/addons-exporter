@@ -774,3 +774,361 @@ testAsync('settings.js batched init writes shortenNames to the localStorage cach
   assert.strictEqual(cacheStore['addons-hub-settings-shortenNames'], 'off',
     'the batched init should write the confirmed shortenNames to localStorage');
 });
+
+// --- Reset dialog: blurred backdrop, scrolling, closing animation, reset reveal ---
+
+test('Reset dialog: the overlay fills the viewport and centres the dialog (inline), with no opaque background inline', () => {
+  const { document, elements } = makeResetDialogSandbox();
+  openResetDialog(document, elements.resetSettingsBtn);
+  const overlay = document.body.querySelector('.s-overlay');
+  assert.ok(overlay, 'overlay not found');
+  const css = overlay.style.cssText;
+  assert.match(css, /position:fixed/);
+  assert.match(css, /inset:0/);
+  assert.match(css, /align-items:center/);
+  assert.match(css, /justify-content:center/);
+  // The tint and blur come from settings.html's .s-overlay rule; an inline
+  // background would override it and bring back the see-nothing backdrop.
+  assert.doesNotMatch(css, /background/);
+});
+
+test('Reset dialog: scrolling the wheel over the backdrop scrolls the page behind it', () => {
+  const { document, elements, scrollCalls } = makeResetDialogSandboxWithWindow();
+  openResetDialog(document, elements.resetSettingsBtn);
+  const overlay = document.body.querySelector('.s-overlay');
+  let prevented = false;
+  overlay.dispatchEvent({ type: 'wheel', deltaX: 0, deltaY: 120, deltaMode: 0, preventDefault() { prevented = true; } });
+  assert.strictEqual(prevented, true, 'default is prevented so the scroll is not applied twice');
+  assert.deepStrictEqual(scrollCalls[0], [0, 120]);
+  overlay.dispatchEvent({ type: 'wheel', deltaX: 0, deltaY: 3, deltaMode: 1, preventDefault() {} });
+  assert.deepStrictEqual(scrollCalls[1], [0, 120], 'line-based wheels are scaled (3 lines = 120px)');
+});
+
+testAsync('Reset dialog: confirming scrolls to the top and replays the opening reveal once the defaults are applied', async () => {
+  const ctx = makeResetDialogSandboxWithWindow();
+  const { document, elements, scrollCalls, replayLog } = ctx;
+  openResetDialog(document, elements.resetSettingsBtn);
+  document.body.querySelector('#rsConfirm').click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepStrictEqual(scrollCalls.at(-1), { top: 0, left: 0, behavior: 'smooth' }, 'taken back to the top');
+  assert.ok(replayLog.includes('add:replay-reset'), 'the opening reveal is replayed');
+});
+
+testAsync('Reset dialog: cancelling does NOT scroll or replay anything', async () => {
+  const ctx = makeResetDialogSandboxWithWindow();
+  const { document, elements, scrollCalls, replayLog } = ctx;
+  openResetDialog(document, elements.resetSettingsBtn);
+  document.body.querySelector('#rsCancel').click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.strictEqual(scrollCalls.length, 0);
+  assert.strictEqual(replayLog.length, 0);
+});
+
+test('Reset dialog: with animation available, it fades out first and is only removed when that finishes', async () => {
+  const ctx = makeResetDialogSandboxWithWindow({ withAnimate: true });
+  const { document, elements, pageContent, finishAnimations } = ctx;
+  openResetDialog(document, elements.resetSettingsBtn);
+  document.body.querySelector('#rsCancel').click();
+  assert.ok(document.body.querySelector('.s-overlay'), 'still on screen while it animates out');
+  assert.strictEqual(pageContent.inert, true, 'page stays inert until the dialog is gone');
+  finishAnimations();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.strictEqual(document.body.querySelector('.s-overlay'), null);
+  assert.strictEqual(pageContent.inert, false);
+  assert.strictEqual(elements.resetSettingsBtn._focused, true);
+});
+
+// Like makeResetDialogSandbox, plus a window (scroll calls recorded), a
+// .card whose replayEntrance() steps are recorded, and - optionally -
+// element.animate() so the dialog's closing animation can be exercised.
+function makeResetDialogSandboxWithWindow({ withAnimate = false } = {}) {
+  const { document, elements } = makeFakeDom(['resetSettingsBtn', 'settingsStatus']);
+  const pageContent = document.createElement('div');
+  pageContent.id = 'pageContent';
+  document.body.appendChild(pageContent);
+  document.body.appendChild(elements.resetSettingsBtn);
+
+  const scrollCalls = [];
+  const replayLog = [];
+  const pendingAnimations = [];
+
+  const cardStub = {
+    classList: {
+      add: (c) => replayLog.push('add:' + c),
+      remove: (c) => replayLog.push('remove:' + c),
+    },
+    get offsetWidth() { replayLog.push('reflow'); return 1; },
+  };
+  const realQuerySelector = document.querySelector;
+  document.querySelector = (sel) => (sel === '.card' ? cardStub : realQuerySelector(sel));
+
+  if (withAnimate) {
+    const realCreate = document.createElement;
+    document.createElement = (tag) => {
+      const el = realCreate(tag);
+      el.animate = () => ({ finished: new Promise((resolve) => pendingAnimations.push(resolve)) });
+      return el;
+    };
+  }
+
+  const sb = {
+    URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
+    Blob: function Blob() {},
+    setTimeout: () => 0,
+    fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
+    document,
+    window: {
+      innerHeight: 1000,
+      scrollBy: (x, y) => scrollCalls.push([x, y]),
+      scrollTo: (opts) => scrollCalls.push(JSON.parse(JSON.stringify(opts))),
+    },
+    browser: {
+      storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
+      runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
+    },
+  };
+  vm.createContext(sb);
+  vm.runInContext(themeSrc, sb);
+  vm.runInContext(commonSrc, sb);
+  vm.runInContext(settingsSrc, sb);
+  return {
+    document, elements, pageContent, scrollCalls, replayLog,
+    finishAnimations: () => pendingAnimations.forEach((resolve) => resolve()),
+  };
+}
+
+// --- Finished export / import / reset: the success celebration ---
+
+// A settings row (class settings-option-row) holding the given status
+// element, recording every element.animate() call made on it.
+function makeSuccessRow(document, statusEl) {
+  const row = document.createElement('div');
+  row.className = 'settings-option-row';
+  row.animations = [];
+  row.animate = (keyframes, options) => { row.animations.push({ keyframes, options }); return {}; };
+  row.appendChild(statusEl);
+  document.body.appendChild(row);
+  return row;
+}
+
+function makeSuccessSandbox({ failRemove = false } = {}) {
+  const { document, elements } = makeFakeDom(['resetSettingsBtn', 'settingsStatus', 'resetSettingsStatus']);
+  document.body.appendChild(elements.resetSettingsBtn);
+  const row = makeSuccessRow(document, elements.resetSettingsStatus);
+  const sb = {
+    URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
+    Blob: function Blob() {},
+    setTimeout: () => 0,
+    fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
+    document,
+    browser: {
+      storage: {
+        local: {
+          get: async () => ({}),
+          set: async () => {},
+          remove: async () => { if (failRemove) throw new Error('disk full'); },
+        },
+      },
+      runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
+    },
+  };
+  vm.createContext(sb);
+  vm.runInContext(themeSrc, sb);
+  vm.runInContext(commonSrc, sb);
+  vm.runInContext(settingsSrc, sb);
+  return { sb, document, elements, row };
+}
+
+async function runReset(ctx) {
+  openResetDialog(ctx.document, ctx.elements.resetSettingsBtn);
+  ctx.document.body.querySelector('#rsConfirm').click();
+  for (let i = 0; i < 6; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+testAsync('success: a finished action flashes its row green and marks the message as a success', async () => {
+  const ctx = makeSuccessSandbox();
+  await runReset(ctx);
+  const status = ctx.elements.resetSettingsStatus;
+  assert.strictEqual(status.textContent, 'Settings reset to defaults.');
+  assert.strictEqual(status.classList.contains('is-success'), true, 'the slide-in hook');
+  assert.strictEqual(status.style.color, 'var(--success-color, var(--text-muted))');
+  assert.strictEqual(ctx.row.animations.length, 1, 'the row flashes once');
+  const [from, to] = ctx.row.animations[0].keyframes;
+  assert.match(from.boxShadow, /^inset 0 0 0 999px rgba\(46, 160, 67/);
+  assert.strictEqual(to.boxShadow, 'inset 0 0 0 999px transparent');
+});
+
+testAsync('success: a failed action gets no green flash and is not marked as a success', async () => {
+  const ctx = makeSuccessSandbox({ failRemove: true });
+  await runReset(ctx);
+  const status = ctx.elements.resetSettingsStatus;
+  assert.match(status.textContent, /Could not reset settings/);
+  assert.strictEqual(status.classList.contains('is-success'), false);
+  assert.strictEqual(status.style.color, 'var(--danger-color)');
+  assert.strictEqual(ctx.row.animations.length, 0);
+});
+
+testAsync('success: the success style is cleared again when the row is restored (e.g. the next action starts)', async () => {
+  const ctx = makeSuccessSandbox();
+  await runReset(ctx);
+  vm.runInContext('resetRow.restore()', ctx.sb); // a top-level const, so not a property of the sandbox
+  assert.strictEqual(ctx.elements.resetSettingsStatus.classList.contains('is-success'), false);
+});
+
+test('success: after an import, the selected option in each group flashes in turn, top to bottom', () => {
+  const ctx = makeSuccessSandbox();
+  const { document } = ctx;
+  const rows = [];
+  // Two groups with a checked and an unchecked option each.
+  for (const [checked, name] of [[true, 'light'], [false, 'dark'], [false, 'html'], [true, 'json']]) {
+    const label = document.createElement('label');
+    label.className = 'settings-option-row';
+    label.animations = [];
+    label.animate = (keyframes, options) => { label.animations.push({ keyframes, options }); return {}; };
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.value = name;
+    input.checked = checked;
+    label.appendChild(input);
+    document.body.appendChild(label);
+    rows.push(label);
+  }
+  ctx.sb.flashSelectedOptions();
+  assert.deepStrictEqual(rows.map((r) => r.animations.length), [1, 0, 0, 1], 'only the selected options flash');
+  assert.ok(rows[3].animations[0].options.delay > rows[0].animations[0].options.delay, 'later groups flash later');
+});
+
+testAsync('success: with reduced motion, nothing flashes (the message still shows as a success)', async () => {
+  const ctx = makeSuccessSandbox();
+  ctx.sb.matchMedia = () => ({ matches: true });
+  await runReset(ctx);
+  assert.strictEqual(ctx.row.animations.length, 0);
+  assert.strictEqual(ctx.elements.resetSettingsStatus.classList.contains('is-success'), true);
+});
+
+// --- Cancelling export / import / reset: the soft grey "backed out" feedback ---
+
+// Builds the three action rows (each a .settings-option-row holding its
+// description and message) so a cancel can be seen: the row flashes grey and
+// the description slides back in.
+function makeCancelSandbox({ downloadError = null, reducedMotion = false } = {}) {
+  const ids = ['resetSettingsBtn', 'settingsStatus', 'exportSettingsBtn', 'importSettingsBtn', 'settingsFileInput',
+    'exportSettingsDesc', 'exportSettingsStatus', 'importSettingsDesc', 'importSettingsStatus',
+    'resetSettingsDesc', 'resetSettingsStatus'];
+  const { document, elements } = makeFakeDom(ids);
+  document.body.appendChild(elements.resetSettingsBtn);
+
+  const rows = {};
+  for (const name of ['export', 'import', 'reset']) {
+    const row = document.createElement('div');
+    row.className = 'settings-option-row';
+    row.animations = [];
+    row.animate = (keyframes, options) => { row.animations.push({ keyframes, options }); return {}; };
+    const desc = elements[`${name}SettingsDesc`];
+    desc.animations = [];
+    desc.animate = (keyframes, options) => { desc.animations.push({ keyframes, options }); return {}; };
+    row.appendChild(desc);
+    row.appendChild(elements[`${name}SettingsStatus`]);
+    document.body.appendChild(row);
+    rows[name] = row;
+  }
+
+  const sb = {
+    URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
+    Blob: function Blob() {},
+    setTimeout: () => 0,
+    fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
+    document,
+    matchMedia: () => ({ matches: reducedMotion }),
+    browser: {
+      storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
+      runtime: {
+        getManifest: () => ({ version: '1.2.0' }),
+        id: 'addons-exporter@local',
+        getPlatformInfo: async () => ({ os: 'win' }),
+      },
+      downloads: {
+        download: async () => { if (downloadError) throw new Error(downloadError); return 1; },
+      },
+    },
+  };
+  vm.createContext(sb);
+  vm.runInContext(themeSrc, sb);
+  vm.runInContext(commonSrc, sb);
+  vm.runInContext(settingsSrc, sb);
+  return { document, elements, rows };
+}
+
+function assertCancelFeedback(ctx, name) {
+  const row = ctx.rows[name];
+  const desc = ctx.elements[`${name}SettingsDesc`];
+  const status = ctx.elements[`${name}SettingsStatus`];
+  assert.strictEqual(desc.style.display, '', 'the description is back');
+  assert.strictEqual(status.style.display, 'none', 'no message is left over');
+  assert.strictEqual(row.animations.length, 1, 'the row flashes once');
+  assert.match(row.animations[0].keyframes[0].boxShadow, /rgba\(128, 128, 128/, 'soft grey, not the green of a success');
+  assert.strictEqual(desc.animations.length, 1, 'the description slides back in');
+  assert.strictEqual(desc.animations[0].keyframes[0].opacity, 0);
+}
+
+test('cancel: dismissing the import file dialog flashes the row grey and slides the description back in', () => {
+  const ctx = makeCancelSandbox();
+  ctx.elements.importSettingsBtn.click();
+  assert.strictEqual(ctx.elements.importSettingsDesc.style.display, 'none', 'description hides while the dialog is open');
+  ctx.elements.settingsFileInput.dispatchEvent('cancel');
+  assertCancelFeedback(ctx, 'import');
+});
+
+testAsync('cancel: choosing no file (browsers without a cancel event) gets the same feedback', async () => {
+  const ctx = makeCancelSandbox();
+  ctx.elements.importSettingsBtn.click();
+  ctx.elements.settingsFileInput.files = [];
+  ctx.elements.settingsFileInput.dispatchEvent('change');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assertCancelFeedback(ctx, 'import');
+});
+
+testAsync('cancel: cancelling the export save dialog is not an error - same grey feedback, no red message', async () => {
+  const ctx = makeCancelSandbox({ downloadError: 'Download canceled by the user' });
+  ctx.elements.exportSettingsBtn.click();
+  for (let i = 0; i < 6; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+  assertCancelFeedback(ctx, 'export');
+});
+
+testAsync('cancel: a real export failure is still shown as a red error (not mistaken for a cancel)', async () => {
+  const ctx = makeCancelSandbox({ downloadError: 'disk full' });
+  ctx.elements.exportSettingsBtn.click();
+  for (let i = 0; i < 6; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(ctx.elements.exportSettingsStatus.textContent, /Export failed: disk full/);
+  assert.strictEqual(ctx.elements.exportSettingsStatus.style.color, 'var(--danger-color)');
+  assert.strictEqual(ctx.rows.export.animations.length, 0);
+});
+
+testAsync('cancel: pressing Cancel in the reset dialog flashes the Reset row grey and slides its description back', async () => {
+  const ctx = makeCancelSandbox();
+  openResetDialog(ctx.document, ctx.elements.resetSettingsBtn);
+  ctx.document.body.querySelector('#rsCancel').click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assertCancelFeedback(ctx, 'reset');
+});
+
+testAsync('cancel: with reduced motion the description still comes back, but nothing animates', async () => {
+  const ctx = makeCancelSandbox({ reducedMotion: true });
+  openResetDialog(ctx.document, ctx.elements.resetSettingsBtn);
+  ctx.document.body.querySelector('#rsCancel').click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.strictEqual(ctx.elements.resetSettingsDesc.style.display, '');
+  assert.strictEqual(ctx.rows.reset.animations.length, 0);
+  assert.strictEqual(ctx.elements.resetSettingsDesc.animations.length, 0);
+});
+
+testAsync('cancel: confirming the reset is not a cancel - no grey flash', async () => {
+  const ctx = makeCancelSandbox();
+  openResetDialog(ctx.document, ctx.elements.resetSettingsBtn);
+  ctx.document.body.querySelector('#rsConfirm').click();
+  for (let i = 0; i < 6; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+  const greys = ctx.rows.reset.animations.filter((a) => /128, 128, 128/.test(a.keyframes[0].boxShadow));
+  assert.strictEqual(greys.length, 0);
+});
+

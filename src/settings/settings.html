@@ -49,6 +49,7 @@
      them taller than single-line radio rows. */
   div.settings-option-row { align-items: center; justify-content: space-between; padding: 8px 12px; margin-bottom: 0; }
   .settings-option-row:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.01); }
+  label.settings-option-row:active { transform: scale(0.985); }
   :root[data-theme="dark"] .settings-option-row:hover { background: #2e3340; border-color: #6b7280; }
   .settings-action-group {
     display: flex;
@@ -63,7 +64,7 @@
   }
   .settings-btn:hover { border-color: var(--btn-bg-hover); transform: scale(1.01); }
   :root[data-theme="dark"] .settings-btn:hover { background: #2e3340; border-color: #6b7280; }
-  .settings-btn:active { transform: scale(0.99); }
+  .settings-btn:active { transform: scale(0.95); transition-duration: 0.08s; }
   .settings-btn-danger { border-color: var(--danger-color); color: var(--danger-color); }
   .settings-btn-danger:hover { background: #fef2f2; border-color: var(--danger-color); }
   :root[data-theme="dark"] .settings-btn-danger:hover { background: #3d1515; }
@@ -74,7 +75,7 @@
     border-radius: 7px;
   }
   .s-modal-btn:hover { transform: scale(1.04); }
-  .s-modal-btn:active { transform: scale(0.97); }
+  .s-modal-btn:active { transform: scale(0.95); transition-duration: 0.08s; }
   .s-modal-btn-danger { color: var(--danger-color); border-color: var(--danger-color); }
   .s-modal-btn-danger:hover { background: #fef2f2; border-color: var(--danger-color); }
   :root[data-theme="dark"] .s-modal-btn-danger:hover { background: #3d1515; }
@@ -93,6 +94,75 @@
     margin-bottom: 2px;
   }
   #settingsStatus.error { color: var(--danger-color); }
+  /* Opening reveal, top to bottom, one step after another: first only the
+     page background, then the card UNFOLDS downward (empty), then the
+     "Settings" title settles in as its letters tighten up, then each
+     section in turn - its heading slides in from the left and its rows
+     wipe in left to right, like being written. Everything starts hidden
+     (backwards fill) until its turn. Reduced motion skips the delays
+     (shared.css), so nothing waits hidden. */
+  @keyframes settings-card-unfold {
+    from { opacity: 0; transform: translateY(20px); clip-path: inset(0 0 100% 0 round 12px); }
+    to   { opacity: 1; transform: none; clip-path: inset(-60px round 12px); }
+  }
+  @keyframes settings-title-in {
+    from { opacity: 0; transform: translateY(12px); letter-spacing: 0.16em; }
+    to   { opacity: 1; transform: none; letter-spacing: 0em; }
+  }
+  @keyframes settings-slide-in {
+    from { opacity: 0; transform: translateX(-18px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes settings-wipe-in {
+    from { opacity: 0; transform: translateX(-14px); clip-path: inset(0 100% 0 0 round 8px); }
+    to   { opacity: 1; transform: none; clip-path: inset(-8px round 8px); }
+  }
+  .card {
+    animation-name: settings-card-unfold;
+    animation-duration: 0.8s;
+    animation-timing-function: var(--motion-ease);
+  }
+  .card { animation-delay: 0.15s; }
+  .card > h1:first-child {
+    animation-name: settings-title-in;
+    animation-duration: 0.6s;
+    animation-timing-function: var(--motion-ease);
+  }
+  .card > h1:first-child { animation-delay: 0.55s; }
+  /* The sections themselves don't animate (the shared card-children rule is
+     switched off here); they only carry their start time, --gd, which their
+     heading and rows below count from. */
+  .card > .settings-group { --gd: 0s; animation: none; }
+  .card > .settings-group:nth-of-type(1) { --gd: 0.7s; }
+  .card > .settings-group:nth-of-type(2) { --gd: 0.86s; }
+  .card > .settings-group:nth-of-type(3) { --gd: 1.02s; }
+  .card > .settings-group:nth-of-type(4) { --gd: 1.18s; }
+  .card > .settings-group:nth-of-type(5) { --gd: 1.34s; }
+  .card > .settings-group:nth-of-type(6) { --gd: 1.5s; }
+  .settings-group > * {
+    animation-name: settings-wipe-in;
+    animation-duration: 0.55s;
+    animation-timing-function: var(--motion-ease);
+    animation-fill-mode: backwards;
+    animation-delay: calc(var(--gd) + 0.12s + var(--i, 0) * 0.08s);
+  }
+  .settings-group > h2 { animation-name: settings-slide-in; }
+  .settings-group > :nth-child(2) { --i: 1; }
+  .settings-group > :nth-child(3) { --i: 2; }
+  .settings-group > :nth-child(4) { --i: 3; }
+  /* Success colour for finished export / import / reset messages. */
+  :root { --success-color: #1a7f37; }
+  :root[data-theme="dark"] { --success-color: #56d364; }
+  /* A finished export / import / reset: the message slides in (the row
+     also flashes green - see flashSuccess in settings.js). The descriptions
+     and messages are inline-block so they can slide: transforms don't apply
+     to plain inline text. */
+  #exportSettingsDesc, #importSettingsDesc, #resetSettingsDesc,
+  #exportSettingsStatus, #importSettingsStatus, #resetSettingsStatus { display: inline-block; }
+  #exportSettingsStatus.is-success, #importSettingsStatus.is-success, #resetSettingsStatus.is-success {
+    font-weight: 600;
+    animation: settings-slide-in var(--motion-slow) var(--motion-spring) backwards;
+  }
   /* Small pop when a radio becomes selected. */
   .settings-option-row input[type="radio"]:checked { animation: hub-pop var(--motion-normal) var(--motion-spring); }
   /* Inline row messages fade in each time they're shown (display toggles). */
@@ -100,7 +170,15 @@
   #exportSettingsStatus, #importSettingsStatus, #resetSettingsStatus,
   #settingsStatus:not(:empty) { animation: hub-fade-in var(--motion-normal) ease backwards; }
   /* Reset dialog: backdrop fades in, the dialog rises in. */
-  .s-overlay { animation: hub-fade-in var(--motion-fast) ease backwards; }
+  /* The page behind the reset dialog stays visible, softly blurred and
+     slightly dimmed (so it reads as "behind"), and can still be scrolled. */
+  .s-overlay {
+    background: rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: hub-fade-in var(--motion-normal) ease backwards;
+  }
+  :root[data-theme="dark"] .s-overlay { background: rgba(0, 0, 0, 0.38); }
   .s-dialog { animation: hub-card-in var(--motion-slow) var(--motion-spring) backwards; }
   /* .about-block, .about-row, .about-label, .about-value come from shared.css */
 </style>
@@ -228,6 +306,7 @@
   </div>
 
   <input type="file" id="settingsFileInput" accept=".json" style="display:none">
+  <script src="../common/press.js"></script>
   <script src="settings.js"></script>
 </body>
 </html>

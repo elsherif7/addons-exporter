@@ -28,6 +28,8 @@
   --link-accent: #0060df;
   --warn-color: #b45309;
   --danger-color: #c0392b;
+  /* Click/tap feedback ring (press.js). */
+  --press-ring: rgba(0, 96, 223, 0.4);
 
   /* Motion: clearly visible, springy entrances. Everything below uses
      these so the whole extension moves the same way - change them here to
@@ -67,6 +69,7 @@
   --link-accent: #6ea8fe;
   --warn-color: #f0a838;
   --danger-color: #ef6a5e;
+  --press-ring: rgba(110, 168, 254, 0.5);
 }
 
 /* Custom scrollbar */
@@ -150,8 +153,9 @@ body {
    the list has loaded) animate in at once instead of waiting their turn. */
 #searchInput, #listControls, #checklistBox, #fileNameRow { animation-delay: 0s; }
 /* replayEntrance() (common.js) adds this for one frame to restart the
-   entrance animations, e.g. when an already-open Settings tab is shown again. */
-.replay-reset, .replay-reset > * { animation: none !important; }
+   entrance animations (the card and everything inside it), e.g. when an
+   already-open Settings tab is opened again from the popup. */
+.replay-reset, .replay-reset * { animation: none !important; }
 /* Status/notes fade in when they first get text. */
 #status:not(:empty), #compareNote:not(:empty) { animation: hub-fade-in var(--motion-normal) ease backwards; }
 h1 { font-size: clamp(22px, 6vw, 28px); margin: 0 0 16px; }
@@ -268,6 +272,10 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 }
 .addon-row:last-child { border-bottom: none; }
 .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
+.addon-row:active { transform: scale(0.985); }
+/* A checkbox pops when it becomes ticked (also plays when a list is first
+   drawn with rows already ticked, and on Select all). */
+.addon-row input[type="checkbox"]:checked { animation: hub-pop var(--motion-normal) var(--motion-spring); }
 :root[data-theme="dark"] .addon-row:hover { background: #2e3340; }
 .addon-name { font-size: 14px; font-weight: 600; color: var(--text); }
 .addon-row label {
@@ -356,10 +364,12 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   font-weight: 600;
   cursor: pointer;
   user-select: none;
-  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.1s;
+  /* The transform part is a springy release: pressed in quickly (see
+     :active below), it bounces back out when let go. */
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.35s var(--motion-spring);
 }
 .hub-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.02); }
-.hub-btn:active { transform: scale(0.99); }
+.hub-btn:active { transform: scale(0.95); transition-duration: 0.08s; }
 .primary-btn {
   display: block;
   width: 85%;
@@ -369,7 +379,7 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   font-size: 15px;
 }
 .primary-btn:hover:not(:disabled) { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.02); }
-.primary-btn:active:not(:disabled) { transform: scale(0.99); }
+.primary-btn:active:not(:disabled) { transform: scale(0.96); transition-duration: 0.08s; }
 .primary-btn:disabled { background: var(--card-bg); color: var(--btn-disabled-bg); border-color: var(--border-soft); cursor: not-allowed; }
 #status {
   display: block;
@@ -459,6 +469,9 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   *, *::before, *::after {
     transition-duration: 0.001ms !important;
     animation-duration: 0.001ms !important;
+    /* Staged reveals use long delays - with reduced motion everything
+       must simply be there, not wait hidden for its turn. */
+    animation-delay: 0s !important;
   }
   .search-input:hover,
   .addon-row:hover,

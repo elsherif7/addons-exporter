@@ -406,8 +406,37 @@ test('motion: nothing leaves a full-screen overlay behind (the old .theme-flash 
   }
 });
 
-test('motion: shared.css has the .replay-reset rule replayEntrance() depends on', () => {
-  assert.match(sharedCssForMotion, /\.replay-reset,\s*\.replay-reset > \*\s*\{\s*animation:\s*none/);
+test('motion: shared.css has the .replay-reset rule replayEntrance() depends on (covers everything inside the card)', () => {
+  assert.match(sharedCssForMotion, /\.replay-reset,\s*\.replay-reset \*\s*\{\s*animation:\s*none/);
+});
+
+test('motion: reduced motion also zeroes animation delays, so staged reveals never leave content hidden', () => {
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
+    const block = src.match(/@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\n\s*\}\n/);
+    assert.ok(block, `${name}: reduced-motion block not found`);
+    assert.match(block[0], /animation-delay:\s*0s\s*!important/, `${name} must zero animation-delay`);
+  }
+});
+
+test('settings: the page reveals in order - card, then title, then each section top to bottom', () => {
+  const html = readSrc('src/settings/settings.html');
+  const sec = (re, label) => {
+    const m = html.match(re);
+    assert.ok(m, `${label} delay not found`);
+    return parseFloat(m[1]);
+  };
+  const card = sec(/\.card \{ animation-delay: ([\d.]+)s; \}/, 'card');
+  const title = sec(/\.card > h1:first-child \{ animation-delay: ([\d.]+)s; \}/, 'title');
+  const groups = [1, 2, 3, 4, 5, 6].map((n) =>
+    sec(new RegExp(`:nth-of-type\\(${n}\\) \\{ --gd: ([\\d.]+)s; \\}`), `section ${n}`));
+  assert.ok(card > 0, 'the card must wait so the bare background shows first');
+  assert.ok(title > card, 'title comes after the card');
+  assert.ok(groups[0] > title, 'first section comes after the title');
+  for (let i = 1; i < groups.length; i++) {
+    assert.ok(groups[i] > groups[i - 1], `section ${i + 1} must come after section ${i}`);
+  }
+  // 6 groups in the markup, so none is left without a delay.
+  assert.strictEqual((html.match(/<div class="settings-group"/g) || []).length, 6);
 });
 
 test('motion: popup Settings button asks an already-open Settings tab to replay its entrance', () => {
@@ -416,15 +445,118 @@ test('motion: popup Settings button asks an already-open Settings tab to replay 
   assert.match(readSrc('src/settings/settings.js'), /replaySettingsEntrance/);
 });
 
-test('settings: pressing Settings again (popup message) scrolls to the top, but a plain tab switch does not', () => {
+test('settings: pressing Settings again (popup message) scrolls to the top and replays the reveal; a plain tab switch does neither', () => {
   const src = readSrc('src/settings/settings.js');
   assert.match(src, /function scrollSettingsToTop\(\)[\s\S]*window\.scrollTo\(\{ top: 0/);
-  // Only the popup's message scrolls; the visibilitychange handler must not.
   const onMessage = src.match(/message\.type === 'replaySettingsEntrance'\) \{([\s\S]*?)\n    \}/);
   assert.ok(onMessage, 'message handler not found');
   assert.match(onMessage[1], /scrollSettingsToTop\(\)/);
-  const onVisible = src.match(/addEventListener\('visibilitychange'[\s\S]*?\}\);/);
-  assert.ok(onVisible, 'visibilitychange handler not found');
-  assert.doesNotMatch(onVisible[0], /scrollSettingsToTop/);
+  assert.match(onMessage[1], /replayEntranceIfIdle\(\)/);
+  // Switching back to the tab must not replay the ~2s reveal or reset scroll.
+  assert.doesNotMatch(src, /addEventListener\('visibilitychange'/);
 });
 
+test('popup: opens in order - card, then title, then the three buttons top to bottom', () => {
+  const delay = (re, label) => {
+    const m = popupHtml.match(re);
+    assert.ok(m, `${label} delay not found`);
+    return parseFloat(m[1]);
+  };
+  const card = delay(/\.card \{[^}]*animation-delay:\s*([\d.]+)s/, 'card');
+  const title = delay(/h3 \{ animation-delay: ([\d.]+)s; \}/, 'title');
+  const exp = delay(/#exportBtn \{ animation-delay: ([\d.]+)s; \}/, 'export button');
+  const imp = delay(/#importBtn \{ animation-delay: ([\d.]+)s; \}/, 'import button');
+  const set = delay(/#settingsBtn \{ animation-delay: ([\d.]+)s; \}/, 'settings button');
+  assert.ok(card > 0, 'the card must wait so the bare background shows first');
+  assert.ok(title > card && exp > title && imp > exp && set > imp, 'each step must come after the one above it');
+});
+
+test('popup: overflow is hidden only while the reveal runs, so sliding items cannot flash a scrollbar', () => {
+  assert.match(popupHtml, /@keyframes popup-no-scroll\s*\{\s*from, to \{ overflow: hidden; \}/);
+  assert.match(popupHtml, /html \{ animation: popup-no-scroll [\d.]+s; \}/);
+});
+
+test('settings and popup: the reveal animations never use blur, and always hold hidden until their turn (backwards fill)', () => {
+  const settingsHtml = readSrc('src/settings/settings.html');
+  for (const [name, src] of [['settings.html', settingsHtml], ['popup.html', popupHtml]]) {
+    // The only blur allowed is the reset dialog's backdrop-filter (a blurred
+    // page behind a dialog), never inside an animation's keyframes.
+    const withoutBackdrop = src.replace(/(-webkit-)?backdrop-filter:[^;]*;/g, '');
+    assert.doesNotMatch(withoutBackdrop, /blur\(/, `${name} must not use blur in its animations`);
+    assert.doesNotMatch(src, /animation-fill-mode:\s*(both|forwards)/, `${name} must not hold a final keyframe`);
+  }
+  // Settings spells its animations out longhand; the fill must be backwards.
+  assert.match(settingsHtml, /\.settings-group > \* \{[^}]*animation-fill-mode: backwards;/);
+  for (const kf of ['settings-card-unfold', 'settings-title-in', 'settings-slide-in', 'settings-wipe-in']) {
+    assert.match(settingsHtml, new RegExp(`@keyframes ${kf}`), `missing @keyframes ${kf}`);
+  }
+  for (const kf of ['popup-card-in', 'popup-title-in', 'popup-in']) {
+    assert.match(popupHtml, new RegExp(`@keyframes ${kf}`), `missing @keyframes ${kf}`);
+  }
+});
+
+test('settings and popup: clipped reveals end beyond the box so shadows and focus rings are never cut off', () => {
+  const settingsHtml = readSrc('src/settings/settings.html');
+  for (const [name, src] of [['settings.html', settingsHtml], ['popup.html', popupHtml]]) {
+    const ends = src.match(/to\s*\{[^}]*clip-path:\s*inset\(([^)]*)\)/g) || [];
+    assert.ok(ends.length > 0, `${name}: no clip-path reveal found`);
+    for (const end of ends) {
+      assert.match(end, /inset\(-\d+px/, `${name}: "${end}" must end with a negative inset`);
+    }
+  }
+});
+
+// --- Press feedback (click/tap ring) ---
+
+test('press: every extension page loads press.js', () => {
+  for (const page of ['src/popup/popup.html', 'src/export/export.html', 'src/import/import.html', 'src/settings/settings.html', 'src/confirmation/confirmation.html']) {
+    assert.match(readSrc(page), /<script src="\.\.\/common\/press\.js"><\/script>/, `${page} does not load press.js`);
+  }
+});
+
+test('press: shared.css, the popup and the report all define the --press-ring colour, in light and dark', () => {
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
+    const defs = src.match(/--press-ring:/g) || [];
+    assert.strictEqual(defs.length, 2, `${name} should define --press-ring for light and dark`);
+  }
+});
+
+test('press: the report carries its own copy of the press feedback (it cannot load press.js)', () => {
+  const src = readSrc('src/background/report-template.js');
+  assert.match(src, /Mirrors src\/common\/press\.js/);
+  assert.match(src, /el\.animate\(/);
+  assert.match(src, /addEventListener\('pointerdown'/);
+});
+
+test('press: buttons press in fast and spring back out (a long transform transition, a short one while :active)', () => {
+  for (const [name, src, spring] of [['shared.css', sharedCssForMotion, '--motion-spring'], ['popup.html', popupHtml, '--spring']]) {
+    assert.match(src, new RegExp(`transform 0\\.35s var\\(${spring}\\)`), `${name}: .hub-btn needs the springy release`);
+    assert.match(src, /\.hub-btn:active \{ transform: scale\(0\.95\); transition-duration: 0\.08s; \}/, `${name}: .hub-btn:active`);
+  }
+});
+
+
+
+test('settings: the reset dialog backdrop is a visible blur (page stays readable behind it)', () => {
+  const html = readSrc('src/settings/settings.html');
+  assert.match(html, /\.s-overlay \{[^}]*backdrop-filter:\s*blur\(\d+px\)/);
+  // Dim only lightly - the page behind must remain visible.
+  const alpha = parseFloat(html.match(/\.s-overlay \{[^}]*background:\s*rgba\(0, 0, 0, ([\d.]+)\)/)[1]);
+  assert.ok(alpha > 0 && alpha <= 0.4, `light tint expected, got ${alpha}`);
+});
+
+test('settings: the success message slides in (no check mark), with a light and dark success colour', () => {
+  const html = readSrc('src/settings/settings.html');
+  assert.match(html, /:root \{ --success-color: #[0-9a-f]{6}; \}/i);
+  assert.match(html, /:root\[data-theme="dark"\] \{ --success-color: #[0-9a-f]{6}; \}/i);
+  for (const id of ['exportSettingsStatus', 'importSettingsStatus', 'resetSettingsStatus']) {
+    assert.match(html, new RegExp(`#${id}\\.is-success`), `${id} is missing its success style`);
+  }
+  assert.doesNotMatch(html, /2713|\u2713/, 'the check mark was removed on purpose');
+  assert.doesNotMatch(html, /\.is-success::before/);
+});
+
+test('settings: descriptions and messages are inline-block, so sliding them in actually moves them', () => {
+  const html = readSrc('src/settings/settings.html');
+  assert.match(html, /#exportSettingsDesc[\s\S]*?#resetSettingsStatus \{ display: inline-block; \}/);
+});
