@@ -34,33 +34,53 @@ function resolveTheme(stored) {
 // makes every color glide instead. Skipped for reduced motion.
 let themeReady = false;
 let themeSwitchTimer = null;
+// The theme a view transition (below) is on its way to, or null. The page
+// only flips inside the transition's callback, a moment after it is
+// requested - so a second applyTheme() in that gap (storage.onChanged fires
+// right after the Settings page's own call) must not start a second
+// transition on top, which would cancel the first one halfway. It just
+// retargets the transition already under way.
+let pendingTheme = null;
 
 function applyTheme(theme) {
   const t = theme === 'dark' ? 'dark' : 'light';
   const root = document.documentElement;
+  // Keep localStorage cache in sync so the next page load can apply
+  // the theme synchronously before the async storage read resolves.
+  try { localStorage.setItem(THEME_CACHE_KEY, t); } catch (e) {}
+
+  if (pendingTheme !== null) {
+    pendingTheme = t;
+    return;
+  }
+
   const changing = themeReady && typeof root.getAttribute === 'function' &&
     root.getAttribute('data-theme') !== t;
   const reduced = typeof matchMedia === 'function' &&
     matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const setTheme = () => root.setAttribute('data-theme', t);
+  const setTheme = (value) => root.setAttribute('data-theme', value);
 
   if (changing && !reduced && typeof document.startViewTransition === 'function') {
-    document.startViewTransition(setTheme);
+    pendingTheme = t;
+    try {
+      document.startViewTransition(() => {
+        const final = pendingTheme === null ? t : pendingTheme;
+        pendingTheme = null;
+        setTheme(final);
+      });
+    } catch (e) {
+      pendingTheme = null; // never leave the page unable to change theme
+      setTheme(t);
+    }
   } else {
     if (changing && !reduced && root.classList && typeof setTimeout === 'function') {
       root.classList.add('theme-switching');
       clearTimeout(themeSwitchTimer);
       themeSwitchTimer = setTimeout(() => root.classList.remove('theme-switching'), 800);
     }
-    setTheme();
+    setTheme(t);
   }
-  // Keep localStorage cache in sync so the next page load can apply
-  // the theme synchronously before the async storage read resolves.
-  try { localStorage.setItem(THEME_CACHE_KEY, t); } catch (e) {}
 }
-
-// Keep this page's theme in sync if it's changed from another tab (e.g.
-// the settings page) while this one is still open.
 if (browser.storage && browser.storage.onChanged) {
   browser.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes[THEME_STORAGE_KEY]) {

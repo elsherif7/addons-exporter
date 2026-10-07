@@ -356,7 +356,7 @@ test('motion: shared.css, the popup and the report all define the .theme-switchi
 
 test('motion: entrance animations use backwards fill (a held final keyframe would override :hover transforms)', () => {
   for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
-    const entrance = src.match(/animation:\s*(?:hub-card-in|hub-rise-in|popup-card-in|popup-in)[^;]*;/g) || [];
+    const entrance = src.match(/animation:\s*(?:hub-card-in|hub-rise-in|hub-unfold|hub-title-in|hub-wipe-in|popup-card-in|popup-in)[^;]*;/g) || [];
     assert.ok(entrance.length > 0, `${name} has no entrance animation`);
     for (const decl of entrance) {
       assert.match(decl, /backwards/, `${name}: "${decl}" must use backwards fill`);
@@ -560,3 +560,103 @@ test('settings: descriptions and messages are inline-block, so sliding them in a
   const html = readSrc('src/settings/settings.html');
   assert.match(html, /#exportSettingsDesc[\s\S]*?#resetSettingsStatus \{ display: inline-block; \}/);
 });
+
+// --- Staged opening reveal: Exporter, Importer and the HTML report ---
+
+test('staged reveal: the Exporter and Importer cards opt in with the "staged" class', () => {
+  for (const page of ['src/export/export.html', 'src/import/import.html']) {
+    assert.match(readSrc(page), /<div class="card staged">/, `${page} must use class="card staged"`);
+  }
+});
+
+test('staged reveal: Exporter parts come in order after the card and the title', () => {
+  const html = readSrc('src/export/export.html');
+  const d = (sel) => {
+    const m = html.match(new RegExp(`\\.card\\.staged > ${sel} \\{ --d: ([\\d.]+)s; \\}`));
+    assert.ok(m, `no --d for ${sel}`);
+    return parseFloat(m[1]);
+  };
+  const order = [d('#exportDesc'), d('\\.list-controls'), d('\\.checklist-box'), d('#exportSelectedBtn')];
+  assert.ok(order[0] > 0.55, 'the first part waits for the title (0.55s)');
+  for (let i = 1; i < order.length; i++) assert.ok(order[i] > order[i - 1], `part ${i + 1} must come after part ${i}`);
+});
+
+test('staged reveal: Importer parts come in order after the card and the title', () => {
+  const html = readSrc('src/import/import.html');
+  const d = (sel) => {
+    const m = html.match(new RegExp(`\\.card\\.staged > ${sel} \\{ --d: ([\\d.]+)s; \\}`));
+    assert.ok(m, `no --d for ${sel}`);
+    return parseFloat(m[1]);
+  };
+  const order = [d('p:nth-of-type\\(1\\)'), d('p:nth-of-type\\(2\\)'), d('\\.picker'), d('#openSelectedBtn')];
+  assert.ok(order[0] > 0.55);
+  for (let i = 1; i < order.length; i++) assert.ok(order[i] > order[i - 1], `part ${i + 1} must come after part ${i}`);
+});
+
+test('staged reveal: parts shown later (search box, list, file chip) have no --d, so they wipe in immediately', () => {
+  for (const page of ['src/export/export.html', 'src/import/import.html']) {
+    const html = readSrc(page);
+    for (const later of ['searchInput', 'listControls', 'checklistBox', 'fileNameRow']) {
+      assert.doesNotMatch(html, new RegExp(`#${later}[^{]*\\{[^}]*--d:`), `${page}: #${later} must not wait`);
+    }
+  }
+});
+
+test('staged reveal: shared.css order is card (0.15s) -> title (0.55s) -> parts (from --d)', () => {
+  assert.match(sharedCssForMotion, /\.card\.staged \{ animation: hub-unfold [^;]*backwards; animation-delay: 0\.15s; \}/);
+  assert.match(sharedCssForMotion, /\.card\.staged > h1:first-child \{ animation: hub-title-in [^;]*backwards; animation-delay: 0\.55s; \}/);
+  assert.match(sharedCssForMotion, /\.card\.staged > :not\(h1\) \{ animation: hub-wipe-in [^;]*backwards; animation-delay: var\(--d, 0s\); \}/);
+});
+
+test('staged reveal: the report opens in order - card, title, intro, search box, list', () => {
+  const delay = (re, label) => {
+    const m = reportCssForMotion.match(re);
+    assert.ok(m, `${label} delay not found`);
+    return parseFloat(m[1]);
+  };
+  const card = delay(/\.card \{ animation: hub-unfold [^;]*; animation-delay: ([\d.]+)s; \}/, 'card');
+  const title = delay(/\.card > h1 \{ animation: hub-title-in [^;]*; animation-delay: ([\d.]+)s; \}/, 'title');
+  const intro = delay(/\.card > p \{ animation: hub-wipe-in [^;]*; animation-delay: ([\d.]+)s; \}/, 'intro');
+  const search = delay(/\.card > \.search-input \{ animation: hub-wipe-in [^;]*; animation-delay: ([\d.]+)s; \}/, 'search');
+  const list = delay(/\.card > \.checklist-box \{ animation: hub-wipe-in [^;]*; animation-delay: ([\d.]+)s; \}/, 'list');
+  assert.ok(card > 0 && title > card && intro > title && search > intro && list > search);
+});
+
+test('staged reveal: clipped reveals in shared.css and the report end beyond the box (shadows and focus rings stay visible)', () => {
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['report.css', reportCssForMotion]]) {
+    for (const kf of ['hub-unfold', 'hub-wipe-in']) {
+      const body = src.match(new RegExp(`@keyframes ${kf} \\{[\\s\\S]*?\\n\\s*\\}\\n`));
+      assert.ok(body, `${name}: @keyframes ${kf} not found`);
+      assert.match(body[0], /to\s*\{[^}]*clip-path:\s*inset\(-\d+px/, `${name}: ${kf} must end with a negative inset`);
+      assert.doesNotMatch(body[0], /blur\(/, `${name}: ${kf} must not blur`);
+    }
+  }
+});
+
+test('staged reveal: the report removes all animation when printing (nothing caught half-revealed)', () => {
+  assert.match(reportCssForMotion, /@media print\s*\{[\s\S]*animation:\s*none/);
+});
+
+test('list controls: Select all / Deselect all are pill buttons and the count is a badge that hides while empty', () => {
+  const css = readSrc('src/common/shared.css');
+  assert.match(css, /\.list-controls button \{[^}]*border-radius: 999px;/, 'pill buttons');
+  assert.match(css, /\.list-controls button \{[^}]*border: 1px solid var\(--border\);/, 'visible outline, so they look pressable');
+  assert.match(css, /#selectionCount \{[^}]*border-radius: 999px;/, 'count badge');
+  assert.match(css, /#selectionCount:empty \{ display: none; \}/, 'no empty badge before the list loads');
+  assert.match(css, /\.list-controls button:focus-visible \{[^}]*outline:/, 'keyboard focus stays visible');
+  assert.match(css, /\.list-controls button:active \{ transform: scale\(0\.94\)/, 'pressed-in feel');
+});
+
+test('settings: the Light and Dark rows carry the report\'s sun and moon icons, and the chosen one spins in', () => {
+  const html = readSrc('src/settings/settings.html');
+  const light = html.match(/<label class="settings-option-row" for="themeLight">[\s\S]*?<\/label>/)[0];
+  const dark = html.match(/<label class="settings-option-row" for="themeDark">[\s\S]*?<\/label>/)[0];
+  assert.match(light, /<svg class="appearance-icon"[^>]*aria-hidden="true"[\s\S]*<circle cx="12" cy="12" r="5"\/>/, 'sun in the Light row');
+  assert.match(dark, /<svg class="appearance-icon"[^>]*aria-hidden="true"[\s\S]*M21 12\.79A9 9 0 1 1 11\.21 3/, 'moon in the Dark row');
+  assert.match(html, /\.settings-option-row input:checked ~ \.appearance-icon \{[^}]*animation: settings-icon-spin [^;]*backwards;/);
+  assert.match(html, /@keyframes settings-icon-spin \{\s*from \{ opacity: 0; transform: rotate\(-200deg\) scale\(0\.3\); \}/, 'same spin as the report toggle');
+  // The icons must be the very same shapes the report uses.
+  const report = readSrc('src/background/report-template.js');
+  assert.ok(report.includes('M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z'), 'report moon path');
+});
+

@@ -163,6 +163,25 @@
     font-weight: 600;
     animation: settings-slide-in var(--motion-slow) var(--motion-spring) backwards;
   }
+  /* Light / Dark rows show the same sun and moon as the report's theme
+     button. The icon of the chosen theme darkens and spins and pops in each
+     time its option becomes selected (a CSS animation restarts whenever its
+     selector starts matching), just like the report's toggle. */
+  @keyframes settings-icon-spin {
+    from { opacity: 0; transform: rotate(-200deg) scale(0.3); }
+    to   { opacity: 1; transform: none; }
+  }
+  .appearance-icon {
+    flex: none;
+    margin-left: auto;
+    margin-top: 1px;
+    color: var(--text-muted);
+    transition: color var(--motion-slow) ease;
+  }
+  .settings-option-row input:checked ~ .appearance-icon {
+    color: var(--text);
+    animation: settings-icon-spin 0.7s var(--motion-spring) backwards;
+  }
   /* Small pop when a radio becomes selected. */
   .settings-option-row input[type="radio"]:checked { animation: hub-pop var(--motion-normal) var(--motion-spring); }
   /* Inline row messages fade in each time they're shown (display toggles). */
@@ -171,7 +190,8 @@
   #settingsStatus:not(:empty) { animation: hub-fade-in var(--motion-normal) ease backwards; }
   /* Reset dialog: backdrop fades in, the dialog rises in. */
   /* The page behind the reset dialog stays visible, softly blurred and
-     slightly dimmed (so it reads as "behind"), and can still be scrolled. */
+     slightly dimmed (so it reads as "behind"). The page is frozen while it is
+     open - settings.js locks scrolling. */
   .s-overlay {
     background: rgba(0, 0, 0, 0.22);
     backdrop-filter: blur(8px);
@@ -192,10 +212,12 @@
       <label class="settings-option-row" for="themeLight">
         <input type="radio" name="theme" id="themeLight" value="light" checked>
         <span style="font-weight:600; color:var(--text); font-size:14px;">Light</span>
+        <svg class="appearance-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </label>
       <label class="settings-option-row" for="themeDark">
         <input type="radio" name="theme" id="themeDark" value="dark">
         <span style="font-weight:600; color:var(--text); font-size:14px;">Dark</span>
+        <svg class="appearance-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path transform="scale(-1,1) translate(-24,0)" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </label>
     </div>
 

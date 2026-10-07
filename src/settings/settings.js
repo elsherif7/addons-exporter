@@ -198,6 +198,7 @@ async function loadCurrentTheme() {
   for (const radio of themeRadios) {
     radio.checked = radio.value === current;
   }
+  return current;
 }
 
 async function loadCurrentExportFormat() {
@@ -222,12 +223,15 @@ async function loadCurrentExportFormat() {
 for (const radio of themeRadios) {
   radio.addEventListener('change', async () => {
     if (!radio.checked) return;
+    // Switch the page at once, exactly like the report's toggle does - the
+    // animation starts the moment you click, not after the save has finished.
+    applyTheme(radio.value);
     try {
       await browser.storage.local.set({ [THEME_STORAGE_KEY]: radio.value });
-      applyTheme(radio.value);
     } catch (err) {
       setSettingsStatus('Could not save theme: ' + err.message, true);
-      await loadCurrentTheme(); // the write failed - revert the radio to what's actually stored
+      // The write failed - put the radio AND the page back to what's actually stored.
+      applyTheme(await loadCurrentTheme());
     }
   });
 }
@@ -495,14 +499,23 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
 
   cancelBtn.focus();
 
-  // The page behind stays visible (blurred) and scrollable while the dialog
-  // is open. Scrolling is forwarded by hand so it works no matter how the
-  // browser treats wheel events over a fixed overlay on top of inert content.
-  overlay.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const unit = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? window.innerHeight : 1;
-    window.scrollBy(e.deltaX * unit, e.deltaY * unit);
-  }, { passive: false });
+  // The page behind stays visible (blurred) but is frozen while the dialog is
+  // open: no scrolling by wheel, touch, keyboard or scrollbar. Hiding the
+  // root's overflow covers all of those at once; the padding stands in for
+  // the scrollbar that disappears, so the page doesn't jump sideways. Both
+  // are put back exactly as they were when the dialog closes. (Scrolling by
+  // code, like the scroll to the top after a reset, still works.)
+  const root = document.documentElement;
+  const savedOverflow = root.style.overflow;
+  const savedPaddingRight = root.style.paddingRight;
+  const scrollbarWidth = (typeof window !== 'undefined' && root.clientWidth)
+    ? Math.max(0, window.innerWidth - root.clientWidth)
+    : 0;
+  root.style.overflow = 'hidden';
+  if (scrollbarWidth > 0) root.style.paddingRight = scrollbarWidth + 'px';
+  // Belt and braces for wheel and touch drags that start over the backdrop.
+  overlay.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+  overlay.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
   new Promise((resolve) => {
     let closed = false;
@@ -510,6 +523,8 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
       if (closed) return;
       closed = true;
       const finish = () => {
+        root.style.overflow = savedOverflow;
+        root.style.paddingRight = savedPaddingRight;
         others.forEach((el) => { el.inert = false; });
         overlay.remove();
         // Return focus to what opened the dialog, without scrolling back to

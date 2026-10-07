@@ -174,3 +174,47 @@ testAsync('theme: no animation when the theme does not change, or when reduced m
   assert.strictEqual(reduced.classes.has('theme-switching'), false);
   assert.strictEqual(reduced.getAttr(), 'dark', 'still switches, just instantly');
 });
+
+// --- one transition at a time (Settings: its own call + storage.onChanged) ---
+
+testAsync('theme: a second applyTheme() before the transition runs does not start another transition', async () => {
+  const ctx = loadThemeForSwitch();
+  await ctx.sandbox.initTheme();
+  ctx.sandbox.applyTheme('dark');
+  ctx.sandbox.applyTheme('dark'); // e.g. storage.onChanged right after the page's own call
+  assert.strictEqual(ctx.transitions.length, 1, 'a second transition would cancel the first halfway');
+  ctx.transitions[0]();
+  assert.strictEqual(ctx.getAttr(), 'dark');
+});
+
+testAsync('theme: flipping back before the transition runs retargets it - the last request wins', async () => {
+  const ctx = loadThemeForSwitch();
+  await ctx.sandbox.initTheme();
+  ctx.sandbox.applyTheme('dark');
+  ctx.sandbox.applyTheme('light');
+  assert.strictEqual(ctx.transitions.length, 1);
+  ctx.transitions[0]();
+  assert.strictEqual(ctx.getAttr(), 'light');
+});
+
+testAsync('theme: after a transition has run, the next change starts a fresh one', async () => {
+  const ctx = loadThemeForSwitch();
+  await ctx.sandbox.initTheme();
+  ctx.sandbox.applyTheme('dark');
+  ctx.transitions[0]();
+  ctx.sandbox.applyTheme('light');
+  assert.strictEqual(ctx.transitions.length, 2);
+  ctx.transitions[1]();
+  assert.strictEqual(ctx.getAttr(), 'light');
+});
+
+testAsync('theme: if startViewTransition throws, the theme still changes and later changes still work', async () => {
+  const ctx = loadThemeForSwitch();
+  await ctx.sandbox.initTheme();
+  ctx.sandbox.document.startViewTransition = () => { throw new Error('boom'); };
+  ctx.sandbox.applyTheme('dark');
+  assert.strictEqual(ctx.getAttr(), 'dark');
+  ctx.sandbox.applyTheme('light');
+  assert.strictEqual(ctx.getAttr(), 'light', 'not stuck waiting for a transition that never started');
+});
+

@@ -59,33 +59,34 @@
   .card { position: relative; max-width: 640px; margin: 0 auto; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; box-shadow: var(--card-shadow); padding: clamp(20px, 6vmin, 40px); text-align: center; box-sizing: border-box; }
   h1 { font-size: clamp(22px, 6vw, 28px); margin: 0 0 16px; }
   p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0 28px; }
-  /* Entrance: card fades and rises in, then its direct children follow.
-     Same motion as shared.css (this file can't load it). backwards
-     fill on purpose: a held final keyframe would override :hover
-     transforms on children. */
-  @keyframes hub-card-in {
-    from { opacity: 0; transform: translateY(44px) scale(0.92); }
-    to   { opacity: 1; transform: none; }
+  /* Staged opening reveal - same as "staged" in shared.css, which a saved
+     report cannot load. First only the page background shows, then the
+     empty card UNFOLDS downward, then the title settles in as its letters
+     tighten up, then the intro, the search box and the list wipe in from
+     the left, one after another. backwards fill throughout: nothing shows
+     before its turn, and no held keyframe overrides :hover. */
+  @keyframes hub-unfold {
+    from { opacity: 0; transform: translateY(20px); clip-path: inset(0 0 100% 0 round 12px); }
+    to   { opacity: 1; transform: none; clip-path: inset(-60px round 12px); }
   }
-  @keyframes hub-rise-in {
-    from { opacity: 0; transform: translateY(30px); }
-    to   { opacity: 1; transform: none; }
+  @keyframes hub-title-in {
+    from { opacity: 0; transform: translateY(12px); letter-spacing: 0.16em; }
+    to   { opacity: 1; transform: none; letter-spacing: 0em; }
+  }
+  @keyframes hub-wipe-in {
+    from { opacity: 0; transform: translateX(-14px); clip-path: inset(0 100% 0 0 round 8px); }
+    to   { opacity: 1; transform: none; clip-path: inset(-8px round 8px); }
   }
   @keyframes hub-fade-in {
     from { opacity: 0; }
     to   { opacity: 1; }
   }
-  .card { animation: hub-card-in 0.7s var(--motion-spring) backwards; }
-  .card > * { animation: hub-rise-in 0.6s var(--motion-spring) backwards; }
-  .card > :nth-child(1) { animation-delay: 0.08s; }
-  .card > :nth-child(2) { animation-delay: 0.16s; }
-  .card > :nth-child(3) { animation-delay: 0.24s; }
-  .card > :nth-child(4) { animation-delay: 0.32s; }
-  .card > :nth-child(5) { animation-delay: 0.4s; }
-  .card > :nth-child(n+6) { animation-delay: 0.48s; }
-  /* The theme toggle is absolutely positioned inside the card; don't let
-     the staggered rise move it independently of the card itself. */
-  .card > .theme-toggle { animation: none; }
+  .card { animation: hub-unfold 0.8s var(--motion-ease) backwards; animation-delay: 0.15s; }
+  .card > h1 { animation: hub-title-in 0.6s var(--motion-ease) backwards; animation-delay: 0.55s; }
+  /* The theme toggle is absolutely positioned inside the card; it just
+     fades in with the title. */
+  .card > .theme-toggle { animation: hub-fade-in var(--motion-normal) ease backwards; animation-delay: 0.55s; }
+  .card > p { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: 0.7s; }
   .cta-link { color: var(--link-accent); font-weight: bold; text-decoration: none; }
   .cta-link:hover { text-decoration: underline; }
   .theme-toggle {
@@ -188,6 +189,12 @@
   .match-label { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
   .match-label[href]:hover { text-decoration: underline; }
   .match-uncertain { color: var(--warn-color); font-weight: 600; }
+
+  /* The rest of the opening reveal (see the staged block near the top).
+     Kept down here, after the .search-input and .checklist-box rules they
+     extend, because the drift tests read the first rule of each selector. */
+  .card > .search-input { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: 0.82s; }
+  .card > .checklist-box { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: 0.94s; }
 
   /* Light/dark switch. Where the browser supports view transitions
      (Firefox 144+), theme.js wraps the theme change in

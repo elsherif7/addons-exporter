@@ -6,10 +6,18 @@
 <script src="../common/theme.js"></script>
 <link rel="icon" href="../icons/icon48.png">
 <link rel="stylesheet" href="../common/shared.css">
+<style>
+  /* Opening reveal, top to bottom (see "staged" in shared.css): the page
+     background, then the card, then the title, then each part in turn. */
+  .card.staged > #exportDesc { --d: 0.7s; }
+  .card.staged > .list-controls { --d: 0.82s; }
+  .card.staged > .checklist-box { --d: 0.94s; }
+  .card.staged > #exportSelectedBtn { --d: 1.06s; }
+</style>
 <title>Add-ons Exporter</title>
 </head>
 <body>
-  <div class="card">
+  <div class="card staged">
     <h1>Add-ons Exporter</h1>
     <p id="exportDesc">Select the <strong>Add-ons</strong> you want to export, then click <strong>Export Selected</strong> to create an <strong>HTML report</strong> you can use to reinstall them later on any Firefox&#8209;based&nbsp;browser.</p>
 

@@ -149,6 +149,30 @@ body {
 .card > :nth-child(4) { animation-delay: 0.32s; }
 .card > :nth-child(5) { animation-delay: 0.4s; }
 .card > :nth-child(n+6) { animation-delay: 0.48s; }
+/* Staged opening reveal - add the class "staged" to a page's card (the
+   Exporter and Importer do). First only the page background shows, then the
+   empty card UNFOLDS downward, then the title settles in as its letters
+   tighten up, then each part of the page wipes in from the left, top to
+   bottom. Each page sets the start time of its visible parts with --d (see
+   export.html / import.html); anything revealed later (search box, list,
+   after a file is chosen) has no --d, so it wipes in at once when shown.
+   backwards fill throughout, so nothing shows before its turn and no held
+   keyframe overrides :hover. Reduced motion zeroes the delays (below). */
+@keyframes hub-unfold {
+  from { opacity: 0; transform: translateY(20px); clip-path: inset(0 0 100% 0 round 12px); }
+  to   { opacity: 1; transform: none; clip-path: inset(-60px round 12px); }
+}
+@keyframes hub-title-in {
+  from { opacity: 0; transform: translateY(12px); letter-spacing: 0.16em; }
+  to   { opacity: 1; transform: none; letter-spacing: 0em; }
+}
+@keyframes hub-wipe-in {
+  from { opacity: 0; transform: translateX(-14px); clip-path: inset(0 100% 0 0 round 8px); }
+  to   { opacity: 1; transform: none; clip-path: inset(-8px round 8px); }
+}
+.card.staged { animation: hub-unfold 0.8s var(--motion-ease) backwards; animation-delay: 0.15s; }
+.card.staged > h1:first-child { animation: hub-title-in 0.6s var(--motion-ease) backwards; animation-delay: 0.55s; }
+.card.staged > :not(h1) { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 0s); }
 /* Parts of a page that are revealed later (after a file is chosen, or once
    the list has loaded) animate in at once instead of waiting their turn. */
 #searchInput, #listControls, #checklistBox, #fileNameRow { animation-delay: 0s; }
@@ -182,29 +206,57 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   border-color: var(--btn-bg);
   transform: scale(1.01);
 }
+/* The row above the list: "Select all" / "Deselect all" as two small pill
+   buttons on the left (they look pressable, unlike bare blue links), and a
+   badge with how many are selected on the right. */
 .list-controls {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 6px 12px;
-  margin-bottom: 10px;
+  gap: 8px 12px;
+  margin-bottom: 12px;
 }
-#selectionCount {
-  font-size: 13px;
-  color: var(--text-muted);
-  padding: 6px 10px;
+.list-controls > span:first-child {
+  display: inline-flex;
+  gap: 8px;
 }
 .list-controls button {
-  background: none;
-  border: none;
-  color: var(--link-accent);
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
   font-size: 13px;
   font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
-  padding: 6px 10px;
+  padding: 7px 14px;
+  user-select: none;
+  /* Springy release, like .hub-btn. */
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.35s var(--motion-spring);
 }
-.list-controls button:hover { text-decoration: underline; }
+.list-controls button:hover {
+  background: var(--hover-bg);
+  border-color: var(--btn-bg);
+  transform: scale(1.04);
+}
+.list-controls button:active { transform: scale(0.94); transition-duration: 0.08s; }
+.list-controls button:focus-visible {
+  outline: 2px solid var(--link-accent);
+  outline-offset: 2px;
+}
+#selectionCount {
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--border-soft);
+  border-radius: 999px;
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+/* Nothing to say yet (before the list loads): no empty badge. */
+#selectionCount:empty { display: none; }
 .checklist-box {
   text-align: left;
   overflow-x: hidden;

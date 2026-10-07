@@ -258,7 +258,7 @@ function makeSettingsSandboxWithRadios(storageSet) {
   vm.runInContext(themeSrc, sb);
   vm.runInContext(commonSrc, sb);
   vm.runInContext(settingsSrc, sb);
-  return { themeRadioEls, formatRadioEls, shortenRadioEls, statusEl, setCalls };
+  return { themeRadioEls, formatRadioEls, shortenRadioEls, statusEl, setCalls, sandbox: sb };
 }
 
 testAsync('theme radio: a storage write failure shows an error and reverts the radio, instead of an unhandled rejection', async () => {
@@ -792,16 +792,52 @@ test('Reset dialog: the overlay fills the viewport and centres the dialog (inlin
   assert.doesNotMatch(css, /background/);
 });
 
-test('Reset dialog: scrolling the wheel over the backdrop scrolls the page behind it', () => {
+test('Reset dialog: the page behind is frozen while it is open, and unfrozen exactly as before when it closes', () => {
+  const { document, elements } = makeResetDialogSandboxWithWindow();
+  const root = document.documentElement;
+  root.style.overflow = 'auto';
+  root.style.paddingRight = '3px';
+  openResetDialog(document, elements.resetSettingsBtn);
+  assert.strictEqual(root.style.overflow, 'hidden', 'no scrolling by wheel, touch, keyboard or scrollbar');
+  document.body.querySelector('#rsCancel').click();
+  assert.strictEqual(root.style.overflow, 'auto', 'the previous value is restored');
+  assert.strictEqual(root.style.paddingRight, '3px');
+});
+
+test('Reset dialog: the vanished scrollbar is replaced by padding so the page does not jump sideways', () => {
+  const { document, elements } = makeResetDialogSandboxWithWindow({ scrollbarWidth: 15 });
+  const root = document.documentElement;
+  root.style.overflow = '';
+  root.style.paddingRight = ''; // a real element reports '' when nothing is set inline
+  openResetDialog(document, elements.resetSettingsBtn);
+  assert.strictEqual(root.style.paddingRight, '15px');
+  document.body.querySelector('#rsCancel').click();
+  assert.strictEqual(root.style.paddingRight, '');
+});
+
+test('Reset dialog: no padding is added when the page has no scrollbar', () => {
+  const { document, elements } = makeResetDialogSandboxWithWindow({ scrollbarWidth: 0 });
+  openResetDialog(document, elements.resetSettingsBtn);
+  assert.strictEqual(document.documentElement.style.paddingRight, undefined);
+});
+
+test('Reset dialog: wheel and touch drags over the backdrop are swallowed and never scroll the window', () => {
   const { document, elements, scrollCalls } = makeResetDialogSandboxWithWindow();
   openResetDialog(document, elements.resetSettingsBtn);
   const overlay = document.body.querySelector('.s-overlay');
-  let prevented = false;
-  overlay.dispatchEvent({ type: 'wheel', deltaX: 0, deltaY: 120, deltaMode: 0, preventDefault() { prevented = true; } });
-  assert.strictEqual(prevented, true, 'default is prevented so the scroll is not applied twice');
-  assert.deepStrictEqual(scrollCalls[0], [0, 120]);
-  overlay.dispatchEvent({ type: 'wheel', deltaX: 0, deltaY: 3, deltaMode: 1, preventDefault() {} });
-  assert.deepStrictEqual(scrollCalls[1], [0, 120], 'line-based wheels are scaled (3 lines = 120px)');
+  for (const type of ['wheel', 'touchmove']) {
+    let prevented = false;
+    overlay.dispatchEvent({ type, deltaX: 0, deltaY: 120, deltaMode: 0, preventDefault() { prevented = true; } });
+    assert.strictEqual(prevented, true, `${type} must be prevented`);
+  }
+  assert.strictEqual(scrollCalls.length, 0, 'nothing forwards the scroll to the page any more');
+});
+
+test('Reset dialog: Escape and the backdrop also unfreeze the page', () => {
+  const { document, elements } = makeResetDialogSandboxWithWindow();
+  openResetDialog(document, elements.resetSettingsBtn);
+  document.body.querySelector('[role="dialog"]').dispatchEvent({ type: 'keydown', key: 'Escape' });
+  assert.notStrictEqual(document.documentElement.style.overflow, 'hidden');
 });
 
 testAsync('Reset dialog: confirming scrolls to the top and replays the opening reveal once the defaults are applied', async () => {
@@ -842,7 +878,7 @@ test('Reset dialog: with animation available, it fades out first and is only rem
 // Like makeResetDialogSandbox, plus a window (scroll calls recorded), a
 // .card whose replayEntrance() steps are recorded, and - optionally -
 // element.animate() so the dialog's closing animation can be exercised.
-function makeResetDialogSandboxWithWindow({ withAnimate = false } = {}) {
+function makeResetDialogSandboxWithWindow({ withAnimate = false, scrollbarWidth = 0 } = {}) {
   const { document, elements } = makeFakeDom(['resetSettingsBtn', 'settingsStatus']);
   const pageContent = document.createElement('div');
   pageContent.id = 'pageContent';
@@ -852,6 +888,7 @@ function makeResetDialogSandboxWithWindow({ withAnimate = false } = {}) {
   const scrollCalls = [];
   const replayLog = [];
   const pendingAnimations = [];
+  document.documentElement.clientWidth = 1000; // window.innerWidth - this = the scrollbar's width
 
   const cardStub = {
     classList: {
@@ -880,6 +917,7 @@ function makeResetDialogSandboxWithWindow({ withAnimate = false } = {}) {
     document,
     window: {
       innerHeight: 1000,
+      innerWidth: 1000 + scrollbarWidth,
       scrollBy: (x, y) => scrollCalls.push([x, y]),
       scrollTo: (opts) => scrollCalls.push(JSON.parse(JSON.stringify(opts))),
     },
@@ -1131,4 +1169,38 @@ testAsync('cancel: confirming the reset is not a cancel - no grey flash', async 
   const greys = ctx.rows.reset.animations.filter((a) => /128, 128, 128/.test(a.keyframes[0].boxShadow));
   assert.strictEqual(greys.length, 0);
 });
+
+testAsync('theme radio: the page switches the moment you click, before the save has finished (like the report toggle)', async () => {
+  const log = [];
+  let releaseSave;
+  const { themeRadioEls, sandbox } = makeSettingsSandboxWithRadios(
+    () => new Promise((resolve) => { log.push('save started'); releaseSave = resolve; })
+  );
+  await settleSettingsInit(); // the page's own start-up applyTheme() has to be out of the way
+  sandbox.applyTheme = (t) => log.push('apply:' + t);
+  const darkRadio = themeRadioEls[1];
+  darkRadio.checked = true;
+  const pending = darkRadio._onChange();
+  await Promise.resolve();
+  assert.deepStrictEqual(log, ['apply:dark', 'save started'], 'applied first, then saved');
+  releaseSave();
+  await pending;
+  assert.deepStrictEqual(log, ['apply:dark', 'save started'], 'and not applied a second time afterwards');
+});
+
+testAsync('theme radio: if the save fails, the page goes back to the stored theme too, not just the radio', async () => {
+  const applied = [];
+  const { themeRadioEls, sandbox } = makeSettingsSandboxWithRadios(async () => { throw new Error('quota exceeded'); });
+  await settleSettingsInit();
+  sandbox.applyTheme = (t) => applied.push(t);
+  themeRadioEls[1].checked = true;
+  await themeRadioEls[1]._onChange();
+  assert.deepStrictEqual(applied, ['dark', 'light'], 'switched at once, then put back to the stored default');
+});
+
+// settings.js loads the stored settings (and applies the theme) as soon as it
+// starts; give that a few turns of the event loop to finish.
+async function settleSettingsInit() {
+  for (let i = 0; i < 6; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+}
 
