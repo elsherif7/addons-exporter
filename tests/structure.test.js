@@ -569,36 +569,79 @@ test('staged reveal: the Exporter and Importer cards opt in with the "staged" cl
   }
 });
 
-test('staged reveal: Exporter parts come in order after the card and the title', () => {
-  const html = readSrc('src/export/export.html');
-  const d = (sel) => {
-    const m = html.match(new RegExp(`\\.card\\.staged > ${sel} \\{ --d: ([\\d.]+)s; \\}`));
-    assert.ok(m, `no --d for ${sel}`);
-    return parseFloat(m[1]);
-  };
-  const order = [d('#exportDesc'), d('\\.list-controls'), d('\\.checklist-box'), d('#exportSelectedBtn')];
-  assert.ok(order[0] > 0.55, 'the first part waits for the title (0.55s)');
-  for (let i = 1; i < order.length; i++) assert.ok(order[i] > order[i - 1], `part ${i + 1} must come after part ${i}`);
-});
-
-test('staged reveal: Importer parts come in order after the card and the title', () => {
-  const html = readSrc('src/import/import.html');
-  const d = (sel) => {
-    const m = html.match(new RegExp(`\\.card\\.staged > ${sel} \\{ --d: ([\\d.]+)s; \\}`));
-    assert.ok(m, `no --d for ${sel}`);
-    return parseFloat(m[1]);
-  };
-  const order = [d('p:nth-of-type\\(1\\)'), d('p:nth-of-type\\(2\\)'), d('\\.picker'), d('#openSelectedBtn')];
-  assert.ok(order[0] > 0.55);
-  for (let i = 1; i < order.length; i++) assert.ok(order[i] > order[i - 1], `part ${i + 1} must come after part ${i}`);
-});
-
-test('staged reveal: parts shown later (search box, list, file chip) have no --d, so they wipe in immediately', () => {
+test('staged reveal: the Exporter and Importer load reveal.js, which times every part in page order', () => {
   for (const page of ['src/export/export.html', 'src/import/import.html']) {
     const html = readSrc(page);
-    for (const later of ['searchInput', 'listControls', 'checklistBox', 'fileNameRow']) {
-      assert.doesNotMatch(html, new RegExp(`#${later}[^{]*\\{[^}]*--d:`), `${page}: #${later} must not wait`);
-    }
+    assert.match(html, /<script src="\.\.\/common\/reveal\.js"><\/script>/, `${page} must load reveal.js`);
+    // The start times come from reveal.js now, not from hand-written --d rules.
+    assert.doesNotMatch(html, /--d:/, `${page} must not hard-code --d any more`);
+  }
+});
+
+test('step by step: the description on the Exporter and both paragraphs on the Importer are marked intro-text', () => {
+  assert.match(readSrc('src/export/export.html'), /<p id="exportDesc" class="intro-text">/);
+  const imp = readSrc('src/import/import.html');
+  assert.strictEqual((imp.match(/<p class="intro-text">/g) || []).length, 2);
+});
+
+test('staged reveal: the Exporter search box takes its place in the order even though it is shown later (data-stage)', () => {
+  assert.match(readSrc('src/export/export.html'), /id="searchInput"[^>]*data-stage[^>]*style="display:none;"/);
+  // The Importer's search box is revealed whenever a file is chosen, so it must NOT hold a slot.
+  assert.doesNotMatch(readSrc('src/import/import.html'), /id="searchInput"[^>]*data-stage/);
+});
+
+test('staged reveal: no leftover rule makes the search box appear at once, ahead of the text above it', () => {
+  assert.doesNotMatch(sharedCssForMotion, /#searchInput, #listControls, #checklistBox, #fileNameRow \{ animation-delay: 0s; \}/);
+});
+
+// The Settings page is the reference: the other pages must animate exactly like it.
+function keyframesBody(src, name) {
+  const m = src.match(new RegExp(`@keyframes ${name} \\{([\\s\\S]*?)\\n\\s*\\}\\n`));
+  assert.ok(m, `@keyframes ${name} not found`);
+  return m[1].replace(/\s+/g, ' ').trim();
+}
+
+test('same as Settings: the Exporter, Importer and report use the very same animations as the Settings page', () => {
+  const settings = readSrc('src/settings/settings.html');
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['report.css', reportCssForMotion]]) {
+    assert.strictEqual(keyframesBody(src, 'hub-unfold'), keyframesBody(settings, 'settings-card-unfold'), `${name}: card unfold`);
+    assert.strictEqual(keyframesBody(src, 'hub-title-in'), keyframesBody(settings, 'settings-title-in'), `${name}: title`);
+    assert.strictEqual(keyframesBody(src, 'hub-wipe-in'), keyframesBody(settings, 'settings-wipe-in'), `${name}: wipe (parts and rows)`);
+    assert.strictEqual(keyframesBody(src, 'hub-slide-in'), keyframesBody(settings, 'settings-slide-in'), `${name}: slide (headings)`);
+  }
+});
+
+test('same as Settings: the same durations - card 0.8s, title 0.6s, parts and rows 0.55s', () => {
+  const settings = readSrc('src/settings/settings.html');
+  assert.match(settings, /animation-duration: 0\.8s;/);
+  assert.match(settings, /animation-name: settings-title-in;\s*animation-duration: 0\.6s;/);
+  assert.match(settings, /\.settings-group > \* \{[^}]*animation-duration: 0\.55s;/);
+  assert.match(sharedCssForMotion, /\.card\.staged \{ animation: hub-unfold 0\.8s /);
+  assert.match(sharedCssForMotion, /\.card\.staged > h1:first-child \{ animation: hub-title-in 0\.6s /);
+  assert.match(sharedCssForMotion, /\.card\.staged > :not\(h1\) \{ animation: hub-wipe-in 0\.55s /);
+  assert.match(sharedCssForMotion, /#addonList\.revealing \.addon-row \{[^}]*animation: hub-wipe-in 0\.55s /);
+  assert.match(sharedCssForMotion, /#addonList\.revealing \.group-heading \{[^}]*animation: hub-slide-in 0\.55s /);
+  assert.match(reportCssForMotion, /\.card \{ animation: hub-unfold 0\.8s /);
+  assert.match(reportCssForMotion, /\.card > h1 \{ animation: hub-title-in 0\.6s /);
+  assert.match(reportCssForMotion, /#addonList\.revealing \.addon-row \{[^}]*animation: hub-wipe-in 0\.55s /);
+});
+
+test('same as Settings: the same spacing - one part every 0.16s, one row every 0.08s', () => {
+  const settings = readSrc('src/settings/settings.html');
+  const groups = [1, 2, 3, 4, 5, 6].map((n) => parseFloat(settings.match(new RegExp(`:nth-of-type\\(${n}\\) \\{ --gd: ([\\d.]+)s; \\}`))[1]));
+  assert.strictEqual(Math.round((groups[1] - groups[0]) * 1000) / 1000, 0.16, 'Settings: sections 0.16s apart');
+  assert.match(settings, /var\(--i, 0\) \* 0\.08s/, 'Settings: rows 0.08s apart');
+  const reveal = readSrc('src/common/reveal.js');
+  assert.match(reveal, /const PART_STEP = 0\.16;/);
+  assert.match(reveal, /const ROW_STEP = 0\.08;/);
+  const tpl = readSrc('src/background/report-template.js');
+  assert.match(tpl, /PART_STEP = 0\.16/);
+  assert.match(tpl, /ROW_STEP = 0\.08/);
+});
+
+test('same as Settings: nothing from the older versions is left over (no typewriter, no box-then-label, no line reveal)', () => {
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['report.css', reportCssForMotion], ['reveal.js', readSrc('src/common/reveal.js')]]) {
+    assert.doesNotMatch(src, /tw-char|hub-lines-in|reveal-lines|type-text|label-in|hub-row-in|--dt/, `${name} still has an older reveal`);
   }
 });
 
@@ -608,7 +651,7 @@ test('staged reveal: shared.css order is card (0.15s) -> title (0.55s) -> parts 
   assert.match(sharedCssForMotion, /\.card\.staged > :not\(h1\) \{ animation: hub-wipe-in [^;]*backwards; animation-delay: var\(--d, 0s\); \}/);
 });
 
-test('staged reveal: the report opens in order - card, title, intro, search box, list', () => {
+test('staged reveal: the report opens in order - card, title, intro, search box, list (also without its script)', () => {
   const delay = (re, label) => {
     const m = reportCssForMotion.match(re);
     assert.ok(m, `${label} delay not found`);
@@ -616,10 +659,19 @@ test('staged reveal: the report opens in order - card, title, intro, search box,
   };
   const card = delay(/\.card \{ animation: hub-unfold [^;]*; animation-delay: ([\d.]+)s; \}/, 'card');
   const title = delay(/\.card > h1 \{ animation: hub-title-in [^;]*; animation-delay: ([\d.]+)s; \}/, 'title');
-  const intro = delay(/\.card > p \{ animation: hub-wipe-in [^;]*; animation-delay: ([\d.]+)s; \}/, 'intro');
-  const search = delay(/\.card > \.search-input \{ animation: hub-wipe-in [^;]*; animation-delay: ([\d.]+)s; \}/, 'search');
-  const list = delay(/\.card > \.checklist-box \{ animation: hub-wipe-in [^;]*; animation-delay: ([\d.]+)s; \}/, 'list');
+  const intro = delay(/\.card > \.intro-text \{ animation: hub-wipe-in [^;]*; animation-delay: var\(--d, ([\d.]+)s\); \}/, 'intro');
+  const search = delay(/\.card > \.search-input \{ animation: hub-wipe-in [^;]*; animation-delay: var\(--d, ([\d.]+)s\); \}/, 'search');
+  const list = delay(/\.card > \.checklist-box \{ animation: hub-wipe-in [^;]*; animation-delay: var\(--d, ([\d.]+)s\); \}/, 'list');
   assert.ok(card > 0 && title > card && intro > title && search > intro && list > search);
+});
+
+test('same as Settings: the report times its parts and rows with its own script, and switches the entrance off afterwards', () => {
+  const tpl = readSrc('src/background/report-template.js');
+  assert.match(tpl, /<p class="intro-text"><strong>Tip:<\/strong>/);
+  assert.match(tpl, /<div id="addonList" class="revealing">/);
+  assert.match(tpl, /Opening reveal - mirrors src\/common\/reveal\.js/);
+  assert.match(tpl, /list\.classList\.remove\('revealing'\)/, 'the flag is taken away again so searching never replays the entrance');
+  assert.match(tpl, /Opening reveal[\s\S]*prefers-reduced-motion: reduce/, 'skipped for reduced motion');
 });
 
 test('staged reveal: clipped reveals in shared.css and the report end beyond the box (shadows and focus rings stay visible)', () => {
@@ -660,3 +712,19 @@ test('settings: the Light and Dark rows carry the report\'s sun and moon icons, 
   assert.ok(report.includes('M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z'), 'report moon path');
 });
 
+
+// --- Tab icons (favicons) ---
+
+test('favicon: every full page (the ones that open in a tab) links an icon, and that file really exists', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const root = path.join(__dirname, '..');
+  const pages = ['src/export/export.html', 'src/import/import.html', 'src/settings/settings.html', 'src/confirmation/confirmation.html'];
+  for (const page of pages) {
+    const m = readSrc(page).match(/<link rel="icon" href="([^"]+)">/);
+    assert.ok(m, `${page} has no <link rel="icon">, so its tab would show no icon`);
+    // Relative links resolve from the page's own folder (src/<page>/), not the project root.
+    const resolved = path.resolve(root, path.dirname(page), m[1]);
+    assert.ok(fs.existsSync(resolved), `${page}: icon link "${m[1]}" points at ${path.relative(root, resolved)}, which does not exist`);
+  }
+});

@@ -150,14 +150,17 @@ body {
 .card > :nth-child(5) { animation-delay: 0.4s; }
 .card > :nth-child(n+6) { animation-delay: 0.48s; }
 /* Staged opening reveal - add the class "staged" to a page's card (the
-   Exporter and Importer do). First only the page background shows, then the
-   empty card UNFOLDS downward, then the title settles in as its letters
-   tighten up, then each part of the page wipes in from the left, top to
-   bottom. Each page sets the start time of its visible parts with --d (see
-   export.html / import.html); anything revealed later (search box, list,
-   after a file is chosen) has no --d, so it wipes in at once when shown.
-   backwards fill throughout, so nothing shows before its turn and no held
-   keyframe overrides :hover. Reduced motion zeroes the delays (below). */
+   Exporter and Importer do). It is the SAME reveal the Settings page has,
+   with the same animations, durations and spacing: first only the page
+   background shows, then the empty card UNFOLDS downward, then the title
+   settles in as its letters tighten up, then each part of the page wipes in
+   from the left, top to bottom, one every 0.16s, and the add-on rows follow,
+   one every 0.08s (group headings slide in, rows wipe in). reveal.js sets the
+   start times: --d for a part, --rd for a list row. Anything revealed later
+   (the Importer's list, after a file is chosen) has no --d, so it wipes in
+   at once when shown. backwards fill throughout, so nothing shows before its
+   turn and no held keyframe overrides :hover. Reduced motion zeroes the
+   delays (below) and reveal.js does not run. */
 @keyframes hub-unfold {
   from { opacity: 0; transform: translateY(20px); clip-path: inset(0 0 100% 0 round 12px); }
   to   { opacity: 1; transform: none; clip-path: inset(-60px round 12px); }
@@ -170,12 +173,15 @@ body {
   from { opacity: 0; transform: translateX(-14px); clip-path: inset(0 100% 0 0 round 8px); }
   to   { opacity: 1; transform: none; clip-path: inset(-8px round 8px); }
 }
+@keyframes hub-slide-in {
+  from { opacity: 0; transform: translateX(-18px); }
+  to   { opacity: 1; transform: none; }
+}
 .card.staged { animation: hub-unfold 0.8s var(--motion-ease) backwards; animation-delay: 0.15s; }
 .card.staged > h1:first-child { animation: hub-title-in 0.6s var(--motion-ease) backwards; animation-delay: 0.55s; }
 .card.staged > :not(h1) { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 0s); }
-/* Parts of a page that are revealed later (after a file is chosen, or once
-   the list has loaded) animate in at once instead of waiting their turn. */
-#searchInput, #listControls, #checklistBox, #fileNameRow { animation-delay: 0s; }
+/* A part with no --d (the Importer's list, search box and file name, revealed
+   only after a file is chosen) has nothing to wait for and wipes in at once. */
 /* replayEntrance() (common.js) adds this for one frame to restart the
    entrance animations (the card and everything inside it), e.g. when an
    already-open Settings tab is opened again from the popup. */
@@ -255,8 +261,10 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   padding: 6px 12px;
   white-space: nowrap;
 }
-/* Nothing to say yet (before the list loads): no empty badge. */
+/* Nothing to say yet (before the list loads): no empty badge. When it first
+   gets text it fades in. */
 #selectionCount:empty { display: none; }
+#selectionCount { animation: hub-fade-in var(--motion-normal) ease backwards; }
 .checklist-box {
   text-align: left;
   overflow-x: hidden;
@@ -386,6 +394,19 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 /* A row/group inserted into the page starts transparent and fades in. */
 @starting-style {
   .addon-row, .group-container, #addonList { opacity: 0; }
+}
+/* List rows and group headings appear one after another, top to bottom,
+   when a list is first drawn - the headings slide in and the rows wipe in,
+   exactly like Settings' headings and rows. reveal.js gives
+   every row its own start time (--rd), flags the list .revealing just long
+   enough, and removes the flag again so filtering never replays this. */
+#addonList.revealing .addon-row {
+  animation: hub-wipe-in 0.55s var(--motion-ease) backwards;
+  animation-delay: var(--rd, 0s);
+}
+#addonList.revealing .group-heading {
+  animation: hub-slide-in 0.55s var(--motion-ease) backwards;
+  animation-delay: var(--rd, 0s);
 }
 .match-label {
   font-size: 12px;

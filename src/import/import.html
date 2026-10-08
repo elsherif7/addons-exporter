@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="../common/theme.js"></script>
-<link rel="icon" href="../icons/icon48.png">
+<link rel="icon" href="../../icons/icon48.png">
 <link rel="stylesheet" href="../common/shared.css">
 <title>Add-ons Importer</title>
 <style>
@@ -49,21 +49,13 @@
     display: block;
   }
 
-  /* Opening reveal, top to bottom (see "staged" in shared.css): the page
-     background, then the card, then the title, then each visible part in
-     turn. The search box, list and file name are revealed later, when a
-     file is chosen, and wipe in then (they have no --d). */
-  .card.staged > p:nth-of-type(1) { --d: 0.7s; }
-  .card.staged > p:nth-of-type(2) { --d: 0.82s; }
-  .card.staged > .picker { --d: 0.94s; }
-  .card.staged > #openSelectedBtn { --d: 1.06s; }
 </style>
 </head>
 <body>
   <div class="card staged">
     <h1>Add-ons Importer</h1>
-    <p>Pick an <strong>exported file</strong> from <strong>Add-ons Exporter</strong>. HTML, JSON, or CSV formats are all supported. The Add-ons you don't have yet are pre-selected, while your installed ones are shown too if you want to check them.</p>
-    <p><strong>Note:</strong> Firefox doesn't allow any extension, including this one, to&nbsp;automatically install other add-ons. It can only open each add-on's page as&nbsp;a tab for you. You'll still need to click <strong>Add&nbsp;to&nbsp;Firefox</strong> yourself on each one.</p>
+    <p class="intro-text">Pick an <strong>exported file</strong> from <strong>Add-ons Exporter</strong>. HTML, JSON, or CSV formats are all supported. The Add-ons you don't have yet are pre-selected, while your installed ones are shown too if you want to check them.</p>
+    <p class="intro-text"><strong>Note:</strong> Firefox doesn't allow any extension, including this one, to&nbsp;automatically install other add-ons. It can only open each add-on's page as&nbsp;a tab for you. You'll still need to click <strong>Add&nbsp;to&nbsp;Firefox</strong> yourself on each one.</p>
 
     <div class="picker" id="picker">
       <button id="chooseFileBtn" class="hub-btn">Choose file</button>
@@ -97,6 +89,7 @@
 
   <script src="../common/common.js"></script>
   <script src="../common/press.js"></script>
+  <script src="../common/reveal.js"></script>
   <script src="import.js"></script>
 </body>
 </html>

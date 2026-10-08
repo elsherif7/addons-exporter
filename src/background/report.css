@@ -86,7 +86,10 @@
   /* The theme toggle is absolutely positioned inside the card; it just
      fades in with the title. */
   .card > .theme-toggle { animation: hub-fade-in var(--motion-normal) ease backwards; animation-delay: 0.55s; }
-  .card > p { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: 0.7s; }
+  /* The same reveal as the Settings page: the intro, the search box and the
+     list box wipe in under the title, one every 0.16s; the inline script sets
+     their start times in --d (the fallbacks are the same timings without it). */
+  .card > .intro-text { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 0.82s); }
   .cta-link { color: var(--link-accent); font-weight: bold; text-decoration: none; }
   .cta-link:hover { text-decoration: underline; }
   .theme-toggle {
@@ -193,8 +196,25 @@
   /* The rest of the opening reveal (see the staged block near the top).
      Kept down here, after the .search-input and .checklist-box rules they
      extend, because the drift tests read the first rule of each selector. */
-  .card > .search-input { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: 0.82s; }
-  .card > .checklist-box { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: 0.94s; }
+  .card > .search-input { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 0.98s); }
+  .card > .checklist-box { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 1.14s); }
+  /* The list rows and group headings cascade in one after another, top to
+     bottom, one every 0.08s - the headings slide in and the rows wipe in,
+     like the Settings page's. The inline script gives every row its start
+     time (--rd) and removes the "revealing" flag once the last row is in, so
+     searching never replays this. */
+  @keyframes hub-slide-in {
+    from { opacity: 0; transform: translateX(-18px); }
+    to   { opacity: 1; transform: none; }
+  }
+  #addonList.revealing .addon-row {
+    animation: hub-wipe-in 0.55s var(--motion-ease) backwards;
+    animation-delay: var(--rd, 0s);
+  }
+  #addonList.revealing .group-heading {
+    animation: hub-slide-in 0.55s var(--motion-ease) backwards;
+    animation-delay: var(--rd, 0s);
+  }
 
   /* Light/dark switch. Where the browser supports view transitions
      (Firefox 144+), theme.js wraps the theme change in

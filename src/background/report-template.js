@@ -178,7 +178,10 @@ function buildHtmlReport(list, theme, shorten = true) {
   /* The theme toggle is absolutely positioned inside the card; it just
      fades in with the title. */
   .card > .theme-toggle { animation: hub-fade-in var(--motion-normal) ease backwards; animation-delay: 0.55s; }
-  .card > p { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: 0.7s; }
+  /* The same reveal as the Settings page: the intro, the search box and the
+     list box wipe in under the title, one every 0.16s; the inline script sets
+     their start times in --d (the fallbacks are the same timings without it). */
+  .card > .intro-text { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 0.82s); }
   .cta-link { color: var(--link-accent); font-weight: bold; text-decoration: none; }
   .cta-link:hover { text-decoration: underline; }
   .theme-toggle {
@@ -285,8 +288,25 @@ function buildHtmlReport(list, theme, shorten = true) {
   /* The rest of the opening reveal (see the staged block near the top).
      Kept down here, after the .search-input and .checklist-box rules they
      extend, because the drift tests read the first rule of each selector. */
-  .card > .search-input { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: 0.82s; }
-  .card > .checklist-box { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: 0.94s; }
+  .card > .search-input { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 0.98s); }
+  .card > .checklist-box { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 1.14s); }
+  /* The list rows and group headings cascade in one after another, top to
+     bottom, one every 0.08s - the headings slide in and the rows wipe in,
+     like the Settings page's. The inline script gives every row its start
+     time (--rd) and removes the "revealing" flag once the last row is in, so
+     searching never replays this. */
+  @keyframes hub-slide-in {
+    from { opacity: 0; transform: translateX(-18px); }
+    to   { opacity: 1; transform: none; }
+  }
+  #addonList.revealing .addon-row {
+    animation: hub-wipe-in 0.55s var(--motion-ease) backwards;
+    animation-delay: var(--rd, 0s);
+  }
+  #addonList.revealing .group-heading {
+    animation: hub-slide-in 0.55s var(--motion-ease) backwards;
+    animation-delay: var(--rd, 0s);
+  }
 
   /* Light/dark switch. Where the browser supports view transitions
      (Firefox 144+), theme.js wraps the theme change in
@@ -355,12 +375,12 @@ function buildHtmlReport(list, theme, shorten = true) {
     }
   </button>
   <h1>Add-ons Exporter</h1>
-  <p><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener">Add-ons Hub</a> installed, click its toolbar icon, choose <strong>Add-ons Importer</strong>, and select this file - any add-ons you don't already have will be pre-selected to open.</p>
+  <p class="intro-text"><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener">Add-ons Hub</a> installed, click its toolbar icon, choose <strong>Add-ons Importer</strong>, and select this file - any add-ons you don't already have will be pre-selected to open.</p>
 
   <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
 
   <div class="checklist-box">
-    <div id="addonList">
+    <div id="addonList" class="revealing">
       <div class="groups-outer-box">
         ${section('Enabled', list.filter(a => a.enabled).sort(byName))}
         ${section('Disabled', list.filter(a => !a.enabled).sort(byName))}
@@ -477,6 +497,39 @@ function buildHtmlReport(list, theme, shorten = true) {
       setFilterVisible(addonListEl, anyMatch);
       noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
     });
+
+    // Opening reveal - mirrors src/common/reveal.js, which a saved report
+    // can't load; it is the same reveal the extension's Settings page has.
+    // Gives the intro, the search box and the list box their start times
+    // (--d, one every 0.16s) and the list rows theirs (--rd, one every
+    // 0.08s), and takes the "revealing" flag off the list afterwards so
+    // searching never replays the entrance. Skipped for reduced motion.
+    (function () {
+      if (typeof document.querySelector !== 'function' || typeof getComputedStyle !== 'function') return;
+      if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var card = document.querySelector('.card');
+      if (!card || !card.children) return;
+      var START = 0.82, PART_STEP = 0.16, ROW_LEAD = 0.08, ROW_STEP = 0.08, ROW_ANIMATED_MAX = 14, ROW_DURATION = 0.55;
+      function round(n) { return Math.round(n * 1000) / 1000; }
+      var t = START;
+      var listBase = 1.22;
+      Array.prototype.forEach.call(card.children, function (child) {
+        if (child.id === 'themeToggle' || child.tagName === 'H1') return;
+        if (getComputedStyle(child).display === 'none') return;
+        child.style.setProperty('--d', round(t) + 's');
+        if (child.classList.contains('checklist-box')) listBase = t + ROW_LEAD;
+        t += PART_STEP;
+      });
+      var list = document.getElementById('addonList');
+      if (list) {
+        var items = list.querySelectorAll('.group-heading, .addon-row');
+        Array.prototype.forEach.call(items, function (item, k) {
+          item.style.setProperty('--rd', round(listBase + Math.min(k, ROW_ANIMATED_MAX) * ROW_STEP) + 's');
+        });
+        var done = listBase + Math.min(items.length, ROW_ANIMATED_MAX) * ROW_STEP + ROW_DURATION + 0.3;
+        setTimeout(function () { list.classList.remove('revealing'); }, Math.ceil(done * 1000));
+      }
+    })();
 
     // Click/tap feedback: a ring (or, for rows, a tinted flash) bursts out
     // of whatever is pressed. Mirrors src/common/press.js, which a saved
