@@ -613,6 +613,20 @@ if (browser.runtime.onMessage) {
   });
 }
 
+// Keep this page's options in step with the stored settings when they change
+// from somewhere else: another Settings tab, a settings import, a reset. (The
+// theme itself is applied by theme.js; this keeps the radio buttons honest.)
+// Programmatically ticking a radio does not fire its change event, so this
+// cannot loop back into saving.
+if (browser.storage && browser.storage.onChanged) {
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes[THEME_STORAGE_KEY]) loadCurrentTheme();
+    if (changes[EXPORT_FORMAT_STORAGE_KEY]) loadCurrentExportFormat();
+    if (changes[SHORT_NAME_STORAGE_KEY]) loadCurrentShortenNames();
+  });
+}
+
 // Clear the settings status message whenever the user interacts with
 // anything on the page — radio change, button click, file input — so it
 // doesn't linger after they've moved on to something else.

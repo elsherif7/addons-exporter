@@ -335,7 +335,7 @@ testAsync('export.js real DOM: Select All while a search is active only checks t
 // --- A33: cross-tab export-format sync via storage.onChanged ---
 
 testAsync('storage.onChanged: an export-format change from another tab refreshes the description', async () => {
-  let registeredListener = null;
+  const registeredListeners = [];
   let getCallCount = 0;
   const { document, elements } = makeFakeDom([
     'addonList', 'selectAllBtn', 'deselectAllBtn', 'exportSelectedBtn',
@@ -356,7 +356,7 @@ testAsync('storage.onChanged: an export-format change from another tab refreshes
             return getCallCount === 1 ? {} : { exportFormat: 'json' };
           },
         },
-        onChanged: { addListener: (fn) => { registeredListener = fn; } },
+        onChanged: { addListener: (fn) => { registeredListeners.push(fn); } },
       },
     },
   };
@@ -365,10 +365,10 @@ testAsync('storage.onChanged: an export-format change from another tab refreshes
   vm.runInContext(exportSrc, sandbox);
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  assert.ok(registeredListener, 'a storage.onChanged listener should have been registered');
+  assert.ok(registeredListeners.length > 0, 'a storage.onChanged listener should have been registered');
   assert.doesNotMatch(elements.exportDesc.textContent, /JSON file/);
 
-  registeredListener({ exportFormat: { newValue: 'json' } }, 'local');
+  registeredListeners.forEach((fn) => fn({ exportFormat: { newValue: 'json' } }, 'local'));
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.match(elements.exportDesc.textContent, /JSON file/);
@@ -390,3 +390,68 @@ testAsync('export.js real DOM: the AMO link searches by name (not a guessed id U
   const label = row.querySelector('label');
   assert.strictEqual(label.contains(link), false, 'the link must not be inside the label (it would be absorbed into the checkbox\'s accessible name)');
 });
+
+// --- Live "Shorten add-on names": an already-open Exporter follows the setting ---
+
+async function renderExportListWithLiveSettings(addons, stored = {}) {
+  const { document, elements } = makeFakeDom([
+    'addonList', 'selectAllBtn', 'deselectAllBtn', 'exportSelectedBtn',
+    'status', 'selectionCount', 'searchInput', 'noSearchMatches', 'exportDesc',
+  ]);
+  const listeners = [];
+  const sandbox = {
+    document,
+    URL,
+    browser: {
+      runtime: { sendMessage: async (msg) => (msg.type === 'listAddons' ? addons : undefined), onMessage: { addListener() {} }, getURL: (p) => p },
+      storage: { local: { get: async () => stored }, onChanged: { addListener: (fn) => listeners.push(fn) } },
+    },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(commonSrc, sandbox);
+  vm.runInContext(exportSrc, sandbox);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const fire = (changes, area = 'local') => listeners.forEach((fn) => fn(changes, area));
+  const names = () => elements.addonList.querySelectorAll('.addon-name').map((n) => n.textContent);
+  return { elements, fire, names };
+}
+
+const LONG_NAMES = [
+  { id: 'a@x', name: 'uBlock Origin - free ad blocker', version: '1.0', enabled: true, type: 'extension' },
+  { id: 'b@x', name: 'Dark Reader: dark mode', version: '2.0', enabled: true, type: 'extension' },
+];
+
+testAsync('live names (Exporter): switching "Shorten add-on names" off shows the full names at once, and back on shortens them again', async () => {
+  const { fire, names } = await renderExportListWithLiveSettings(LONG_NAMES);
+  assert.deepStrictEqual(names(), ['Dark Reader', 'uBlock Origin'], 'starts shortened (the default)');
+  fire({ shortenNames: { newValue: 'off' } });
+  assert.deepStrictEqual(names(), ['Dark Reader: dark mode', 'uBlock Origin - free ad blocker']);
+  fire({ shortenNames: { newValue: 'on' } });
+  assert.deepStrictEqual(names(), ['Dark Reader', 'uBlock Origin']);
+});
+
+testAsync('live names (Exporter): a reset (the setting removed) goes back to the default, shortened', async () => {
+  const { fire, names } = await renderExportListWithLiveSettings(LONG_NAMES, { shortenNames: 'off' });
+  assert.deepStrictEqual(names(), ['Dark Reader: dark mode', 'uBlock Origin - free ad blocker'], 'starts with full names');
+  fire({ shortenNames: { oldValue: 'off' } }); // no newValue: removed
+  assert.deepStrictEqual(names(), ['Dark Reader', 'uBlock Origin']);
+});
+
+testAsync('live names (Exporter): other settings and other storage areas leave the names alone', async () => {
+  const { fire, names } = await renderExportListWithLiveSettings(LONG_NAMES);
+  fire({ theme: { newValue: 'dark' } });
+  fire({ shortenNames: { newValue: 'off' } }, 'sync');
+  assert.deepStrictEqual(names(), ['Dark Reader', 'uBlock Origin']);
+});
+
+testAsync('live names (Exporter): a search in progress is applied again to the new names', async () => {
+  const { elements, fire } = await renderExportListWithLiveSettings(LONG_NAMES);
+  elements.searchInput.value = 'free ad';
+  elements.searchInput.dispatchEvent('input');
+  const visible = () => elements.addonList.querySelectorAll('.addon-row')
+    .filter((r) => r.style.display !== 'none').map((r) => r.querySelector('.addon-name').textContent);
+  assert.deepStrictEqual(visible(), [], 'the search matches what is shown - the short names - so nothing yet');
+  fire({ shortenNames: { newValue: 'off' } });
+  assert.deepStrictEqual(visible(), ['uBlock Origin - free ad blocker'], 'now the full name is shown, and the search finds it without retyping');
+});
+

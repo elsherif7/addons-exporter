@@ -362,3 +362,44 @@ function replayEntrance() {
 // open at once. Used by import.js (fallback) and background.js.
 const TAB_OPEN_DELAY_MS = 150;
 
+// --- Live settings ------------------------------------------------------------
+// Settings changed anywhere (the Settings page, a settings import, a reset)
+// reach every other open extension page through storage.onChanged. The theme
+// (theme.js), the export format (export.js) and the Settings page's own
+// options already follow it; these two make "Shorten add-on names" follow it
+// too, so the names on an already-open Exporter or Importer change the moment
+// the setting does.
+
+// Switches every row's name between its short and its full form, in place.
+// Rows remember their full name (data-full-name); anything without one is
+// left alone. Returns how many names changed, and gives each a quick fade so
+// the change is noticed (skipped for reduced motion).
+function applyNameShortening(root, shorten) {
+  const reduced = typeof matchMedia === 'function' &&
+    matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let changed = 0;
+  for (const nameEl of Array.from(root.querySelectorAll('.addon-name'))) {
+    const full = nameEl.dataset && nameEl.dataset.fullName;
+    if (full === undefined) continue;
+    const next = shorten ? shortName(full) : full;
+    if (nameEl.textContent === next) continue;
+    nameEl.textContent = next;
+    changed++;
+    if (!reduced && typeof nameEl.animate === 'function') {
+      nameEl.animate([{ opacity: 0.15 }, { opacity: 1 }], { duration: 350, easing: 'ease-out' });
+    }
+  }
+  return changed;
+}
+
+// Calls handler(shorten) - true or false - whenever the "Shorten add-on
+// names" setting changes in storage, including when a reset removes it (which
+// means back to the default).
+function onShortenNamesChanged(handler) {
+  if (typeof browser === 'undefined' || !browser.storage || !browser.storage.onChanged) return;
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes[SHORT_NAME_STORAGE_KEY]) return;
+    handler(resolveShortenNames(changes[SHORT_NAME_STORAGE_KEY].newValue) === 'on');
+  });
+}
+

@@ -995,3 +995,67 @@ testAsync('import.js real DOM: no note shown when everything is new and nothing 
   ]);
   assert.strictEqual(elements.compareNote.textContent, '', 'no note needed when all add-ons are new');
 });
+
+// --- Live "Shorten add-on names": an already-open Importer follows the setting ---
+
+async function renderRealImportListLive(addons, stored = {}) {
+  const { document, elements } = makeFakeDom([
+    'status', 'fileName', 'fileNameRow', 'fileInput', 'picker', 'removeFileBtn',
+    'chooseFileBtn', 'listControls', 'addonList', 'checklistBox', 'selectAllBtn',
+    'deselectAllBtn', 'selectionCount', 'openSelectedBtn', 'compareNote',
+    'searchInput', 'noSearchMatches',
+  ]);
+  const listeners = [];
+  const sandbox = {
+    document,
+    URL,
+    browser: {
+      runtime: { sendMessage: async (msg) => (msg.type === 'listAddons' ? [] : undefined), getURL: (p) => p },
+      storage: { local: { get: async () => stored }, onChanged: { addListener: (fn) => listeners.push(fn) } },
+      tabs: { create: async () => ({}) },
+    },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(commonSrc, sandbox);
+  vm.runInContext(importSrc, sandbox);
+  sandbox.setSelectedFile(jsonAddonsFile(addons));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const fire = (changes, area = 'local') => listeners.forEach((fn) => fn(changes, area));
+  const names = () => elements.addonList.querySelectorAll('.addon-name').map((n) => n.textContent);
+  return { elements, fire, names };
+}
+
+const LIVE_ADDONS = [
+  { id: 'a@x', name: 'uBlock Origin - free ad blocker', version: '1.0', link: 'https://example.com/a' },
+  { id: 'b@x', name: 'Dark Reader: dark mode', version: '2.0', link: 'https://example.com/b' },
+];
+
+testAsync('live names (Importer): switching "Shorten add-on names" off shows the full names at once, and back on shortens them again', async () => {
+  const { fire, names } = await renderRealImportListLive(LIVE_ADDONS);
+  assert.deepStrictEqual(names().sort(), ['Dark Reader', 'uBlock Origin']);
+  fire({ shortenNames: { newValue: 'off' } });
+  assert.deepStrictEqual(names().sort(), ['Dark Reader: dark mode', 'uBlock Origin - free ad blocker']);
+  fire({ shortenNames: { newValue: 'on' } });
+  assert.deepStrictEqual(names().sort(), ['Dark Reader', 'uBlock Origin']);
+});
+
+testAsync('live names (Importer): a reset (the setting removed) goes back to shortened names', async () => {
+  const { fire, names } = await renderRealImportListLive(LIVE_ADDONS, { shortenNames: 'off' });
+  assert.deepStrictEqual(names().sort(), ['Dark Reader: dark mode', 'uBlock Origin - free ad blocker']);
+  fire({ shortenNames: { oldValue: 'off' } });
+  assert.deepStrictEqual(names().sort(), ['Dark Reader', 'uBlock Origin']);
+});
+
+testAsync('live names (Importer): a search in progress is applied again to the new names, and the selection is untouched', async () => {
+  const { elements, fire } = await renderRealImportListLive(LIVE_ADDONS);
+  const checkedBefore = elements.addonList.querySelectorAll('input[type="checkbox"]:checked').length;
+  elements.searchInput.value = 'free ad';
+  elements.searchInput.dispatchEvent('input');
+  const visible = () => elements.addonList.querySelectorAll('.addon-row')
+    .filter((r) => r.style.display !== 'none').map((r) => r.querySelector('.addon-name').textContent);
+  assert.deepStrictEqual(visible(), []);
+  fire({ shortenNames: { newValue: 'off' } });
+  assert.deepStrictEqual(visible(), ['uBlock Origin - free ad blocker']);
+  assert.strictEqual(elements.addonList.querySelectorAll('input[type="checkbox"]:checked').length, checkedBefore, 'ticked boxes stay ticked');
+});
+

@@ -728,3 +728,20 @@ test('favicon: every full page (the ones that open in a tab) links an icon, and 
     assert.ok(fs.existsSync(resolved), `${page}: icon link "${m[1]}" points at ${path.relative(root, resolved)}, which does not exist`);
   }
 });
+
+// --- Live settings: every open page follows a change made anywhere ---
+
+test('live settings: the theme, export format and name shortening each have a live listener on the pages that use them', () => {
+  assert.match(readSrc('src/common/theme.js'), /changes\[THEME_STORAGE_KEY\][\s\S]*applyTheme\(/, 'every page follows the theme');
+  assert.match(readSrc('src/export/export.js'), /changes\[EXPORT_FORMAT_STORAGE_KEY\][\s\S]*updateExportDesc\(\)/, 'the Exporter follows the export format');
+  for (const page of ['src/export/export.js', 'src/import/import.js']) {
+    const src = readSrc(page);
+    assert.match(src, /onShortenNamesChanged\(\(shorten\) => \{/, `${page} follows "Shorten add-on names"`);
+    assert.match(src, /nameSpan\.dataset\.fullName = a\.name|nameEl\.dataset\.fullName = a\.name/, `${page} rows remember their full name`);
+  }
+  const settings = readSrc('src/settings/settings.js');
+  for (const key of ['THEME_STORAGE_KEY', 'EXPORT_FORMAT_STORAGE_KEY', 'SHORT_NAME_STORAGE_KEY']) {
+    assert.match(settings, new RegExp(`changes\\[${key}\\]\\) load`), `the Settings page follows ${key}`);
+  }
+});
+

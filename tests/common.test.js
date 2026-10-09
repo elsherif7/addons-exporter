@@ -798,3 +798,83 @@ test('replayEntrance: safe no-op without a document or .card', () => {
   sb.replayEntrance();
 });
 
+// --- Live settings: applyNameShortening / onShortenNamesChanged ---
+
+function makeNameEl(full, shown, { animate = true } = {}) {
+  const el = { dataset: full === undefined ? {} : { fullName: full }, textContent: shown, animations: [] };
+  if (animate) el.animate = (keyframes, options) => { el.animations.push({ keyframes, options }); return {}; };
+  return el;
+}
+
+function makeNamesRoot(els) {
+  return { querySelectorAll: (sel) => (sel === '.addon-name' ? els : []) };
+}
+
+test('applyNameShortening: shows the short form when on and the full form when off, and says how many changed', () => {
+  const a = makeNameEl('uBlock Origin - free ad blocker', 'uBlock Origin - free ad blocker');
+  const b = makeNameEl('Dark Reader: dark mode', 'Dark Reader: dark mode');
+  const root = makeNamesRoot([a, b]);
+  assert.strictEqual(sandbox.applyNameShortening(root, true), 2);
+  assert.strictEqual(a.textContent, 'uBlock Origin');
+  assert.strictEqual(b.textContent, 'Dark Reader');
+  assert.strictEqual(sandbox.applyNameShortening(root, false), 2);
+  assert.strictEqual(a.textContent, 'uBlock Origin - free ad blocker');
+});
+
+test('applyNameShortening: a name that does not change (no separator, or already right) is left alone, with no fade', () => {
+  const plain = makeNameEl('Simple Name', 'Simple Name');
+  const already = makeNameEl('Tab Tool - helper', 'Tab Tool');
+  const changed = sandbox.applyNameShortening(makeNamesRoot([plain, already]), true);
+  assert.strictEqual(changed, 0);
+  assert.strictEqual(plain.animations.length + already.animations.length, 0);
+});
+
+test('applyNameShortening: each changed name fades in briefly so the change is noticed', () => {
+  const a = makeNameEl('A - x', 'A - x');
+  sandbox.applyNameShortening(makeNamesRoot([a]), true);
+  assert.strictEqual(a.animations.length, 1);
+  assert.strictEqual(a.animations[0].keyframes[0].opacity, 0.15);
+  assert.strictEqual(a.animations[0].keyframes[1].opacity, 1);
+});
+
+test('applyNameShortening: rows that never recorded a full name are skipped, and a missing animate() is fine', () => {
+  const noData = makeNameEl(undefined, 'Mystery - thing');
+  const noAnimate = makeNameEl('B - y', 'B - y', { animate: false });
+  const changed = sandbox.applyNameShortening(makeNamesRoot([noData, noAnimate]), true);
+  assert.strictEqual(changed, 1);
+  assert.strictEqual(noData.textContent, 'Mystery - thing');
+  assert.strictEqual(noAnimate.textContent, 'B');
+});
+
+test('onShortenNamesChanged: calls the handler with true/false, and a reset (setting removed) means the default, true', () => {
+  const listeners = [];
+  const sb = { URL, browser: { storage: { onChanged: { addListener: (fn) => listeners.push(fn) } } } };
+  vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
+  const seen = [];
+  sb.onShortenNamesChanged((v) => seen.push(v));
+  assert.strictEqual(listeners.length, 1);
+  listeners[0]({ shortenNames: { newValue: 'off' } }, 'local');
+  listeners[0]({ shortenNames: { newValue: 'on' } }, 'local');
+  listeners[0]({ shortenNames: { oldValue: 'off' } }, 'local');
+  listeners[0]({ shortenNames: { newValue: 'banana' } }, 'local');
+  assert.deepStrictEqual(seen, [false, true, true, true]);
+});
+
+test('onShortenNamesChanged: other settings, other storage areas, and pages without storage.onChanged are ignored safely', () => {
+  const listeners = [];
+  const sb = { URL, browser: { storage: { onChanged: { addListener: (fn) => listeners.push(fn) } } } };
+  vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
+  const seen = [];
+  sb.onShortenNamesChanged((v) => seen.push(v));
+  listeners[0]({ theme: { newValue: 'dark' } }, 'local');
+  listeners[0]({ shortenNames: { newValue: 'off' } }, 'sync');
+  assert.deepStrictEqual(seen, []);
+
+  const bare = { URL, browser: { storage: {} } };
+  vm.createContext(bare);
+  vm.runInContext(commonSrc, bare);
+  bare.onShortenNamesChanged(() => {}); // must not throw
+});
+

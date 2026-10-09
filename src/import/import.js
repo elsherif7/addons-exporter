@@ -356,6 +356,7 @@ function createAddonRow(a, i, isInstalled, shorten) {
   const nameEl = document.createElement('span');
   nameEl.className = 'addon-name';
   nameEl.textContent = shorten ? shortName(a.name) : a.name;
+  nameEl.dataset.fullName = a.name; // so the name can follow the Shorten setting live
 
   const amoLink = safe ? (() => {
     const lnk = document.createElement('a');
@@ -628,10 +629,18 @@ deselectAllBtn.addEventListener('click', () => {
   updateSelectionCount();
 });
 
-searchInput.addEventListener('input', () => {
+function applySearch() {
   const anyMatch = filterAddonRows(addonListEl, searchInput.value);
   setFilterVisible(addonListEl, anyMatch, 'block');
   noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
+}
+searchInput.addEventListener('input', applySearch);
+
+// "Shorten add-on names" changed (Settings page, a settings import, a reset):
+// the names on this already-open page change at once. What the search box
+// matches changes with them, so a search in progress is applied again.
+onShortenNamesChanged((shorten) => {
+  if (applyNameShortening(addonListEl, shorten) > 0 && searchInput.value) applySearch();
 });
 
 // Makes the whole row clickable, not just the checkbox/label text.

@@ -219,7 +219,7 @@ function makeRadioEl(value) {
   return { value, checked: false, _onChange: null, addEventListener(ev, fn) { if (ev === 'change') this._onChange = fn; } };
 }
 
-function makeSettingsSandboxWithRadios(storageSet) {
+function makeSettingsSandboxWithRadios(storageSet, { stored = {} } = {}) {
   const themeRadioEls = [makeRadioEl('light'), makeRadioEl('dark')];
   const formatRadioEls = [makeRadioEl('html'), makeRadioEl('json'), makeRadioEl('csv')];
   const shortenRadioEls = [makeRadioEl('on'), makeRadioEl('off')];
@@ -237,6 +237,7 @@ function makeSettingsSandboxWithRadios(storageSet) {
     documentElement: { setAttribute() {} },
   };
   const setCalls = [];
+  const changeListeners = [];
   const sb = {
     URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
     Blob: function Blob() {},
@@ -246,10 +247,11 @@ function makeSettingsSandboxWithRadios(storageSet) {
     browser: {
       storage: {
         local: {
-          get: async () => ({}),
+          get: async () => stored,
           set: storageSet || (async (o) => { setCalls.push(o); }),
           remove: async () => {},
         },
+        onChanged: { addListener: (fn) => changeListeners.push(fn) },
       },
       runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
     },
@@ -258,7 +260,7 @@ function makeSettingsSandboxWithRadios(storageSet) {
   vm.runInContext(themeSrc, sb);
   vm.runInContext(commonSrc, sb);
   vm.runInContext(settingsSrc, sb);
-  return { themeRadioEls, formatRadioEls, shortenRadioEls, statusEl, setCalls, sandbox: sb };
+  return { themeRadioEls, formatRadioEls, shortenRadioEls, statusEl, setCalls, sandbox: sb, stored, changeListeners };
 }
 
 testAsync('theme radio: a storage write failure shows an error and reverts the radio, instead of an unhandled rejection', async () => {
@@ -1203,4 +1205,41 @@ testAsync('theme radio: if the save fails, the page goes back to the stored them
 async function settleSettingsInit() {
   for (let i = 0; i < 6; i++) await new Promise((resolve) => setTimeout(resolve, 0));
 }
+
+// --- Live settings: this page's options follow the stored settings ---
+
+const ticked = (radios) => radios.filter((r) => r.checked).map((r) => r.value);
+
+testAsync('live settings (Settings page): options changed elsewhere (another tab, an import, a reset) show here at once', async () => {
+  const ctx = makeSettingsSandboxWithRadios(undefined, { stored: {} });
+  await settleSettingsInit();
+  assert.deepStrictEqual([ticked(ctx.themeRadioEls), ticked(ctx.formatRadioEls), ticked(ctx.shortenRadioEls)], [['light'], ['html'], ['on']]);
+
+  // Another tab (or a settings import) saves new choices.
+  Object.assign(ctx.stored, { theme: 'dark', exportFormat: 'json', shortenNames: 'off' });
+  ctx.changeListeners.forEach((fn) => fn({
+    theme: { newValue: 'dark' }, exportFormat: { newValue: 'json' }, shortenNames: { newValue: 'off' },
+  }, 'local'));
+  await settleSettingsInit();
+  assert.deepStrictEqual([ticked(ctx.themeRadioEls), ticked(ctx.formatRadioEls), ticked(ctx.shortenRadioEls)], [['dark'], ['json'], ['off']]);
+
+  // A reset removes them: back to the defaults.
+  delete ctx.stored.theme; delete ctx.stored.exportFormat; delete ctx.stored.shortenNames;
+  ctx.changeListeners.forEach((fn) => fn({
+    theme: { oldValue: 'dark' }, exportFormat: { oldValue: 'json' }, shortenNames: { oldValue: 'off' },
+  }, 'local'));
+  await settleSettingsInit();
+  assert.deepStrictEqual([ticked(ctx.themeRadioEls), ticked(ctx.formatRadioEls), ticked(ctx.shortenRadioEls)], [['light'], ['html'], ['on']]);
+});
+
+testAsync('live settings (Settings page): only the option that changed is reloaded, and other storage areas are ignored', async () => {
+  const ctx = makeSettingsSandboxWithRadios(undefined, { stored: { theme: 'dark' } });
+  await settleSettingsInit();
+  ctx.themeRadioEls[0].checked = true; // deliberately out of step, to see whether it gets touched
+  ctx.themeRadioEls[1].checked = false;
+  ctx.changeListeners.forEach((fn) => fn({ exportFormat: { newValue: 'csv' } }, 'local'));
+  ctx.changeListeners.forEach((fn) => fn({ theme: { newValue: 'dark' } }, 'sync'));
+  await settleSettingsInit();
+  assert.deepStrictEqual(ticked(ctx.themeRadioEls), ['light'], 'the theme was not reloaded by an export-format change or a sync-area change');
+});
 
