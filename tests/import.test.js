@@ -1059,3 +1059,141 @@ testAsync('live names (Importer): a search in progress is applied again to the n
   assert.strictEqual(elements.addonList.querySelectorAll('input[type="checkbox"]:checked').length, checkedBefore, 'ticked boxes stay ticked');
 });
 
+// --- Removing the file (the x) plays the opening in reverse, then really removes it ---
+
+async function renderImportForRemoval(addons, { reducedMotion = false, slowFile = null } = {}) {
+  const { document, elements } = makeFakeDom([
+    'status', 'fileName', 'fileNameRow', 'fileInput', 'picker', 'removeFileBtn',
+    'chooseFileBtn', 'listControls', 'addonList', 'checklistBox', 'selectAllBtn',
+    'deselectAllBtn', 'selectionCount', 'openSelectedBtn', 'compareNote',
+    'searchInput', 'noSearchMatches',
+  ]);
+  const log = [];     // every element.animate() call, in order
+  const pending = []; // controllable animations
+  const animatable = (el, name) => {
+    el.animate = (keyframes, options) => {
+      let resolve;
+      const finished = new Promise((r) => { resolve = r; });
+      const anim = { name, keyframes, options, finished, cancelled: false, resolve, cancel() { anim.cancelled = true; } };
+      log.push(anim);
+      pending.push(anim);
+      return anim;
+    };
+  };
+  for (const name of ['checklistBox', 'listControls', 'searchInput', 'compareNote', 'fileNameRow', 'chooseFileBtn']) animatable(elements[name], name);
+  const sandbox = {
+    document,
+    URL,
+    matchMedia: () => ({ matches: reducedMotion }),
+    browser: {
+      runtime: { sendMessage: async (msg) => (msg.type === 'listAddons' ? [] : undefined), getURL: (p) => p },
+      storage: { local: { get: async () => ({}) }, onChanged: { addListener() {} } },
+      tabs: { create: async () => ({}) },
+    },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(commonSrc, sandbox);
+  vm.runInContext(importSrc, sandbox);
+  sandbox.setSelectedFile(slowFile || jsonAddonsFile(addons));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  log.length = 0; // forget animations from loading the file
+  pending.length = 0;
+  const finishAll = async () => {
+    pending.forEach((a) => a.resolve());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  };
+  return { elements, sandbox, log, finishAll };
+}
+
+const REMOVAL_ADDONS = [
+  { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
+  { id: 'b@x', name: 'Beta', version: '2.0', link: 'https://example.com/b' },
+];
+
+testAsync('remove file (x): the page plays out in reverse - lowest part first, each 80ms after the one below it, sliding left and fading', async () => {
+  const { elements, log } = await renderImportForRemoval(REMOVAL_ADDONS);
+  elements.removeFileBtn.click();
+  assert.deepStrictEqual(log.map((a) => a.name), ['checklistBox', 'listControls', 'searchInput', 'fileNameRow']);
+  assert.deepStrictEqual(log.map((a) => a.options.delay), [0, 80, 160, 240]);
+  for (const a of log) {
+    assert.strictEqual(a.keyframes[1].opacity, 0);
+    assert.strictEqual(a.keyframes[1].transform, 'translateX(-14px)');
+    assert.strictEqual(a.options.fill, 'forwards', 'held at the end frame until the file is really gone');
+  }
+});
+
+testAsync('remove file (x): the file is only really removed once the exit has finished', async () => {
+  const { elements, finishAll } = await renderImportForRemoval(REMOVAL_ADDONS);
+  elements.removeFileBtn.click();
+  assert.strictEqual(elements.fileNameRow.style.display, 'flex', 'still showing while it animates out');
+  assert.strictEqual(elements.addonList.querySelectorAll('.addon-row').length, 2);
+  await finishAll();
+  assert.strictEqual(elements.fileNameRow.style.display, 'none');
+  assert.strictEqual(elements.chooseFileBtn.style.display, '');
+  assert.strictEqual(elements.addonList.querySelectorAll('.addon-row').length, 0);
+  assert.strictEqual(elements.status.textContent, '');
+});
+
+testAsync('remove file (x): the held end frames are cancelled afterwards, so the next file\'s list is not left invisible', async () => {
+  const { elements, log, finishAll } = await renderImportForRemoval(REMOVAL_ADDONS);
+  elements.removeFileBtn.click();
+  const exit = log.slice();
+  await finishAll();
+  assert.ok(exit.every((a) => a.cancelled), 'every exit animation was cancelled once the file was gone');
+});
+
+testAsync('remove file (x): "Choose file" pops back in once the file is gone', async () => {
+  const { elements, log, finishAll } = await renderImportForRemoval(REMOVAL_ADDONS);
+  elements.removeFileBtn.click();
+  await finishAll();
+  const pop = log.find((a) => a.name === 'chooseFileBtn');
+  assert.ok(pop, 'the button animates in');
+  assert.strictEqual(pop.keyframes[0].opacity, 0);
+  assert.strictEqual(pop.keyframes[1].opacity, 1);
+});
+
+testAsync('remove file (x): pressing it twice does not start a second exit', async () => {
+  const { elements, log } = await renderImportForRemoval(REMOVAL_ADDONS);
+  elements.removeFileBtn.click();
+  elements.removeFileBtn.click();
+  assert.strictEqual(log.length, 4);
+});
+
+testAsync('remove file (x): a note under the file name is part of the exit; with nothing to say it is skipped', async () => {
+  const withNote = await renderImportForRemoval(REMOVAL_ADDONS);
+  withNote.elements.compareNote.textContent = 'You already have every add-on from this export installed.';
+  withNote.elements.removeFileBtn.click();
+  assert.deepStrictEqual(withNote.log.map((a) => a.name), ['checklistBox', 'listControls', 'searchInput', 'compareNote', 'fileNameRow']);
+});
+
+testAsync('remove file (x): choosing another file while it is animating out keeps that file and its list visible', async () => {
+  const { elements, sandbox, log, finishAll } = await renderImportForRemoval(REMOVAL_ADDONS);
+  elements.removeFileBtn.click();
+  const exit = log.slice();
+  sandbox.setSelectedFile(jsonAddonsFile([{ id: 'c@x', name: 'Gamma', version: '3', link: 'https://example.com/c' }]));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  await finishAll();
+  assert.ok(exit.every((a) => a.cancelled), 'the held frames are released so the new list shows');
+  assert.deepStrictEqual(elements.addonList.querySelectorAll('.addon-name').map((n) => n.textContent), ['Gamma']);
+  assert.notStrictEqual(elements.fileNameRow.style.display, 'none', 'the new file is still shown');
+});
+
+testAsync('remove file (x): a load that is still in flight can no longer draw anything once x is pressed', async () => {
+  let release;
+  const slowFile = { name: 'slow.json', size: 10, text: () => new Promise((resolve) => { release = () => resolve(JSON.stringify({ formatVersion: 1, addons: [{ id: 'z@x', name: 'Late', version: '1', link: 'https://example.com/z' }] })); }) };
+  const { elements, finishAll } = await renderImportForRemoval(REMOVAL_ADDONS, { slowFile });
+  elements.removeFileBtn.click();
+  release();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  await finishAll();
+  assert.strictEqual(elements.addonList.querySelectorAll('.addon-row').length, 0, 'the late result is thrown away');
+});
+
+testAsync('remove file (x): with reduced motion, or when nothing can animate, the file is removed at once', async () => {
+  const reduced = await renderImportForRemoval(REMOVAL_ADDONS, { reducedMotion: true });
+  reduced.elements.removeFileBtn.click();
+  assert.strictEqual(reduced.log.length, 0);
+  assert.strictEqual(reduced.elements.fileNameRow.style.display, 'none');
+  assert.strictEqual(reduced.elements.addonList.querySelectorAll('.addon-row').length, 0);
+});
+

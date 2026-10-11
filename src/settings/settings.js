@@ -84,6 +84,11 @@ const settingsStatusEl = document.getElementById('settingsStatus');
 //  - a cancelled one (dismissed file dialog, cancelled save dialog, Cancel in
 //    the reset dialog) flashes the row soft grey and slides its description
 //    back in from the left.
+// A message in the Export / Import / Reset rows stays for this long if nobody
+// touches anything, then goes away by itself and the row's description comes
+// back. (Touching anything clears it sooner - see the click handler below.)
+const STATUS_AUTO_HIDE_MS = 7000;
+
 const SUCCESS_FLASH = 'rgba(46, 160, 67, 0.32)';
 const CANCEL_FLASH = 'rgba(128, 128, 128, 0.3)';
 
@@ -123,16 +128,33 @@ function flashSelectedOptions() {
 function ActionRow(descId, statusId) {
   const descEl   = document.getElementById(descId);
   const statusEl = document.getElementById(statusId);
+  let hideTimer = null;
+
+  function cancelAutoHide() {
+    if (hideTimer !== null && typeof clearTimeout === 'function') clearTimeout(hideTimer);
+    hideTimer = null;
+  }
 
   function show(msg, isError) {
     statusEl.textContent   = msg || '';
     statusEl.style.color   = isError ? 'var(--danger-color)' : 'var(--success-color, var(--text-muted))';
     statusEl.style.display = msg ? '' : 'none';
     if (statusEl.classList) statusEl.classList.toggle('is-success', !!msg && !isError);
+    // A message that nobody touches goes away by itself: the description
+    // comes back (sliding in, like after a cancel - but without the grey flash).
+    cancelAutoHide();
+    if (msg && typeof setTimeout === 'function') {
+      hideTimer = setTimeout(() => {
+        hideTimer = null;
+        restore();
+        slideBackIn(descEl);
+      }, STATUS_AUTO_HIDE_MS);
+    }
   }
 
   // Restore description, clear status.
   function restore() {
+    cancelAutoHide();
     if (statusEl) {
       statusEl.style.display = 'none';
       statusEl.textContent = '';

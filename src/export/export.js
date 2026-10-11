@@ -95,9 +95,9 @@ function checkboxes() {
 function updateSelectionCount() {
   const boxes = checkboxes();
   const checked = listEl.querySelectorAll('input[type="checkbox"]:checked').length;
-  selectionCountEl.textContent = boxes.length
+  setSelectionCount(selectionCountEl, boxes.length
     ? `${checked} of ${boxes.length} selected`
-    : '';
+    : '');
   exportBtn.disabled = checked === 0;
 }
 

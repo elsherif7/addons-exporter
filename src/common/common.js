@@ -403,3 +403,84 @@ function onShortenNamesChanged(handler) {
   });
 }
 
+// Sets the "12 of 12 selected" badge's text. When the number CHANGES it plays
+// a clear animation, in three parts at once:
+//  1. the number ROLLS over like a counter - the new one slides in while the
+//     old one slides out (upwards when more are selected, downwards when
+//     fewer), clipped to a little slot around the number;
+//  2. the whole badge POPS up in size and settles;
+//  3. it FLASHES a tint that shows the direction: green for more, amber for
+//     fewer (no tint when only the total changed).
+// The first time the badge gets text, or when it is cleared, nothing extra
+// plays (the badge's own fade-in covers that). Skipped for reduced motion.
+// textContent is always the plain text again once the animation is over.
+const COUNT_ROLL_MS = 380;
+const COUNT_UP_TINT = 'rgba(46, 160, 67, 0.4)';
+const COUNT_DOWN_TINT = 'rgba(217, 119, 6, 0.35)';
+const countText = new WeakMap(); // the badge's real text, even while a roll is on screen
+
+function setSelectionCount(el, text) {
+  const before = countText.has(el) ? countText.get(el) : el.textContent;
+  countText.set(el, text);
+  el.textContent = text; // also ends any roll that is still on screen
+  if (text === before || before === '' || text === '') return;
+  if (typeof el.animate !== 'function') return;
+  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const prev = parseInt(before, 10);
+  const next = parseInt(text, 10);
+  const direction = Number.isFinite(prev) && Number.isFinite(next) ? Math.sign(next - prev) : 0;
+  const ease = 'cubic-bezier(0.34, 1.3, 0.64, 1)';
+
+  // 2. the pop
+  el.animate(
+    [{ transform: 'scale(1)' }, { transform: 'scale(1.18)', offset: 0.35 }, { transform: 'scale(1)' }],
+    { duration: 460, easing: ease }
+  );
+  // 3. the tint
+  if (direction !== 0) {
+    const tint = direction > 0 ? COUNT_UP_TINT : COUNT_DOWN_TINT;
+    el.animate(
+      [{ boxShadow: 'inset 0 0 0 999px ' + tint }, { boxShadow: 'inset 0 0 0 999px transparent' }],
+      { duration: 700, easing: 'ease-out' }
+    );
+  }
+  // 1. the roll
+  const oldNumber = /^(\d+)/.exec(before);
+  const parts = /^(\d+)([\s\S]*)$/.exec(text);
+  if (!oldNumber || !parts || oldNumber[1] === parts[1] ||
+      typeof document === 'undefined' || typeof document.createElement !== 'function') return;
+
+  const slot = document.createElement('span');
+  slot.className = 'count-roll';
+  const now = document.createElement('span');
+  now.className = 'count-roll-now';
+  now.textContent = parts[1];
+  const old = document.createElement('span');
+  old.className = 'count-roll-old';
+  old.textContent = oldNumber[1];
+  old.setAttribute('aria-hidden', 'true');
+  slot.appendChild(now);
+  slot.appendChild(old);
+  const rest = document.createElement('span');
+  rest.textContent = parts[2];
+  el.textContent = '';
+  el.appendChild(slot);
+  el.appendChild(rest);
+
+  const up = direction >= 0; // more selected: the new number comes up from below
+  const rolls = [
+    now.animate(
+      [{ transform: `translateY(${up ? '100%' : '-100%'})` }, { transform: 'none' }],
+      { duration: COUNT_ROLL_MS, easing: ease }
+    ),
+    old.animate(
+      [{ transform: 'none' }, { transform: `translateY(${up ? '-100%' : '100%'})` }],
+      { duration: COUNT_ROLL_MS, easing: ease, fill: 'forwards' }
+    ),
+  ];
+  // Back to plain text once it is over - unless a newer update already took over.
+  Promise.all(rolls.map((a) => a.finished)).then(() => {
+    if (countText.get(el) === text) el.textContent = text;
+  }, () => {});
+}

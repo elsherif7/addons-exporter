@@ -264,6 +264,13 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 /* Nothing to say yet (before the list loads): no empty badge. When it first
    gets text it fades in. */
 #selectionCount:empty { display: none; }
+/* While the number in the badge changes, setSelectionCount() (common.js)
+   builds a little slot around it: the new number slides in while the old one
+   slides out, both clipped to the slot, like a counter rolling over. The
+   slot only exists for the length of the animation. */
+#selectionCount .count-roll { display: inline-block; position: relative; overflow: hidden; vertical-align: top; }
+#selectionCount .count-roll-now { display: inline-block; }
+#selectionCount .count-roll-old { position: absolute; left: 0; top: 0; }
 #selectionCount { animation: hub-fade-in var(--motion-normal) ease backwards; }
 .checklist-box {
   text-align: left;

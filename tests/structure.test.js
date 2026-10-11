@@ -745,3 +745,51 @@ test('live settings: the theme, export format and name shortening each have a li
   }
 });
 
+test('settings: row messages (Export / Import / Reset) hide themselves after 7 seconds', () => {
+  const src = readSrc('src/settings/settings.js');
+  assert.match(src, /const STATUS_AUTO_HIDE_MS = 7000;/);
+  assert.match(src, /hideTimer = setTimeout\([\s\S]*?STATUS_AUTO_HIDE_MS\)/);
+  assert.match(src, /function restore\(\) \{\s*cancelAutoHide\(\);/, 'restoring the row (touching anything) cancels the pending hide');
+});
+
+test('confirmation page: opens exactly like Settings (a staged card, timed by reveal.js)', () => {
+  const html = readSrc('src/confirmation/confirmation.html');
+  assert.match(html, /<div class="card staged">/);
+  assert.match(html, /<script src="\.\.\/common\/reveal\.js"><\/script>/);
+  // reveal.js must be there before the page script, which builds the message.
+  assert.ok(html.indexOf('reveal.js') < html.indexOf('confirmation.js'));
+  // The heading, the message and the links are the card's direct children - the parts that get their turn.
+  assert.match(html, /<h1 id="heading">/);
+  assert.match(html, /<p id="message">/);
+  assert.match(html, /<div class="about-block">/);
+});
+
+test('remove file (x): the Importer exits in reverse and releases its held frames', () => {
+  const src = readSrc('src/import/import.js');
+  assert.match(src, /async function removeFileAnimated\(\)/);
+  assert.match(src, /removeFileBtn\.addEventListener\('click', removeFileAnimated\)/);
+  assert.match(src, /fill: 'forwards'/);
+  assert.match(src, /a\.cancel\(\)/, 'the held end frames are cancelled afterwards');
+});
+
+test('selection badge: the Exporter and Importer set it through setSelectionCount, so a change animates', () => {
+  for (const page of ['src/export/export.js', 'src/import/import.js']) {
+    assert.match(readSrc(page), /setSelectionCount\(selectionCountEl, /, `${page} must use setSelectionCount`);
+  }
+  assert.doesNotMatch(readSrc('src/export/export.js'), /selectionCountEl\.textContent =/);
+});
+
+test('checkboxes: they keep the browser\'s own blue tick boxes (a custom restyle was tried and rejected)', () => {
+  const css = readSrc('src/common/shared.css');
+  assert.match(css, /\.addon-row input\[type="checkbox"\] \{\n  margin-top: 3px;\n\}/);
+  assert.doesNotMatch(css, /\.addon-row input\[type="checkbox"\][^{]*\{[^}]*appearance:\s*none/, 'no custom-drawn boxes');
+  assert.doesNotMatch(css, /hub-tick/);
+  // The little pop when a box becomes ticked is the only extra.
+  assert.match(css, /\.addon-row input\[type="checkbox"\]:checked \{ animation: hub-pop var\(--motion-normal\) var\(--motion-spring\); \}/);
+});
+
+test('selection badge: a slot for the rolling number exists in the stylesheet', () => {
+  const css = readSrc('src/common/shared.css');
+  assert.match(css, /#selectionCount \.count-roll \{[^}]*overflow: hidden;/);
+  assert.match(css, /#selectionCount \.count-roll-old \{[^}]*position: absolute;/);
+});

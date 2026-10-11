@@ -8,11 +8,13 @@
 <link rel="stylesheet" href="../common/shared.css">
 <title>Add-ons Exporter</title>
 <style>
-  /* .about-block and .about-row come from shared.css, as does the
-     entrance animation (.card and its children fade and rise in). */
+  /* .about-block and .about-row come from shared.css, as does the opening:
+     this card is "staged", so it opens exactly like the Settings page - the
+     card unfolds, the title settles in, then the message and the links wipe
+     in one after another (reveal.js times them). */
 </style></head>
 <body>
-  <div class="card">
+  <div class="card staged">
     <h1 id="heading">Add-ons Exporter</h1>
     <p id="message">Thanks for using <strong>Add-ons Exporter</strong>. Your add-ons were exported as an <strong>HTML report</strong>. On another browser, choose <strong>Add-ons Importer</strong> to select which ones to install.</p>
 
@@ -33,6 +35,7 @@
   </div>
   <script src="../common/common.js"></script>
   <script src="../common/press.js"></script>
+  <script src="../common/reveal.js"></script>
   <script src="confirmation.js"></script>
 </body>
 </html>

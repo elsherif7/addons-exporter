@@ -315,7 +315,7 @@ function checkboxes() {
 function updateSelectionCount() {
   const boxes = checkboxes();
   const checked = addonListEl.querySelectorAll('input[type="checkbox"]:checked').length;
-  selectionCountEl.textContent = boxes.length ? `${checked} of ${boxes.length} selected` : '';
+  setSelectionCount(selectionCountEl, boxes.length ? `${checked} of ${boxes.length} selected` : '');
   openSelectedBtn.disabled = checked === 0;
 }
 
@@ -580,7 +580,62 @@ function setSelectedFile(file) {
   }
 }
 
-removeFileBtn.addEventListener('click', () => setSelectedFile(null));
+// Removing the file plays out the page's opening in reverse: what is lowest
+// goes first (the list, the Select all row, the search box, the note, the file
+// name), each sliding left and fading, one after another - then the file is
+// really removed and "Choose file" pops back in. Until it has finished the
+// page keeps its state, but a load still in flight is cancelled at once so it
+// cannot draw anything in the middle of the exit. Without animation support,
+// or for reduced motion, the file is simply removed at once.
+let removingFile = false;
+
+function removalTargets() {
+  return [checklistBoxEl, listControls, searchInput, compareNoteEl, fileNameRow].filter((el) => {
+    if (!el || el.style.display === 'none') return false;
+    return el !== compareNoteEl || el.textContent !== '';
+  });
+}
+
+function animateOut(el, delayMs) {
+  return el.animate(
+    [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(-14px)' }],
+    { duration: 220, delay: delayMs, easing: 'ease-in', fill: 'forwards' }
+  );
+}
+
+async function removeFileAnimated() {
+  if (removingFile) return;
+  const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const targets = reduced ? [] : removalTargets().filter((el) => typeof el.animate === 'function');
+  if (targets.length === 0) {
+    setSelectedFile(null);
+    return;
+  }
+
+  removingFile = true;
+  const myGeneration = ++loadGeneration; // a load still in flight is stale from now on
+  const animations = targets.map((el, i) => animateOut(el, i * 80));
+  try {
+    await Promise.all(animations.map((a) => a.finished));
+  } catch {
+    /* an animation was cancelled - carry on and remove the file anyway */
+  }
+  removingFile = false;
+  const replaced = myGeneration !== loadGeneration; // another file was chosen meanwhile: keep it
+
+  if (!replaced) setSelectedFile(null); // hides everything for real...
+  // ...so the held end frames can go (they must never linger on a new file's list).
+  animations.forEach((a) => { try { a.cancel(); } catch { /* already gone */ } });
+  if (replaced) return;
+  if (typeof chooseFileBtn.animate === 'function') {
+    chooseFileBtn.animate(
+      [{ opacity: 0, transform: 'scale(0.85)' }, { opacity: 1, transform: 'none' }],
+      { duration: 350, easing: 'cubic-bezier(0.34, 1.4, 0.64, 1)' }
+    );
+  }
+}
+
+removeFileBtn.addEventListener('click', removeFileAnimated);
 
 chooseFileBtn.addEventListener('click', () => {
   fileInput.click();

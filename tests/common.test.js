@@ -878,3 +878,160 @@ test('onShortenNamesChanged: other settings, other storage areas, and pages with
   bare.onShortenNamesChanged(() => {}); // must not throw
 });
 
+// --- setSelectionCount: the "12 of 12 selected" badge rolls, pops and flashes when the number changes ---
+
+// A node with just enough of the DOM: text, children, attributes, and an
+// animate() whose animations finish only when the test says so.
+class BadgeNode {
+  constructor() { this.className = ''; this.children = []; this.attrs = {}; this.animations = []; this._text = ''; }
+  get textContent() { return this.children.length ? this.children.map((c) => c.textContent).join('') : this._text; }
+  set textContent(v) { this.children = []; this._text = v; }
+  appendChild(c) { this.children.push(c); return c; }
+  setAttribute(k, v) { this.attrs[k] = v; }
+  animate(keyframes, options) {
+    let done;
+    const finished = new Promise((resolve) => { done = resolve; });
+    const anim = { keyframes, options, finished, finish: () => done() };
+    this.animations.push(anim);
+    return anim;
+  }
+}
+
+function badgeEnv({ reducedMotion = false, withDocument = true } = {}) {
+  const sb = { URL, matchMedia: () => ({ matches: reducedMotion }) };
+  if (withDocument) sb.document = { createElement: () => new BadgeNode() };
+  vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
+  const badge = new BadgeNode();
+  return { sb, badge, set: (text) => sb.setSelectionCount(badge, text) };
+}
+
+const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
+const shadowOf = (badge) => badge.animations.filter((a) => a.keyframes[0].boxShadow).map((a) => a.keyframes[0].boxShadow);
+
+test('setSelectionCount: more selected - the badge pops, flashes green, and the new number rolls up from below', () => {
+  const { badge, set } = badgeEnv();
+  set('3 of 12 selected');
+  set('4 of 12 selected');
+  // While it rolls the slot holds the new number and the ghost of the old one (hidden from screen readers);
+  // the real text is tracked separately and comes back as plain text when the roll ends.
+  assert.strictEqual(badge.textContent, '43 of 12 selected');
+
+  const pop = badge.animations.find((a) => a.keyframes[1].transform === 'scale(1.18)');
+  assert.ok(pop, 'the whole badge pops to 1.18x and settles');
+  assert.deepStrictEqual(shadowOf(badge).length, 1);
+  assert.match(shadowOf(badge)[0], /rgba\(46, 160, 67/, 'green');
+
+  const [slot, rest] = badge.children;
+  assert.strictEqual(slot.className, 'count-roll');
+  const [now, old] = slot.children;
+  assert.strictEqual(now.textContent, '4');
+  assert.strictEqual(old.textContent, '3');
+  assert.strictEqual(old.attrs['aria-hidden'], 'true', 'the ghost of the old number is hidden from screen readers');
+  assert.strictEqual(rest.textContent, ' of 12 selected');
+  assert.strictEqual(now.animations[0].keyframes[0].transform, 'translateY(100%)', 'the new number comes up from below');
+  assert.strictEqual(old.animations[0].keyframes[1].transform, 'translateY(-100%)', 'the old one leaves upwards');
+  assert.strictEqual(old.animations[0].options.fill, 'forwards');
+});
+
+test('setSelectionCount: fewer selected - flashes amber, and the number rolls the other way', () => {
+  const { badge, set } = badgeEnv();
+  set('12 of 12 selected');
+  set('11 of 12 selected');
+  assert.match(shadowOf(badge)[0], /rgba\(217, 119, 6/, 'amber');
+  const [now, old] = badge.children[0].children;
+  assert.strictEqual(now.animations[0].keyframes[0].transform, 'translateY(-100%)', 'the new number comes down from above');
+  assert.strictEqual(old.animations[0].keyframes[1].transform, 'translateY(100%)');
+});
+
+test('setSelectionCount: Select all / Deselect all (12 -> 0) rolls too, and a two-digit number rolls whole', () => {
+  const { badge, set } = badgeEnv();
+  set('12 of 12 selected');
+  set('0 of 12 selected');
+  const [now, old] = badge.children[0].children;
+  assert.strictEqual(now.textContent, '0');
+  assert.strictEqual(old.textContent, '12');
+});
+
+test('setSelectionCount: if only the total changes (same number selected), it just pops - no tint, no roll', () => {
+  const { badge, set } = badgeEnv();
+  set('3 of 12 selected');
+  set('3 of 13 selected');
+  assert.strictEqual(badge.animations.length, 1, 'only the pop');
+  assert.strictEqual(shadowOf(badge).length, 0);
+  assert.strictEqual(badge.children.length, 0, 'no slot built');
+  assert.strictEqual(badge.textContent, '3 of 13 selected');
+});
+
+test('setSelectionCount: once the roll has finished the badge holds plain text again', async () => {
+  const { badge, set } = badgeEnv();
+  set('3 of 12 selected');
+  set('4 of 12 selected');
+  const [now, old] = badge.children[0].children;
+  now.animations[0].finish();
+  old.animations[0].finish();
+  await flushPromises();
+  assert.strictEqual(badge.children.length, 0);
+  assert.strictEqual(badge.textContent, '4 of 12 selected');
+});
+
+test('setSelectionCount: a newer change during a roll takes over - the earlier roll finishing cannot put the old text back', async () => {
+  const { badge, set } = badgeEnv();
+  set('3 of 12 selected');
+  set('4 of 12 selected');
+  const firstRoll = badge.children[0].children;
+  set('5 of 12 selected'); // before the first roll has finished
+  assert.strictEqual(badge.children[0].children[0].textContent, '5', 'a fresh roll for the new number');
+  firstRoll[0].animations[0].finish();
+  firstRoll[1].animations[0].finish();
+  await flushPromises();
+  assert.notStrictEqual(badge.textContent, '4 of 12 selected');
+  const secondRoll = badge.children[0].children;
+  secondRoll[0].animations[0].finish();
+  secondRoll[1].animations[0].finish();
+  await flushPromises();
+  assert.strictEqual(badge.textContent, '5 of 12 selected');
+});
+
+test('setSelectionCount: the roll compares against the real text, not the mid-roll slot', () => {
+  const { badge, set } = badgeEnv();
+  set('3 of 12 selected');
+  set('4 of 12 selected');
+  const before = badge.animations.length;
+  set('4 of 12 selected'); // same again while the roll is on screen
+  assert.strictEqual(badge.animations.length, before, 'no new animation for an unchanged number');
+});
+
+test('setSelectionCount: the first text, the same text, and clearing it play nothing extra', () => {
+  const { badge, set } = badgeEnv();
+  set('12 of 12 selected');
+  set('12 of 12 selected');
+  set('');
+  assert.strictEqual(badge.animations.length, 0);
+  assert.strictEqual(badge.textContent, '');
+});
+
+test('setSelectionCount: with reduced motion the text just changes', () => {
+  const { badge, set } = badgeEnv({ reducedMotion: true });
+  set('3 of 12 selected');
+  set('4 of 12 selected');
+  assert.strictEqual(badge.animations.length, 0);
+  assert.strictEqual(badge.textContent, '4 of 12 selected');
+});
+
+test('setSelectionCount: without a document to build the slot in, the pop and tint still play and the text is right', () => {
+  const { badge, set } = badgeEnv({ withDocument: false });
+  set('3 of 12 selected');
+  set('4 of 12 selected');
+  assert.strictEqual(badge.animations.length, 2, 'pop + tint');
+  assert.strictEqual(badge.textContent, '4 of 12 selected');
+});
+
+test('setSelectionCount: an element that cannot animate just gets its text', () => {
+  const sb = { URL };
+  vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
+  const plain = { textContent: '3 of 12 selected' };
+  sb.setSelectionCount(plain, '4 of 12 selected');
+  assert.strictEqual(plain.textContent, '4 of 12 selected');
+});

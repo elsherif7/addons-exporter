@@ -447,7 +447,7 @@ function makeExportSettingsSandbox({ platformOs, simulateDownloadCreated = false
   const sb = {
     URL: { createObjectURL: () => 'blob:fake-url', revokeObjectURL() {} },
     Blob: function Blob() {},
-    setTimeout: (fn) => { fn(); return 0; },
+    setTimeout: (fn, ms) => { if (ms !== 7000) fn(); return 0; } /* 7000 = a row message's auto-hide: not fired here */,
     clearTimeout() {},
     fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
     document: fakeDocument,
@@ -536,7 +536,7 @@ testAsync('exportSettingsBtn: a getPlatformInfo failure falls back to the deskto
   const sb2 = {
     URL: { createObjectURL: () => 'blob:fake-url', revokeObjectURL() {} },
     Blob: function Blob() {},
-    setTimeout: (fn) => { fn(); return 0; },
+    setTimeout: (fn, ms) => { if (ms !== 7000) fn(); return 0; } /* 7000 = a row message's auto-hide: not fired here */,
     clearTimeout() {},
     fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
     document: fakeDocument2,
@@ -953,13 +953,20 @@ function makeSuccessRow(document, statusEl) {
 }
 
 function makeSuccessSandbox({ failRemove = false } = {}) {
-  const { document, elements } = makeFakeDom(['resetSettingsBtn', 'settingsStatus', 'resetSettingsStatus']);
+  const { document, elements } = makeFakeDom(['resetSettingsBtn', 'settingsStatus', 'resetSettingsStatus', 'resetSettingsDesc']);
   document.body.appendChild(elements.resetSettingsBtn);
   const row = makeSuccessRow(document, elements.resetSettingsStatus);
+  const desc = elements.resetSettingsDesc;
+  desc.animations = [];
+  desc.animate = (keyframes, options) => { desc.animations.push({ keyframes, options }); return {}; };
+  row.appendChild(desc);
+  const timers = [];
+  const cleared = [];
   const sb = {
     URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
     Blob: function Blob() {},
-    setTimeout: () => 0,
+    setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
+    clearTimeout: (id) => { cleared.push(id); },
     fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
     document,
     browser: {
@@ -977,7 +984,7 @@ function makeSuccessSandbox({ failRemove = false } = {}) {
   vm.runInContext(themeSrc, sb);
   vm.runInContext(commonSrc, sb);
   vm.runInContext(settingsSrc, sb);
-  return { sb, document, elements, row };
+  return { sb, document, elements, row, desc, timers, cleared };
 }
 
 async function runReset(ctx) {
@@ -1241,5 +1248,70 @@ testAsync('live settings (Settings page): only the option that changed is reload
   ctx.changeListeners.forEach((fn) => fn({ theme: { newValue: 'dark' } }, 'sync'));
   await settleSettingsInit();
   assert.deepStrictEqual(ticked(ctx.themeRadioEls), ['light'], 'the theme was not reloaded by an export-format change or a sync-area change');
+});
+
+// --- Messages that nobody touches go away after 7 seconds ---
+
+const autoHide = (ctx) => ctx.timers.filter((t) => t.ms === 7000);
+
+testAsync('auto-hide: a finished action\'s message goes away by itself after 7 seconds and the description comes back', async () => {
+  const ctx = makeSuccessSandbox();
+  await runReset(ctx);
+  const status = ctx.elements.resetSettingsStatus;
+  assert.strictEqual(status.textContent, 'Settings reset to defaults.');
+  const timers = autoHide(ctx);
+  assert.strictEqual(timers.length, 1, 'one 7-second timer was started');
+
+  timers[0].fn();
+  assert.strictEqual(status.textContent, '');
+  assert.strictEqual(status.style.display, 'none');
+  assert.strictEqual(status.classList.contains('is-success'), false);
+  assert.strictEqual(ctx.desc.style.display, '', 'the description is back');
+  assert.strictEqual(ctx.desc.animations.length, 1, 'and slides back in');
+  assert.strictEqual(ctx.row.animations.filter((a) => /128, 128, 128/.test(a.keyframes[0].boxShadow)).length, 0,
+    'without the grey "cancelled" flash - nothing was cancelled');
+});
+
+testAsync('auto-hide: a new message restarts the 7 seconds (the old timer is cancelled)', async () => {
+  const ctx = makeSuccessSandbox();
+  await runReset(ctx);
+  vm.runInContext("resetRow.setMsg('Something else happened.')", ctx.sb);
+  assert.strictEqual(autoHide(ctx).length, 2, 'a second timer');
+  assert.ok(ctx.cleared.length >= 1, 'and the first one was cancelled');
+  assert.strictEqual(ctx.elements.resetSettingsStatus.textContent, 'Something else happened.');
+});
+
+testAsync('auto-hide: touching anything first (restoring the row) cancels the pending timer, so it cannot fire later', async () => {
+  const ctx = makeSuccessSandbox();
+  await runReset(ctx);
+  const before = ctx.cleared.length;
+  vm.runInContext('resetRow.restore()', ctx.sb);
+  assert.ok(ctx.cleared.length > before, 'the pending timer was cancelled');
+  assert.strictEqual(ctx.elements.resetSettingsStatus.textContent, '');
+});
+
+testAsync('auto-hide: an error message goes away after 7 seconds too, not just a success', async () => {
+  const ctx = makeSuccessSandbox({ failRemove: true });
+  await runReset(ctx);
+  assert.match(ctx.elements.resetSettingsStatus.textContent, /Could not reset settings/);
+  assert.strictEqual(autoHide(ctx).length, 1);
+  autoHide(ctx)[0].fn();
+  assert.strictEqual(ctx.elements.resetSettingsStatus.textContent, '');
+  assert.strictEqual(ctx.desc.style.display, '');
+});
+
+testAsync('auto-hide: hiding hands the row back with nothing left over - the next message works normally', async () => {
+  const ctx = makeSuccessSandbox();
+  await runReset(ctx);
+  autoHide(ctx)[0].fn();
+  vm.runInContext("resetRow.setMsg('Next one.')", ctx.sb);
+  assert.strictEqual(ctx.elements.resetSettingsStatus.textContent, 'Next one.');
+  assert.strictEqual(autoHide(ctx).length, 2);
+});
+
+testAsync('auto-hide: a row that is only "activated" with no message (waiting for a dialog) starts no timer', async () => {
+  const ctx = makeSuccessSandbox();
+  vm.runInContext("resetRow.activate('')", ctx.sb);
+  assert.strictEqual(autoHide(ctx).length, 0);
 });
 
