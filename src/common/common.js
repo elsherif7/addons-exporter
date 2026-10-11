@@ -4,10 +4,15 @@
 // Bump if the exported JSON shape ever changes.
 const EXPORT_FORMAT_VERSION = 1;
 
-// Storage key for the user's chosen export file format.
-// Valid values: 'html' | 'json' | 'csv' | 'txt'. Defaults to 'html' when unset.
+// Storage key for the user's chosen export file format(s).
+// Each valid value is 'html' | 'json' | 'csv' | 'txt'. One format is stored
+// as that plain string (exactly what older versions wrote); more than one is
+// stored as an array of them, e.g. ['html', 'json']. Defaults to 'html' when
+// unset.
 const EXPORT_FORMAT_STORAGE_KEY = 'exportFormat';
 const EXPORT_FORMAT_DEFAULT = 'html';
+// Every format, in the fixed order they are listed and exported in.
+const EXPORT_FORMATS = ['html', 'json', 'csv', 'txt'];
 
 // Storage key for the shorten-add-on-names setting.
 // Valid values: 'on' | 'off'. Defaults to 'on' when unset.
@@ -45,6 +50,46 @@ function formatLabel(fmt) {
   return 'HTML report';
 }
 
+// Turns whatever is stored (or passed around) for the export format - a
+// single format string, an array of them, or a comma-separated string such
+// as 'html,json' (how the confirmation page's address carries several) -
+// into a clean list: only known formats, no repeats, always in the fixed
+// EXPORT_FORMATS order. Nothing usable gives the default, so there is always
+// at least one.
+function resolveExportFormats(val) {
+  const raw = Array.isArray(val) ? val : (typeof val === 'string' ? val.split(',') : []);
+  const picked = EXPORT_FORMATS.filter((f) => raw.includes(f));
+  return picked.length ? picked : [EXPORT_FORMAT_DEFAULT];
+}
+
+// The form to store a list of formats in: a lone format as its plain string
+// (so a profile with one format looks exactly as it always did, and older
+// versions can still read it), several as an array.
+function serializeExportFormats(list) {
+  const formats = resolveExportFormats(list);
+  return formats.length === 1 ? formats[0] : formats;
+}
+
+// "HTML report", "HTML report and JSON file", "HTML report, JSON file and
+// CSV file" - for plain-text messages.
+function formatLabelsText(fmts) {
+  const labels = resolveExportFormats(fmts).map(formatLabel);
+  if (labels.length === 1) return labels[0];
+  return labels.slice(0, -1).join(', ') + ' and ' + labels[labels.length - 1];
+}
+
+// Same list as formatLabelsText, but appended to `container` with each label
+// in <strong>, for the messages that bold them.
+function appendFormatLabels(container, fmts) {
+  const labels = resolveExportFormats(fmts).map(formatLabel);
+  labels.forEach((label, i) => {
+    if (i > 0) container.append(i === labels.length - 1 ? ' and ' : ', ');
+    const strong = document.createElement('strong');
+    strong.textContent = label;
+    container.append(strong);
+  });
+}
+
 // Shared value-checking for two of the three settings (the third, theme,
 // is already centralized in theme.js's resolveTheme()) - storage can
 // hold anything (a stale value from an older version, or something
@@ -77,11 +122,13 @@ async function getStoredSettings() {
     const stored = await browser.storage.local.get(['theme', EXPORT_FORMAT_STORAGE_KEY, SHORT_NAME_STORAGE_KEY]);
     return {
       theme: stored.theme === 'dark' ? 'dark' : 'light',
-      exportFormat: resolveExportFormat(stored[EXPORT_FORMAT_STORAGE_KEY]),
+      // exportFormat is the first chosen format; exportFormats is all of them.
+      exportFormat: resolveExportFormats(stored[EXPORT_FORMAT_STORAGE_KEY])[0],
+      exportFormats: resolveExportFormats(stored[EXPORT_FORMAT_STORAGE_KEY]),
       shortenNames: resolveShortenNames(stored[SHORT_NAME_STORAGE_KEY]),
     };
   } catch {
-    return { theme: 'light', exportFormat: EXPORT_FORMAT_DEFAULT, shortenNames: SHORT_NAME_DEFAULT };
+    return { theme: 'light', exportFormat: EXPORT_FORMAT_DEFAULT, exportFormats: [EXPORT_FORMAT_DEFAULT], shortenNames: SHORT_NAME_DEFAULT };
   }
 }
 

@@ -28,6 +28,7 @@
   const ROW_STEP = 0.08;       // one list row after another
   const ROW_ANIMATED_MAX = 14; // rows beyond this just appear together, so a long list stays quick
   const ROW_DURATION = 0.55;
+  const BUTTON_AFTER_LAST = 0.4; // the Exporter's Export button starts this long after the last row starts
 
   const startedAt = Date.now();
   const elapsed = () => (Date.now() - startedAt) / 1000;
@@ -37,6 +38,8 @@
   let chromePlanned = false; // the search box and Select all row were part of the opening sequence
   let chromeDone = false;    // ... or were timed later, when the Importer's list first appeared
   let listBase = null;       // when the first row may begin (null: the list is revealed later)
+  let holdBtn = null;        // Exporter: the Export button waits until the last add-on is in
+  let holdFrom = 0;          // ... and never earlier than its normal slot in the page order
 
   function planCard() {
     const card = document.querySelector('.card.staged');
@@ -47,6 +50,15 @@
       const takesSlot = child.hasAttribute('data-stage') || getComputedStyle(child).display !== 'none';
       if (!takesSlot) continue; // revealed later, whenever it is shown (see onListRendered)
 
+      if (child.classList.contains('primary-btn') && listBase !== null) {
+        // Exporter: this button must not show before the add-ons have. Park it
+        // far in the future; onListRendered gives it its real start time.
+        holdBtn = child;
+        holdFrom = t;
+        child.style.setProperty('--d', '3600s');
+        t += PART_STEP;
+        continue;
+      }
       child.style.setProperty('--d', secs(t));
       if (child.classList.contains('search-input') || child.classList.contains('list-controls')) chromePlanned = true;
       if (child.classList.contains('checklist-box')) listBase = t + ROW_LEAD;
@@ -55,10 +67,21 @@
   }
 
   let rowTimer = null;
+  // Gives the held Export button its real start: after the last add-on is in.
+  function releaseButton(abs) {
+    if (!holdBtn) return;
+    holdBtn.style.setProperty('--d', secs(Math.max(abs, holdFrom)));
+    holdBtn = null;
+  }
+
   function onListRendered(list) {
     const items = Array.from(list.querySelectorAll('.group-heading, .addon-row'))
       .filter((el) => !el.hasAttribute('data-seq'));
-    if (!items.some((el) => el.classList.contains('addon-row'))) return;
+    if (!items.some((el) => el.classList.contains('addon-row'))) {
+      // Nothing to cascade (no add-ons, or an error message): show the button on its normal slot.
+      releaseButton(0);
+      return;
+    }
 
     // Exporter: the rows start under their list box. Importer: the list shows
     // up when a file is chosen, so the search box, the Select all row and the
@@ -84,6 +107,7 @@
       k++;
     }
     list.classList.add('revealing');
+    releaseButton(base + Math.min(k - 1, ROW_ANIMATED_MAX) * ROW_STEP + BUTTON_AFTER_LAST);
     const done = base + Math.min(k, ROW_ANIMATED_MAX) * ROW_STEP + ROW_DURATION + 0.3;
     clearTimeout(rowTimer);
     // Take the flag away again once the last row is in, so searching (which

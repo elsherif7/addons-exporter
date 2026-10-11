@@ -119,8 +119,10 @@ function buildHtmlReport(list, theme, shorten = true) {
     --text-secondary: #444;
     --text-muted: #666;
     --text-faint: #707070;
-    --border: #d0d3d9;
+    --border: #747b87;
     --border-soft: #e2e4e8;
+    /* Lines between rows: between --border-soft and --border. */
+    --divider: #c3c7ce;
     --border-faint: #f0f1f3;
     --hover-bg: #fafbfc;
     --btn-bg: #1f2937;
@@ -150,8 +152,9 @@ function buildHtmlReport(list, theme, shorten = true) {
     --text-secondary: #c3c5ca;
     --text-muted: #9199a3;
     --text-faint: #8890a0;
-    --border: #3a3f4b;
+    --border: #70767f;
     --border-soft: #2f333c;
+    --divider: #40454f;
     --border-faint: #262932;
     --hover-bg: #262a33;
     --btn-bg: #374151;
@@ -272,7 +275,7 @@ function buildHtmlReport(list, theme, shorten = true) {
     align-items: center;
     justify-content: space-between;
     padding: 10px 14px;
-    border-bottom: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--divider);
     user-select: none;
     transition: background 0.12s, transform 0.1s;
     /* Search fade (see .is-filtered below). The line above is the
@@ -280,7 +283,8 @@ function buildHtmlReport(list, theme, shorten = true) {
     transition: background 0.12s, transform 0.1s,
       opacity var(--motion-search) ease, display var(--motion-search) allow-discrete;
   }
-  .addon-row-info { flex: 1; }
+  /* Name, version, type (and any match note): one equal 10px gap between each. */
+  .addon-row-info { flex: 1; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; }
   .addon-row:last-child { border-bottom: none; }
   .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
   .addon-row:active { transform: scale(0.985); }
@@ -300,6 +304,7 @@ function buildHtmlReport(list, theme, shorten = true) {
   .match-label { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
   .match-label[href] { display: inline-block; color: var(--link-accent); text-decoration: none; border-radius: 4px; }
   .match-label[href]:hover { text-decoration: underline; }
+  .addon-row-info .addon-version, .addon-row-info .match-label { margin-left: 0; }
   .match-uncertain { color: var(--warn-color); font-weight: 600; }
 
   /* The rest of the opening reveal (see the staged block near the top).

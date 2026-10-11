@@ -1204,3 +1204,25 @@ testAsync('auto-hide: a row that is only "activated" with no message (waiting fo
   assert.strictEqual(autoHide(ctx).length, 0);
 });
 
+
+test('parseSettingsFile: several export formats (an array) are accepted, cleaned and ordered', () => {
+  const result = parseSettingsFile(makeSettingsFile({ [EXPORT_FORMAT_STORAGE_KEY]: ['txt', 'html', 'bogus', 'html'] }));
+  assert.strictEqual(result.ok, true);
+  assert.deepStrictEqual(Array.from(result.settings[EXPORT_FORMAT_STORAGE_KEY]), ['html', 'txt']);
+});
+
+test('parseSettingsFile: an array with a single valid format is stored as a plain string', () => {
+  const result = parseSettingsFile(makeSettingsFile({ [EXPORT_FORMAT_STORAGE_KEY]: ['json'] }));
+  assert.strictEqual(result.settings[EXPORT_FORMAT_STORAGE_KEY], 'json');
+});
+
+test('parseSettingsFile: an array with no valid formats is ignored', () => {
+  const result = parseSettingsFile(makeSettingsFile({ [EXPORT_FORMAT_STORAGE_KEY]: ['bogus'], [THEME_STORAGE_KEY]: 'dark' }));
+  assert.strictEqual(result.ok, true);
+  assert.ok(!(EXPORT_FORMAT_STORAGE_KEY in result.settings));
+});
+
+test('withSettingsDefaults: a stored list of formats is kept, a bad one falls back to html', () => {
+  assert.deepStrictEqual(Array.from(withSettingsDefaults({ [EXPORT_FORMAT_STORAGE_KEY]: ['html', 'csv'] })[EXPORT_FORMAT_STORAGE_KEY]), ['html', 'csv']);
+  assert.strictEqual(withSettingsDefaults({ [EXPORT_FORMAT_STORAGE_KEY]: 'xml' })[EXPORT_FORMAT_STORAGE_KEY], 'html');
+});

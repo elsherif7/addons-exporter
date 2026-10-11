@@ -17,7 +17,7 @@ const KNOWN_SETTINGS_KEYS = [
 ];
 
 // Builds the settings export object from the current stored values.
-// settings is a plain object: { theme: '...', exportFormat: '...' }.
+// settings is a plain object: { theme: '...', exportFormat: '...' } (exportFormat is one format, or an array when several are chosen).
 function buildSettingsExport(settings) {
   const out = {};
   for (const key of KNOWN_SETTINGS_KEYS) {
@@ -52,8 +52,10 @@ function parseSettingsFile(text) {
   const t = parsed.settings[THEME_STORAGE_KEY];
   if (t === 'light' || t === 'dark') validated[THEME_STORAGE_KEY] = t;
 
+  // One format as a string (any version's file), or several as an array.
   const f = parsed.settings[EXPORT_FORMAT_STORAGE_KEY];
-  if (f === 'html' || f === 'json' || f === 'csv' || f === 'txt') validated[EXPORT_FORMAT_STORAGE_KEY] = f;
+  const fList = Array.isArray(f) ? f.filter(isValidExportFormat) : (isValidExportFormat(f) ? [f] : []);
+  if (fList.length > 0) validated[EXPORT_FORMAT_STORAGE_KEY] = serializeExportFormats(fList);
 
   const s = parsed.settings[SHORT_NAME_STORAGE_KEY];
   if (s === 'on' || s === 'off') validated[SHORT_NAME_STORAGE_KEY] = s;
@@ -230,18 +232,13 @@ async function loadCurrentExportFormat() {
   } catch {
     stored = {};
   }
-  const current = (stored && (stored[EXPORT_FORMAT_STORAGE_KEY] === 'html' ||
-                               stored[EXPORT_FORMAT_STORAGE_KEY] === 'json' ||
-                               stored[EXPORT_FORMAT_STORAGE_KEY] === 'csv' ||
-                               stored[EXPORT_FORMAT_STORAGE_KEY] === 'txt'))
-    ? stored[EXPORT_FORMAT_STORAGE_KEY]
-    : EXPORT_FORMAT_DEFAULT;
-  for (const radio of formatRadios) {
-    radio.checked = radio.value === current;
+  const current = resolveExportFormats(stored && stored[EXPORT_FORMAT_STORAGE_KEY]);
+  for (const box of formatRadios) {
+    box.checked = current.includes(box.value);
   }
   // Keep the localStorage cache in sync so settings-init.js can apply
   // the correct value before the first paint on the next page open.
-  try { localStorage.setItem('addons-hub-settings-exportFormat', current); } catch (e) {}
+  try { localStorage.setItem('addons-hub-settings-exportFormat', current.join(',')); } catch (e) {}
 }
 for (const radio of themeRadios) {
   radio.addEventListener('change', async () => {
@@ -259,11 +256,18 @@ for (const radio of themeRadios) {
   });
 }
 
-for (const radio of formatRadios) {
-  radio.addEventListener('change', async () => {
-    if (!radio.checked) return;
+// The export formats are tick boxes: any number can be on, but never none -
+// unticking the last one just puts it back (there must be something to export).
+for (const box of formatRadios) {
+  box.addEventListener('change', async () => {
+    const ticked = Array.from(formatRadios).filter((b) => b.checked).map((b) => b.value);
+    if (ticked.length === 0) {
+      box.checked = true;
+      return;
+    }
     try {
-      await browser.storage.local.set({ [EXPORT_FORMAT_STORAGE_KEY]: radio.value });
+      await browser.storage.local.set({ [EXPORT_FORMAT_STORAGE_KEY]: serializeExportFormats(ticked) });
+      try { localStorage.setItem('addons-hub-settings-exportFormat', resolveExportFormats(ticked).join(',')); } catch (e) {}
     } catch (err) {
       setSettingsStatus('Could not save export format: ' + err.message, true);
       await loadCurrentExportFormat();
@@ -314,7 +318,7 @@ function withSettingsDefaults(stored) {
   const shorten = stored && stored[SHORT_NAME_STORAGE_KEY];
   return {
     [THEME_STORAGE_KEY]: resolveTheme(stored),
-    [EXPORT_FORMAT_STORAGE_KEY]: (fmt === 'html' || fmt === 'json' || fmt === 'csv' || fmt === 'txt') ? fmt : EXPORT_FORMAT_DEFAULT,
+    [EXPORT_FORMAT_STORAGE_KEY]: serializeExportFormats(fmt),
     [SHORT_NAME_STORAGE_KEY]: (shorten === 'on' || shorten === 'off') ? shorten : SHORT_NAME_DEFAULT,
   };
 }
@@ -399,20 +403,20 @@ settingsFileInput.addEventListener('change', async () => {
 // applied at once — one round-trip instead of three sequential ones,
 // which reduces the window where the hardcoded HTML defaults are visible.
 (async () => {
-  const { theme, exportFormat, shortenNames } = await getStoredSettings();
+  const { theme, exportFormats, shortenNames } = await getStoredSettings();
   for (const radio of themeRadios) {
     radio.checked = radio.value === theme;
   }
   applyTheme(theme);
-  for (const radio of formatRadios) {
-    radio.checked = radio.value === exportFormat;
+  for (const box of formatRadios) {
+    box.checked = exportFormats.includes(box.value);
   }
   for (const radio of shortenRadios) {
     radio.checked = radio.value === shortenNames;
   }
   // Write the confirmed values to the localStorage cache so settings-init.js
   // can pre-apply them synchronously before the first paint on the next open.
-  try { localStorage.setItem('addons-hub-settings-exportFormat', exportFormat); } catch (e) {}
+  try { localStorage.setItem('addons-hub-settings-exportFormat', exportFormats.join(',')); } catch (e) {}
   try { localStorage.setItem('addons-hub-settings-shortenNames', shortenNames); } catch (e) {}
 })();
 

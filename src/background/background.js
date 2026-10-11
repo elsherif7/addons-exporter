@@ -6,22 +6,34 @@ browser.runtime.onMessage.addListener((message) => {
     return Promise.resolve(queueTabOpens(message.urls));
   }
   if (message.type === 'export') {
-    return doExport(message.ids).then(async ({ html, filename, format, stats }) => {
-      const mimeType = format === 'json' ? 'application/json'
-        : format === 'csv' ? 'text/csv'
-        : format === 'txt' ? 'text/plain'
-        : 'text/html';
-      const blob = new Blob([html], { type: mimeType });
+    return doExport(message.ids).then(async ({ html, filename, files, formats, format, stats }) => {
+      // One format: that file, as it always was. Several: they are bundled
+      // into ONE zip, so there is a single Save dialog instead of one per file.
+      const list = files || [{ html, filename, format }];
+      let blob;
+      let saveName;
+      if (list.length > 1) {
+        const zipBytes = buildZip(list.map((f) => ({ name: f.filename, content: f.html })));
+        blob = new Blob([zipBytes], { type: 'application/zip' });
+        saveName = list[0].filename.replace(/\.\w+$/, '') + '.zip';
+      } else {
+        const mimeType = list[0].format === 'json' ? 'application/json'
+          : list[0].format === 'csv' ? 'text/csv'
+          : list[0].format === 'txt' ? 'text/plain'
+          : 'text/html';
+        blob = new Blob([list[0].html], { type: mimeType });
+        saveName = list[0].filename;
+      }
       const url = URL.createObjectURL(blob);
       try {
-        await browser.downloads.download({ url, filename, saveAs: true });
+        await browser.downloads.download({ url, filename: saveName, saveAs: true });
       } finally {
         setTimeout(() => URL.revokeObjectURL(url), 30000);
       }
 
       // No tab is opened from here: export.js replaces its own page with
       // the confirmation page once it gets this result back.
-      return { format, stats };
+      return { format, formats: formats || [format], zipped: list.length > 1, stats };
     });
   }
 });
@@ -279,25 +291,30 @@ async function doExport(ids, {
   // the report's starting state (see report-template.js's
   // buildHtmlReport). getStoredSettings() (common.js) falls back to every
   // default if storage is ever unavailable.
-  const { theme, exportFormat, shortenNames } = await getStoredSettings();
+  const { theme, exportFormats, shortenNames } = await getStoredSettings();
   const shorten = shortenNames !== 'off';
 
-  let content;
-  let ext;
-  if (exportFormat === 'json') {
-    content = buildJsonExport(list);
-    ext = 'json';
-  } else if (exportFormat === 'csv') {
-    content = buildCsvExport(list);
-    ext = 'csv';
-  } else if (exportFormat === 'txt') {
-    content = buildTxtExport(list);
-    ext = 'txt';
-  } else {
-    content = buildHtmlReport(list, theme, shorten);
-    ext = 'html';
-  }
+  // One file per chosen format, all named with the same timestamp. They are
+  // built from the one list, so the (slow) AMO lookups above run only once
+  // however many formats are ticked.
+  const timestamp = formatFilenameTimestamp(new Date());
+  const files = exportFormats.map((fmt) => {
+    let content;
+    if (fmt === 'json') content = buildJsonExport(list);
+    else if (fmt === 'csv') content = buildCsvExport(list);
+    else if (fmt === 'txt') content = buildTxtExport(list);
+    else content = buildHtmlReport(list, theme, shorten);
+    return { html: content, filename: `Firefox Add-ons (${timestamp}).${fmt}`, format: fmt };
+  });
 
-  const filename = `Firefox Add-ons (${formatFilenameTimestamp(new Date())}).${ext}`;
-  return { html: content, filename, format: ext, stats };
+  // html / filename / format are the first file's, kept for anything that
+  // only deals with one; files and formats carry every one.
+  return {
+    html: files[0].html,
+    filename: files[0].filename,
+    format: files[0].format,
+    files,
+    formats: files.map((f) => f.format),
+    stats,
+  };
 }

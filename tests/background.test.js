@@ -567,3 +567,102 @@ testAsync('openTabs: caps a single batch at 500 tabs', async () => {
   assert.deepStrictEqual(plain(reply), { queued: 500 });
 });
 
+
+testAsync('doExport: with several formats ticked it builds one file per format, all with the same timestamp', async () => {
+  const addon = { id: 'ext1@example.com', name: 'Test Addon', version: '1.0', enabled: true, type: 'extension' };
+  const bgSandbox = {
+    URL, AbortController, setTimeout, clearTimeout,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    fetch: async () => ({ ok: false, status: 404, json: async () => ({}) }),
+    browser: {
+      runtime: { onMessage: { addListener() {} }, sendMessage: async () => {} },
+      management: { getAll: async () => [addon] },
+      storage: { local: { get: async () => ({ exportFormat: ['json', 'html', 'csv'] }) } },
+    },
+  };
+  vm.createContext(bgSandbox);
+  vm.runInContext(commonSrc, bgSandbox);
+  vm.runInContext(reportTemplateSrc, bgSandbox);
+  vm.runInContext(backgroundSrc, bgSandbox);
+  const result = await bgSandbox.doExport([addon.id]);
+  assert.deepStrictEqual(Array.from(result.formats), ['html', 'json', 'csv']);
+  assert.strictEqual(result.files.length, 3);
+  const stamps = result.files.map((f) => f.filename.replace(/\.\w+$/, ''));
+  assert.strictEqual(new Set(stamps).size, 1, 'one shared timestamp');
+  assert.deepStrictEqual(Array.from(result.files.map((f) => f.filename.split('.').pop())), ['html', 'json', 'csv']);
+  assert.strictEqual(result.format, 'html', 'format / html / filename stay the first file\'s');
+  assert.strictEqual(result.filename, result.files[0].filename);
+});
+
+// --- several formats are saved as ONE zip (one Save dialog) ---
+
+function readZip(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const eocd = bytes.length - 22;
+  assert.strictEqual(view.getUint32(eocd, true), 0x06054b50, 'end-of-central-directory signature');
+  const count = view.getUint16(eocd + 10, true);
+  let pos = view.getUint32(eocd + 16, true);
+  assert.strictEqual(view.getUint32(eocd + 12, true), eocd - pos, 'central directory size matches where it actually is');
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    assert.strictEqual(view.getUint32(pos, true), 0x02014b50);
+    const size = view.getUint32(pos + 24, true);
+    const nameLen = view.getUint16(pos + 28, true);
+    const offset = view.getUint32(pos + 42, true);
+    const name = Buffer.from(bytes.subarray(pos + 46, pos + 46 + nameLen)).toString('utf8');
+    assert.strictEqual(view.getUint32(offset, true), 0x04034b50);
+    const dataStart = offset + 30 + view.getUint16(offset + 26, true) + view.getUint16(offset + 28, true);
+    out.push({ name, text: Buffer.from(bytes.subarray(dataStart, dataStart + size)).toString('utf8'), crc: view.getUint32(pos + 16, true) });
+    pos += 46 + nameLen;
+  }
+  return out;
+}
+
+test('zip.js: buildZip stores every file intact, with correct names and CRCs (incl. non-ASCII)', () => {
+  const zipSrc = readSrc('src/background/zip.js');
+  const sb = { TextEncoder, Uint8Array, Uint32Array, DataView };
+  vm.createContext(sb);
+  vm.runInContext(zipSrc, sb);
+  const files = [
+    { name: 'Firefox Add-ons (x).html', content: '<p>héllo – ✓</p>' },
+    { name: 'Firefox Add-ons (x).json', content: '{"a":1}' },
+  ];
+  const entries = readZip(sb.buildZip(files, new Date(2026, 9, 12, 1, 30, 4)));
+  assert.strictEqual(entries.length, 2);
+  entries.forEach((e, i) => {
+    assert.strictEqual(e.name, files[i].name);
+    assert.strictEqual(e.text, files[i].content);
+  });
+  // CRC-32 of "123456789" is the well-known check value 0xCBF43926.
+  const check = readZip(sb.buildZip([{ name: 'c.txt', content: '123456789' }]));
+  assert.strictEqual(check[0].crc, 0xCBF43926);
+});
+
+testAsync('export message: several formats are downloaded as one .zip with a single Save dialog', async () => {
+  const downloads = [];
+  const addon = { id: 'ext1@example.com', name: 'Test Addon', version: '1.0', enabled: true, type: 'extension' };
+  let listener;
+  const bgSandbox = {
+    URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} }, AbortController, setTimeout: () => 0, clearTimeout,
+    Blob, TextEncoder, Uint8Array, Uint32Array, DataView,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    fetch: async () => ({ ok: false, status: 404, json: async () => ({}) }),
+    browser: {
+      runtime: { onMessage: { addListener: (fn) => { listener = fn; } }, sendMessage: async () => {} },
+      management: { getAll: async () => [addon] },
+      storage: { local: { get: async () => ({ exportFormat: ['html', 'json'] }) } },
+      downloads: { download: async (opts) => { downloads.push(opts); return 1; } },
+    },
+  };
+  vm.createContext(bgSandbox);
+  vm.runInContext(commonSrc, bgSandbox);
+  vm.runInContext(reportTemplateSrc, bgSandbox);
+  vm.runInContext(readSrc('src/background/zip.js'), bgSandbox);
+  vm.runInContext(backgroundSrc, bgSandbox);
+  const result = await listener({ type: 'export', ids: [addon.id] });
+  assert.strictEqual(downloads.length, 1, 'one download, so one Save dialog');
+  assert.ok(/\.zip$/.test(downloads[0].filename));
+  assert.strictEqual(downloads[0].saveAs, true);
+  assert.strictEqual(result.zipped, true);
+  assert.deepStrictEqual(Array.from(result.formats), ['html', 'json']);
+});

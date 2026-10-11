@@ -50,7 +50,7 @@
   div.settings-option-row { align-items: center; justify-content: space-between; padding: 8px 12px; margin-bottom: 0; }
   .settings-option-row:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.01); }
   label.settings-option-row:active { transform: scale(0.985); }
-  :root[data-theme="dark"] .settings-option-row:hover { background: #2e3340; border-color: #6b7280; }
+  :root[data-theme="dark"] .settings-option-row:hover { background: #2e3340; border-color: #d1d5db; }
   .settings-action-group {
     display: flex;
     flex-direction: column;
@@ -62,8 +62,9 @@
     padding: 9px 14px;
     text-align: center;
   }
-  .settings-btn:hover { border-color: var(--btn-bg-hover); transform: scale(1.01); }
-  :root[data-theme="dark"] .settings-btn:hover { background: #2e3340; border-color: #6b7280; }
+  /* Hover: a soft grey fill, like the pink one on Reset but neutral. */
+  .settings-btn:hover { background: #e9ebee; border-color: var(--btn-bg-hover); transform: scale(1.01); }
+  :root[data-theme="dark"] .settings-btn:hover { background: #3a3f4b; border-color: #d1d5db; }
   .settings-btn:active { transform: scale(0.95); transition-duration: 0.08s; }
   .settings-btn-danger { border-color: var(--danger-color); color: var(--danger-color); }
   .settings-btn-danger:hover { background: #fef2f2; border-color: var(--danger-color); }
@@ -73,12 +74,15 @@
 
   /* Modal buttons shared by reset dialogs */
   .s-modal-btn {
-    padding: 7px 20px;
+    padding: 7px 0;
+    width: 96px;
     border-radius: 7px;
   }
-  .s-modal-btn:hover { transform: scale(1.04); }
+  .s-modal-btn:hover { background: #e9ebee; transform: scale(1.04); }
+  :root[data-theme="dark"] .s-modal-btn:hover { background: #3a3f4b; }
   .s-modal-btn:active { transform: scale(0.95); transition-duration: 0.08s; }
-  .s-modal-btn-danger { color: var(--danger-color); border-color: var(--danger-color); }
+  .s-modal-btn-danger { color: var(--danger-color); border-color: var(--danger-color); --press-ring: rgba(192, 57, 43, 0.5); }
+  :root[data-theme="dark"] .s-modal-btn-danger { --press-ring: rgba(239, 106, 94, 0.5); }
   .s-modal-btn-danger:hover { background: #fef2f2; border-color: var(--danger-color); }
   :root[data-theme="dark"] .s-modal-btn-danger:hover { background: #3d1515; }
   #settingsStatus {
@@ -151,6 +155,10 @@
   .settings-group > :nth-child(2) { --i: 1; }
   .settings-group > :nth-child(3) { --i: 2; }
   .settings-group > :nth-child(4) { --i: 3; }
+  .settings-group > :nth-child(5) { --i: 4; }
+  .settings-group > :nth-child(6) { --i: 5; }
+  /* The short note under a section heading (Export Format). */
+  .settings-hint { font-size: 12px; color: var(--text-muted); line-height: 1.4; margin: -4px 0 10px; }
   /* Success colour for finished export / import / reset messages. */
   :root { --success-color: #1a7f37; }
   :root[data-theme="dark"] { --success-color: #56d364; }
@@ -184,7 +192,8 @@
     animation: settings-icon-spin 0.7s var(--motion-spring) backwards;
   }
   /* Small pop when a radio becomes selected. */
-  .settings-option-row input[type="radio"]:checked { animation: hub-pop var(--motion-normal) var(--motion-spring); }
+  .settings-option-row input[type="radio"]:checked,
+  .settings-option-row input[type="checkbox"]:checked { animation: hub-pop var(--motion-normal) var(--motion-spring); }
   /* Inline row messages fade in each time they're shown (display toggles). */
   #exportSettingsDesc, #importSettingsDesc, #resetSettingsDesc,
   #exportSettingsStatus, #importSettingsStatus, #resetSettingsStatus,
@@ -224,32 +233,33 @@
 
     <div class="settings-group">
       <h2 id="exportFormatHeading">Export Format</h2>
+      <p class="settings-hint">Tick one or more. If you tick several, they are saved together in one .zip file.</p>
       <label class="settings-option-row" for="formatHtml">
-        <input type="radio" name="exportFormat" id="formatHtml" value="html">
+        <input type="checkbox" name="exportFormat" id="formatHtml" value="html">
         <span>
           <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">HTML</span>
-          <span style="font-size:12px; color:var(--text-muted);">Human-readable report. Re-importable by Add-ons Importer.</span>
+          <span style="font-size:12px; color:var(--text-muted);">A readable report you can open in any browser. Add-ons Importer can read it back.</span>
         </span>
       </label>
       <label class="settings-option-row" for="formatJson">
-        <input type="radio" name="exportFormat" id="formatJson" value="json">
+        <input type="checkbox" name="exportFormat" id="formatJson" value="json">
         <span>
           <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">JSON</span>
-          <span style="font-size:12px; color:var(--text-muted);">Machine-readable. Re-importable by Add-ons Importer.</span>
+          <span style="font-size:12px; color:var(--text-muted);">Plain data for other tools. Add-ons Importer can read it back.</span>
         </span>
       </label>
       <label class="settings-option-row" for="formatCsv">
-        <input type="radio" name="exportFormat" id="formatCsv" value="csv">
+        <input type="checkbox" name="exportFormat" id="formatCsv" value="csv">
         <span>
           <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">CSV</span>
-          <span style="font-size:12px; color:var(--text-muted);">For spreadsheets. Re-importable by Add-ons Importer.</span>
+          <span style="font-size:12px; color:var(--text-muted);">A table for Excel or any spreadsheet. Add-ons Importer can read it back.</span>
         </span>
       </label>
       <label class="settings-option-row" for="formatTxt">
-        <input type="radio" name="exportFormat" id="formatTxt" value="txt">
+        <input type="checkbox" name="exportFormat" id="formatTxt" value="txt">
         <span>
           <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">TXT</span>
-          <span style="font-size:12px; color:var(--text-muted);">Plain text list. One add-on per line with name, version, and link.</span>
+          <span style="font-size:12px; color:var(--text-muted);">A simple list, one add-on per line. Add-ons Importer can read it back.</span>
         </span>
       </label>
     </div>
@@ -281,7 +291,7 @@
             <span id="exportSettingsDesc" style="font-size:12px; color:var(--text-muted);">Save your current settings to a file.</span>
             <span id="exportSettingsStatus" style="font-size:12px; display:none;"></span>
           </span>
-          <button class="settings-btn hub-btn" id="exportSettingsBtn" style="flex-shrink:0; flex:none; width:auto; min-width:80px; padding:6px 14px; margin-left:12px;">Export</button>
+          <button class="settings-btn hub-btn" id="exportSettingsBtn" style="flex-shrink:0; flex:none; width:92px; min-width:92px; padding:6px 0; margin-left:12px;">Export</button>
         </div>
         <div class="settings-option-row">
           <span style="flex:1;">
@@ -289,7 +299,7 @@
             <span id="importSettingsDesc" style="font-size:12px; color:var(--text-muted);">Restore settings from a previously exported file.</span>
             <span id="importSettingsStatus" style="font-size:12px; display:none;"></span>
           </span>
-          <button class="settings-btn hub-btn" id="importSettingsBtn" style="flex-shrink:0; flex:none; width:auto; min-width:80px; padding:6px 14px; margin-left:12px;">Import</button>
+          <button class="settings-btn hub-btn" id="importSettingsBtn" style="flex-shrink:0; flex:none; width:92px; min-width:92px; padding:6px 0; margin-left:12px;">Import</button>
         </div>
       </div>
     </div>
@@ -302,7 +312,7 @@
           <span id="resetSettingsDesc" style="font-size:12px; color:var(--text-muted);">Clears theme, export format, and display settings back to defaults.</span>
           <span id="resetSettingsStatus" style="font-size:12px; display:none;"></span>
         </span>
-        <button class="settings-btn settings-btn-danger hub-btn" id="resetSettingsBtn" style="flex-shrink:0; flex:none; width:auto; min-width:80px; padding:6px 14px; margin-left:12px;">Reset</button>
+        <button class="settings-btn settings-btn-danger hub-btn" id="resetSettingsBtn" style="flex-shrink:0; flex:none; width:92px; min-width:92px; padding:6px 0; margin-left:12px;">Reset</button>
       </div>
       <span id="settingsStatus"></span>
     </div>

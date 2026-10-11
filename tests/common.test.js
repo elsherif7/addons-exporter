@@ -1038,3 +1038,37 @@ test('setSelectionCount: an element that cannot animate just gets its text', () 
   sb.setSelectionCount(plain, '4 of 12 selected');
   assert.strictEqual(plain.textContent, '4 of 12 selected');
 });
+
+// --- several export formats at once ---
+
+test('resolveExportFormats: a string, a list or a comma list becomes known formats in fixed order, never empty', () => {
+  assert.deepStrictEqual(Array.from(sandbox.resolveExportFormats('json')), ['json']);
+  assert.deepStrictEqual(Array.from(sandbox.resolveExportFormats(['txt', 'html'])), ['html', 'txt']);
+  assert.deepStrictEqual(Array.from(sandbox.resolveExportFormats('csv,json,csv')), ['json', 'csv']);
+  assert.deepStrictEqual(Array.from(sandbox.resolveExportFormats(['xml', 'json'])), ['json']);
+  for (const bad of [undefined, null, '', 'xml', [], ['xml'], 42]) {
+    assert.deepStrictEqual(Array.from(sandbox.resolveExportFormats(bad)), ['html']);
+  }
+});
+
+test('serializeExportFormats: one format stays a plain string, several become an array', () => {
+  assert.strictEqual(sandbox.serializeExportFormats(['json']), 'json');
+  assert.strictEqual(sandbox.serializeExportFormats('csv'), 'csv');
+  assert.deepStrictEqual(Array.from(sandbox.serializeExportFormats(['txt', 'html'])), ['html', 'txt']);
+  assert.strictEqual(sandbox.serializeExportFormats([]), 'html');
+});
+
+test('formatLabelsText: labels are joined like a sentence', () => {
+  assert.strictEqual(sandbox.formatLabelsText('json'), 'JSON file');
+  assert.strictEqual(sandbox.formatLabelsText(['html', 'json']), 'HTML report and JSON file');
+  assert.strictEqual(sandbox.formatLabelsText(['html', 'json', 'csv', 'txt']), 'HTML report, JSON file, CSV file and TXT file');
+});
+
+test('getStoredSettings: exportFormats lists every stored format, exportFormat is the first', async () => {
+  const sb = { URL, browser: { storage: { local: { get: async () => ({ exportFormat: ['json', 'html'] }) } } } };
+  vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
+  const s = await sb.getStoredSettings();
+  assert.deepStrictEqual(Array.from(s.exportFormats), ['html', 'json']);
+  assert.strictEqual(s.exportFormat, 'html');
+});

@@ -18,8 +18,10 @@
   --text-secondary: #444;
   --text-muted: #666;
   --text-faint: #707070;
-  --border: #d0d3d9;
+  --border: #747b87;
   --border-soft: #e2e4e8;
+  /* Lines between rows: between --border-soft and --border. */
+  --divider: #c3c7ce;
   --border-faint: #f0f1f3;
   --hover-bg: #fafbfc;
   --btn-bg: #1f2937;
@@ -59,8 +61,9 @@
   --text-secondary: #c3c5ca;
   --text-muted: #9199a3;
   --text-faint: #8890a0;
-  --border: #3a3f4b;
+  --border: #70767f;
   --border-soft: #2f333c;
+  --divider: #40454f;
   --border-faint: #262932;
   --hover-bg: #262a33;
   --btn-bg: #374151;
@@ -236,7 +239,11 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   font-weight: 600;
   line-height: 1.2;
   cursor: pointer;
-  padding: 7px 14px;
+  /* A fixed height shared with #selectionCount below, so the three
+     always match whatever font the browser picks for each. */
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 14px;
   user-select: none;
   /* Springy release, like .hub-btn. */
   transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.35s var(--motion-spring);
@@ -252,13 +259,21 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   outline-offset: 2px;
 }
 #selectionCount {
-  font-size: 12.5px;
+  /* Same size as the Select all / Deselect all buttons next to it. */
+  font-size: 13px;
   font-weight: 600;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
   color: var(--text);
   background: var(--border-soft);
+  border: 1px solid transparent;
   border-radius: 999px;
-  padding: 6px 12px;
+  box-sizing: border-box;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
   white-space: nowrap;
 }
 /* Nothing to say yet (before the list loads): no empty badge. When it first
@@ -327,7 +342,7 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   align-items: flex-start;
   gap: 10px;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--divider);
   cursor: pointer;
   user-select: none;
   transition: background 0.12s, border-color 0.12s, transform 0.1s;
@@ -350,10 +365,21 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   text-align: left;
   font-size: 14px;
   cursor: pointer;
+  /* Name, version, type (and any match note) sit in a row with one equal
+     10px gap between each, the same as the gap after the checkbox - instead
+     of relying on typed spaces, which came out different sizes. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 10px;
 }
+/* A warning under the name takes its own line. */
+.addon-row label .addon-link-preview { flex-basis: 100%; }
 .addon-row input[type="checkbox"] {
   margin-top: 3px;
 }
+/* Nothing extra after the tick box, so its gap to the name is the row's 10px. */
+.addon-row > input[type="checkbox"] { margin-right: 0; }
 .addon-version {
   color: var(--text-faint);
   font-size: 12px;
@@ -427,6 +453,8 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   border-radius: 4px;
 }
 .match-label[href]:hover { text-decoration: underline; }
+/* Inside a row's label the flex gap spaces things, so no extra left margin. */
+.addon-row label .match-label { margin-left: 0; }
 .match-uncertain {
   color: var(--warn-color);
   font-weight: 600;
@@ -508,15 +536,15 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   align-items: center;
   padding: 10px 14px;
   font-size: 14px;
-  border-bottom: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--divider);
   transition: background 0.12s, border-color 0.12s, transform 0.1s;
 }
 .about-row:last-child { border-bottom: none; }
-.about-row:hover { background: var(--hover-bg); border-bottom-color: var(--border); transform: scale(1.01); }
-:root[data-theme="dark"] .about-row:hover { background: #2e3340; border-bottom-color: #6b7280; }
+.about-row:hover { background: var(--hover-bg); border-bottom-color: var(--divider); transform: scale(1.01); }
+:root[data-theme="dark"] .about-row:hover { background: #2e3340; border-bottom-color: #70767f; }
 .about-label { color: var(--text-muted); font-size: 14px; font-weight: 600; }
 .about-value { color: var(--text); font-weight: 600; font-size: 14px; }
-.about-value a { color: var(--link-accent); text-decoration: none; font-weight: 600; }
+.about-value a { display: inline-block; border-radius: 4px; color: var(--link-accent); text-decoration: none; font-weight: 600; }
 .about-value a:hover { text-decoration: underline; }
 
 /* Light/dark switch. Where the browser supports view transitions

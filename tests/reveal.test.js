@@ -136,10 +136,29 @@ test('reveal: it only decides timing - no text is split, hidden or rewritten', (
 test('reveal: parts come one after another, top to bottom, every 0.16s - the pace of the Settings sections', () => {
   const p = exporterCard();
   load({ card: p.card, byId: { addonList: p.list } });
-  const parts = [p.desc, p.search, p.controls, p.box, p.exportBtn];
+  const parts = [p.desc, p.search, p.controls, p.box];
   const starts = parts.map((el) => secs(el, '--d'));
   assert.strictEqual(starts[0], 0.82, 'the first part waits for the card and the title');
   starts.forEach((v, i) => { if (i) assert.strictEqual(r3(v - starts[i - 1]), 0.16, `part ${i + 1} follows part ${i} by 0.16s`); });
+});
+
+test('reveal: the Exporter\'s Export button waits until the last add-on is in, never before', () => {
+  const p = exporterCard();
+  const { observers } = load({ card: p.card, byId: { addonList: p.list } });
+  assert.ok(secs(p.exportBtn, '--d') > 1000, 'parked while the list is still loading');
+  const items = addRows(p.list, 5);
+  observers[0].cb();
+  const lastRow = secs(items[items.length - 1], '--rd');
+  assert.ok(secs(p.exportBtn, '--d') > lastRow, 'the button starts after the last row starts');
+  assert.ok(secs(p.exportBtn, '--d') < lastRow + 1, 'and soon after it');
+});
+
+test('reveal: with no add-ons to show, the Export button still appears', () => {
+  const p = exporterCard();
+  const { observers } = load({ card: p.card, byId: { addonList: p.list } });
+  p.list.appendChild(new El('p', { classes: ['placeholder-text'], text: 'No add-ons found to export.' }));
+  observers[0].cb();
+  assert.ok(secs(p.exportBtn, '--d') < 5);
 });
 
 test('reveal: the title is not given a start time here (its slot is fixed in the stylesheet)', () => {

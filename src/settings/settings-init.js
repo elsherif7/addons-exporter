@@ -9,7 +9,7 @@
 // yields the call stack, so correcting .checked here is guaranteed to happen
 // before the first visible frame.
 //
-// The Export Format and Display radio groups have no hardcoded `checked`
+// The Export Format tick boxes and the Display radio group have no hardcoded `checked`
 // attribute in the HTML — this script sets the correct one synchronously
 // before any paint, so the user never sees an unselected or wrong state.
 // On a fresh install (no cache yet), the defaults (html / on) are applied
@@ -40,18 +40,25 @@
     // localStorage unavailable — fall through to apply defaults below.
   }
 
+  // The cached export format is one format or several joined by commas
+  // (e.g. 'html,json'). Keep only the known ones; none left means the default.
+  var fmtList = [];
+  if (typeof fmt === 'string') {
+    fmtList = fmt.split(',').filter(function (f) { return VALID_FORMATS.indexOf(f) !== -1; });
+  }
+  if (fmtList.length === 0) fmtList = [DEFAULT_FORMAT];
+
   // Validate; fall back to defaults for missing or invalid cache values.
-  if (VALID_FORMATS.indexOf(fmt) === -1)   fmt     = DEFAULT_FORMAT;
   if (VALID_SHORTEN.indexOf(shorten) === -1) shorten = DEFAULT_SHORTEN;
 
   var fmtHtml = document.getElementById('formatHtml');
   var fmtJson = document.getElementById('formatJson');
   var fmtCsv  = document.getElementById('formatCsv');
   var fmtTxt  = document.getElementById('formatTxt');
-  if (fmtHtml) fmtHtml.checked = (fmt === 'html');
-  if (fmtJson) fmtJson.checked = (fmt === 'json');
-  if (fmtCsv)  fmtCsv.checked  = (fmt === 'csv');
-  if (fmtTxt)  fmtTxt.checked  = (fmt === 'txt');
+  if (fmtHtml) fmtHtml.checked = (fmtList.indexOf('html') !== -1);
+  if (fmtJson) fmtJson.checked = (fmtList.indexOf('json') !== -1);
+  if (fmtCsv)  fmtCsv.checked  = (fmtList.indexOf('csv') !== -1);
+  if (fmtTxt)  fmtTxt.checked  = (fmtList.indexOf('txt') !== -1);
 
   var sOn  = document.getElementById('shortenNamesOn');
   var sOff = document.getElementById('shortenNamesOff');

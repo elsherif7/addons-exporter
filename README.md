@@ -33,8 +33,9 @@ addons-hub/
     │   └── shared.css  # Shared styles used by export, import, settings, and confirmation pages
     ├── background/
     │   ├── background.js       # Handles messaging, AMO lookups, and export orchestration logic
-    │   └── report-template.js  # Builds the self-contained HTML report and all other export formats returned by doExport()
-    │   └── report.css          # Source CSS for the report's inline <style> block; inlined by `npm run build`
+    │   ├── report-template.js  # Builds the self-contained HTML report and all other export formats returned by doExport()
+    │   ├── report.css          # Source CSS for the report's inline <style> block; inlined by `npm run build`
+    │   └── zip.js              # Tiny ZIP writer: several export formats are saved together as one .zip
     ├── popup/
     │   ├── popup.html  # Markup for the small toolbar popup interface
     │   └── popup.js    # Handles clicks on the popup's export, import, and settings buttons
@@ -102,7 +103,7 @@ Reads a previously exported file (`.html`/`.htm`, `.json`, `.csv`, or `.txt`, up
 
 ### Settings
 
-The Settings page controls **Appearance** (light/dark theme), **Export Format** (HTML/JSON/CSV/TXT), and **Display** (whether long add-on names are shortened for readability), plus a few other things below.
+The Settings page controls **Appearance** (light/dark theme), **Export Format** (HTML/JSON/CSV/TXT — tick one or more; with one format you get that file; with several they are bundled into a single `.zip` (one Save dialog) built from a single set of AMO lookups, and you unzip it before using the Importer), and **Display** (whether long add-on names are shortened for readability), plus a few other things below.
 
 **Export Settings** and **Import Settings**, at the bottom of the page, back up and restore all three of the settings above. Export saves them to a small JSON file named `Add-ons Hub Settings (<timestamp>).json`, which you can use to carry your preferences to another browser or device. Import reads a previously exported settings file, validates it, and applies the recognised settings immediately — unknown keys from a future version are silently ignored, so a newer export still applies whatever it can.
 

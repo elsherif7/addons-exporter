@@ -14,7 +14,12 @@ const exportDescEl = document.getElementById('exportDesc');
 // separately (see doExport()'s stats in background.js) so a real AMO
 // outage doesn't look identical to a completely normal export.
 function buildExportSuccessStatus(fmt, stats) {
-  let msg = `Export complete. Your ${formatLabel(fmt)} has been saved to the folder you picked.`;
+  // fmt is one format or a list of them (several can be ticked in Settings;
+  // several are saved together in one .zip).
+  const formats = resolveExportFormats(fmt);
+  let msg = formats.length === 1
+    ? `Export complete. Your ${formatLabelsText(formats)} has been saved to the folder you picked.`
+    : `Export complete. Your ${formatLabelsText(formats)} have been saved together in one .zip file in the folder you picked.`;
   if (stats) {
     const total = stats.total || 0;
     const failures = stats.lookupFailures || 0;
@@ -47,27 +52,26 @@ function buildExportSuccessStatus(fmt, stats) {
 
 // Updates the description paragraph to reflect the currently stored format.
 async function updateExportDesc() {
-  let fmt = EXPORT_FORMAT_DEFAULT;
+  let formats = [EXPORT_FORMAT_DEFAULT];
   try {
     const stored = await browser.storage.local.get(EXPORT_FORMAT_STORAGE_KEY);
-    const val = stored[EXPORT_FORMAT_STORAGE_KEY];
-    if (val === 'html' || val === 'json' || val === 'csv' || val === 'txt') fmt = val;
+    formats = resolveExportFormats(stored[EXPORT_FORMAT_STORAGE_KEY]);
   } catch {
     // keep default
   }
-  const label = formatLabel(fmt);
-  const article = indefiniteArticleFor(label);
+  const article = indefiniteArticleFor(formatLabel(formats[0]));
 
   exportDescEl.textContent = '';
   const addonsStrong = document.createElement('strong');
   addonsStrong.textContent = 'Add-ons';
   const exportStrong = document.createElement('strong');
   exportStrong.textContent = 'Export Selected';
-  const labelStrong = document.createElement('strong');
-  labelStrong.textContent = label;
   exportDescEl.append(
     'Select the ', addonsStrong, ' you want to export, then click ', exportStrong,
-    ` to create ${article} `, labelStrong,
+    ` to create ${article} `
+  );
+  appendFormatLabels(exportDescEl, formats);
+  exportDescEl.append(
     ' you can use to reinstall them later on any Firefox\u2011based\u00a0browser.'
   );
 }
@@ -270,8 +274,8 @@ exportBtn.addEventListener('click', async () => {
   try {
     const result = await browser.runtime.sendMessage({ type: 'export', ids });
 
-    setStatus(buildExportSuccessStatus(result.format, result.stats));
-    await goToConfirmation(`from=export&format=${result.format}`);
+    setStatus(buildExportSuccessStatus(result.formats || result.format, result.stats));
+    await goToConfirmation(`from=export&format=${(result.formats || [result.format]).join(',')}${result.zipped ? '&zip=1' : ''}`);
   } catch (e) {
     setStatus('Error: ' + e.message);
   } finally {
