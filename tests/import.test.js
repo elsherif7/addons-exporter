@@ -875,15 +875,15 @@ testAsync('import.js real DOM: a row with an unsafe link gets the row-disabled c
 
 // --- A23: validateSelectedFile ---
 
-test('validateSelectedFile: accepts .html, .htm, .json, and .csv', () => {
-  for (const name of ['export.html', 'export.htm', 'export.json', 'export.csv']) {
+test('validateSelectedFile: accepts .html, .htm, .json, .csv, and .txt', () => {
+  for (const name of ['export.html', 'export.htm', 'export.json', 'export.csv', 'export.txt']) {
     const result = validateSelectedFile({ name, size: 1000 });
     assert.strictEqual(result.ok, true, `${name} should be accepted`);
   }
 });
 
 test('validateSelectedFile: rejects an unrecognised extension', () => {
-  const result = validateSelectedFile({ name: 'notes.txt', size: 1000 });
+  const result = validateSelectedFile({ name: 'notes.xml', size: 1000 });
   assert.strictEqual(result.ok, false);
   assert.match(result.error, /isn't a supported file type/);
 });
@@ -911,10 +911,10 @@ test('validateSelectedFile: a missing/undefined size is not treated as oversized
 
 // --- A23: setSelectedFile rejects an invalid file before loading it ---
 
-testAsync('import.js: selecting a .txt file is rejected before any read is attempted', async () => {
+testAsync('import.js: selecting an unsupported file type is rejected before any read is attempted', async () => {
   const { sandbox, elements } = bootImportSandbox();
   let readAttempted = false;
-  sandbox.setSelectedFile({ name: 'notes.txt', size: 100, text: async () => { readAttempted = true; return ''; } });
+  sandbox.setSelectedFile({ name: 'notes.xml', size: 100, text: async () => { readAttempted = true; return ''; } });
   await sleep(20);
 
   assert.strictEqual(readAttempted, false, 'the file should never be read at all');

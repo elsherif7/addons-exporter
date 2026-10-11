@@ -190,6 +190,7 @@
   .addon-name { font-size: 14px; font-weight: 600; color: var(--text); }
   .addon-version { color: var(--text-faint); font-size: 12px; margin-left: 6px; }
   .match-label { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+  .match-label[href] { display: inline-block; color: var(--link-accent); text-decoration: none; border-radius: 4px; }
   .match-label[href]:hover { text-decoration: underline; }
   .match-uncertain { color: var(--warn-color); font-weight: 600; }
 

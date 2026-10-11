@@ -421,8 +421,10 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   margin-left: 8px;
 }
 .match-label[href] {
+  display: inline-block;
   color: var(--link-accent);
   text-decoration: none;
+  border-radius: 4px;
 }
 .match-label[href]:hover { text-decoration: underline; }
 .match-uncertain {

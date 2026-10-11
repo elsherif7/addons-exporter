@@ -38,10 +38,10 @@ test('settings-option-row: about-block-hover class no longer exists in settings.
 });
 
 // Structural: all 8 option rows use settings-option-row.
-test('settings-option-row: all 7 radio label rows use settings-option-row', () => {
+test('settings-option-row: all 8 radio label rows use settings-option-row', () => {
   const matches = [...settingsHtml.matchAll(/<label[^>]+class="settings-option-row"[^>]*>/g)];
-  assert.strictEqual(matches.length, 7,
-    `expected 7 radio label rows with class="settings-option-row", found ${matches.length}`);
+  assert.strictEqual(matches.length, 8,
+    `expected 8 radio label rows with class="settings-option-row", found ${matches.length}`);
 });
 
 test('settings-option-row: the Reset Settings action row uses settings-option-row', () => {
@@ -75,6 +75,7 @@ for (const [id, name, value] of [
   ['formatHtml',      'exportFormat', 'html'],
   ['formatJson',      'exportFormat', 'json'],
   ['formatCsv',       'exportFormat', 'csv'],
+  ['formatTxt',       'exportFormat', 'txt'],
   ['shortenNamesOn',  'shortenNames', 'on'],
   ['shortenNamesOff', 'shortenNames', 'off'],
 ]) {
@@ -97,6 +98,7 @@ for (const [labelFor, radioId] of [
   ['formatHtml',      'formatHtml'],
   ['formatJson',      'formatJson'],
   ['formatCsv',       'formatCsv'],
+  ['formatTxt',       'formatTxt'],
   ['shortenNamesOn',  'shortenNamesOn'],
   ['shortenNamesOff', 'shortenNamesOff'],
 ]) {

@@ -1,5 +1,7 @@
 // Builds the standalone, self-contained HTML report handed back by
-// doExport() in background.js. Pure string templating only - nothing
+// Builds every export format returned by doExport() in background.js:
+// buildHtmlReport(), buildJsonExport(), buildCsvExport(), buildTxtExport().
+// Pure string templating only - nothing
 // here touches browser.* APIs, so it can be loaded and tested on its
 // own. Depends on common.js (escapeHtml, byName, LINK_TYPE_LABELS,
 // UNCERTAIN_LINK_TYPES, EXPORT_FORMAT_VERSION), which must be loaded
@@ -53,7 +55,21 @@ function buildCsvExport(list) {
   return lines.join('\r\n');
 }
 
-// list is the resolved add-ons array (see doExport() for its shape).
+// Builds a plain-text export. One add-on per line:
+//   Name | Version | Type | Enabled | Link
+// First line is a format-version comment so the format is identifiable.
+function buildTxtExport(list) {
+  const lines = [
+    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
+    '',
+    ...list.map((a) => {
+      const type = a.type === 'theme' ? 'Theme' : 'Extension';
+      const enabled = a.enabled ? 'Enabled' : 'Disabled';
+      return `${a.name} | ${a.version} | ${type} | ${enabled} | ${a.link}`;
+    }),
+  ];
+  return lines.join('\r\n');
+}
 // theme is 'light' or 'dark' - the report's starting appearance,
 // baked in from whatever the exporter's own Settings said at export
 // time (see doExport()'s call site). The toggle button lets anyone
@@ -282,6 +298,7 @@ function buildHtmlReport(list, theme, shorten = true) {
   .addon-name { font-size: 14px; font-weight: 600; color: var(--text); }
   .addon-version { color: var(--text-faint); font-size: 12px; margin-left: 6px; }
   .match-label { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+  .match-label[href] { display: inline-block; color: var(--link-accent); text-decoration: none; border-radius: 4px; }
   .match-label[href]:hover { text-decoration: underline; }
   .match-uncertain { color: var(--warn-color); font-weight: 600; }
 
@@ -552,12 +569,16 @@ function buildHtmlReport(list, theme, shorten = true) {
         el.animate(
           el.matches(ROW)
             ? [{ boxShadow: 'inset 0 0 0 999px ' + c }, { boxShadow: 'inset 0 0 0 999px transparent' }]
-            : [{ boxShadow: '0 0 0 0 ' + c }, { boxShadow: '0 0 0 12px transparent' }],
+            : [{ boxShadow: '0 0 0 2px ' + c }, { boxShadow: '0 0 0 10px transparent' }],
           { duration: 520, easing: 'ease-out' }
         );
       }
       function findTarget(node) {
         if (!node || typeof node.closest !== 'function') return null;
+        // If the click is on (or inside) a link, pulse only the link — never
+        // the whole row — so the AMO link gets its own ring, not a row flash.
+        var link = node.closest('a[href]');
+        if (link) return link;
         return node.closest(ROW) || node.closest(TARGET);
       }
       if (document.addEventListener) {

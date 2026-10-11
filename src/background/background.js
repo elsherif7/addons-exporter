@@ -7,7 +7,11 @@ browser.runtime.onMessage.addListener((message) => {
   }
   if (message.type === 'export') {
     return doExport(message.ids).then(async ({ html, filename, format, stats }) => {
-      const blob = new Blob([html], { type: 'text/html' });
+      const mimeType = format === 'json' ? 'application/json'
+        : format === 'csv' ? 'text/csv'
+        : format === 'txt' ? 'text/plain'
+        : 'text/html';
+      const blob = new Blob([html], { type: mimeType });
       const url = URL.createObjectURL(blob);
       try {
         await browser.downloads.download({ url, filename, saveAs: true });
@@ -105,10 +109,11 @@ function formatFilenameTimestamp(d) {
   return `${date}_${time}`;
 }
 
-// buildHtmlReport() - the standalone HTML report builder - lives in
-// report-template.js, loaded before this file (see manifest.json). It's
-// pure string templating with no browser.* dependency, split out so it
-// can be read/tested on its own, separate from this file's messaging
+// buildHtmlReport(), buildJsonExport(), buildCsvExport(), buildTxtExport() -
+// all export format builders - live in
+// report-template.js, loaded before this file (see manifest.json). They're
+// pure string templating with no browser.* dependency, split out so they
+// can be read/tested on their own, separate from this file's messaging
 // and AMO-lookup concerns.
 
 // Caps how many AMO lookups run at once, so a big add-on collection
@@ -264,6 +269,11 @@ async function doExport(ids, {
     return { id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
   });
 
+  // Sort A→Z by name so every export format (HTML, JSON, CSV, TXT) comes
+  // out in the same consistent alphabetical order, regardless of the order
+  // browser.management.getAll() happened to return them in.
+  list.sort(byName);
+
   // background.js has no document to apply a theme to, so it doesn't
   // load theme.js - it only needs the resolved value here, to bake into
   // the report's starting state (see report-template.js's
@@ -280,6 +290,9 @@ async function doExport(ids, {
   } else if (exportFormat === 'csv') {
     content = buildCsvExport(list);
     ext = 'csv';
+  } else if (exportFormat === 'txt') {
+    content = buildTxtExport(list);
+    ext = 'txt';
   } else {
     content = buildHtmlReport(list, theme, shorten);
     ext = 'html';

@@ -608,6 +608,8 @@ testAsync('getStoredSettings: reads all three keys in a single storage.get call'
 
 test('resolveExportFormat / resolveShortenNames: valid values pass through, invalid ones fall back', () => {
   assert.strictEqual(sandbox.resolveExportFormat('json'), 'json');
+  assert.strictEqual(sandbox.resolveExportFormat('csv'), 'csv');
+  assert.strictEqual(sandbox.resolveExportFormat('txt'), 'txt');
   assert.strictEqual(sandbox.resolveExportFormat('xml'), 'html');
   assert.strictEqual(sandbox.resolveShortenNames('off'), 'off');
   assert.strictEqual(sandbox.resolveShortenNames('maybe'), 'on');
@@ -636,6 +638,7 @@ test('A34 tripwire: getStoredSettings\' literal theme key matches theme.js\'s TH
 test('A34: formatLabel maps each export format to its label', () => {
   assert.strictEqual(sandbox.formatLabel('json'), 'JSON file');
   assert.strictEqual(sandbox.formatLabel('csv'), 'CSV file');
+  assert.strictEqual(sandbox.formatLabel('txt'), 'TXT file');
   assert.strictEqual(sandbox.formatLabel('html'), 'HTML report');
   assert.strictEqual(sandbox.formatLabel('nonsense'), 'HTML report');
 });

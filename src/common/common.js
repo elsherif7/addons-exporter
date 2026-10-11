@@ -5,7 +5,7 @@
 const EXPORT_FORMAT_VERSION = 1;
 
 // Storage key for the user's chosen export file format.
-// Valid values: 'html' | 'json' | 'csv'. Defaults to 'html' when unset.
+// Valid values: 'html' | 'json' | 'csv' | 'txt'. Defaults to 'html' when unset.
 const EXPORT_FORMAT_STORAGE_KEY = 'exportFormat';
 const EXPORT_FORMAT_DEFAULT = 'html';
 
@@ -41,6 +41,7 @@ function byName(a, b) {
 function formatLabel(fmt) {
   if (fmt === 'json') return 'JSON file';
   if (fmt === 'csv') return 'CSV file';
+  if (fmt === 'txt') return 'TXT file';
   return 'HTML report';
 }
 
@@ -51,7 +52,7 @@ function formatLabel(fmt) {
 // set rather than trusted as-is. Previously each of export.js, settings.js
 // and background.js had its own copy of this same check.
 function isValidExportFormat(val) {
-  return val === 'html' || val === 'json' || val === 'csv';
+  return val === 'html' || val === 'json' || val === 'csv' || val === 'txt';
 }
 function isValidShortenNames(val) {
   return val === 'on' || val === 'off';
@@ -91,7 +92,7 @@ async function getStoredSettings() {
 // so it needs "an", not "a". A few single letters exist whose *name*
 // starts with a vowel sound even though the letter itself doesn't: this
 // covers all of them, not just the ones this extension happens to use
-// today (HTML/JSON/CSV).
+// today (HTML/JSON/CSV/TXT).
 function indefiniteArticleFor(label) {
   const firstWord = String(label).trim().split(/\s+/)[0] || '';
   if (/^[A-Z]{2,}$/.test(firstWord)) {

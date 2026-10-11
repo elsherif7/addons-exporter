@@ -51,7 +51,7 @@ async function updateExportDesc() {
   try {
     const stored = await browser.storage.local.get(EXPORT_FORMAT_STORAGE_KEY);
     const val = stored[EXPORT_FORMAT_STORAGE_KEY];
-    if (val === 'html' || val === 'json' || val === 'csv') fmt = val;
+    if (val === 'html' || val === 'json' || val === 'csv' || val === 'txt') fmt = val;
   } catch {
     // keep default
   }

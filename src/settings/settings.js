@@ -53,7 +53,7 @@ function parseSettingsFile(text) {
   if (t === 'light' || t === 'dark') validated[THEME_STORAGE_KEY] = t;
 
   const f = parsed.settings[EXPORT_FORMAT_STORAGE_KEY];
-  if (f === 'html' || f === 'json' || f === 'csv') validated[EXPORT_FORMAT_STORAGE_KEY] = f;
+  if (f === 'html' || f === 'json' || f === 'csv' || f === 'txt') validated[EXPORT_FORMAT_STORAGE_KEY] = f;
 
   const s = parsed.settings[SHORT_NAME_STORAGE_KEY];
   if (s === 'on' || s === 'off') validated[SHORT_NAME_STORAGE_KEY] = s;
@@ -232,7 +232,8 @@ async function loadCurrentExportFormat() {
   }
   const current = (stored && (stored[EXPORT_FORMAT_STORAGE_KEY] === 'html' ||
                                stored[EXPORT_FORMAT_STORAGE_KEY] === 'json' ||
-                               stored[EXPORT_FORMAT_STORAGE_KEY] === 'csv'))
+                               stored[EXPORT_FORMAT_STORAGE_KEY] === 'csv' ||
+                               stored[EXPORT_FORMAT_STORAGE_KEY] === 'txt'))
     ? stored[EXPORT_FORMAT_STORAGE_KEY]
     : EXPORT_FORMAT_DEFAULT;
   for (const radio of formatRadios) {
@@ -313,7 +314,7 @@ function withSettingsDefaults(stored) {
   const shorten = stored && stored[SHORT_NAME_STORAGE_KEY];
   return {
     [THEME_STORAGE_KEY]: resolveTheme(stored),
-    [EXPORT_FORMAT_STORAGE_KEY]: (fmt === 'html' || fmt === 'json' || fmt === 'csv') ? fmt : EXPORT_FORMAT_DEFAULT,
+    [EXPORT_FORMAT_STORAGE_KEY]: (fmt === 'html' || fmt === 'json' || fmt === 'csv' || fmt === 'txt') ? fmt : EXPORT_FORMAT_DEFAULT,
     [SHORT_NAME_STORAGE_KEY]: (shorten === 'on' || shorten === 'off') ? shorten : SHORT_NAME_DEFAULT,
   };
 }

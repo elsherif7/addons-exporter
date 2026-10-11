@@ -282,6 +282,54 @@ function parseCsvRow(line) {
 }
 
 
+// Validates and parses a TXT export file's text content. Expects:
+//   line 1: # addons-hub-format-version: <n>
+//   line 2: (blank)
+//   line 3+: Name | Version | Type | Enabled | Link
+// Returns { ok, addons } or { ok: false, error }.
+function parseTxtPayload(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+
+  // Line 1: format-version comment
+  const versionMatch = lines[0] && lines[0].match(/^#\s*addons-hub-format-version:\s*(\d+)/);
+  if (!versionMatch) {
+    return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no format-version comment found)' };
+  }
+  const formatVersion = parseInt(versionMatch[1], 10);
+  if (formatVersion > SUPPORTED_FORMAT_VERSION) {
+    return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
+  }
+
+  // Skip the header comment line and any blank lines at the top
+  const dataLines = lines.slice(1).filter((l) => l.trim() !== '');
+
+  if (dataLines.length === 0) {
+    return { ok: false, error: 'No add-ons found in that file' };
+  }
+
+  const addons = [];
+  for (const line of dataLines) {
+    const parts = line.split(' | ');
+    // Minimum: name and link (index 0 and 4). Other fields optional for resilience.
+    if (parts.length < 2) continue;
+    const name = parts[0] ? parts[0].trim() : '';
+    if (!name) continue;
+    addons.push({
+      name,
+      version: parts[1] ? parts[1].trim() : undefined,
+      type:    parts[2] ? (parts[2].trim().toLowerCase() === 'theme' ? 'theme' : 'extension') : undefined,
+      enabled: parts[3] ? parts[3].trim().toLowerCase() === 'enabled' : undefined,
+      link:    parts[4] ? parts[4].trim() : undefined,
+    });
+  }
+
+  if (addons.length === 0) {
+    return { ok: false, error: 'No valid add-ons found in that file' };
+  }
+
+  return { ok: true, addons: migrateAddonsData(dedupeAddons(addons), formatVersion) };
+}
+
 const statusEl = document.getElementById('status');
 const fileNameEl = document.getElementById('fileName');
 const fileNameRow = document.getElementById('fileNameRow');
@@ -477,7 +525,7 @@ function renderAddonList(addons, installed, shorten) {
 let loadGeneration = 0;
 
 const MAX_IMPORT_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
-const ACCEPTED_IMPORT_EXTENSIONS = new Set(['html', 'htm', 'json', 'csv']);
+const ACCEPTED_IMPORT_EXTENSIONS = new Set(['html', 'htm', 'json', 'csv', 'txt']);
 
 // Checked before a file is ever read - lets a wrong-typed or oversized
 // file get a clear, immediate reason instead of failing deep inside
@@ -487,7 +535,7 @@ const ACCEPTED_IMPORT_EXTENSIONS = new Set(['html', 'htm', 'json', 'csv']);
 function validateSelectedFile(file) {
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   if (!ACCEPTED_IMPORT_EXTENSIONS.has(ext)) {
-    return { ok: false, error: `"${file.name}" isn't a supported file type. Choose an .html, .json, or .csv export.` };
+    return { ok: false, error: `"${file.name}" isn't a supported file type. Choose an .html, .json, .csv, or .txt export.` };
   }
   if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_SIZE_BYTES) {
     return { ok: false, error: `That file is too large (over ${Math.round(MAX_IMPORT_FILE_SIZE_BYTES / (1024 * 1024))} MB) to be a real export.` };
@@ -509,6 +557,8 @@ async function loadFile(file) {
       result = parseJsonPayload(text);
     } else if (ext === 'csv') {
       result = parseCsvPayload(text);
+    } else if (ext === 'txt') {
+      result = parseTxtPayload(text);
     } else {
       // Default to HTML (also handles .html and any unrecognised extension).
       // DOMParser never executes scripts in the parsed document, so this is

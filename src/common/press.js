@@ -21,10 +21,12 @@
     return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 
-  function ringColor() {
+  function ringColor(el) {
     try {
-      const v = getComputedStyle(document.documentElement).getPropertyValue('--press-ring').trim();
-      return v || FALLBACK_COLOR;
+      const v = getComputedStyle(el).getPropertyValue('--press-ring').trim();
+      if (v) return v;
+      const root = getComputedStyle(document.documentElement).getPropertyValue('--press-ring').trim();
+      return root || FALLBACK_COLOR;
     } catch (e) {
       return FALLBACK_COLOR;
     }
@@ -38,17 +40,21 @@
 
   function pulse(el) {
     if (!el || typeof el.animate !== 'function' || isDisabled(el) || prefersReducedMotion()) return;
-    const color = ringColor();
+    const color = ringColor(el);
     // Rows sit inside a box that clips overflow, so they flash from the
     // inside; everything else sends a ring outward.
     const keyframes = el.matches(ROW_SELECTOR)
       ? [{ boxShadow: 'inset 0 0 0 999px ' + color }, { boxShadow: 'inset 0 0 0 999px transparent' }]
-      : [{ boxShadow: '0 0 0 0 ' + color }, { boxShadow: '0 0 0 12px transparent' }];
+      : [{ boxShadow: '0 0 0 2px ' + color }, { boxShadow: '0 0 0 10px transparent' }];
     el.animate(keyframes, { duration: DURATION_MS, easing: 'ease-out' });
   }
 
   function findTarget(node) {
     if (!node || typeof node.closest !== 'function') return null;
+    // If the click is on (or inside) a link, pulse only the link — never
+    // the whole row — so the AMO link gets its own ring, not a row flash.
+    const link = node.closest('a[href]');
+    if (link) return link;
     return node.closest(ROW_SELECTOR) || node.closest(TARGET_SELECTOR);
   }
 

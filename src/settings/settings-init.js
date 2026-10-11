@@ -27,7 +27,7 @@
 (function () {
   var DEFAULT_FORMAT  = 'html';
   var DEFAULT_SHORTEN = 'on';
-  var VALID_FORMATS   = ['html', 'json', 'csv'];
+  var VALID_FORMATS   = ['html', 'json', 'csv', 'txt'];
   var VALID_SHORTEN   = ['on', 'off'];
 
   var fmt     = null;
@@ -47,9 +47,11 @@
   var fmtHtml = document.getElementById('formatHtml');
   var fmtJson = document.getElementById('formatJson');
   var fmtCsv  = document.getElementById('formatCsv');
+  var fmtTxt  = document.getElementById('formatTxt');
   if (fmtHtml) fmtHtml.checked = (fmt === 'html');
   if (fmtJson) fmtJson.checked = (fmt === 'json');
   if (fmtCsv)  fmtCsv.checked  = (fmt === 'csv');
+  if (fmtTxt)  fmtTxt.checked  = (fmt === 'txt');
 
   var sOn  = document.getElementById('shortenNamesOn');
   var sOff = document.getElementById('shortenNamesOff');

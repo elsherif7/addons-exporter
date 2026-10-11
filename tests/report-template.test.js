@@ -1,8 +1,9 @@
 // Tests for src/background/report-template.js. Loads the real source via
 // vm, same as the other test files, but needs no browser/fetch mocking at
-// all - buildHtmlReport() and its helpers are pure string templating with
-// no browser.* dependency. That's the point of splitting it out of
-// background.js: this file can be tested entirely on its own.
+// all - buildHtmlReport(), buildJsonExport(), buildCsvExport(), and
+// buildTxtExport() are pure string templating with no browser.* dependency.
+// That's the point of splitting them out of background.js: this file can
+// be tested entirely on its own.
 
 const assert = require('assert');
 const vm = require('vm');
