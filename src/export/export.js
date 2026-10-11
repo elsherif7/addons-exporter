@@ -270,69 +270,8 @@ exportBtn.addEventListener('click', async () => {
   try {
     const result = await browser.runtime.sendMessage({ type: 'export', ids });
 
-    if (result && result.html) {
-      // Android: background.js couldn't save the file itself there (its
-      // downloads API can't handle client-generated content on Android -
-      // see the comment in background.js's message listener), so it
-      // handed the report back here instead. Triggering the save right
-      // here, in this same click's continuation, is what gives it a
-      // chance of being recognized as a real download rather than
-      // getting silently dropped - the same click.download() call made
-      // from a freshly opened tab or after another message hop wasn't.
-      const blob = new Blob([result.html], { type: 'text/html' });
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = result.filename;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-
-      setStatus('Saving report...');
-
-      // Android shows its own download confirmation prompt for this
-      // click, and navigating away before the user answers it dismisses
-      // it (confirmed by testing) - a fixed delay either cuts that off
-      // (too short) or forces an arbitrary wait (too long, still a
-      // guess). downloads.onCreated is a real signal instead: even
-      // though downloads.download() can't be called here, the browser's
-      // download-tracking system still seems to observe a plain <a
-      // download> click the same way, since it's the same underlying
-      // mechanism either way. Falls back to a generous timeout in case
-      // that turns out not to hold on a given build, so this still
-      // finishes instead of hanging indefinitely either way.
-      await new Promise((resolve) => {
-        let settled = false;
-        let fallbackTimer;
-        // After a short wait with no onCreated signal, show a hint so the
-        // user knows something is expected of them (Android's download
-        // prompt may need a tap to confirm).
-        const hintTimer = setTimeout(() => {
-          setStatus('Saving. Tap \u201cDownload\u201d in the prompt if asked\u2026');
-        }, 1500);
-        const proceed = () => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(hintTimer);
-          browser.downloads.onCreated.removeListener(onCreated);
-          clearTimeout(fallbackTimer);
-          resolve();
-        };
-        const onCreated = () => proceed();
-        browser.downloads.onCreated.addListener(onCreated);
-        fallbackTimer = setTimeout(proceed, 5000);
-        link.click();
-      });
-
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
-      const fmt = result.filename.split('.').pop().toLowerCase() || 'html';
-      await goToConfirmation(`from=export&format=${fmt}`);
-    } else {
-      // Desktop: background.js already saved the file, so this page just
-      // becomes the confirmation page.
-      setStatus(buildExportSuccessStatus(result.format, result.stats));
-      await goToConfirmation(`from=export&format=${result.format}`);
-    }
+    setStatus(buildExportSuccessStatus(result.format, result.stats));
+    await goToConfirmation(`from=export&format=${result.format}`);
   } catch (e) {
     setStatus('Error: ' + e.message);
   } finally {

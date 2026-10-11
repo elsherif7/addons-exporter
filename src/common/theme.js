@@ -31,7 +31,7 @@ function resolveTheme(stored) {
 // flash of the wrong theme. With view transitions (Firefox 144+) the old
 // look drifts away and the new one fades in over it (see the
 // ::view-transition rules in shared.css); without them, .theme-switching
-// makes every color glide instead. Skipped for reduced motion.
+// makes every color glide instead.
 let themeReady = false;
 let themeSwitchTimer = null;
 // The theme a view transition (below) is on its way to, or null. The page
@@ -56,11 +56,9 @@ function applyTheme(theme) {
 
   const changing = themeReady && typeof root.getAttribute === 'function' &&
     root.getAttribute('data-theme') !== t;
-  const reduced = typeof matchMedia === 'function' &&
-    matchMedia('(prefers-reduced-motion: reduce)').matches;
   const setTheme = (value) => root.setAttribute('data-theme', value);
 
-  if (changing && !reduced && typeof document.startViewTransition === 'function') {
+  if (changing && typeof document.startViewTransition === 'function') {
     pendingTheme = t;
     try {
       document.startViewTransition(() => {
@@ -73,7 +71,7 @@ function applyTheme(theme) {
       setTheme(t);
     }
   } else {
-    if (changing && !reduced && root.classList && typeof setTimeout === 'function') {
+    if (changing && root.classList && typeof setTimeout === 'function') {
       root.classList.add('theme-switching');
       clearTimeout(themeSwitchTimer);
       themeSwitchTimer = setTimeout(() => root.classList.remove('theme-switching'), 800);

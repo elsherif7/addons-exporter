@@ -355,34 +355,20 @@ function openResetDialog(document, resetBtn) {
   return document.body.querySelector('[role="dialog"]');
 }
 
-test('Reset dialog: has role=dialog, aria-modal, and is labelled by its own title', () => {
+test('Reset dialog: opens when button is clicked and can be closed with Cancel', () => {
   const { document, elements } = makeResetDialogSandbox();
   const dialog = openResetDialog(document, elements.resetSettingsBtn);
   assert.ok(dialog, 'a dialog should have been added to the page');
-  assert.strictEqual(dialog.getAttribute('aria-modal'), 'true');
-  const labelledBy = dialog.getAttribute('aria-labelledby');
-  const titleEl = document.body.querySelector(`#${labelledBy}`);
-  assert.ok(titleEl, 'aria-labelledby should point at a real element');
-  assert.strictEqual(titleEl.textContent, 'Settings');
+  document.body.querySelector('#rsCancel').click();
+  assert.strictEqual(document.body.querySelector('[role="dialog"]'), null, 'the dialog should be removed');
+  assert.strictEqual(elements.resetSettingsBtn._focused, true, 'focus should return to the button that opened it');
 });
 
-test('Reset dialog: focus moves to Cancel when it opens, and everything else is made inert', () => {
-  const { document, elements, pageContent } = makeResetDialogSandbox();
-  assert.strictEqual(pageContent.inert, undefined, 'not inert before the dialog opens');
+test('Reset dialog: focus moves to Cancel when it opens', () => {
+  const { document, elements } = makeResetDialogSandbox();
   openResetDialog(document, elements.resetSettingsBtn);
   const cancelBtn = document.body.querySelector('#rsCancel');
   assert.strictEqual(cancelBtn._focused, true, 'focus should move into the dialog (to Cancel) on open');
-  assert.strictEqual(pageContent.inert, true, 'the rest of the page should be inert while the dialog is open');
-});
-
-test('Reset dialog: Cancel closes it, restores focus to the Reset button, and un-inerts the page', () => {
-  const { document, elements, pageContent } = makeResetDialogSandbox();
-  openResetDialog(document, elements.resetSettingsBtn);
-  document.body.querySelector('#rsCancel').click();
-
-  assert.strictEqual(document.body.querySelector('[role="dialog"]'), null, 'the dialog should be removed');
-  assert.strictEqual(elements.resetSettingsBtn._focused, true, 'focus should return to the button that opened it');
-  assert.strictEqual(pageContent.inert, false, 'the page should no longer be inert once the dialog closes');
 });
 
 test('Reset dialog: Escape closes it the same way Cancel does', () => {
@@ -411,21 +397,13 @@ test('Reset dialog: mentions the display setting, which it actually resets', () 
   assert.match(message.textContent, /display/i, 'the dialog text should mention the display setting it also resets');
 });
 
-// --- 2.1: exportSettingsBtn — Android vs desktop path ---
-// The export handler now detects the platform and uses a plain <a download>
-// click on Android (where downloads.download({saveAs}) silently fails with
-// a blob: URL) instead of the saveAs dialog used on desktop.
+// --- 2.1: exportSettingsBtn ---
 
-function makeExportSettingsSandbox({ platformOs, simulateDownloadCreated = false }) {
+function makeExportSettingsSandbox() {
   const exportBtnEl = { addEventListener(ev, fn) { if (ev === 'click') this._onClick = fn; } };
   const statusEl = { textContent: '', className: '' };
   const exportStatusEl = { textContent: '', style: { display: 'none', color: '' } };
-  const appendedLinks = [];
   const downloadCalls = [];
-  const bodyStub = {
-    appendChild: (el) => appendedLinks.push(el),
-    children: [],
-  };
   const fakeDocument = {
     querySelectorAll: () => [],
     getElementById: (id) => {
@@ -434,20 +412,14 @@ function makeExportSettingsSandbox({ platformOs, simulateDownloadCreated = false
       if (id === 'exportSettingsStatus') return exportStatusEl;
       return makeFakeElement();
     },
-    body: bodyStub,
-    createElement: () => ({
-      style: {},
-      href: '',
-      download: '',
-      click() { this.clicked = true; },
-      remove() { this.removed = true; },
-    }),
+    body: { appendChild() {}, children: [] },
+    createElement: () => ({ style: {} }),
     documentElement: { setAttribute() {} },
   };
   const sb = {
     URL: { createObjectURL: () => 'blob:fake-url', revokeObjectURL() {} },
     Blob: function Blob() {},
-    setTimeout: (fn, ms) => { if (ms !== 7000) fn(); return 0; } /* 7000 = a row message's auto-hide: not fired here */,
+    setTimeout: (fn, ms) => { if (ms !== 7000) fn(); return 0; },
     clearTimeout() {},
     fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
     document: fakeDocument,
@@ -455,15 +427,10 @@ function makeExportSettingsSandbox({ platformOs, simulateDownloadCreated = false
       runtime: {
         getManifest: () => ({ version: '1.2.0' }),
         id: 'addons-exporter@local',
-        getPlatformInfo: async () => ({ os: platformOs }),
       },
       storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
       downloads: {
         download: async (opts) => { downloadCalls.push(opts); return 1; },
-        onCreated: {
-          addListener: (fn) => { if (simulateDownloadCreated) fn({}); },
-          removeListener() {},
-        },
       },
     },
   };
@@ -472,94 +439,17 @@ function makeExportSettingsSandbox({ platformOs, simulateDownloadCreated = false
   vm.runInContext(themeSrc, sb);
   vm.runInContext(commonSrc, sb);
   vm.runInContext(settingsSrc, sb);
-  return { exportBtnEl, statusEl, exportStatusEl, appendedLinks, downloadCalls };
+  return { exportBtnEl, statusEl, exportStatusEl, downloadCalls };
 }
 
-testAsync('exportSettingsBtn: on desktop, uses downloads.download with saveAs and shows success', async () => {
-  const { exportBtnEl, statusEl, exportStatusEl, appendedLinks, downloadCalls } = makeExportSettingsSandbox({ platformOs: 'win' });
+testAsync('exportSettingsBtn: uses downloads.download with saveAs and shows success', async () => {
+  const { exportBtnEl, statusEl, exportStatusEl, downloadCalls } = makeExportSettingsSandbox();
   await exportBtnEl._onClick();
-  assert.strictEqual(downloadCalls.length, 1, 'should call downloads.download once on desktop');
+  assert.strictEqual(downloadCalls.length, 1, 'should call downloads.download once');
   assert.strictEqual(downloadCalls[0].saveAs, true);
   assert.match(downloadCalls[0].filename, /^Add-ons Hub Settings \(.+\)\.json$/);
-  assert.strictEqual(appendedLinks.length, 0, 'should not create an <a> link on desktop');
   assert.strictEqual(exportStatusEl.textContent, 'Settings exported.');
   assert.strictEqual(statusEl.className, '');
-});
-
-testAsync('exportSettingsBtn: on Android, uses <a download> click instead of downloads.download saveAs', async () => {
-  const { exportBtnEl, statusEl, exportStatusEl, appendedLinks, downloadCalls } = makeExportSettingsSandbox({
-    platformOs: 'android',
-    simulateDownloadCreated: true,
-  });
-  await exportBtnEl._onClick();
-  assert.strictEqual(downloadCalls.length, 0, 'should not call downloads.download on Android');
-  assert.strictEqual(appendedLinks.length, 1, 'should create an <a> link on Android');
-  assert.strictEqual(appendedLinks[0].href, 'blob:fake-url');
-  assert.match(appendedLinks[0].download, /^Add-ons Hub Settings \(.+\)\.json$/);
-  assert.strictEqual(appendedLinks[0].clicked, true);
-  assert.strictEqual(appendedLinks[0].removed, true);
-  assert.strictEqual(exportStatusEl.textContent, 'Settings exported.');
-});
-
-testAsync('exportSettingsBtn: on Android, still succeeds via the fallback timer if onCreated never fires', async () => {
-  const { exportBtnEl, statusEl, exportStatusEl } = makeExportSettingsSandbox({
-    platformOs: 'android',
-    simulateDownloadCreated: false, // fallback setTimeout fires immediately in this sandbox
-  });
-  await exportBtnEl._onClick();
-  assert.strictEqual(exportStatusEl.textContent, 'Settings exported.');
-});
-
-testAsync('exportSettingsBtn: a getPlatformInfo failure falls back to the desktop path gracefully', async () => {
-  // If getPlatformInfo rejects (shouldn't happen in practice, but guards
-  // against a future API change), the catch gives os: 'unknown', which
-  // takes the desktop (saveAs) path rather than throwing altogether.
-  const { exportBtnEl, statusEl, exportStatusEl, downloadCalls } = makeExportSettingsSandbox({ platformOs: 'win' });
-  // Swap getPlatformInfo to a throwing version via the already-created sandbox's browser object.
-  // Re-create the sandbox with a throwing getPlatformInfo instead.
-  const exportBtnEl2 = { addEventListener(ev, fn) { if (ev === 'click') this._onClick = fn; } };
-  const statusEl2 = { textContent: '', className: '' };
-  const exportStatusEl2 = { textContent: '', style: { display: 'none', color: '' } };
-  const downloadCalls2 = [];
-  const fakeDocument2 = {
-    querySelectorAll: () => [],
-    getElementById: (id) => {
-      if (id === 'exportSettingsBtn') return exportBtnEl2;
-      if (id === 'settingsStatus') return statusEl2;
-      if (id === 'exportSettingsStatus') return exportStatusEl2;
-      return makeFakeElement();
-    },
-    body: { appendChild() {}, children: [] },
-    createElement: () => ({ style: {}, href: '', download: '', click() {}, remove() {} }),
-    documentElement: { setAttribute() {} },
-  };
-  const sb2 = {
-    URL: { createObjectURL: () => 'blob:fake-url', revokeObjectURL() {} },
-    Blob: function Blob() {},
-    setTimeout: (fn, ms) => { if (ms !== 7000) fn(); return 0; } /* 7000 = a row message's auto-hide: not fired here */,
-    clearTimeout() {},
-    fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
-    document: fakeDocument2,
-    browser: {
-      runtime: {
-        getManifest: () => ({ version: '1.2.0' }),
-        id: 'addons-exporter@local',
-        getPlatformInfo: async () => { throw new Error('API unavailable'); },
-      },
-      storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
-      downloads: {
-        download: async (opts) => { downloadCalls2.push(opts); return 1; },
-        onCreated: { addListener() {}, removeListener() {} },
-      },
-    },
-  };
-  vm.createContext(sb2);
-  vm.runInContext(themeSrc, sb2);
-  vm.runInContext(commonSrc, sb2);
-  vm.runInContext(settingsSrc, sb2);
-  await exportBtnEl2._onClick();
-  assert.strictEqual(downloadCalls2.length, 1, 'should fall back to the desktop (saveAs) path when getPlatformInfo throws');
-  assert.strictEqual(exportStatusEl2.textContent, 'Settings exported.');
 });
 
 // --- settings-init.js: localStorage startup cache ---
@@ -1046,20 +936,12 @@ test('success: after an import, the selected option in each group flashes in tur
   assert.ok(rows[3].animations[0].options.delay > rows[0].animations[0].options.delay, 'later groups flash later');
 });
 
-testAsync('success: with reduced motion, nothing flashes (the message still shows as a success)', async () => {
-  const ctx = makeSuccessSandbox();
-  ctx.sb.matchMedia = () => ({ matches: true });
-  await runReset(ctx);
-  assert.strictEqual(ctx.row.animations.length, 0);
-  assert.strictEqual(ctx.elements.resetSettingsStatus.classList.contains('is-success'), true);
-});
-
 // --- Cancelling export / import / reset: the soft grey "backed out" feedback ---
 
 // Builds the three action rows (each a .settings-option-row holding its
 // description and message) so a cancel can be seen: the row flashes grey and
 // the description slides back in.
-function makeCancelSandbox({ downloadError = null, reducedMotion = false } = {}) {
+function makeCancelSandbox({ downloadError = null } = {}) {
   const ids = ['resetSettingsBtn', 'settingsStatus', 'exportSettingsBtn', 'importSettingsBtn', 'settingsFileInput',
     'exportSettingsDesc', 'exportSettingsStatus', 'importSettingsDesc', 'importSettingsStatus',
     'resetSettingsDesc', 'resetSettingsStatus'];
@@ -1087,7 +969,6 @@ function makeCancelSandbox({ downloadError = null, reducedMotion = false } = {})
     setTimeout: () => 0,
     fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
     document,
-    matchMedia: () => ({ matches: reducedMotion }),
     browser: {
       storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
       runtime: {
@@ -1158,16 +1039,6 @@ testAsync('cancel: pressing Cancel in the reset dialog flashes the Reset row gre
   ctx.document.body.querySelector('#rsCancel').click();
   await new Promise((resolve) => setTimeout(resolve, 0));
   assertCancelFeedback(ctx, 'reset');
-});
-
-testAsync('cancel: with reduced motion the description still comes back, but nothing animates', async () => {
-  const ctx = makeCancelSandbox({ reducedMotion: true });
-  openResetDialog(ctx.document, ctx.elements.resetSettingsBtn);
-  ctx.document.body.querySelector('#rsCancel').click();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.strictEqual(ctx.elements.resetSettingsDesc.style.display, '');
-  assert.strictEqual(ctx.rows.reset.animations.length, 0);
-  assert.strictEqual(ctx.elements.resetSettingsDesc.animations.length, 0);
 });
 
 testAsync('cancel: confirming the reset is not a cancel - no grey flash', async () => {

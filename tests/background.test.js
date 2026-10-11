@@ -11,11 +11,9 @@ const commonSrc = readSrc('src/common/common.js');
 const reportTemplateSrc = readSrc('src/background/report-template.js');
 const backgroundSrc = readSrc('src/background/background.js');
 
-// --- background.js: excludes Firefox for Android's own bundled components ---
-// Android bundles several of its own WebExtension-based components
-// (ads/icons/fxa/readerview/search telemetry) with ids ending in
-// @mozac.org - these aren't anything the user installed and shouldn't
-// show up as exportable, the same way desktop's @mozilla.org ones don't.
+// --- background.js: excludes Mozilla's own built-in components ---
+// IDs ending in @mozilla.org or @mozac.org are not add-ons the user
+// actually installed and are excluded from the exportable set.
 
 testAsync('listInstalledAddons: excludes both @mozilla.org and @mozac.org built-ins', async () => {
   const bgSandbox = {
@@ -27,8 +25,8 @@ testAsync('listInstalledAddons: excludes both @mozilla.org and @mozac.org built-
         getAll: async () => [
           { id: 'ublock@example.com', name: 'uBlock Origin', version: '1.0', enabled: true, type: 'extension' },
           { id: 'webcompat@mozilla.org', name: 'Web Compat', version: '1.0', enabled: true, type: 'extension' },
-          { id: 'ads@mozac.org', name: 'Mozilla Android Components - Ads Telemetry', version: '1.0', enabled: true, type: 'extension' },
-          { id: 'readerview@mozac.org', name: 'Mozilla Android Components - ReaderView', version: '1.0', enabled: true, type: 'extension' },
+          { id: 'ads@mozac.org', name: 'Built-in Ads Component', version: '1.0', enabled: true, type: 'extension' },
+          { id: 'readerview@mozac.org', name: 'Built-in ReaderView Component', version: '1.0', enabled: true, type: 'extension' },
         ],
       },
     },
@@ -41,16 +39,12 @@ testAsync('listInstalledAddons: excludes both @mozilla.org and @mozac.org built-
   assert.deepStrictEqual(Array.from(result, (a) => a.id), ['ublock@example.com']);
 });
 
-// --- background.js: export message handler, platform-specific saving ---
-// Android's downloads.download() can't handle a blob: URL (Android's own
-// DownloadManager only accepts http/https) and there's no saveAs dialog
-// to fall back to either. The message handler now hands the report back
-// to export.js on Android instead of saving it itself - see the comment
-// there for why. Loads the real background.js via vm with a mocked
-// browser/fetch, and invokes the actual registered message listener
-// (not doExport() directly) so this covers the real platform branching.
+// --- background.js: export message handler ---
+// Loads the real background.js via vm with a mocked browser/fetch,
+// and invokes the actual registered message listener
+// (not doExport() directly) so this covers the export save path.
 
-async function captureExportMessageResult(platformOs, storageLocalGetImpl) {
+async function captureExportMessageResult(storageLocalGetImpl) {
   const defaultStorage = async () => ({});
   const storageGet = storageLocalGetImpl || defaultStorage;
   let downloadOptions = null;
@@ -60,23 +54,19 @@ async function captureExportMessageResult(platformOs, storageLocalGetImpl) {
     URL,
     Blob,
     AbortController,
-    // background.js schedules a 30s delay before revoking the blob URL
-    // on desktop - firing immediately here avoids this test (and the
-    // whole test run) actually waiting that long to exit, since Node
-    // keeps the event loop alive for pending timers.
+    // background.js schedules a 30s delay before revoking the blob URL -
+    // firing immediately here avoids the test run actually waiting that long.
     setTimeout: (fn) => { fn(); return 0; },
     clearTimeout() {},
     console: { warn() {}, debug() {}, log() {}, error() {} },
     fetch: async (url) => {
       // Exact-id lookup: pretend it's not on AMO. Name search: no results.
-      // Neither path matters for this test - only the final export step does.
       if (url.includes('/addons/addon/')) return { ok: false, status: 404, json: async () => ({}) };
       return { ok: true, status: 200, json: async () => ({ results: [] }) };
     },
     browser: {
       runtime: {
         onMessage: { addListener: (fn) => { messageListener = fn; } },
-        getPlatformInfo: async () => ({ os: platformOs }),
         getURL: (path) => `moz-extension://test-id/${path}`,
         sendMessage: async () => {},
       },
@@ -108,16 +98,8 @@ async function captureExportMessageResult(platformOs, storageLocalGetImpl) {
   return { downloadOptions, createdTabUrls, result };
 }
 
-testAsync('export message: on Android, hands the report back instead of saving or opening any tab itself', async () => {
-  const { downloadOptions, createdTabUrls, result } = await captureExportMessageResult('android');
-  assert.strictEqual(downloadOptions, null);
-  assert.strictEqual(createdTabUrls.length, 0);
-  assert.match(result.html, /Test Addon/);
-  assert.match(result.filename, /^Firefox Add-ons \(.+\)\.html$/);
-});
-
-testAsync('export message: on desktop, downloads with saveAs, opens no tab itself, and returns {format, stats}', async () => {
-  const { downloadOptions, createdTabUrls, result } = await captureExportMessageResult('win');
+testAsync('export message: downloads with saveAs, opens no tab itself, and returns {format, stats}', async () => {
+  const { downloadOptions, createdTabUrls, result } = await captureExportMessageResult();
   assert.strictEqual(downloadOptions.saveAs, true);
   assert.match(downloadOptions.url, /^blob:/);
   // export.js replaces its own page with the confirmation page instead.
@@ -443,12 +425,12 @@ testAsync('doExport: defaults to .html when storage.local.get throws for exportF
 // --- background.js: the result reports the format export.js puts in the confirmation URL ---
 
 testAsync('export message: on desktop with JSON format, the result reports format=json', async () => {
-  const { result } = await captureExportMessageResult('win', async () => ({ exportFormat: 'json' }));
+  const { result } = await captureExportMessageResult(async () => ({ exportFormat: 'json' }));
   assert.strictEqual(result.format, 'json');
 });
 
 testAsync('export message: on desktop with CSV format, the result reports format=csv', async () => {
-  const { result } = await captureExportMessageResult('win', async () => ({ exportFormat: 'csv' }));
+  const { result } = await captureExportMessageResult(async () => ({ exportFormat: 'csv' }));
   assert.strictEqual(result.format, 'csv');
 });
 

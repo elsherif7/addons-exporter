@@ -66,7 +66,7 @@ addons-hub/
 
 ## Installation
 
-> Requires Firefox 109 or newer (the first release with MV3 support), or Firefox for Android 113 or newer.
+> Requires Firefox 109 or newer (the first release with MV3 support).
 
 **1. Install from Firefox Add-ons (recommended)**
 
@@ -91,7 +91,7 @@ Both are opened from the toolbar icon's popup.
 
 ### Add-ons Exporter
 
-Creates a checklist of every installed extension and theme, split into Enabled/Disabled groups with a search box to filter by name. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage, and finally a plain AMO search link if none of those find anything), and the result is saved as a file in whichever format you've chosen in Settings — **HTML** (default, human-readable with the data embedded for re-import), **JSON**, or **CSV**. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on. A **Cancel** button appears while an export is running; if AMO itself seems to be having trouble (repeated failures, or the lookups are taking a long time), the remaining add-ons get a fallback link instead of hanging indefinitely, and the final status says how many, if any, couldn't be looked up. The HTML report opens in whichever theme Settings is currently set to, and has its own light/dark toggle in the corner — the toggle choice is remembered in `localStorage` so it persists across opens of the same file.
+Creates a checklist of every installed extension and theme, split into Enabled/Disabled groups with a search box to filter by name. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage, and finally a plain AMO search link if none of those find anything), and the result is saved as a file in whichever format you've chosen in Settings — **HTML** (default, human-readable with the data embedded for re-import), **JSON**, or **CSV**. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on. If AMO itself seems to be having trouble (repeated failures, or the lookups are taking a long time), the remaining add-ons get a fallback link instead of hanging indefinitely, and the final status says how many, if any, couldn't be looked up. The HTML report opens in whichever theme Settings is currently set to, and has its own light/dark toggle in the corner — the toggle choice is remembered in `localStorage` so it persists across opens of the same file.
 
 ### Add-ons Importer
 
@@ -105,14 +105,12 @@ The Settings page controls **Appearance** (light/dark theme), **Export Format** 
 
 **Reset** clears all three settings back to their defaults, after a confirmation dialog.
 
-**Check now**, under About, checks whether a newer version is listed on AMO than the one currently installed, and links to it if so.
-
 #### A few other things worth knowing
 
-- When the export finishes, the Exporter page fades out and is replaced by the confirmation page in the same tab, rather than opening a second tab. On desktop the background script saves the file first; on Firefox for Android the platform doesn't allow the background script to trigger the download itself, so Add-ons Exporter does it directly and moves on to the confirmation page once the download is picked up.
+- When the export finishes, the Exporter page fades out and is replaced by the confirmation page in the same tab, rather than opening a second tab. The background script saves the file directly via the downloads API.
 - Add-ons Importer opens the first selected add-on's page as a background tab, then fades out and is replaced by the confirmation page in the same tab right away. The background script keeps opening the remaining add-ons' pages, one after another, while the confirmation page is already showing. Links that can't be opened (not http/https) are skipped and the confirmation page says how many; if none open, the Importer stays put and shows the error.
 - AMO lookups are capped at 15 seconds each and 5 in flight at once, so a single slow response can't stall an export. If AMO responds with a rate-limit (429), that one lookup is retried once after a short wait. If lookups keep failing, or the export has been running for 90 seconds, the remaining add-ons skip straight to a fallback link instead of continuing to retry against a struggling API.
-- Firefox's own bundled built-ins (New Tab page, default themes) and spell-check dictionaries/language packs are excluded, since they aren't real installed add-ons and have no matching store listing. On Firefox for Android, its own bundled components (ad-blocking telemetry, reader view, etc.) are excluded the same way.
+- Firefox's own bundled built-ins (New Tab page, default themes) and spell-check dictionaries/language packs are excluded, since they aren't real installed add-ons and have no matching store listing.
 - Add-ons Importer only ever opens http/https links; anything else is flagged and left unselected, since an export file's data isn't inherently trusted.
 - A CSV export guards against formula injection: an add-on name starting with a character a spreadsheet would read as a formula (`=`, `+`, `-`, `@`) gets a leading apostrophe added so it's treated as plain text instead. Add-ons Importer strips that apostrophe back off, so the name round-trips correctly.
 - If every add-on in the file is already installed, Add-ons Importer shows a short note about it — informational only, since there's nothing to open.

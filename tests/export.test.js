@@ -1,13 +1,7 @@
 // Tests for src/export/export.js's click handler.
-// On desktop, background.js already saves the file, so export.js's
-// handler just replaces its own page with confirmation.html (same tab,
-// no second tab). On Android, background.js hands the report back
-// instead (see background.test.js), and export.js must trigger the
-// actual save right here, synchronously within this same click - not
-// after another message hop - for it to have a chance of being treated
-// as a real user-triggered download. Loads the real export.js via vm
-// with a mocked browser/DOM, and invokes its actual exportBtn click
-// handler.
+// export.js's handler replaces its own page with confirmation.html (same tab,
+// no second tab). Loads the real export.js via vm with a mocked browser/DOM,
+// and invokes its actual exportBtn click handler.
 
 const assert = require('assert');
 const vm = require('vm');
@@ -16,7 +10,7 @@ const { test, testAsync, readSrc, makeFakeDom } = require('./helpers');
 const commonSrc = readSrc('src/common/common.js');
 const exportSrc = readSrc('src/export/export.js');
 
-async function captureExportClick({ selectedIds, exportResponse, simulateDownloadCreated = false }) {
+async function captureExportClick({ selectedIds, exportResponse }) {
   const checkedCheckboxes = selectedIds.map((id) => ({ dataset: { id } }));
   const listElStub = {
     querySelectorAll: (sel) => (sel.includes('checkbox') ? checkedCheckboxes : []),
@@ -24,8 +18,6 @@ async function captureExportClick({ selectedIds, exportResponse, simulateDownloa
     replaceChildren() {},
   };
   let exportClickHandler = null;
-  const appendedLinks = [];
-  const bodyStub = { appendChild: (el) => appendedLinks.push(el) };
   const createdTabUrls = [];
   const navigatedUrls = [];
   const sentMessages = [];
@@ -45,20 +37,14 @@ async function captureExportClick({ selectedIds, exportResponse, simulateDownloa
   };
   const exSandbox = {
     URL: { createObjectURL: () => 'blob:fake-url', revokeObjectURL() {} },
-    Blob: function Blob(parts, opts) { this.parts = parts; this.opts = opts; },
-    // export.js's fallback timer fires immediately here, keeping the
-    // test fast. When simulateDownloadCreated is true, the
-    // downloads.onCreated stub below fires first anyway (synchronously,
-    // before this fallback even runs), so the "settled" guard in
-    // export.js means only one path actually resolves things either way.
     setTimeout: (fn) => { fn(); return 0; },
     clearTimeout() {},
     // export.js finishes by replacing its own page with confirmation.html
     location: { replace: (url) => navigatedUrls.push(url) },
     document: {
       getElementById: (id) => elements[id],
-      body: bodyStub,
-      createElement: () => ({ style: {}, click() { this.clicked = true; }, remove() { this.removed = true; } }),
+      body: { appendChild() {} },
+      createElement: () => ({ style: {} }),
     },
     browser: {
       runtime: {
@@ -73,16 +59,6 @@ async function captureExportClick({ selectedIds, exportResponse, simulateDownloa
       },
       tabs: { create: async (options) => { createdTabUrls.push(options.url); return {}; } },
       storage: { local: { get: async () => ({}) } },
-      downloads: {
-        onCreated: {
-          // Simulates the download actually being observed - fires
-          // synchronously at registration time, same as a very fast
-          // real download would resolve things before the fallback
-          // timer got a chance to.
-          addListener: (fn) => { if (simulateDownloadCreated) fn({}); },
-          removeListener() {},
-        },
-      },
     },
   };
   vm.createContext(exSandbox);
@@ -92,50 +68,14 @@ async function captureExportClick({ selectedIds, exportResponse, simulateDownloa
   // even exists to be clicked.
   await new Promise((resolve) => setTimeout(resolve, 0));
   await exportClickHandler();
-  return { sentMessages, appendedLinks, createdTabUrls, navigatedUrls, statusEl: elements.status, exportBtnEl: elements.exportSelectedBtn };
+  return { sentMessages, createdTabUrls, navigatedUrls, statusEl: elements.status, exportBtnEl: elements.exportSelectedBtn };
 }
 
-testAsync('export.js click handler: on Android, proceeds to confirmation.html once downloads.onCreated fires', async () => {
-  const { sentMessages, appendedLinks, createdTabUrls, navigatedUrls, exportBtnEl } = await captureExportClick({
-    selectedIds: ['ext1@example.com'],
-    exportResponse: { html: '<html>Test Addon report</html>', filename: 'Firefox Add-ons (test).html' },
-    simulateDownloadCreated: true,
-  });
-  const exportMsg = sentMessages.find((m) => m.type === 'export');
-  // Array.from (called in this realm) normalizes the foreign-realm array
-  // that comes back from the vm sandbox, so deepStrictEqual can compare
-  // it against a plain literal instead of tripping over cross-realm
-  // Array identity.
-  assert.deepStrictEqual(Array.from(exportMsg.ids), ['ext1@example.com']);
-  assert.strictEqual(appendedLinks.length, 1);
-  assert.strictEqual(appendedLinks[0].href, 'blob:fake-url');
-  assert.strictEqual(appendedLinks[0].download, 'Firefox Add-ons (test).html');
-  assert.strictEqual(appendedLinks[0].clicked, true);
-  assert.strictEqual(appendedLinks[0].removed, true);
-  // Both onCreated and the (immediate, mocked) fallback timer fire here -
-  // the "settled" guard in export.js should mean the page only navigates
-  // once - and in place, never by opening another tab.
-  assert.strictEqual(createdTabUrls.length, 0);
-  assert.strictEqual(navigatedUrls.length, 1);
-  assert.strictEqual(navigatedUrls[0], 'moz-extension://test-id/src/confirmation/confirmation.html?from=export&format=html');
-});
-
-testAsync('export.js click handler: on Android, still proceeds via the fallback timer if onCreated never fires', async () => {
-  const { navigatedUrls } = await captureExportClick({
-    selectedIds: ['ext1@example.com'],
-    exportResponse: { html: '<html>Test Addon report</html>', filename: 'Firefox Add-ons (test).html' },
-    simulateDownloadCreated: false,
-  });
-  assert.strictEqual(navigatedUrls.length, 1);
-  assert.match(navigatedUrls[0], /confirmation\.html\?from=export&format=html$/);
-});
-
-testAsync('export.js click handler: on desktop, saves nothing itself and replaces its page with confirmation.html', async () => {
-  const { appendedLinks, createdTabUrls, navigatedUrls } = await captureExportClick({
+testAsync('export.js click handler: saves nothing itself and replaces its page with confirmation.html', async () => {
+  const { createdTabUrls, navigatedUrls } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
     exportResponse: { format: 'html', stats: { total: 1, lookupFailures: 0 } },
   });
-  assert.strictEqual(appendedLinks.length, 0);
   assert.strictEqual(createdTabUrls.length, 0, 'no second tab');
   assert.deepStrictEqual(navigatedUrls, [
     'moz-extension://test-id/src/confirmation/confirmation.html?from=export&format=html',

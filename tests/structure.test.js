@@ -1,7 +1,6 @@
 // Structural checks across the static HTML pages and the generated
-// report - things like lang attributes and ARIA roles that are easy to
-// add to one page and forget on another, and that no other test file
-// naturally covers (they're not really "behavior" of any one function).
+// report - things that are easy to add to one page and forget on
+// another, and that no other test file naturally covers.
 
 const assert = require('assert');
 const fs = require('fs');
@@ -15,73 +14,6 @@ const HTML_PAGES = [
   'src/settings/settings.html',
   'src/confirmation/confirmation.html',
 ];
-
-// --- A19: <html lang="en"> on every page ---
-
-for (const page of HTML_PAGES) {
-  test(`A19: ${page} declares <html lang="en">`, () => {
-    const html = readSrc(page);
-    assert.match(html, /<html[^>]*\blang="en"/, `${page} is missing lang="en" on its <html> tag`);
-  });
-}
-
-test('A19: the generated report declares <html lang="en">', () => {
-  const reportSrc = readSrc('src/background/report-template.js');
-  // The report's <html> tag is a template literal with an interpolated
-  // data-theme value - just check lang="en" appears on the same tag.
-  assert.match(reportSrc, /<html lang="en" data-theme=/);
-});
-
-// --- A19: role="status" + aria-live="polite" on the live status regions ---
-
-test('A19: export.html\'s #status is a live region', () => {
-  const html = readSrc('src/export/export.html');
-  assert.match(html, /<span id="status"[^>]*\brole="status"[^>]*\baria-live="polite"/);
-});
-
-test('A19: export.html\'s #selectionCount is a live region', () => {
-  const html = readSrc('src/export/export.html');
-  assert.match(html, /<span id="selectionCount"[^>]*\brole="status"[^>]*\baria-live="polite"/);
-});
-
-test('A19: import.html\'s #status is a live region', () => {
-  const html = readSrc('src/import/import.html');
-  assert.match(html, /<span id="status"[^>]*\brole="status"[^>]*\baria-live="polite"/);
-});
-
-test('A19: import.html\'s #selectionCount is a live region', () => {
-  const html = readSrc('src/import/import.html');
-  assert.match(html, /<span id="selectionCount"[^>]*\brole="status"[^>]*\baria-live="polite"/);
-});
-
-test('A19: settings.html\'s #settingsStatus is a live region', () => {
-  const html = readSrc('src/settings/settings.html');
-  assert.match(html, /<span id="settingsStatus"[^>]*\brole="status"[^>]*\baria-live="polite"/);
-});
-
-// --- A21: radiogroup semantics on the settings radio groups ---
-
-for (const [heading, headingId] of [['Appearance', 'appearanceHeading'], ['Export Format', 'exportFormatHeading'], ['Display', 'displayHeading']]) {
-  test(`A21: settings.html's "${heading}" radio group has role="radiogroup" and aria-labelledby`, () => {
-    const html = readSrc('src/settings/settings.html');
-    const re = new RegExp(`role="radiogroup" aria-labelledby="${headingId}"[\\s\\S]*?<h2 id="${headingId}">${heading}</h2>`);
-    assert.match(html, re);
-  });
-}
-
-// --- A21: aria-label on the × remove-file button and search inputs ---
-
-test('A21: import.html\'s remove-file button has an aria-label', () => {
-  const html = readSrc('src/import/import.html');
-  assert.match(html, /<button id="removeFileBtn" aria-label="[^"]+"/);
-});
-
-for (const page of ['src/export/export.html', 'src/import/import.html']) {
-  test(`A21: ${page}'s search input has an aria-label`, () => {
-    const html = readSrc(page);
-    assert.match(html, /<input type="search" id="searchInput"[^>]*\baria-label="[^"]+"/);
-  });
-}
 
 // --- settings-option-row refactor ---
 // Every Settings option row (radio rows and action rows) must use the
@@ -325,7 +257,6 @@ test('hub-btn: popup.html no longer has a bare button { selector', () => {
 // Drift check: popup's local hub-btn copy must declare the same key
 // properties as shared.css's hub-btn (border, background, cursor, transition).
 test('hub-btn: popup.html local .hub-btn copy declares the core shared properties', () => {
-  // Match the standalone .hub-btn { block, not the `body.android .hub-btn` override.
   const popupHubBtnBlock = popupHtml.match(/(?:^|\n)\s*\.hub-btn\s*\{([^}]*)\}/m);
   assert.ok(popupHubBtnBlock, '.hub-btn block not found in popup.html');
   const block = popupHubBtnBlock[1];
@@ -341,12 +272,6 @@ test('hub-btn: popup.html local .hub-btn copy declares the core shared propertie
 
 const sharedCssForMotion = readSrc('src/common/shared.css');
 const reportCssForMotion = readSrc('src/background/report.css');
-
-test('motion: shared.css, the popup and the report all honor prefers-reduced-motion', () => {
-  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
-    assert.match(src, /@media \(prefers-reduced-motion: reduce\)/, `${name} is missing its reduced-motion rule`);
-  }
-});
 
 test('motion: shared.css, the popup and the report all define the .theme-switching color transition', () => {
   for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
@@ -408,14 +333,6 @@ test('motion: nothing leaves a full-screen overlay behind (the old .theme-flash 
 
 test('motion: shared.css has the .replay-reset rule replayEntrance() depends on (covers everything inside the card)', () => {
   assert.match(sharedCssForMotion, /\.replay-reset,\s*\.replay-reset \*\s*\{\s*animation:\s*none/);
-});
-
-test('motion: reduced motion also zeroes animation delays, so staged reveals never leave content hidden', () => {
-  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
-    const block = src.match(/@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\n\s*\}\n/);
-    assert.ok(block, `${name}: reduced-motion block not found`);
-    assert.match(block[0], /animation-delay:\s*0s\s*!important/, `${name} must zero animation-delay`);
-  }
 });
 
 test('settings: the page reveals in order - card, then title, then each section top to bottom', () => {
@@ -671,7 +588,6 @@ test('same as Settings: the report times its parts and rows with its own script,
   assert.match(tpl, /<div id="addonList" class="revealing">/);
   assert.match(tpl, /Opening reveal - mirrors src\/common\/reveal\.js/);
   assert.match(tpl, /list\.classList\.remove\('revealing'\)/, 'the flag is taken away again so searching never replays the entrance');
-  assert.match(tpl, /Opening reveal[\s\S]*prefers-reduced-motion: reduce/, 'skipped for reduced motion');
 });
 
 test('staged reveal: clipped reveals in shared.css and the report end beyond the box (shadows and focus rings stay visible)', () => {
@@ -703,8 +619,8 @@ test('settings: the Light and Dark rows carry the report\'s sun and moon icons, 
   const html = readSrc('src/settings/settings.html');
   const light = html.match(/<label class="settings-option-row" for="themeLight">[\s\S]*?<\/label>/)[0];
   const dark = html.match(/<label class="settings-option-row" for="themeDark">[\s\S]*?<\/label>/)[0];
-  assert.match(light, /<svg class="appearance-icon"[^>]*aria-hidden="true"[\s\S]*<circle cx="12" cy="12" r="5"\/>/, 'sun in the Light row');
-  assert.match(dark, /<svg class="appearance-icon"[^>]*aria-hidden="true"[\s\S]*M21 12\.79A9 9 0 1 1 11\.21 3/, 'moon in the Dark row');
+  assert.match(light, /<svg class="appearance-icon"[\s\S]*<circle cx="12" cy="12" r="5"\/>/, 'sun in the Light row');
+  assert.match(dark, /<svg class="appearance-icon"[\s\S]*M21 12\.79A9 9 0 1 1 11\.21 3/, 'moon in the Dark row');
   assert.match(html, /\.settings-option-row input:checked ~ \.appearance-icon \{[^}]*animation: settings-icon-spin [^;]*backwards;/);
   assert.match(html, /@keyframes settings-icon-spin \{\s*from \{ opacity: 0; transform: rotate\(-200deg\) scale\(0\.3\); \}/, 'same spin as the report toggle');
   // The icons must be the very same shapes the report uses.

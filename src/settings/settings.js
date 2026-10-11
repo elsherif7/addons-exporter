@@ -78,7 +78,7 @@ const settingsStatusEl = document.getElementById('settingsStatus');
 // restore() on any row (or clearAllRows()) brings the description back.
 // ---------------------------------------------------------------------------
 // Row feedback, all done with element.animate() so the row's own CSS
-// animations are left alone, and all skipped for reduced motion:
+// animations are left alone:
 //  - a finished export / import / reset flashes its row green and slides the
 //    message in (see .is-success in settings.html);
 //  - a cancelled one (dismissed file dialog, cancelled save dialog, Cancel in
@@ -93,8 +93,7 @@ const SUCCESS_FLASH = 'rgba(46, 160, 67, 0.32)';
 const CANCEL_FLASH = 'rgba(128, 128, 128, 0.3)';
 
 function motionAllowed(el) {
-  if (!el || typeof el.animate !== 'function') return false;
-  return !(typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  return !!(el && typeof el.animate === 'function');
 }
 
 function flashRow(el, color, delayMs = 0) {
@@ -331,49 +330,10 @@ exportSettingsBtn.addEventListener('click', async () => {
     const timestamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
     const filename = `Add-ons Hub Settings (${timestamp}).json`;
 
-    let platform;
     try {
-      platform = await browser.runtime.getPlatformInfo();
-    } catch {
-      platform = { os: 'unknown' };
-    }
-
-    if (platform.os === 'android') {
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      try {
-        await new Promise((resolve) => {
-          let settled = false;
-          let fallbackTimer;
-          const hintTimer = setTimeout(() => {
-            setSettingsStatus('Saving. Tap \u201cDownload\u201d in the prompt if asked\u2026');
-          }, 1500);
-          const proceed = () => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(hintTimer);
-            browser.downloads.onCreated.removeListener(onCreated);
-            clearTimeout(fallbackTimer);
-            resolve();
-          };
-          const onCreated = () => proceed();
-          browser.downloads.onCreated.addListener(onCreated);
-          fallbackTimer = setTimeout(proceed, 5000);
-          link.click();
-        });
-      } finally {
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
-      }
-    } else {
-      try {
-        await browser.downloads.download({ url, filename, saveAs: true });
-      } finally {
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
-      }
+      await browser.downloads.download({ url, filename, saveAs: true });
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
     }
 
     exportRow.setMsg('Settings exported.');
@@ -482,8 +442,6 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
   const dialog = document.createElement('div');
   dialog.className = 's-dialog';
   dialog.setAttribute('role', 'dialog');
-  dialog.setAttribute('aria-modal', 'true');
-  dialog.setAttribute('aria-labelledby', 'resetDialogTitle');
   dialog.style.cssText = 'background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:24px 28px;min-width:300px;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.2);';
 
   const title = document.createElement('div');
@@ -513,9 +471,8 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);
 
-  // Makes the rest of the page unreachable by keyboard/assistive tech
-  // while the dialog is open, so Tab can't escape it - simpler and more
-  // robust than intercepting every Tab keypress by hand.
+  // Makes the rest of the page unreachable by keyboard while the dialog
+  // is open, so Tab can't escape it.
   const others = Array.from(document.body.children).filter((el) => el !== overlay);
   others.forEach((el) => { el.inert = true; });
 
@@ -554,11 +511,8 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
         resetBtn.focus({ preventScroll: true });
       };
       // The dialog leaves the way it came in: it shrinks and fades while the
-      // blurred backdrop clears. Skipped (removed at once) when animation is
-      // unavailable or reduced motion is on.
-      const reduced = typeof matchMedia === 'function' &&
-        matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (!reduced && typeof overlay.animate === 'function' && typeof dialog.animate === 'function') {
+      // blurred backdrop clears. Removed at once when animation is unavailable.
+      if (typeof overlay.animate === 'function' && typeof dialog.animate === 'function') {
         dialog.animate(
           [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(12px) scale(0.94)' }],
           { duration: 220, easing: 'ease-in', fill: 'forwards' }
@@ -614,9 +568,7 @@ let lastEntranceAt = Date.now();
 
 function scrollSettingsToTop() {
   if (typeof window === 'undefined' || typeof window.scrollTo !== 'function') return;
-  const reduced = typeof matchMedia === 'function' &&
-    matchMedia('(prefers-reduced-motion: reduce)').matches;
-  window.scrollTo({ top: 0, left: 0, behavior: reduced ? 'auto' : 'smooth' });
+  window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
 }
 
 function replayEntranceIfIdle() {

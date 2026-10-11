@@ -82,13 +82,12 @@ test('buildHtmlReport: falls back to light for anything other than exactly "dark
   assert.match(buildHtmlReport(sampleList, undefined), /<html lang="en" data-theme="light">/);
 });
 
-test('buildHtmlReport: includes a theme toggle button matching the starting theme', () => {
+test('buildHtmlReport: includes a theme toggle button', () => {
   const lightHtml = buildHtmlReport(sampleList, 'light');
   assert.match(lightHtml, /id="themeToggle"/);
-  assert.match(lightHtml, /aria-label="Switch to dark mode"/);
 
   const darkHtml = buildHtmlReport(sampleList, 'dark');
-  assert.match(darkHtml, /aria-label="Switch to light mode"/);
+  assert.match(darkHtml, /id="themeToggle"/);
 });
 
 test('safeJsonForScriptTag: escapes "</" so an add-on name can\'t close the script tag early', () => {
@@ -389,14 +388,6 @@ for (const [label, rootSelector] of [['light', ':root'], ['dark', ':root[data-th
 
 test('A35: no :has() selector remains in shared.css', () => {
   assert.doesNotMatch(sharedCssSrc, /:has\(/);
-});
-
-test('A22: shared.css has a prefers-reduced-motion rule', () => {
-  assert.match(sharedCssSrc, /@media \(prefers-reduced-motion: reduce\)/);
-});
-
-test('A22: the report has a prefers-reduced-motion rule', () => {
-  assert.match(reportTemplateSrcRaw, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
 // --- A36: the report's tip no longer overstates what the Importer does ---

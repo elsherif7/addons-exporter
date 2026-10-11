@@ -7,12 +7,6 @@ browser.runtime.onMessage.addListener((message) => {
   }
   if (message.type === 'export') {
     return doExport(message.ids).then(async ({ html, filename, format, stats }) => {
-      const platform = await browser.runtime.getPlatformInfo();
-
-      if (platform.os === 'android') {
-        return { html, filename, stats };
-      }
-
       const blob = new Blob([html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       try {
@@ -150,10 +144,8 @@ async function getExportableAddons() {
   // Excludes dictionaries, language packs, and anything else that isn't
   // a plain extension or theme — the report only has Enabled/Disabled
   // sections, and those types have no matching store listing. Also
-  // excludes Mozilla's own built-in components: desktop's use ids ending
-  // in @mozilla.org, while Firefox for Android bundles several of its own
-  // (ads/icons/fxa/readerview/search telemetry) ending in @mozac.org -
-  // neither is something the user actually chose to install.
+  // excludes Mozilla's own built-in components: ids ending in @mozilla.org
+  // or @mozac.org are not add-ons the user actually chose to install.
   return all.filter(a =>
     (a.type === 'extension' || a.type === 'theme') &&
     !a.id.endsWith('@mozilla.org') &&

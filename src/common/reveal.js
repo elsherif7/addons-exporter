@@ -15,11 +15,10 @@
 // Parts that are revealed later (the add-on list once it has loaded, and on
 // the Importer everything below the file picker, once a file is chosen) are
 // picked up by a MutationObserver and given the same cadence from that moment.
-// Skipped for reduced motion. The saved HTML report cannot load this file, so
+// The saved HTML report cannot load this file, so
 // report-template.js carries its own small copy of the same idea.
 (function () {
   if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
-  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   // --- timings, in seconds - the same cadence as the Settings page ------------
   const START = 0.82;          // first part (Settings: first section at 0.7s, its first row 0.12s later)

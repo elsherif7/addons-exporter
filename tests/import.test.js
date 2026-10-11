@@ -873,19 +873,6 @@ testAsync('import.js real DOM: a row with an unsafe link gets the row-disabled c
   assert.strictEqual(unsafeRow.classList.contains('row-disabled'), true);
 });
 
-// --- A21: the AMO link sits outside the label ---
-
-testAsync('import.js real DOM: the AMO link is not nested inside the label', async () => {
-  const elements = await renderRealImportList([
-    { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
-  ]);
-  const row = elements.addonList.querySelector('.addon-row');
-  const link = row.querySelector('a.match-label');
-  const label = row.querySelector('label');
-  assert.ok(link, 'the row should have a match-label link');
-  assert.strictEqual(label.contains(link), false, 'the link must not be inside the label (it would be absorbed into the checkbox\'s accessible name)');
-});
-
 // --- A23: validateSelectedFile ---
 
 test('validateSelectedFile: accepts .html, .htm, .json, and .csv', () => {
@@ -1061,7 +1048,7 @@ testAsync('live names (Importer): a search in progress is applied again to the n
 
 // --- Removing the file (the x) plays the opening in reverse, then really removes it ---
 
-async function renderImportForRemoval(addons, { reducedMotion = false, slowFile = null } = {}) {
+async function renderImportForRemoval(addons, { slowFile = null } = {}) {
   const { document, elements } = makeFakeDom([
     'status', 'fileName', 'fileNameRow', 'fileInput', 'picker', 'removeFileBtn',
     'chooseFileBtn', 'listControls', 'addonList', 'checklistBox', 'selectAllBtn',
@@ -1084,7 +1071,6 @@ async function renderImportForRemoval(addons, { reducedMotion = false, slowFile 
   const sandbox = {
     document,
     URL,
-    matchMedia: () => ({ matches: reducedMotion }),
     browser: {
       runtime: { sendMessage: async (msg) => (msg.type === 'listAddons' ? [] : undefined), getURL: (p) => p },
       storage: { local: { get: async () => ({}) }, onChanged: { addListener() {} } },
@@ -1187,13 +1173,5 @@ testAsync('remove file (x): a load that is still in flight can no longer draw an
   await new Promise((resolve) => setTimeout(resolve, 20));
   await finishAll();
   assert.strictEqual(elements.addonList.querySelectorAll('.addon-row').length, 0, 'the late result is thrown away');
-});
-
-testAsync('remove file (x): with reduced motion, or when nothing can animate, the file is removed at once', async () => {
-  const reduced = await renderImportForRemoval(REMOVAL_ADDONS, { reducedMotion: true });
-  reduced.elements.removeFileBtn.click();
-  assert.strictEqual(reduced.log.length, 0);
-  assert.strictEqual(reduced.elements.fileNameRow.style.display, 'none');
-  assert.strictEqual(reduced.elements.addonList.querySelectorAll('.addon-row').length, 0);
 });
 

@@ -99,8 +99,7 @@
      "Settings" title settles in as its letters tighten up, then each
      section in turn - its heading slides in from the left and its rows
      wipe in left to right, like being written. Everything starts hidden
-     (backwards fill) until its turn. Reduced motion skips the delays
-     (shared.css), so nothing waits hidden. */
+     (backwards fill) until its turn. */
   @keyframes settings-card-unfold {
     from { opacity: 0; transform: translateY(20px); clip-path: inset(0 0 100% 0 round 12px); }
     to   { opacity: 1; transform: none; clip-path: inset(-60px round 12px); }
@@ -207,21 +206,21 @@
   <div class="card">
     <h1>Settings</h1>
 
-    <div class="settings-group" role="radiogroup" aria-labelledby="appearanceHeading">
+    <div class="settings-group">
       <h2 id="appearanceHeading">Appearance</h2>
       <label class="settings-option-row" for="themeLight">
         <input type="radio" name="theme" id="themeLight" value="light" checked>
         <span style="font-weight:600; color:var(--text); font-size:14px;">Light</span>
-        <svg class="appearance-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="appearance-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </label>
       <label class="settings-option-row" for="themeDark">
         <input type="radio" name="theme" id="themeDark" value="dark">
         <span style="font-weight:600; color:var(--text); font-size:14px;">Dark</span>
-        <svg class="appearance-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path transform="scale(-1,1) translate(-24,0)" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="appearance-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path transform="scale(-1,1) translate(-24,0)" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </label>
     </div>
 
-    <div class="settings-group" role="radiogroup" aria-labelledby="exportFormatHeading">
+    <div class="settings-group">
       <h2 id="exportFormatHeading">Export Format</h2>
       <label class="settings-option-row" for="formatHtml">
         <input type="radio" name="exportFormat" id="formatHtml" value="html">
@@ -246,7 +245,7 @@
       </label>
     </div>
 
-    <div class="settings-group" role="radiogroup" aria-labelledby="displayHeading">
+    <div class="settings-group">
       <h2 id="displayHeading">Display</h2>
       <label class="settings-option-row" for="shortenNamesOn">
         <input type="radio" name="shortenNames" id="shortenNamesOn" value="on">
@@ -296,7 +295,7 @@
         </span>
         <button class="settings-btn settings-btn-danger hub-btn" id="resetSettingsBtn" style="flex-shrink:0; flex:none; width:auto; min-width:80px; padding:6px 14px; margin-left:12px;">Reset</button>
       </div>
-      <span id="settingsStatus" role="status" aria-live="polite"></span>
+      <span id="settingsStatus"></span>
     </div>
 
     <div class="settings-group">
