@@ -936,12 +936,19 @@ test('success: after an import, the selected option in each group flashes in tur
   assert.ok(rows[3].animations[0].options.delay > rows[0].animations[0].options.delay, 'later groups flash later');
 });
 
-// --- Cancelling export / import / reset: the soft grey "backed out" feedback ---
+testAsync('success: with reduced motion, nothing flashes (the message still shows as a success)', async () => {
+  const ctx = makeSuccessSandbox();
+  ctx.sb.matchMedia = () => ({ matches: true });
+  await runReset(ctx);
+  assert.strictEqual(ctx.row.animations.length, 0);
+  assert.strictEqual(ctx.elements.resetSettingsStatus.classList.contains('is-success'), true);
+});
 
+// --- Cancelling export / import / reset: the soft grey "backed out" feedback ---
 // Builds the three action rows (each a .settings-option-row holding its
 // description and message) so a cancel can be seen: the row flashes grey and
 // the description slides back in.
-function makeCancelSandbox({ downloadError = null } = {}) {
+function makeCancelSandbox({ downloadError = null, reducedMotion = false } = {}) {
   const ids = ['resetSettingsBtn', 'settingsStatus', 'exportSettingsBtn', 'importSettingsBtn', 'settingsFileInput',
     'exportSettingsDesc', 'exportSettingsStatus', 'importSettingsDesc', 'importSettingsStatus',
     'resetSettingsDesc', 'resetSettingsStatus'];
@@ -969,6 +976,7 @@ function makeCancelSandbox({ downloadError = null } = {}) {
     setTimeout: () => 0,
     fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
     document,
+    matchMedia: () => ({ matches: reducedMotion }),
     browser: {
       storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
       runtime: {
@@ -1039,6 +1047,16 @@ testAsync('cancel: pressing Cancel in the reset dialog flashes the Reset row gre
   ctx.document.body.querySelector('#rsCancel').click();
   await new Promise((resolve) => setTimeout(resolve, 0));
   assertCancelFeedback(ctx, 'reset');
+});
+
+testAsync('cancel: with reduced motion the description still comes back, but nothing animates', async () => {
+  const ctx = makeCancelSandbox({ reducedMotion: true });
+  openResetDialog(ctx.document, ctx.elements.resetSettingsBtn);
+  ctx.document.body.querySelector('#rsCancel').click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.strictEqual(ctx.elements.resetSettingsDesc.style.display, '');
+  assert.strictEqual(ctx.rows.reset.animations.length, 0);
+  assert.strictEqual(ctx.elements.resetSettingsDesc.animations.length, 0);
 });
 
 testAsync('cancel: confirming the reset is not a cancel - no grey flash', async () => {

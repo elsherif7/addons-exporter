@@ -6,11 +6,12 @@ const { test, readSrc } = require('./helpers');
 const pressSrc = readSrc('src/common/press.js');
 
 // A fake element that knows which selectors it "matches" and records animate().
-function makeEl({ rowLike = false, matchesTarget = true, disabled = false, classes = [] } = {}) {
+function makeEl({ rowLike = false, matchesTarget = true, disabled = false, ariaDisabled = false, classes = [] } = {}) {
   const el = {
     animations: [],
     disabled,
     classList: { contains: (c) => classes.includes(c) },
+    getAttribute: (name) => (name === 'aria-disabled' && ariaDisabled ? 'true' : null),
     matches: (sel) => rowLike && /addon-row|settings-option-row/.test(sel),
     animate(keyframes, options) { el.animations.push({ keyframes, options }); return {}; },
     closest: (sel) => {
@@ -22,13 +23,14 @@ function makeEl({ rowLike = false, matchesTarget = true, disabled = false, class
   return el;
 }
 
-function loadPress({ ringValue = 'rgba(1, 2, 3, 0.5)' } = {}) {
+function loadPress({ reducedMotion = false, ringValue = 'rgba(1, 2, 3, 0.5)' } = {}) {
   const listeners = {};
   const sandbox = {
     document: {
       documentElement: {},
       addEventListener: (type, fn, capture) => { listeners[type] = { fn, capture }; },
     },
+    matchMedia: () => ({ matches: reducedMotion }),
     getComputedStyle: () => ({ getPropertyValue: (name) => (name === '--press-ring' ? ` ${ringValue} ` : '') }),
   };
   vm.createContext(sandbox);
@@ -91,16 +93,21 @@ test('press: keyboard activation (a click with detail 0) pulses; a real mouse cl
   assert.strictEqual(btn.animations.length, 1, 'the pointerdown already pulsed for a mouse click');
 });
 
-test('press: disabled buttons and disabled rows do not pulse', () => {
+test('press: disabled buttons, aria-disabled controls and disabled rows do not pulse', () => {
   const { listeners } = loadPress();
-  for (const opts of [{ disabled: true }, { classes: ['row-disabled'] }]) {
+  for (const opts of [{ disabled: true }, { ariaDisabled: true }, { classes: ['row-disabled'] }]) {
     const el = makeEl(opts);
     listeners.pointerdown.fn({ target: el, pointerType: 'mouse', button: 0 });
     assert.strictEqual(el.animations.length, 0, JSON.stringify(opts));
   }
 });
 
-test('press: nothing happens for non-interactive targets or a missing target', () => {
+test('press: nothing happens for reduced motion, non-interactive targets, or a missing target', () => {
+  const reduced = loadPress({ reducedMotion: true });
+  const btn = makeEl();
+  reduced.listeners.pointerdown.fn({ target: btn, pointerType: 'mouse', button: 0 });
+  assert.strictEqual(btn.animations.length, 0);
+
   const { listeners } = loadPress();
   const plain = makeEl({ matchesTarget: false });
   listeners.pointerdown.fn({ target: plain, pointerType: 'mouse', button: 0 });

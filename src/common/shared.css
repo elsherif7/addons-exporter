@@ -159,7 +159,8 @@ body {
    start times: --d for a part, --rd for a list row. Anything revealed later
    (the Importer's list, after a file is chosen) has no --d, so it wipes in
    at once when shown. backwards fill throughout, so nothing shows before its
-   turn and no held keyframe overrides :hover. */
+   turn and no held keyframe overrides :hover. Reduced motion zeroes the
+   delays (below) and reveal.js does not run. */
 @keyframes hub-unfold {
   from { opacity: 0; transform: translateY(20px); clip-path: inset(0 0 100% 0 round 12px); }
   to   { opacity: 1; transform: none; clip-path: inset(-60px round 12px); }
@@ -545,3 +546,21 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 }
 
 
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    /* Staged reveals use long delays - with reduced motion everything
+       must simply be there, not wait hidden for its turn. */
+    animation-delay: 0s !important;
+  }
+  .search-input:hover,
+  .addon-row:hover,
+  .hub-btn:hover,
+  .hub-btn:active,
+  .primary-btn:hover,
+  .primary-btn:active {
+    transform: none !important;
+  }
+}

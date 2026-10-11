@@ -354,6 +354,18 @@ function buildHtmlReport(list, theme, shorten = true) {
   }
 
 
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.001ms !important;
+      animation-duration: 0.001ms !important;
+      animation-delay: 0s !important;
+    }
+    .theme-toggle:hover, .theme-toggle:active,
+    .search-input:hover, .addon-row:hover {
+      transform: none !important;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -412,18 +424,19 @@ function buildHtmlReport(list, theme, shorten = true) {
 
     // Mirrors applyTheme() in theme.js: view transitions (new theme fades
     // in over the old one) where supported, a color glide otherwise,
-    // nothing on first load.
+    // nothing on first load or for reduced motion.
     function applyTheme(theme) {
       var root = document.documentElement;
       var changing = themeReady && root.getAttribute('data-theme') !== theme;
+      var reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
       function update() {
         root.setAttribute('data-theme', theme);
         themeToggleEl.innerHTML = theme === 'dark' ? SUN_SVG : MOON_SVG;
       }
-      if (changing && document.startViewTransition) {
+      if (changing && !reduced && document.startViewTransition) {
         document.startViewTransition(update);
       } else {
-        if (changing) {
+        if (changing && !reduced) {
           root.classList.add('theme-switching');
           clearTimeout(themeSwitchTimer);
           themeSwitchTimer = setTimeout(function () { root.classList.remove('theme-switching'); }, 800);
@@ -491,9 +504,10 @@ function buildHtmlReport(list, theme, shorten = true) {
     // Gives the intro, the search box and the list box their start times
     // (--d, one every 0.16s) and the list rows theirs (--rd, one every
     // 0.08s), and takes the "revealing" flag off the list afterwards so
-    // searching never replays the entrance.
+    // searching never replays the entrance. Skipped for reduced motion.
     (function () {
       if (typeof document.querySelector !== 'function' || typeof getComputedStyle !== 'function') return;
+      if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       var card = document.querySelector('.card');
       if (!card || !card.children) return;
       var START = 0.82, PART_STEP = 0.16, ROW_LEAD = 0.08, ROW_STEP = 0.08, ROW_ANIMATED_MAX = 14, ROW_DURATION = 0.55;
@@ -533,6 +547,7 @@ function buildHtmlReport(list, theme, shorten = true) {
       }
       function pulse(el) {
         if (!el || typeof el.animate !== 'function') return;
+        if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         var c = ringColor();
         el.animate(
           el.matches(ROW)

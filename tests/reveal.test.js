@@ -66,7 +66,7 @@ class El {
 }
 
 // Builds a card and loads reveal.js against it. `time` is a mutable clock.
-function load({ card, byId = {}, time = { t: 1000000 }, noCard = false } = {}) {
+function load({ card, byId = {}, reducedMotion = false, time = { t: 1000000 }, noCard = false } = {}) {
   const timers = [];
   const cleared = [];
   const observers = [];
@@ -78,6 +78,7 @@ function load({ card, byId = {}, time = { t: 1000000 }, noCard = false } = {}) {
       createDocumentFragment: () => ({ isFragment: true, childNodes: [], appendChild(n) { this.childNodes.push(n); } }),
     },
     getComputedStyle: (el) => ({ display: el.hidden ? 'none' : 'block' }),
+    matchMedia: () => ({ matches: reducedMotion }),
     MutationObserver: function (cb) {
       this.cb = cb;
       this.observe = (target, opts) => { this.target = target; this.opts = opts; };
@@ -295,6 +296,13 @@ test('reveal (Importer): a second file only re-times the rows - the search box a
 });
 
 // --- switches and edge cases -------------------------------------------------
+
+test('reveal: with reduced motion nothing is timed - the page is simply there', () => {
+  const p = exporterCard();
+  const ctx = load({ card: p.card, byId: { addonList: p.list }, reducedMotion: true });
+  assert.strictEqual(p.desc.vars['--d'], undefined);
+  assert.strictEqual(ctx.observers.length, 0);
+});
 
 test('reveal: a page with no staged card, or no document at all, is left alone', () => {
   load({ card: null, noCard: true });

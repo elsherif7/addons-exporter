@@ -102,7 +102,7 @@ test('loading theme.js with no storage.onChanged at all does not throw', () => {
 
 // --- view-transition switch (with the color glide as the fallback) ---
 
-function loadThemeForSwitch({ withViewTransitions = true } = {}) {
+function loadThemeForSwitch({ reducedMotion = false, withViewTransitions = true } = {}) {
   const transitions = [];
   const classes = new Set();
   const timers = [];
@@ -120,6 +120,7 @@ function loadThemeForSwitch({ withViewTransitions = true } = {}) {
   }
   const sandbox = {
     document,
+    matchMedia: () => ({ matches: reducedMotion }),
     localStorage: { getItem() { return null; }, setItem() {} },
     setTimeout: (fn) => { timers.push(fn); return timers.length; },
     clearTimeout() {},
@@ -159,12 +160,19 @@ testAsync('theme: without view transitions, colors glide via .theme-switching, r
   assert.strictEqual(ctx.classes.has('theme-switching'), false);
 });
 
-testAsync('theme: no animation when the theme does not change', async () => {
+testAsync('theme: no animation when the theme does not change, or when reduced motion is on', async () => {
   const same = loadThemeForSwitch();
   await same.sandbox.initTheme();
   same.sandbox.applyTheme('light');
   assert.strictEqual(same.transitions.length, 0);
   assert.strictEqual(same.classes.has('theme-switching'), false);
+
+  const reduced = loadThemeForSwitch({ reducedMotion: true });
+  await reduced.sandbox.initTheme();
+  reduced.sandbox.applyTheme('dark');
+  assert.strictEqual(reduced.transitions.length, 0);
+  assert.strictEqual(reduced.classes.has('theme-switching'), false);
+  assert.strictEqual(reduced.getAttr(), 'dark', 'still switches, just instantly');
 });
 
 // --- one transition at a time (Settings: its own call + storage.onChanged) ---

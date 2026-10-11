@@ -78,7 +78,7 @@ const settingsStatusEl = document.getElementById('settingsStatus');
 // restore() on any row (or clearAllRows()) brings the description back.
 // ---------------------------------------------------------------------------
 // Row feedback, all done with element.animate() so the row's own CSS
-// animations are left alone:
+// animations are left alone, and all skipped for reduced motion:
 //  - a finished export / import / reset flashes its row green and slides the
 //    message in (see .is-success in settings.html);
 //  - a cancelled one (dismissed file dialog, cancelled save dialog, Cancel in
@@ -93,7 +93,8 @@ const SUCCESS_FLASH = 'rgba(46, 160, 67, 0.32)';
 const CANCEL_FLASH = 'rgba(128, 128, 128, 0.3)';
 
 function motionAllowed(el) {
-  return !!(el && typeof el.animate === 'function');
+  if (!el || typeof el.animate !== 'function') return false;
+  return !(typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
 }
 
 function flashRow(el, color, delayMs = 0) {
@@ -511,8 +512,11 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
         resetBtn.focus({ preventScroll: true });
       };
       // The dialog leaves the way it came in: it shrinks and fades while the
-      // blurred backdrop clears. Removed at once when animation is unavailable.
-      if (typeof overlay.animate === 'function' && typeof dialog.animate === 'function') {
+      // blurred backdrop clears. Skipped (removed at once) when animation is
+      // unavailable or reduced motion is on.
+      const reduced = typeof matchMedia === 'function' &&
+        matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!reduced && typeof overlay.animate === 'function' && typeof dialog.animate === 'function') {
         dialog.animate(
           [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(12px) scale(0.94)' }],
           { duration: 220, easing: 'ease-in', fill: 'forwards' }
@@ -568,7 +572,9 @@ let lastEntranceAt = Date.now();
 
 function scrollSettingsToTop() {
   if (typeof window === 'undefined' || typeof window.scrollTo !== 'function') return;
-  window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+  const reduced = typeof matchMedia === 'function' &&
+    matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({ top: 0, left: 0, behavior: reduced ? 'auto' : 'smooth' });
 }
 
 function replayEntranceIfIdle() {

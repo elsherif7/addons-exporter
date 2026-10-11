@@ -273,6 +273,12 @@ test('hub-btn: popup.html local .hub-btn copy declares the core shared propertie
 const sharedCssForMotion = readSrc('src/common/shared.css');
 const reportCssForMotion = readSrc('src/background/report.css');
 
+test('motion: shared.css, the popup and the report all honor prefers-reduced-motion', () => {
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
+    assert.match(src, /@media \(prefers-reduced-motion: reduce\)/, `${name} is missing its reduced-motion rule`);
+  }
+});
+
 test('motion: shared.css, the popup and the report all define the .theme-switching color transition', () => {
   for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
     assert.match(src, /:root\.theme-switching/, `${name} is missing the theme transition`);
@@ -333,6 +339,14 @@ test('motion: nothing leaves a full-screen overlay behind (the old .theme-flash 
 
 test('motion: shared.css has the .replay-reset rule replayEntrance() depends on (covers everything inside the card)', () => {
   assert.match(sharedCssForMotion, /\.replay-reset,\s*\.replay-reset \*\s*\{\s*animation:\s*none/);
+});
+
+test('motion: reduced motion also zeroes animation delays, so staged reveals never leave content hidden', () => {
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
+    const block = src.match(/@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\n\s*\}\n/);
+    assert.ok(block, `${name}: reduced-motion block not found`);
+    assert.match(block[0], /animation-delay:\s*0s\s*!important/, `${name} must zero animation-delay`);
+  }
 });
 
 test('settings: the page reveals in order - card, then title, then each section top to bottom', () => {
@@ -588,6 +602,7 @@ test('same as Settings: the report times its parts and rows with its own script,
   assert.match(tpl, /<div id="addonList" class="revealing">/);
   assert.match(tpl, /Opening reveal - mirrors src\/common\/reveal\.js/);
   assert.match(tpl, /list\.classList\.remove\('revealing'\)/, 'the flag is taken away again so searching never replays the entrance');
+  assert.match(tpl, /Opening reveal[\s\S]*prefers-reduced-motion: reduce/, 'skipped for reduced motion');
 });
 
 test('staged reveal: clipped reveals in shared.css and the report end beyond the box (shadows and focus rings stay visible)', () => {

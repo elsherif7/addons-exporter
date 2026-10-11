@@ -651,11 +651,12 @@ test('A34: formatLabel is no longer duplicated in export.js or confirmation.js',
 // Cosmetic fade before the page is replaced by the confirmation page.
 // Must be a safe no-op wherever animation isn't available, and must
 // never block the caller.
-function makeFadeSandbox({ card, replaceImpl } = {}) {
+function makeFadeSandbox({ card, reducedMotion = false, replaceImpl } = {}) {
   const navigated = [];
   const sb = {
     URL,
     document: { querySelector: (sel) => (sel === '.card' ? card : null) },
+    matchMedia: () => ({ matches: reducedMotion }),
     location: { replace: replaceImpl || ((url) => navigated.push(url)) },
     browser: { runtime: { getURL: (p) => `moz-extension://test-id/${p}` } },
   };
@@ -682,6 +683,13 @@ testAsync('fadeOutPage: animates the .card out and holds the final frame', async
   assert.strictEqual(card.calls[0].frames[1].opacity, 0);
   assert.strictEqual(card.calls[0].opts.fill, 'forwards');
   assert.strictEqual(card.cancelled, false);
+});
+
+testAsync('fadeOutPage: does nothing when the user prefers reduced motion', async () => {
+  const card = makeAnimatedCard();
+  const { sb } = makeFadeSandbox({ card, reducedMotion: true });
+  assert.strictEqual(await sb.fadeOutPage(), null);
+  assert.strictEqual(card.calls.length, 0);
 });
 
 testAsync('fadeOutPage: safe no-op when there is no .card, no animate(), or no document', async () => {
@@ -889,8 +897,8 @@ class BadgeNode {
   }
 }
 
-function badgeEnv({ withDocument = true } = {}) {
-  const sb = { URL };
+function badgeEnv({ reducedMotion = false, withDocument = true } = {}) {
+  const sb = { URL, matchMedia: () => ({ matches: reducedMotion }) };
   if (withDocument) sb.document = { createElement: () => new BadgeNode() };
   vm.createContext(sb);
   vm.runInContext(commonSrc, sb);
@@ -919,6 +927,7 @@ test('setSelectionCount: more selected - the badge pops, flashes green, and the 
   const [now, old] = slot.children;
   assert.strictEqual(now.textContent, '4');
   assert.strictEqual(old.textContent, '3');
+  assert.strictEqual(old.attrs['aria-hidden'], 'true', 'the ghost of the old number is hidden from screen readers');
   assert.strictEqual(rest.textContent, ' of 12 selected');
   assert.strictEqual(now.animations[0].keyframes[0].transform, 'translateY(100%)', 'the new number comes up from below');
   assert.strictEqual(old.animations[0].keyframes[1].transform, 'translateY(-100%)', 'the old one leaves upwards');
@@ -1000,6 +1009,14 @@ test('setSelectionCount: the first text, the same text, and clearing it play not
   set('');
   assert.strictEqual(badge.animations.length, 0);
   assert.strictEqual(badge.textContent, '');
+});
+
+test('setSelectionCount: with reduced motion the text just changes', () => {
+  const { badge, set } = badgeEnv({ reducedMotion: true });
+  set('3 of 12 selected');
+  set('4 of 12 selected');
+  assert.strictEqual(badge.animations.length, 0);
+  assert.strictEqual(badge.textContent, '4 of 12 selected');
 });
 
 test('setSelectionCount: without a document to build the slot in, the pop and tint still play and the text is right', () => {

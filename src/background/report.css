@@ -261,3 +261,15 @@
     .addon-row, .group-container, #addonList { opacity: 1 !important; }
   }
 
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.001ms !important;
+      animation-duration: 0.001ms !important;
+      animation-delay: 0s !important;
+    }
+    .theme-toggle:hover, .theme-toggle:active,
+    .search-input:hover, .addon-row:hover {
+      transform: none !important;
+    }
+  }

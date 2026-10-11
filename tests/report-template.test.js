@@ -390,6 +390,14 @@ test('A35: no :has() selector remains in shared.css', () => {
   assert.doesNotMatch(sharedCssSrc, /:has\(/);
 });
 
+test('A22: shared.css has a prefers-reduced-motion rule', () => {
+  assert.match(sharedCssSrc, /@media \(prefers-reduced-motion: reduce\)/);
+});
+
+test('A22: the report has a prefers-reduced-motion rule', () => {
+  assert.match(reportTemplateSrcRaw, /@media \(prefers-reduced-motion: reduce\)/);
+});
+
 // --- A36: the report's tip no longer overstates what the Importer does ---
 
 test('A36: the report tip does not claim every link opens automatically', () => {

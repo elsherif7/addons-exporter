@@ -585,7 +585,8 @@ function setSelectedFile(file) {
 // name), each sliding left and fading, one after another - then the file is
 // really removed and "Choose file" pops back in. Until it has finished the
 // page keeps its state, but a load still in flight is cancelled at once so it
-// cannot draw anything in the middle of the exit.
+// cannot draw anything in the middle of the exit. Without animation support,
+// or for reduced motion, the file is simply removed at once.
 let removingFile = false;
 
 function removalTargets() {
@@ -604,7 +605,8 @@ function animateOut(el, delayMs) {
 
 async function removeFileAnimated() {
   if (removingFile) return;
-  const targets = removalTargets().filter((el) => typeof el.animate === 'function');
+  const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const targets = reduced ? [] : removalTargets().filter((el) => typeof el.animate === 'function');
   if (targets.length === 0) {
     setSelectedFile(null);
     return;

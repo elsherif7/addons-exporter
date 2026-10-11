@@ -304,14 +304,15 @@ function filterAddonRows(container, query) {
 // Used by export.js and import.js when they finish: the page fades out
 // and is replaced, in the same tab, by the confirmation page (instead of
 // opening a second tab next to it). The fade uses the Web Animations API
-// on the page's .card and is skipped when that isn't available, so callers
-// can always just await it.
+// on the page's .card and is skipped when that isn't available or the
+// user has asked for reduced motion, so callers can always just await it.
 const PAGE_FADE_MS = 380;
 
 // Resolves once the card has faded out, with the animation (held at its
 // final frame) so the caller can undo it, or null if nothing was animated.
 async function fadeOutPage() {
   if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return null;
+  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return null;
   const card = document.querySelector('.card');
   if (!card || typeof card.animate !== 'function') return null;
   try {
@@ -372,8 +373,10 @@ const TAB_OPEN_DELAY_MS = 150;
 // Switches every row's name between its short and its full form, in place.
 // Rows remember their full name (data-full-name); anything without one is
 // left alone. Returns how many names changed, and gives each a quick fade so
-// the change is noticed.
+// the change is noticed (skipped for reduced motion).
 function applyNameShortening(root, shorten) {
+  const reduced = typeof matchMedia === 'function' &&
+    matchMedia('(prefers-reduced-motion: reduce)').matches;
   let changed = 0;
   for (const nameEl of Array.from(root.querySelectorAll('.addon-name'))) {
     const full = nameEl.dataset && nameEl.dataset.fullName;
@@ -382,7 +385,7 @@ function applyNameShortening(root, shorten) {
     if (nameEl.textContent === next) continue;
     nameEl.textContent = next;
     changed++;
-    if (typeof nameEl.animate === 'function') {
+    if (!reduced && typeof nameEl.animate === 'function') {
       nameEl.animate([{ opacity: 0.15 }, { opacity: 1 }], { duration: 350, easing: 'ease-out' });
     }
   }
@@ -409,7 +412,7 @@ function onShortenNamesChanged(handler) {
 //  3. it FLASHES a tint that shows the direction: green for more, amber for
 //     fewer (no tint when only the total changed).
 // The first time the badge gets text, or when it is cleared, nothing extra
-// plays (the badge's own fade-in covers that).
+// plays (the badge's own fade-in covers that). Skipped for reduced motion.
 // textContent is always the plain text again once the animation is over.
 const COUNT_ROLL_MS = 380;
 const COUNT_UP_TINT = 'rgba(46, 160, 67, 0.4)';
@@ -422,6 +425,7 @@ function setSelectionCount(el, text) {
   el.textContent = text; // also ends any roll that is still on screen
   if (text === before || before === '' || text === '') return;
   if (typeof el.animate !== 'function') return;
+  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   const prev = parseInt(before, 10);
   const next = parseInt(text, 10);
@@ -455,6 +459,7 @@ function setSelectionCount(el, text) {
   const old = document.createElement('span');
   old.className = 'count-roll-old';
   old.textContent = oldNumber[1];
+  old.setAttribute('aria-hidden', 'true');
   slot.appendChild(now);
   slot.appendChild(old);
   const rest = document.createElement('span');

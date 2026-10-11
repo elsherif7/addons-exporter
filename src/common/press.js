@@ -17,6 +17,10 @@
   const DURATION_MS = 520;
   const FALLBACK_COLOR = 'rgba(0, 96, 223, 0.4)';
 
+  function prefersReducedMotion() {
+    return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
   function ringColor() {
     try {
       const v = getComputedStyle(document.documentElement).getPropertyValue('--press-ring').trim();
@@ -28,11 +32,12 @@
 
   function isDisabled(el) {
     return !!el.disabled ||
+      el.getAttribute('aria-disabled') === 'true' ||
       (el.classList && el.classList.contains('row-disabled'));
   }
 
   function pulse(el) {
-    if (!el || typeof el.animate !== 'function' || isDisabled(el)) return;
+    if (!el || typeof el.animate !== 'function' || isDisabled(el) || prefersReducedMotion()) return;
     const color = ringColor();
     // Rows sit inside a box that clips overflow, so they flash from the
     // inside; everything else sends a ring outward.

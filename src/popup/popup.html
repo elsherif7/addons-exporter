@@ -142,7 +142,14 @@
         fill 0.6s ease-in-out, stroke 0.6s ease-in-out !important;
     }
 
-
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        transition-duration: 0.001ms !important;
+        animation-duration: 0.001ms !important;
+        animation-delay: 0s !important;
+      }
+      .hub-btn:hover, .hub-btn:active { transform: none !important; }
+    }
   </style>
 </head>
 <body>

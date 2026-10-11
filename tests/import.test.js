@@ -1048,7 +1048,7 @@ testAsync('live names (Importer): a search in progress is applied again to the n
 
 // --- Removing the file (the x) plays the opening in reverse, then really removes it ---
 
-async function renderImportForRemoval(addons, { slowFile = null } = {}) {
+async function renderImportForRemoval(addons, { reducedMotion = false, slowFile = null } = {}) {
   const { document, elements } = makeFakeDom([
     'status', 'fileName', 'fileNameRow', 'fileInput', 'picker', 'removeFileBtn',
     'chooseFileBtn', 'listControls', 'addonList', 'checklistBox', 'selectAllBtn',
@@ -1071,6 +1071,7 @@ async function renderImportForRemoval(addons, { slowFile = null } = {}) {
   const sandbox = {
     document,
     URL,
+    matchMedia: () => ({ matches: reducedMotion }),
     browser: {
       runtime: { sendMessage: async (msg) => (msg.type === 'listAddons' ? [] : undefined), getURL: (p) => p },
       storage: { local: { get: async () => ({}) }, onChanged: { addListener() {} } },
@@ -1175,3 +1176,10 @@ testAsync('remove file (x): a load that is still in flight can no longer draw an
   assert.strictEqual(elements.addonList.querySelectorAll('.addon-row').length, 0, 'the late result is thrown away');
 });
 
+testAsync('remove file (x): with reduced motion, or when nothing can animate, the file is removed at once', async () => {
+  const reduced = await renderImportForRemoval(REMOVAL_ADDONS, { reducedMotion: true });
+  reduced.elements.removeFileBtn.click();
+  assert.strictEqual(reduced.log.length, 0);
+  assert.strictEqual(reduced.elements.fileNameRow.style.display, 'none');
+  assert.strictEqual(reduced.elements.addonList.querySelectorAll('.addon-row').length, 0);
+});
