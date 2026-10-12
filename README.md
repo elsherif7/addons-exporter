@@ -15,6 +15,7 @@ addons-hub/
 ├── scripts/               # Build helpers: embed the report icon, inline report.css, syntax-check every source file
 ├── tests/                 # Plain Node.js test suite, run via `npm test`
 │   ├── run.js                   # Requires every test file, then prints the combined summary
+│   ├── golden/                  # Expected output files used by golden.test.js
 │   ├── helpers.js               # Shared test()/testAsync() harness plus vm-loading and sandbox utilities
 │   ├── common.test.js           # Unit tests covering every helper function in common.js
 │   ├── theme.test.js            # Tests for the shared light/dark theme logic
@@ -22,6 +23,8 @@ addons-hub/
 │   ├── report-template.test.js  # Tests for all export format builders (HTML, JSON, CSV, TXT) in report-template.js
 │   ├── background.test.js       # Tests covering messaging, AMO lookups, and export logic
 │   ├── export.test.js           # Tests covering the export page's picker and click logic
+│   ├── golden.test.js           # Compares the exact text of every export format with the files in tests/golden/ (`UPDATE_GOLDEN=1 node tests/run.js` regenerates them)
+│   ├── zip-external.test.js     # Checks the .zip with unzip, Python and bsdtar (whichever are installed), not just with this project's own reader
 │   ├── press.test.js            # Tests for the click/tap press-ring feedback in press.js
 │   ├── reveal.test.js           # Tests for the opening-reveal timing in reveal.js (including the Export button waiting for the last add-on)
 │   ├── settings.test.js         # Tests for the settings page: backup/restore, reset, update check

@@ -33,6 +33,17 @@ if (!STYLE_RE.test(src)) {
 
 const updated = src.replace(STYLE_RE, `$1${css}$3`);
 
+// --check: report whether the file is up to date, but never write it. Used by
+// `npm test` (pretest) so a test run cannot change the working tree.
+if (process.argv.includes('--check')) {
+  if (updated === src) {
+    console.log('build-report-css: report-template.js is up to date.');
+    process.exit(0);
+  }
+  console.error('build-report-css: report-template.js is out of date - run `npm run build` and try again.');
+  process.exit(1);
+}
+
 if (updated === src) {
   console.log('build-report-css: report-template.js is already up to date, nothing changed.');
 } else {

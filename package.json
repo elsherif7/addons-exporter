@@ -5,9 +5,10 @@
   "private": true,
   "scripts": {
     "build": "node scripts/build-report-css.js && node scripts/embed-icon.js",
-    "pretest": "npm run build && node scripts/check-syntax.js",
+    "pretest": "node scripts/build-report-css.js --check && node scripts/embed-icon.js --check && node scripts/check-syntax.js",
     "test": "node tests/run.js",
-    "embed-icon": "node scripts/embed-icon.js"
+    "embed-icon": "node scripts/embed-icon.js",
+    "build:check": "node scripts/build-report-css.js --check && node scripts/embed-icon.js --check"
   },
   "engines": {
     "node": ">=18"

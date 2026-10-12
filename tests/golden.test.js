@@ -1,0 +1,133 @@
+// Golden-file tests: the exact text of every export format, for a fixed set of
+// add-ons that includes the awkward cases (quotes, commas, a newline, a name a
+// spreadsheet would read as a formula, non-Latin text, a very long name, markup
+// in a name, a theme, disabled add-ons).
+//
+// Why they exist: a refactor of the builders, the shared helpers or the report
+// must not change what users get in their saved files. These compare the whole
+// output, byte for byte, against files in tests/golden/.
+//
+// If an output is MEANT to change, regenerate the files and review the diff:
+//     UPDATE_GOLDEN=1 node tests/run.js
+//
+// Line endings are compared after normalising \r\n to \n, so a checkout that
+// converts line endings (git on Windows) does not fail these; a separate test
+// still checks that the CSV and TXT files really use \r\n.
+//
+// The HTML report's stylesheet and icon are replaced by placeholders before
+// comparing: they are covered by the report.css and icon sync tests, and keeping
+// them out of the golden file means a colour change does not touch it.
+
+const assert = require('assert');
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+const { test, readSrc, evalInContext } = require('./helpers');
+
+const sandbox = { URL };
+vm.createContext(sandbox);
+vm.runInContext(readSrc('src/common/common.js'), sandbox);
+vm.runInContext(readSrc('src/background/report-template.js'), sandbox);
+const { buildHtmlReport, buildJsonExport, buildCsvExport, buildTxtExport } = sandbox;
+
+const GOLDEN_DIR = path.join(__dirname, 'golden');
+const UPDATE = process.env.UPDATE_GOLDEN === '1';
+
+const AMO = 'https://addons.mozilla.org/en-US/firefox/addon/';
+const fixture = [
+  { id: 'uBlock0@raymondhill.net', name: 'uBlock Origin – free ad blocker', version: '1.58.0', enabled: true, type: 'extension', link: AMO + 'ublock-origin/', linkType: 'amo-exact' },
+  { id: 'addon@darkreader.org', name: 'Dark Reader', version: '4.9.90', enabled: true, type: 'extension', link: AMO + 'darkreader/', linkType: 'amo-exact' },
+  { id: '{7be2ba16-0f1e-4d93-9ebc-5164397477e9}', name: 'Buster: Captcha Solver for Humans', version: '2.0.1', enabled: true, type: 'extension', link: AMO + 'buster-captcha-solver/', linkType: 'amo-search' },
+  { id: 'quotes@example.com', name: 'Tab "Stash", Pro Edition', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/tab,stash?x=1&y="2"', linkType: 'homepage' },
+  { id: 'formula@example.com', name: '=SUM(1+1) Helper', version: '0.1', enabled: true, type: 'extension', link: AMO + 'formula-helper/', linkType: 'amo-exact' },
+  { id: 'plus@example.com', name: '+Plus Notes', version: '3', enabled: false, type: 'extension', link: AMO + 'plus-notes/', linkType: 'amo-exact' },
+  { id: 'jp@example.com', name: '広告ブロッカー - 日本語版', version: '2.5', enabled: true, type: 'extension', link: AMO + 'jp-blocker/', linkType: 'amo-exact' },
+  { id: 'cafe@example.com', name: 'Café Tab Manager: Pro', version: '5.1.2', enabled: true, type: 'extension', link: AMO + 'cafe-tab-manager/', linkType: 'amo-exact' },
+  // KNOWN LIMITATION (not fixed in Phase 0): a name containing a line break
+  // splits its TXT line in two, so the Importer cannot read that add-on back
+  // from a TXT file. CSV quotes it correctly. The golden TXT files record the
+  // current behaviour; update them if this is ever fixed.
+  { id: 'newline@example.com', name: 'Line\nBreak Tool', version: '1.1', enabled: false, type: 'extension', link: 'https://example.com/line-break', linkType: 'homepage' },
+  { id: 'markup@example.com', name: '<script>alert(1)</script> & "friends"', version: '9.9', enabled: true, type: 'extension', link: 'https://example.com/?q=search&lang=en', linkType: 'amo-search-fallback' },
+  { id: 'long@example.com', name: 'An Extremely Long Add-on Name That Goes Well Past Forty Characters Without Any Separator', version: '10.20.30', enabled: true, type: 'extension', link: AMO + 'long-name/', linkType: 'amo-exact' },
+  { id: '{11111111-2222-3333-4444-555555555555}', name: 'Midnight Theme', version: '1.0', enabled: false, type: 'theme', link: 'https://example.com/midnight', linkType: 'homepage' },
+  { id: 'sun@example.com', name: 'Sunrise — Light Theme', version: '2.0', enabled: true, type: 'theme', link: AMO + 'sunrise/', linkType: 'amo-exact' },
+];
+
+const norm = (s) => s.replace(/\r\n/g, '\n');
+
+// The stylesheet and icon are checked by their own sync tests.
+function maskHtml(html) {
+  return html
+    .replace(/<style>[\s\S]*?<\/style>/, '<style>/* report.css (checked by its own sync test) */</style>')
+    .replace(/data:image\/png;base64,[A-Za-z0-9+/=]+/g, 'data:image/png;base64,ICON');
+}
+
+function check(name, actual) {
+  const file = path.join(GOLDEN_DIR, name);
+  if (UPDATE) {
+    fs.mkdirSync(GOLDEN_DIR, { recursive: true });
+    fs.writeFileSync(file, actual, 'utf8');
+    return;
+  }
+  assert.ok(fs.existsSync(file), `missing golden file tests/golden/${name} - run: UPDATE_GOLDEN=1 node tests/run.js`);
+  const expected = fs.readFileSync(file, 'utf8');
+  assert.strictEqual(norm(actual), norm(expected),
+    `output differs from tests/golden/${name}. If the change is intended, run: UPDATE_GOLDEN=1 node tests/run.js, then review the diff.`);
+}
+
+const variants = [
+  ['short', true],
+  ['full', false],
+];
+
+for (const [label, shorten] of variants) {
+  test(`golden: JSON export (${label} names) is unchanged`, () => {
+    check(`export-${label}.json`, buildJsonExport(fixture, shorten));
+  });
+  test(`golden: CSV export (${label} names) is unchanged`, () => {
+    check(`export-${label}.csv`, buildCsvExport(fixture, shorten));
+  });
+  test(`golden: TXT export (${label} names) is unchanged`, () => {
+    check(`export-${label}.txt`, buildTxtExport(fixture, shorten));
+  });
+  test(`golden: HTML report (${label} names, light) is unchanged`, () => {
+    check(`report-${label}-light.html`, maskHtml(buildHtmlReport(fixture, 'light', shorten)));
+  });
+}
+test('golden: HTML report (short names, dark) is unchanged', () => {
+  check('report-short-dark.html', maskHtml(buildHtmlReport(fixture, 'dark', true)));
+});
+
+test('golden: an empty list gives the same (valid) output in every format', () => {
+  check('empty.json', buildJsonExport([], true));
+  check('empty.csv', buildCsvExport([], true));
+  check('empty.txt', buildTxtExport([], true));
+  check('empty.html', maskHtml(buildHtmlReport([], 'light', true)));
+});
+
+// Line endings are part of the format, not just of the golden files. The one
+// lone \n allowed in CSV and TXT is inside the add-on whose name contains a
+// newline (see the note on that fixture entry).
+test('golden: CSV and TXT exports separate lines with \\r\\n, JSON with \\n', () => {
+  const lone = (text) => (text.match(/(?<!\r)\n/g) || []).length;
+  assert.ok(buildCsvExport(fixture, true).includes('\r\n'));
+  assert.strictEqual(lone(buildCsvExport(fixture, true)), 1, 'CSV: only the newline inside the quoted name');
+  assert.ok(buildTxtExport(fixture, true).includes('\r\n'));
+  assert.strictEqual(lone(buildTxtExport(fixture, true)), 1, 'TXT: only the newline inside the name');
+  assert.ok(!buildJsonExport(fixture, true).includes('\r'), 'JSON has no \\r');
+});
+
+// A quick guard that the fixture really covers what the header comment claims,
+// so someone trimming it later does not silently weaken these tests.
+test('golden: the fixture still contains each awkward case', () => {
+  const names = fixture.map((a) => a.name).join('\n');
+  assert.ok(/"/.test(names) && /,/.test(names), 'quotes and commas');
+  assert.ok(/\n/.test(fixture.find((a) => a.id === 'newline@example.com').name), 'a newline');
+  assert.ok(fixture.some((a) => /^[=+]/.test(a.name)), 'a leading formula character');
+  assert.ok(fixture.some((a) => /[^\x00-\x7F]/.test(a.name)), 'non-ASCII text');
+  assert.ok(fixture.some((a) => a.name.length > 40 && sandbox.shortName(a.name) === a.name), 'a very long name that shortening leaves alone');
+  assert.ok(fixture.some((a) => /</.test(a.name)), 'markup');
+  assert.ok(fixture.some((a) => a.type === 'theme'), 'a theme');
+  assert.ok(fixture.some((a) => !a.enabled), 'a disabled add-on');
+});

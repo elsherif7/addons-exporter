@@ -30,6 +30,17 @@ if (!CONST_RE.test(src)) {
 
 const updated = src.replace(CONST_RE, `$1${dataUri}$2`);
 
+// --check: report whether the file is up to date, but never write it. Used by
+// `npm test` (pretest) so a test run cannot change the working tree.
+if (process.argv.includes('--check')) {
+  if (updated === src) {
+    console.log('embed-icon: report-template.js is up to date.');
+    process.exit(0);
+  }
+  console.error('embed-icon: report-template.js is out of date - run `npm run embed-icon` and try again.');
+  process.exit(1);
+}
+
 if (updated === src) {
   console.log('embed-icon: REPORT_ICON_DATA_URI is already up to date, nothing changed.');
 } else {

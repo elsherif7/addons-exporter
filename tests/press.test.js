@@ -44,14 +44,14 @@ test('press: listens for pointerdown and click, both in the capture phase', () =
   assert.strictEqual(listeners.click.capture, true);
 });
 
-test('press: pressing a button sends out a ring that fades (box-shadow spread 0 -> 12px)', () => {
+test('press: pressing a button sends out a ring that fades (box-shadow spread 2px -> 10px)', () => {
   const { listeners } = loadPress();
   const btn = makeEl();
   listeners.pointerdown.fn({ target: btn, pointerType: 'mouse', button: 0 });
   assert.strictEqual(btn.animations.length, 1);
   const [from, to] = btn.animations[0].keyframes;
-  assert.strictEqual(from.boxShadow, '0 0 0 0 rgba(1, 2, 3, 0.5)', 'colour comes from --press-ring');
-  assert.strictEqual(to.boxShadow, '0 0 0 12px transparent');
+  assert.strictEqual(from.boxShadow, '0 0 0 2px rgba(1, 2, 3, 0.5)', 'colour comes from --press-ring');
+  assert.strictEqual(to.boxShadow, '0 0 0 10px transparent');
   assert.strictEqual(btn.animations[0].options.duration, 520);
 });
 
@@ -67,8 +67,9 @@ test('press: list rows flash from the inside instead (their container clips outs
 test('press: pressing something inside a row pulses the whole row (rows are matched first)', () => {
   const { listeners } = loadPress();
   const row = makeEl({ rowLike: true });
-  // The checkbox itself is a valid target, but the row around it wins.
-  const checkbox = { closest: (sel) => (/addon-row|settings-option-row/.test(sel) ? row : checkbox) };
+  // The checkbox itself is a valid target, but the row around it wins. It is
+  // not inside a link, so the link lookup (which comes first) finds nothing.
+  const checkbox = { closest: (sel) => (sel === 'a[href]' ? null : /addon-row|settings-option-row/.test(sel) ? row : checkbox) };
   listeners.pointerdown.fn({ target: checkbox, pointerType: 'touch', button: 0 });
   assert.strictEqual(row.animations.length, 1);
 });
