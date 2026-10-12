@@ -682,7 +682,7 @@ test('parseCsvPayload: enabled is parsed case-insensitively (a spreadsheet often
 test('parseCsvPayload: strips the leading-apostrophe formula guard back off on import', () => {
   const csv = buildCsvExport([
     { id: 'x@e.com', name: '=HYPERLINK("https://evil.example","click")', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' },
-  ]);
+  ], false); // full names: this checks the guard round-trips, not shortening
   const result = parseCsvPayload(csv);
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons[0].name, '=HYPERLINK("https://evil.example","click")',
@@ -1182,4 +1182,219 @@ testAsync('remove file (x): with reduced motion, or when nothing can animate, th
   assert.strictEqual(reduced.log.length, 0);
   assert.strictEqual(reduced.elements.fileNameRow.style.display, 'none');
   assert.strictEqual(reduced.elements.addonList.querySelectorAll('.addon-row').length, 0);
+});
+
+// --- the readable JSON / CSV / TXT exports still import back unchanged ---
+
+const readableSample = [
+  { id: 'z@e.com', name: 'Zed Tool', version: '2.0', enabled: false, type: 'extension', link: 'https://example.com/z', linkType: 'amo-exact' },
+  { id: 'a@e.com', name: 'Ünïcode, "Quoted" Add-on', version: '1.10.3', enabled: true, type: 'extension', link: 'https://example.com/a', linkType: 'amo-search' },
+  { id: 'd@e.com', name: 'Dark Theme', version: '1.0', enabled: true, type: 'theme', link: 'https://example.com/d', linkType: 'homepage' },
+  { id: 'b@e.com', name: 'Beta', version: '3', enabled: false, type: 'theme', link: 'https://example.com/b', linkType: 'amo-exact' },
+];
+const readableNames = (r) => Array.from(r.addons.map((a) => a.name));
+
+test('readable exports: enabled add-ons come first, then disabled, each A-Z (JSON, CSV and TXT agree)', () => {
+  const expected = ['Dark Theme', 'Ünïcode, "Quoted" Add-on', 'Beta', 'Zed Tool'];
+  assert.deepStrictEqual(readableNames(sandbox.parseJsonPayload(sandbox.buildJsonExport(readableSample, false))), expected);
+  assert.deepStrictEqual(readableNames(sandbox.parseCsvPayload(sandbox.buildCsvExport(readableSample, false))), expected);
+  assert.deepStrictEqual(readableNames(sandbox.parseTxtPayload(sandbox.buildTxtExport(readableSample, false))), expected);
+});
+
+test('readable exports: every field survives the round trip in all three formats', () => {
+  const byId = (r) => Object.fromEntries(r.addons.map((a) => [a.id || a.name, a]));
+  for (const text of [sandbox.buildJsonExport(readableSample, false), sandbox.buildCsvExport(readableSample, false)]) {
+    const r = text.trimStart().startsWith('{') ? sandbox.parseJsonPayload(text) : sandbox.parseCsvPayload(text);
+    assert.strictEqual(r.ok, true);
+    const m = byId(r);
+    for (const a of readableSample) {
+      assert.strictEqual(m[a.id].name, a.name);
+      assert.strictEqual(m[a.id].version, a.version);
+      assert.strictEqual(m[a.id].enabled, a.enabled);
+      assert.strictEqual(m[a.id].type, a.type);
+      assert.strictEqual(m[a.id].link, a.link);
+    }
+  }
+  const t = sandbox.parseTxtPayload(sandbox.buildTxtExport(readableSample, false));
+  assert.strictEqual(t.ok, true);
+  for (const a of readableSample) {
+    const got = t.addons.find((x) => x.name === a.name);
+    assert.ok(got, a.name);
+    assert.strictEqual(got.version, a.version);
+    assert.strictEqual(got.enabled, a.enabled);
+    assert.strictEqual(got.type, a.type);
+    assert.strictEqual(got.link, a.link);
+  }
+});
+
+test('JSON export: each add-on lists name first and the id last', () => {
+  const parsed = JSON.parse(sandbox.buildJsonExport(readableSample, false));
+  assert.deepStrictEqual(Object.keys(parsed.addons[0]), ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id']);
+  assert.strictEqual(parsed.formatVersion, EXPORT_FORMAT_VERSION);
+});
+
+test('TXT export: a title, Enabled and Disabled sections, and lined-up columns', () => {
+  const txt = sandbox.buildTxtExport(readableSample, false);
+  const lines = txt.split('\r\n');
+  assert.match(lines[0], /^# addons-hub-format-version: \d+$/);
+  assert.strictEqual(lines[2], 'Firefox Add-ons - 4 in total (2 enabled, 2 disabled)');
+  assert.ok(lines.includes('Enabled (2)') && lines.includes('Disabled (2)'));
+  const rows = lines.filter((l) => l.includes(' | '));
+  assert.strictEqual(rows.length, 4);
+  // every column starts at the same place on every line
+  const firstBar = rows.map((l) => l.indexOf(' | '));
+  assert.strictEqual(new Set(firstBar).size, 1);
+  assert.ok(!/\r\n$/.test(txt), 'no blank line left at the end');
+});
+
+test('CSV export: begins with a byte-order mark, which the importer ignores', () => {
+  const csv = sandbox.buildCsvExport(readableSample, false);
+  assert.strictEqual(csv.charCodeAt(0), 0xFEFF);
+  assert.strictEqual(sandbox.parseCsvPayload(csv).ok, true);
+  assert.strictEqual(sandbox.parseTxtPayload('﻿' + sandbox.buildTxtExport(readableSample, false)).ok, true);
+});
+
+// --- shortened names, ids, and older exports without ids ---
+
+const longNameAddons = [
+  { id: 'buster@x', name: 'Buster: Captcha Solver for Humans', version: '3.4.0', enabled: true, type: 'extension', link: 'https://example.com/buster', linkType: 'amo-exact' },
+  { id: 'stayfree@x', name: 'StayFree - Website Blocker, Web Analytics', version: '2.0', enabled: false, type: 'extension', link: 'https://example.com/stayfree', linkType: 'amo-exact' },
+  { id: 'plain@x', name: 'Plain Name', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/plain', linkType: 'homepage' },
+];
+const namesOf = (r) => Array.from(r.addons.map((a) => a.name));
+
+test('shortened names: JSON, CSV and TXT all apply the Shorten setting, HTML-report style (on by default)', () => {
+  const expectShort = ['Buster', 'Plain Name', 'StayFree'];
+  assert.deepStrictEqual(namesOf(sandbox.parseJsonPayload(sandbox.buildJsonExport(longNameAddons))).sort(), expectShort);
+  assert.deepStrictEqual(namesOf(sandbox.parseCsvPayload(sandbox.buildCsvExport(longNameAddons))).sort(), expectShort);
+  assert.deepStrictEqual(namesOf(sandbox.parseTxtPayload(sandbox.buildTxtExport(longNameAddons))).sort(), expectShort);
+});
+
+test('shortened names: turning the setting off keeps the full names in all three', () => {
+  const full = longNameAddons.map((a) => a.name).sort();
+  assert.deepStrictEqual(namesOf(sandbox.parseJsonPayload(sandbox.buildJsonExport(longNameAddons, false))).sort(), full);
+  assert.deepStrictEqual(namesOf(sandbox.parseCsvPayload(sandbox.buildCsvExport(longNameAddons, false))).sort(), full);
+  assert.deepStrictEqual(namesOf(sandbox.parseTxtPayload(sandbox.buildTxtExport(longNameAddons, false))).sort(), full);
+});
+
+test('ids: every format carries each add-on\'s id, shortened names or not', () => {
+  for (const shorten of [true, false]) {
+    const j = sandbox.parseJsonPayload(sandbox.buildJsonExport(longNameAddons, shorten));
+    const c = sandbox.parseCsvPayload(sandbox.buildCsvExport(longNameAddons, shorten));
+    const t = sandbox.parseTxtPayload(sandbox.buildTxtExport(longNameAddons, shorten));
+    for (const r of [j, c, t]) {
+      assert.deepStrictEqual(Array.from(r.addons.map((a) => a.id)).sort(), ['buster@x', 'plain@x', 'stayfree@x']);
+    }
+  }
+});
+
+test('TXT export: the id is the sixth column, after the link (the first five are unchanged)', () => {
+  const rows = sandbox.buildTxtExport(longNameAddons).split('\r\n').filter((l) => l.includes(' | '));
+  assert.strictEqual(rows.length, 3);
+  for (const row of rows) {
+    const parts = row.split(' | ').map((p) => p.trim());
+    assert.strictEqual(parts.length, 6);
+    assert.match(parts[4], /^https:\/\/example\.com\//);
+    assert.match(parts[5], /@x$/);
+  }
+});
+
+test('older TXT export (five columns, no id) still imports, with no id', () => {
+  const old = [
+    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
+    '',
+    'uBlock Origin | 1.60.0 | Extension | Enabled | https://example.com/ub',
+    'Old Theme | 1.0 | Theme | Disabled | https://example.com/ot',
+  ].join('\r\n');
+  const r = sandbox.parseTxtPayload(old);
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.addons.length, 2);
+  assert.strictEqual(r.addons[0].name, 'uBlock Origin');
+  assert.strictEqual(r.addons[0].id, undefined);
+  assert.strictEqual(r.addons[1].type, 'theme');
+});
+
+test('older JSON export (no ids, full names) still imports', () => {
+  const r = sandbox.parseJsonPayload(JSON.stringify({ formatVersion: EXPORT_FORMAT_VERSION, addons: [
+    { name: 'Buster: Captcha Solver for Humans', version: '3.4.0', enabled: true, type: 'extension', link: 'https://example.com/b' },
+  ] }));
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.addons[0].name, 'Buster: Captcha Solver for Humans');
+  assert.strictEqual(r.addons[0].id, undefined);
+});
+
+test('older CSV export (the old column order, id first) still imports', () => {
+  const csv = [
+    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
+    'id,name,version,enabled,type,link,linkType',
+    'buster@x,Buster,3.4.0,true,extension,https://example.com/b,amo-exact',
+  ].join('\r\n');
+  const r = sandbox.parseCsvPayload(csv);
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.addons[0].id, 'buster@x');
+  assert.strictEqual(r.addons[0].name, 'Buster');
+});
+
+const installedFull = [
+  { id: 'buster@x', name: 'Buster: Captcha Solver for Humans' },
+  { id: 'stayfree@x', name: 'StayFree - Website Blocker, Web Analytics' },
+  { id: 'plain@x', name: 'Plain Name' },
+];
+
+test('matching: the id wins, even when the file\'s name is shortened', () => {
+  const index = sandbox.buildInstalledIndex(installedFull);
+  const m = sandbox.findInstalledMatch({ id: 'buster@x', name: 'Buster' }, index);
+  assert.strictEqual(m.id, 'buster@x');
+});
+
+test('matching: with an id that is not installed, it falls back to the name', () => {
+  const index = sandbox.buildInstalledIndex(installedFull);
+  assert.strictEqual(sandbox.findInstalledMatch({ id: 'other-id', name: 'Plain Name' }, index).id, 'plain@x');
+  assert.strictEqual(sandbox.findInstalledMatch({ id: 'other-id', name: 'Buster' }, index).id, 'buster@x');
+});
+
+test('matching: no id - an exact full name, a shortened name, or a differently-shortened name all find the add-on', () => {
+  const index = sandbox.buildInstalledIndex(installedFull);
+  assert.strictEqual(sandbox.findInstalledMatch({ name: 'Buster: Captcha Solver for Humans' }, index).id, 'buster@x');
+  assert.strictEqual(sandbox.findInstalledMatch({ name: 'buster' }, index).id, 'buster@x');
+  assert.strictEqual(sandbox.findInstalledMatch({ name: 'StayFree' }, index).id, 'stayfree@x');
+  assert.strictEqual(sandbox.findInstalledMatch({ name: 'StayFree - something else' }, index).id, 'stayfree@x');
+  assert.strictEqual(sandbox.findInstalledMatch({ name: 'Plain Name' }, index).id, 'plain@x');
+});
+
+test('matching: a short name shared by two installed add-ons is ambiguous, so it matches neither', () => {
+  const index = sandbox.buildInstalledIndex([
+    { id: 'a@x', name: 'Dark: Reader' },
+    { id: 'b@x', name: 'Dark - Mode' },
+  ]);
+  assert.strictEqual(sandbox.findInstalledMatch({ name: 'Dark' }, index), null);
+  assert.strictEqual(sandbox.findInstalledMatch({ id: 'b@x', name: 'Dark' }, index).id, 'b@x', 'the id still decides');
+});
+
+test('matching: an unknown add-on matches nothing', () => {
+  const index = sandbox.buildInstalledIndex(installedFull);
+  assert.strictEqual(sandbox.findInstalledMatch({ name: 'Something Else' }, index), null);
+});
+
+test('end to end: shortened exports in all three formats still match every installed add-on', () => {
+  const index = sandbox.buildInstalledIndex(installedFull);
+  const files = [
+    sandbox.parseJsonPayload(sandbox.buildJsonExport(longNameAddons)),
+    sandbox.parseCsvPayload(sandbox.buildCsvExport(longNameAddons)),
+    sandbox.parseTxtPayload(sandbox.buildTxtExport(longNameAddons)),
+  ];
+  for (const r of files) {
+    assert.strictEqual(r.ok, true);
+    for (const item of r.addons) {
+      const m = sandbox.findInstalledMatch(item, index);
+      assert.ok(m && m.id === item.id, `${item.name} should match ${item.id}`);
+    }
+  }
+});
+
+test('end to end: an older shortened-name TXT with no ids still matches by name', () => {
+  const index = sandbox.buildInstalledIndex(installedFull);
+  const old = [`# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`, '', 'Buster | 3.4.0 | Extension | Enabled | https://example.com/b'].join('\r\n');
+  const r = sandbox.parseTxtPayload(old);
+  assert.strictEqual(sandbox.findInstalledMatch(r.addons[0], index).id, 'buster@x');
 });

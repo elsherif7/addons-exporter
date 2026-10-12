@@ -300,9 +300,9 @@ async function doExport(ids, {
   const timestamp = formatFilenameTimestamp(new Date());
   const files = exportFormats.map((fmt) => {
     let content;
-    if (fmt === 'json') content = buildJsonExport(list);
-    else if (fmt === 'csv') content = buildCsvExport(list);
-    else if (fmt === 'txt') content = buildTxtExport(list);
+    if (fmt === 'json') content = buildJsonExport(list, shorten);
+    else if (fmt === 'csv') content = buildCsvExport(list, shorten);
+    else if (fmt === 'txt') content = buildTxtExport(list, shorten);
     else content = buildHtmlReport(list, theme, shorten);
     return { html: content, filename: `Firefox Add-ons (${timestamp}).${fmt}`, format: fmt };
   });

@@ -20,20 +20,35 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function buildInstalledIndex(installed) {
   const byId = new Map();
   const byName = new Map();
+  // Short form of each installed name (see shortName() in common.js): an
+  // export made with "Shorten add-on names" on has short names, so a file
+  // without ids can only be matched against installed add-ons by that. A
+  // short name shared by two installed add-ons is ambiguous and is
+  // stored as null, so it never guesses between them.
+  const byShortName = new Map();
   for (const a of installed) {
     byId.set(a.id, a);
     byName.set(a.name.toLowerCase(), a);
+    const short = shortName(a.name).toLowerCase();
+    byShortName.set(short, byShortName.has(short) ? null : a);
   }
-  return { byId, byName };
+  return { byId, byName, byShortName };
 }
 
-// Prefers id, falls back to a case-insensitive name match for older
-// export files that predate the id field.
+// Matches a file's add-on to an installed one: the id first (the reliable
+// way, and what makes shortened names safe), then - for an add-on with no
+// id, such as an older export or a TXT file from before ids were included,
+// or one whose id isn't installed - the name: the exact name
+// (case-insensitive), then the shortened form, so a short name in the file
+// still finds the full installed name and the other way round.
 function findInstalledMatch(item, index) {
   if (item.id && index.byId.has(item.id)) {
     return index.byId.get(item.id);
   }
-  return index.byName.get(item.name.toLowerCase()) || null;
+  const name = item.name.toLowerCase();
+  if (index.byName.has(name)) return index.byName.get(name);
+  const short = shortName(item.name).toLowerCase();
+  return index.byShortName.get(short) || null;
 }
 
 // Validates and normalizes the embedded addons payload from an exported
@@ -149,7 +164,8 @@ function stripCsvFormulaGuard(s) {
 //   line 3+: one data row per add-on
 // Returns { ok, addons } or { ok: false, error }.
 function parseCsvPayload(text) {
-  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  // A leading byte-order mark (the export adds one so Excel reads UTF-8) is not part of the text.
+  const normalized = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
   // Line 1 (the format-version comment) is pulled out as plain text,
   // ahead of any CSV-field parsing - a spreadsheet that pads it with
@@ -288,7 +304,7 @@ function parseCsvRow(line) {
 //   line 3+: Name | Version | Type | Enabled | Link
 // Returns { ok, addons } or { ok: false, error }.
 function parseTxtPayload(text) {
-  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const lines = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
   // Line 1: format-version comment
   const versionMatch = lines[0] && lines[0].match(/^#\s*addons-hub-format-version:\s*(\d+)/);
@@ -310,7 +326,8 @@ function parseTxtPayload(text) {
   const addons = [];
   for (const line of dataLines) {
     const parts = line.split(' | ');
-    // Minimum: name and link (index 0 and 4). Other fields optional for resilience.
+    // Minimum: name and link (index 0 and 4). Other fields (including the
+    // id in column 6) are optional for resilience.
     if (parts.length < 2) continue;
     const name = parts[0] ? parts[0].trim() : '';
     if (!name) continue;
@@ -320,6 +337,9 @@ function parseTxtPayload(text) {
       type:    parts[2] ? (parts[2].trim().toLowerCase() === 'theme' ? 'theme' : 'extension') : undefined,
       enabled: parts[3] ? parts[3].trim().toLowerCase() === 'enabled' : undefined,
       link:    parts[4] ? parts[4].trim() : undefined,
+      // Newer files end each line with the add-on's id; older ones have only
+      // the five columns above.
+      id:      parts[5] && parts[5].trim() ? parts[5].trim() : undefined,
     });
   }
 

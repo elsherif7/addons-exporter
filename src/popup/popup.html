@@ -17,6 +17,7 @@
       --btn-bg: #1f2937;
       --btn-bg-hover: #111827;
       --border: #747b87;
+      --border-hover: #1f2937;
       --hover-bg: #fafbfc;
       /* Click/tap feedback ring (press.js). */
       --press-ring: rgba(0, 96, 223, 0.4);
@@ -36,6 +37,7 @@
       --btn-bg: #374151;
       --btn-bg-hover: #4b5563;
       --border: #70767f;
+      --border-hover: #d1d5db;
       --hover-bg: #262a33;
       --press-ring: rgba(110, 168, 254, 0.5);
     }
@@ -72,7 +74,7 @@
       transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.35s var(--spring);
     }
     .hub-btn:last-of-type { margin-bottom: 0; }
-    .hub-btn:hover { background: var(--hover-bg); border-color: var(--btn-bg-hover); transform: scale(1.02); }
+    .hub-btn:hover { background: var(--hover-bg); border-color: var(--border-hover); transform: scale(1.02); }
     .hub-btn:active { transform: scale(0.95); transition-duration: 0.08s; }
 
     /* Opening reveal, one step after another (same idea as the Settings

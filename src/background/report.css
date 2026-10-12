@@ -12,6 +12,7 @@
     --text-muted: #666;
     --text-faint: #707070;
     --border: #747b87;
+    --border-hover: #1f2937;
     --border-soft: #e2e4e8;
     /* Lines between rows: between --border-soft and --border. */
     --divider: #c3c7ce;
@@ -45,6 +46,7 @@
     --text-muted: #9199a3;
     --text-faint: #8890a0;
     --border: #70767f;
+    --border-hover: #d1d5db;
     --border-soft: #2f333c;
     --divider: #40454f;
     --border-faint: #262932;
@@ -102,7 +104,7 @@
     width: 32px;
     height: 32px;
     border-radius: 8px;
-    border: 1px solid var(--border-soft);
+    border: 1px solid var(--border);
     background: var(--card-bg);
     color: var(--text);
     font-size: 15px;
@@ -113,7 +115,7 @@
     justify-content: center;
     transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
-  .theme-toggle:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.02); }
+  .theme-toggle:hover { background: var(--hover-bg); border-color: var(--border-hover); transform: scale(1.02); }
   .theme-toggle:active { transform: scale(0.9); }
   .search-input {
     display: block;
@@ -129,8 +131,8 @@
     color: var(--text);
     transition: border-color 0.12s, transform 0.1s;
   }
-  .search-input:focus { outline: none; border-color: var(--btn-bg); transform: scale(1.01); }
-  .search-input:hover { border-color: var(--btn-bg); transform: scale(1.01); }
+  .search-input:focus { outline: none; border-color: var(--border-hover); transform: scale(1.01); }
+  .search-input:hover { border-color: var(--border-hover); transform: scale(1.01); }
   .placeholder-text { padding: 20px; color: var(--text-muted); font-size: 14px; margin: 0; }
   #noSearchMatches { border: 1px solid var(--border); border-radius: 10px; text-align: center; animation: hub-fade-in var(--motion-normal) ease backwards; }
   .checklist-box {

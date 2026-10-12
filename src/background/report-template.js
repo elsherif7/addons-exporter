@@ -22,15 +22,45 @@ const REPORT_ICON_DATA_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAA
 // Builds a plain JSON export. Same payload shape as the embedded
 // #addons-exporter-data in the HTML report, just saved as a standalone
 // .json file. Importable by the importer the same way HTML is.
-function buildJsonExport(list) {
-  return JSON.stringify({ formatVersion: EXPORT_FORMAT_VERSION, addons: list }, null, 2);
+// The plain-data exports (JSON, CSV, TXT) list enabled add-ons first and
+// disabled ones after, each group A-Z, the same way the HTML report groups
+// them - easier to read than one long mixed list.
+function orderForReading(list) {
+  const enabled = list.filter((a) => a.enabled).sort(byName);
+  const disabled = list.filter((a) => !a.enabled).sort(byName);
+  return [...enabled, ...disabled];
+}
+
+// Each add-on's fields in reading order (name first, the technical id last).
+// The importer finds fields by name, so the order is only for people.
+function jsonAddon(a, shorten = true) {
+  return {
+    name: shorten ? shortName(a.name) : a.name,
+    version: a.version,
+    type: a.type,
+    enabled: a.enabled,
+    link: a.link,
+    linkType: a.linkType,
+    id: a.id,
+  };
+}
+
+// shorten (the Settings "Shorten add-on names" choice, on by default) cuts
+// each name at its first separator, exactly as the HTML report does. The
+// id is always included, and the Importer matches by id first, so a short
+// name never stops an add-on from being recognised.
+function buildJsonExport(list, shorten = true) {
+  return JSON.stringify({
+    formatVersion: EXPORT_FORMAT_VERSION,
+    addons: orderForReading(list).map((a) => jsonAddon(a, shorten)),
+  }, null, 2);
 }
 
 // Builds a CSV export. First line is a format-version comment so the
 // importer can validate it without guessing. Second line is the header
 // row. One data row per add-on. Fields with commas or quotes are
 // quoted and internal quotes are doubled per RFC 4180.
-function buildCsvExport(list) {
+function buildCsvExport(list, shorten = true) {
   const csvField = (val) => {
     let s = String(val == null ? '' : val);
     // A cell starting with =, +, -, @, tab, or CR is read as a formula by
@@ -47,27 +77,70 @@ function buildCsvExport(list) {
   };
   const row = (fields) => fields.map(csvField).join(',');
 
+  // Columns in reading order (name first, the technical id last); the
+  // importer finds them by the header names, so the order is only for
+  // people. A byte-order mark at the very start makes Excel read the file
+  // as UTF-8, so non-English add-on names show correctly; the importer
+  // ignores it.
   const lines = [
     `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
-    row(['id', 'name', 'version', 'enabled', 'type', 'link', 'linkType']),
-    ...list.map((a) => row([a.id, a.name, a.version, a.enabled, a.type, a.link, a.linkType])),
+    row(['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id']),
+    ...orderForReading(list).map((a) => row([shorten ? shortName(a.name) : a.name, a.version, a.type, a.enabled, a.link, a.linkType, a.id])),
   ];
-  return lines.join('\r\n');
+  return '\uFEFF' + lines.join('\r\n');
 }
 
-// Builds a plain-text export. One add-on per line:
-//   Name | Version | Type | Enabled | Link
+// Builds a plain-text export, laid out to be read: a title, then an
+// "Enabled" and a "Disabled" section (each A-Z) with the columns lined up.
+// One add-on per line:
+//   Name | Version | Type | Status | Link | Id
+// The id is last, so an older reader that only knows the first five columns
+// still works; the Importer uses it to match add-ons even though the name
+// may be shortened (shorten, the Settings choice, on by default).
 // First line is a format-version comment so the format is identifiable.
-function buildTxtExport(list) {
+// The importer ignores every line without " | " in it (the title, the
+// section headings and the underlines), so none of those may contain it.
+function buildTxtExport(list, shorten = true) {
+  const enabled = list.filter((a) => a.enabled).sort(byName);
+  const disabled = list.filter((a) => !a.enabled).sort(byName);
+  const all = [...enabled, ...disabled];
+  const nameOf = (a) => String(shorten ? shortName(a.name) : a.name);
+
+  // Column widths, so every line lines up. A very long name is allowed to
+  // push its own line out rather than widening every other line.
+  const NAME_MAX = 40;
+  const nameWidth = Math.min(NAME_MAX, Math.max(0, ...all.map((a) => nameOf(a).length)));
+  const versionWidth = Math.max(0, ...all.map((a) => String(a.version).length));
+  const linkWidth = Math.max(0, ...all.map((a) => String(a.link).length));
+  const line = (a) => {
+    const type = a.type === 'theme' ? 'Theme' : 'Extension';
+    const status = a.enabled ? 'Enabled' : 'Disabled';
+    return [
+      nameOf(a).padEnd(nameWidth),
+      String(a.version).padEnd(versionWidth),
+      type.padEnd('Extension'.length),
+      status.padEnd('Disabled'.length),
+      String(a.link).padEnd(linkWidth),
+      a.id,
+    ].join(' | ');
+  };
+  const section = (title, items) => {
+    if (items.length === 0) return [];
+    const heading = `${title} (${items.length})`;
+    return [heading, '-'.repeat(heading.length), ...items.map(line), ''];
+  };
+
+  const total = all.length;
   const lines = [
     `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
     '',
-    ...list.map((a) => {
-      const type = a.type === 'theme' ? 'Theme' : 'Extension';
-      const enabled = a.enabled ? 'Enabled' : 'Disabled';
-      return `${a.name} | ${a.version} | ${type} | ${enabled} | ${a.link}`;
-    }),
+    `Firefox Add-ons - ${total} in total (${enabled.length} enabled, ${disabled.length} disabled)`,
+    '',
+    ...section('Enabled', enabled),
+    ...section('Disabled', disabled),
   ];
+  // No blank line left dangling at the end.
+  while (lines.length && lines[lines.length - 1] === '') lines.pop();
   return lines.join('\r\n');
 }
 // theme is 'light' or 'dark' - the report's starting appearance,
@@ -120,6 +193,7 @@ function buildHtmlReport(list, theme, shorten = true) {
     --text-muted: #666;
     --text-faint: #707070;
     --border: #747b87;
+    --border-hover: #1f2937;
     --border-soft: #e2e4e8;
     /* Lines between rows: between --border-soft and --border. */
     --divider: #c3c7ce;
@@ -153,6 +227,7 @@ function buildHtmlReport(list, theme, shorten = true) {
     --text-muted: #9199a3;
     --text-faint: #8890a0;
     --border: #70767f;
+    --border-hover: #d1d5db;
     --border-soft: #2f333c;
     --divider: #40454f;
     --border-faint: #262932;
@@ -210,7 +285,7 @@ function buildHtmlReport(list, theme, shorten = true) {
     width: 32px;
     height: 32px;
     border-radius: 8px;
-    border: 1px solid var(--border-soft);
+    border: 1px solid var(--border);
     background: var(--card-bg);
     color: var(--text);
     font-size: 15px;
@@ -221,7 +296,7 @@ function buildHtmlReport(list, theme, shorten = true) {
     justify-content: center;
     transition: background 0.12s, border-color 0.12s, transform 0.1s;
   }
-  .theme-toggle:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.02); }
+  .theme-toggle:hover { background: var(--hover-bg); border-color: var(--border-hover); transform: scale(1.02); }
   .theme-toggle:active { transform: scale(0.9); }
   .search-input {
     display: block;
@@ -237,8 +312,8 @@ function buildHtmlReport(list, theme, shorten = true) {
     color: var(--text);
     transition: border-color 0.12s, transform 0.1s;
   }
-  .search-input:focus { outline: none; border-color: var(--btn-bg); transform: scale(1.01); }
-  .search-input:hover { border-color: var(--btn-bg); transform: scale(1.01); }
+  .search-input:focus { outline: none; border-color: var(--border-hover); transform: scale(1.01); }
+  .search-input:hover { border-color: var(--border-hover); transform: scale(1.01); }
   .placeholder-text { padding: 20px; color: var(--text-muted); font-size: 14px; margin: 0; }
   #noSearchMatches { border: 1px solid var(--border); border-radius: 10px; text-align: center; animation: hub-fade-in var(--motion-normal) ease backwards; }
   .checklist-box {

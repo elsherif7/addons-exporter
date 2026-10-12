@@ -48,9 +48,9 @@
      and use slightly less padding since two-line content already makes
      them taller than single-line radio rows. */
   div.settings-option-row { align-items: center; justify-content: space-between; padding: 8px 12px; margin-bottom: 0; }
-  .settings-option-row:hover { background: var(--hover-bg); border-color: var(--btn-bg); transform: scale(1.01); }
+  .settings-option-row:hover { background: var(--hover-bg); border-color: var(--border-hover); transform: scale(1.01); }
   label.settings-option-row:active { transform: scale(0.985); }
-  :root[data-theme="dark"] .settings-option-row:hover { background: #2e3340; border-color: #d1d5db; }
+  :root[data-theme="dark"] .settings-option-row:hover { background: #2e3340; }
   .settings-action-group {
     display: flex;
     flex-direction: column;
@@ -63,11 +63,14 @@
     text-align: center;
   }
   /* Hover: a soft grey fill, like the pink one on Reset but neutral. */
-  .settings-btn:hover { background: #e9ebee; border-color: var(--btn-bg-hover); transform: scale(1.01); }
-  :root[data-theme="dark"] .settings-btn:hover { background: #3a3f4b; border-color: #d1d5db; }
+  .settings-btn:hover { background: #e9ebee; border-color: var(--border-hover); transform: scale(1.01); }
+  :root[data-theme="dark"] .settings-btn:hover { background: #3a3f4b; }
   .settings-btn:active { transform: scale(0.95); transition-duration: 0.08s; }
-  .settings-btn-danger { border-color: var(--danger-color); color: var(--danger-color); }
-  .settings-btn-danger:hover { background: #fef2f2; border-color: var(--danger-color); }
+  /* The red Reset buttons get a deeper red outline than their text. */
+  :root { --danger-border: #9b1c1c; }
+  :root[data-theme="dark"] { --danger-border: #e0463a; }
+  .settings-btn-danger { border-color: var(--danger-border); color: var(--danger-color); }
+  .settings-btn-danger:hover { background: #fef2f2; border-color: var(--danger-border); }
   :root[data-theme="dark"] .settings-btn-danger:hover { background: #3d1515; }
   #resetSettingsBtn { --press-ring: rgba(192, 57, 43, 0.5); }
   :root[data-theme="dark"] #resetSettingsBtn { --press-ring: rgba(239, 106, 94, 0.5); }
@@ -81,9 +84,9 @@
   .s-modal-btn:hover { background: #e9ebee; transform: scale(1.04); }
   :root[data-theme="dark"] .s-modal-btn:hover { background: #3a3f4b; }
   .s-modal-btn:active { transform: scale(0.95); transition-duration: 0.08s; }
-  .s-modal-btn-danger { color: var(--danger-color); border-color: var(--danger-color); --press-ring: rgba(192, 57, 43, 0.5); }
+  .s-modal-btn-danger { color: var(--danger-color); border-color: var(--danger-border); --press-ring: rgba(192, 57, 43, 0.5); }
   :root[data-theme="dark"] .s-modal-btn-danger { --press-ring: rgba(239, 106, 94, 0.5); }
-  .s-modal-btn-danger:hover { background: #fef2f2; border-color: var(--danger-color); }
+  .s-modal-btn-danger:hover { background: #fef2f2; border-color: var(--danger-border); }
   :root[data-theme="dark"] .s-modal-btn-danger:hover { background: #3d1515; }
   #settingsStatus {
     display: block;

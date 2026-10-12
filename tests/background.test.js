@@ -397,8 +397,8 @@ testAsync('doExport: produces a .json file when exportFormat is "json"', async (
 testAsync('doExport: produces a .csv file when exportFormat is "csv"', async () => {
   const { content, filename } = await runDoExportForFormat(async () => ({ exportFormat: 'csv' }));
   assert.match(filename, /\.csv$/);
-  assert.match(content, /^# addons-hub-format-version:/);
-  assert.match(content, /id,name,version,enabled,type,link,linkType/);
+  assert.match(content, /^\uFEFF# addons-hub-format-version:/);
+  assert.match(content, /name,version,type,enabled,link,linkType,id/);
   assert.match(content, new RegExp(baseAddon.name));
 });
 
@@ -666,3 +666,39 @@ testAsync('export message: several formats are downloaded as one .zip with a sin
   assert.strictEqual(result.zipped, true);
   assert.deepStrictEqual(Array.from(result.formats), ['html', 'json']);
 });
+
+// --- the Shorten add-on names setting reaches every export format ---
+
+const longNameAddon = { id: 'buster@x', name: 'Buster: Captcha Solver for Humans', version: '3.4.0', enabled: true, type: 'extension' };
+
+async function exportContent(storage, addon = longNameAddon) {
+  const bgSandbox = {
+    URL, AbortController, setTimeout, clearTimeout,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    fetch: async () => ({ ok: true, status: 200, json: async () => ({ results: [] }) }),
+    browser: {
+      runtime: { onMessage: { addListener() {} }, sendMessage: async () => {} },
+      management: { getAll: async () => [addon] },
+      storage: { local: { get: async () => storage } },
+    },
+  };
+  vm.createContext(bgSandbox);
+  vm.runInContext(commonSrc, bgSandbox);
+  vm.runInContext(reportTemplateSrc, bgSandbox);
+  vm.runInContext(backgroundSrc, bgSandbox);
+  return (await bgSandbox.doExport([addon.id])).html;
+}
+
+for (const fmt of ['json', 'csv', 'txt']) {
+  testAsync(`doExport (${fmt}): shortens names by default and keeps the id`, async () => {
+    const content = await exportContent({ exportFormat: fmt });
+    assert.ok(content.includes('Buster'));
+    assert.ok(!content.includes('Captcha Solver'), 'the long name is cut');
+    assert.ok(content.includes('buster@x'), 'the id is there');
+  });
+  testAsync(`doExport (${fmt}): keeps the full name when Shorten add-on names is off`, async () => {
+    const content = await exportContent({ exportFormat: fmt, shortenNames: 'off' });
+    assert.ok(content.includes('Buster: Captcha Solver for Humans'));
+    assert.ok(content.includes('buster@x'));
+  });
+}
