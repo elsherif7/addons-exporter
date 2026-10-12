@@ -43,10 +43,7 @@ const fixture = [
   { id: 'plus@example.com', name: '+Plus Notes', version: '3', enabled: false, type: 'extension', link: AMO + 'plus-notes/', linkType: 'amo-exact' },
   { id: 'jp@example.com', name: '広告ブロッカー - 日本語版', version: '2.5', enabled: true, type: 'extension', link: AMO + 'jp-blocker/', linkType: 'amo-exact' },
   { id: 'cafe@example.com', name: 'Café Tab Manager: Pro', version: '5.1.2', enabled: true, type: 'extension', link: AMO + 'cafe-tab-manager/', linkType: 'amo-exact' },
-  // KNOWN LIMITATION (not fixed in Phase 0): a name containing a line break
-  // splits its TXT line in two, so the Importer cannot read that add-on back
-  // from a TXT file. CSV quotes it correctly. The golden TXT files record the
-  // current behaviour; update them if this is ever fixed.
+  // A name with a line break: CSV quotes it, TXT writes it as \n.
   { id: 'newline@example.com', name: 'Line\nBreak Tool', version: '1.1', enabled: false, type: 'extension', link: 'https://example.com/line-break', linkType: 'homepage' },
   { id: 'markup@example.com', name: '<script>alert(1)</script> & "friends"', version: '9.9', enabled: true, type: 'extension', link: 'https://example.com/?q=search&lang=en', linkType: 'amo-search-fallback' },
   { id: 'long@example.com', name: 'An Extremely Long Add-on Name That Goes Well Past Forty Characters Without Any Separator', version: '10.20.30', enabled: true, type: 'extension', link: AMO + 'long-name/', linkType: 'amo-exact' },
@@ -107,14 +104,14 @@ test('golden: an empty list gives the same (valid) output in every format', () =
 });
 
 // Line endings are part of the format, not just of the golden files. The one
-// lone \n allowed in CSV and TXT is inside the add-on whose name contains a
-// newline (see the note on that fixture entry).
+// lone \n allowed in CSV is inside the quoted name that contains a newline; a
+// TXT file never has one (its lines are one add-on each).
 test('golden: CSV and TXT exports separate lines with \\r\\n, JSON with \\n', () => {
   const lone = (text) => (text.match(/(?<!\r)\n/g) || []).length;
   assert.ok(buildCsvExport(fixture, true).includes('\r\n'));
   assert.strictEqual(lone(buildCsvExport(fixture, true)), 1, 'CSV: only the newline inside the quoted name');
   assert.ok(buildTxtExport(fixture, true).includes('\r\n'));
-  assert.strictEqual(lone(buildTxtExport(fixture, true)), 1, 'TXT: only the newline inside the name');
+  assert.strictEqual(lone(buildTxtExport(fixture, true)), 0, 'TXT: no stray line breaks');
   assert.ok(!buildJsonExport(fixture, true).includes('\r'), 'JSON has no \\r');
 });
 
@@ -130,4 +127,15 @@ test('golden: the fixture still contains each awkward case', () => {
   assert.ok(fixture.some((a) => /</.test(a.name)), 'markup');
   assert.ok(fixture.some((a) => a.type === 'theme'), 'a theme');
   assert.ok(fixture.some((a) => !a.enabled), 'a disabled add-on');
+});
+
+// TXT escaping, for names that would otherwise break a line or a column.
+test('golden: TXT escaping is unchanged', () => {
+  const escapes = [
+    { id: 'a@example.com', name: 'Pipe | Name', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/a', linkType: 'homepage' },
+    { id: 'b@example.com', name: 'Line\nBreak\r\nName', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/b', linkType: 'homepage' },
+    { id: 'c@example.com', name: 'C:\\Tools\\ \\| end\\', version: '1.0', enabled: false, type: 'theme', link: 'https://example.com/c d', linkType: 'homepage' },
+    { id: 'd@example.com', name: '  Padded  ', version: '1.0', enabled: false, type: 'extension', link: 'https://example.com/d', linkType: 'homepage' },
+  ];
+  check('escapes.txt', buildTxtExport(escapes, false));
 });

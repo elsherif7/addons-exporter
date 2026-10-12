@@ -94,11 +94,19 @@ function makeSettingsFile(settings, formatVersion = SETTINGS_FILE_FORMAT_VERSION
   return JSON.stringify({ formatVersion, settings });
 }
 
-test('parseSettingsFile: valid file succeeds and returns recognised settings', () => {
-  const result = parseSettingsFile(makeSettingsFile({ [THEME_STORAGE_KEY]: 'dark', [EXPORT_FORMAT_STORAGE_KEY]: 'csv' }));
+const ALL_SETTINGS = { [THEME_STORAGE_KEY]: 'dark', [EXPORT_FORMAT_STORAGE_KEY]: 'csv', [SHORT_NAME_STORAGE_KEY]: 'off' };
+const settingsRejects = (text, pattern) => {
+  const result = parseSettingsFile(text);
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, pattern);
+};
+
+test('parseSettingsFile: a file the exporter wrote succeeds and returns all three settings', () => {
+  const result = parseSettingsFile(makeSettingsFile(ALL_SETTINGS));
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.settings[THEME_STORAGE_KEY], 'dark');
   assert.strictEqual(result.settings[EXPORT_FORMAT_STORAGE_KEY], 'csv');
+  assert.strictEqual(result.settings[SHORT_NAME_STORAGE_KEY], 'off');
 });
 
 test('parseSettingsFile: throws on malformed JSON', () => {
@@ -106,80 +114,69 @@ test('parseSettingsFile: throws on malformed JSON', () => {
 });
 
 test('parseSettingsFile: missing formatVersion is rejected', () => {
-  const result = parseSettingsFile(JSON.stringify({ settings: { [THEME_STORAGE_KEY]: 'dark' } }));
-  assert.strictEqual(result.ok, false);
-  assert.match(result.error, /missing its format version/);
+  settingsRejects(JSON.stringify({ settings: ALL_SETTINGS }), /missing its format version/);
 });
 
 test('parseSettingsFile: non-numeric formatVersion is rejected', () => {
-  const result = parseSettingsFile(JSON.stringify({ formatVersion: '1', settings: { [THEME_STORAGE_KEY]: 'dark' } }));
-  assert.strictEqual(result.ok, false);
-  assert.match(result.error, /missing its format version/);
+  settingsRejects(JSON.stringify({ formatVersion: '1', settings: ALL_SETTINGS }), /missing its format version/);
 });
 
 test('parseSettingsFile: formatVersion newer than supported is rejected', () => {
-  const result = parseSettingsFile(makeSettingsFile({ [THEME_STORAGE_KEY]: 'dark' }, SETTINGS_FILE_FORMAT_VERSION + 1));
-  assert.strictEqual(result.ok, false);
-  assert.match(result.error, /newer version of Add-ons Hub/);
+  settingsRejects(makeSettingsFile(ALL_SETTINGS, SETTINGS_FILE_FORMAT_VERSION + 1), /newer version of Add-ons Hub/);
 });
 
 test('parseSettingsFile: missing settings object is rejected', () => {
-  const result = parseSettingsFile(JSON.stringify({ formatVersion: SETTINGS_FILE_FORMAT_VERSION }));
-  assert.strictEqual(result.ok, false);
-  assert.match(result.error, /valid settings/);
+  settingsRejects(JSON.stringify({ formatVersion: SETTINGS_FILE_FORMAT_VERSION }), /valid settings/);
 });
 
 test('parseSettingsFile: settings as an array is rejected', () => {
-  const result = parseSettingsFile(JSON.stringify({ formatVersion: SETTINGS_FILE_FORMAT_VERSION, settings: [] }));
-  assert.strictEqual(result.ok, false);
-  assert.match(result.error, /valid settings/);
+  settingsRejects(JSON.stringify({ formatVersion: SETTINGS_FILE_FORMAT_VERSION, settings: [] }), /valid settings/);
 });
 
-test('parseSettingsFile: unknown settings keys are silently dropped', () => {
-  const result = parseSettingsFile(makeSettingsFile({ [THEME_STORAGE_KEY]: 'light', futureKey: 'someValue' }));
-  assert.strictEqual(result.ok, true);
-  assert.ok(!('futureKey' in result.settings), 'unknown key should be dropped');
-  assert.strictEqual(result.settings[THEME_STORAGE_KEY], 'light');
+test('parseSettingsFile: an unknown setting rejects the file (nothing is silently dropped)', () => {
+  settingsRejects(makeSettingsFile({ ...ALL_SETTINGS, futureKey: 'someValue' }), /unknown setting "futureKey"/);
 });
 
-test('parseSettingsFile: invalid theme value is dropped', () => {
-  const result = parseSettingsFile(makeSettingsFile({ [THEME_STORAGE_KEY]: 'purple' }));
-  assert.strictEqual(result.ok, true);
-  assert.ok(!(THEME_STORAGE_KEY in result.settings), 'invalid theme should be dropped');
+test('parseSettingsFile: a missing setting rejects the file', () => {
+  for (const key of [THEME_STORAGE_KEY, EXPORT_FORMAT_STORAGE_KEY, SHORT_NAME_STORAGE_KEY]) {
+    const settings = { ...ALL_SETTINGS };
+    delete settings[key];
+    settingsRejects(makeSettingsFile(settings), new RegExp(`"${key}" is missing`));
+  }
 });
 
-test('parseSettingsFile: invalid exportFormat value is dropped', () => {
-  const result = parseSettingsFile(makeSettingsFile({ [EXPORT_FORMAT_STORAGE_KEY]: 'xml' }));
-  assert.strictEqual(result.ok, true);
-  assert.ok(!(EXPORT_FORMAT_STORAGE_KEY in result.settings), 'invalid exportFormat should be dropped');
+test('parseSettingsFile: a field next to formatVersion and settings rejects the file', () => {
+  settingsRejects(JSON.stringify({ formatVersion: SETTINGS_FILE_FORMAT_VERSION, settings: ALL_SETTINGS, note: 'x' }), /not exactly formatVersion, then settings/);
 });
 
-test('parseSettingsFile: file with only unknown/invalid keys succeeds but returns empty settings', () => {
-  const result = parseSettingsFile(makeSettingsFile({ futureKey: 'x', [THEME_STORAGE_KEY]: 'nonsense' }));
-  assert.strictEqual(result.ok, true);
-  assert.strictEqual(Object.keys(result.settings).length, 0, 'settings object should be empty');
+test('parseSettingsFile: the settings must come in the order the export writes them (theme, exportFormat, shortenNames)', () => {
+  settingsRejects(makeSettingsFile({ [SHORT_NAME_STORAGE_KEY]: 'off', [THEME_STORAGE_KEY]: 'dark', [EXPORT_FORMAT_STORAGE_KEY]: 'csv' }), /in the order theme, exportFormat, shortenNames/);
+  settingsRejects(JSON.stringify({ settings: ALL_SETTINGS, formatVersion: SETTINGS_FILE_FORMAT_VERSION }), /not exactly formatVersion, then settings/);
+});
+
+test('parseSettingsFile: an invalid value rejects the file', () => {
+  settingsRejects(makeSettingsFile({ ...ALL_SETTINGS, [THEME_STORAGE_KEY]: 'purple' }), /theme must be/);
+  settingsRejects(makeSettingsFile({ ...ALL_SETTINGS, [EXPORT_FORMAT_STORAGE_KEY]: 'xml' }), /exportFormat must be/);
+  settingsRejects(makeSettingsFile({ ...ALL_SETTINGS, [SHORT_NAME_STORAGE_KEY]: 'maybe' }), /shortenNames must be/);
+  settingsRejects(makeSettingsFile({ ...ALL_SETTINGS, [SHORT_NAME_STORAGE_KEY]: true }), /shortenNames must be/);
 });
 
 test('parseSettingsFile: all valid values are accepted', () => {
   for (const theme of ['light', 'dark']) {
-    const r = parseSettingsFile(makeSettingsFile({ [THEME_STORAGE_KEY]: theme }));
-    assert.strictEqual(r.ok, true);
-    assert.strictEqual(r.settings[THEME_STORAGE_KEY], theme);
+    assert.strictEqual(parseSettingsFile(makeSettingsFile({ ...ALL_SETTINGS, [THEME_STORAGE_KEY]: theme })).settings[THEME_STORAGE_KEY], theme);
   }
-  for (const fmt of ['html', 'json', 'csv']) {
-    const r = parseSettingsFile(makeSettingsFile({ [EXPORT_FORMAT_STORAGE_KEY]: fmt }));
-    assert.strictEqual(r.ok, true);
-    assert.strictEqual(r.settings[EXPORT_FORMAT_STORAGE_KEY], fmt);
+  for (const fmt of ['html', 'json', 'csv', 'txt']) {
+    assert.strictEqual(parseSettingsFile(makeSettingsFile({ ...ALL_SETTINGS, [EXPORT_FORMAT_STORAGE_KEY]: fmt })).settings[EXPORT_FORMAT_STORAGE_KEY], fmt);
+  }
+  for (const on of ['on', 'off']) {
+    assert.strictEqual(parseSettingsFile(makeSettingsFile({ ...ALL_SETTINGS, [SHORT_NAME_STORAGE_KEY]: on })).settings[SHORT_NAME_STORAGE_KEY], on);
   }
 });
 
 test('parseSettingsFile: round-trip through buildSettingsExport preserves values', () => {
-  const original = { [THEME_STORAGE_KEY]: 'dark', [EXPORT_FORMAT_STORAGE_KEY]: 'csv' };
-  const json = buildSettingsExport(original);
-  const result = parseSettingsFile(json);
+  const result = parseSettingsFile(buildSettingsExport(ALL_SETTINGS));
   assert.strictEqual(result.ok, true);
-  assert.strictEqual(result.settings[THEME_STORAGE_KEY], 'dark');
-  assert.strictEqual(result.settings[EXPORT_FORMAT_STORAGE_KEY], 'csv');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(result.settings)), ALL_SETTINGS);
 });
 
 // --- A7: a pristine (never-touched) profile's export can be re-imported ---
@@ -1205,21 +1202,23 @@ testAsync('auto-hide: a row that is only "activated" with no message (waiting fo
 });
 
 
-test('parseSettingsFile: several export formats (an array) are accepted, cleaned and ordered', () => {
-  const result = parseSettingsFile(makeSettingsFile({ [EXPORT_FORMAT_STORAGE_KEY]: ['txt', 'html', 'bogus', 'html'] }));
+test('parseSettingsFile: several export formats (an array, in the usual order) are accepted', () => {
+  const result = parseSettingsFile(makeSettingsFile({ ...ALL_SETTINGS, [EXPORT_FORMAT_STORAGE_KEY]: ['html', 'txt'] }));
   assert.strictEqual(result.ok, true);
   assert.deepStrictEqual(Array.from(result.settings[EXPORT_FORMAT_STORAGE_KEY]), ['html', 'txt']);
 });
 
-test('parseSettingsFile: an array with a single valid format is stored as a plain string', () => {
-  const result = parseSettingsFile(makeSettingsFile({ [EXPORT_FORMAT_STORAGE_KEY]: ['json'] }));
-  assert.strictEqual(result.settings[EXPORT_FORMAT_STORAGE_KEY], 'json');
+test('parseSettingsFile: an array the exporter would not write is rejected (out of order, repeats, unknown, or just one format)', () => {
+  for (const bad of [['txt', 'html'], ['html', 'html'], ['html', 'bogus'], ['json'], [], ['bogus']]) {
+    settingsRejects(makeSettingsFile({ ...ALL_SETTINGS, [EXPORT_FORMAT_STORAGE_KEY]: bad }), /exportFormat must be/);
+  }
 });
 
-test('parseSettingsFile: an array with no valid formats is ignored', () => {
-  const result = parseSettingsFile(makeSettingsFile({ [EXPORT_FORMAT_STORAGE_KEY]: ['bogus'], [THEME_STORAGE_KEY]: 'dark' }));
-  assert.strictEqual(result.ok, true);
-  assert.ok(!(EXPORT_FORMAT_STORAGE_KEY in result.settings));
+test('parseSettingsFile: what the Export button writes for any chosen formats is accepted', () => {
+  for (const formats of [['html'], ['json', 'csv'], ['html', 'json', 'csv', 'txt']]) {
+    const json = buildSettingsExport(withSettingsDefaults({ [EXPORT_FORMAT_STORAGE_KEY]: formats }));
+    assert.strictEqual(parseSettingsFile(json).ok, true, formats.join());
+  }
 });
 
 test('withSettingsDefaults: a stored list of formats is kept, a bad one falls back to html', () => {

@@ -433,3 +433,45 @@ test('report.css is in sync with the <style> block in report-template.js', () =>
     'report-template.js\'s <style> block is out of sync with report.css — run `npm run build` to update it'
   );
 });
+
+
+// --- TXT: escaping, so a name can never break the line layout ---
+
+const awkwardTxtList = [
+  { id: 'nl@example.com', name: 'Line\nBreak\r\nTool', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/a', linkType: 'homepage' },
+  { id: 'pipe@example.com', name: 'Foo | Bar', version: '2.0', enabled: true, type: 'extension', link: 'https://example.com/b', linkType: 'homepage' },
+  { id: 'edge@example.com', name: '| Leading and trailing |', version: '3.0', enabled: false, type: 'extension', link: 'https://example.com/c', linkType: 'homepage' },
+  { id: 'slash@example.com', name: 'C:\\Tools\\new | \\|', version: '4.0', enabled: false, type: 'theme', link: 'https://example.com/d', linkType: 'homepage' },
+  { id: 'url@example.com', name: 'Spaced Link', version: '5.0', enabled: true, type: 'extension', link: 'https://example.com/x y | z\nw', linkType: 'homepage' },
+];
+
+test('buildTxtExport: every add-on is exactly one line with the six columns, whatever its name holds', () => {
+  const txt = sandbox.buildTxtExport(awkwardTxtList, false);
+  const rows = txt.split('\r\n').filter((l) => l.includes(' | '));
+  assert.strictEqual(rows.length, awkwardTxtList.length, 'one line per add-on');
+  for (const row of rows) assert.strictEqual(row.split(' | ').length, 6, row);
+  assert.ok(!/[^\r]\n/.test(txt), 'no stray line break anywhere');
+});
+
+test('buildTxtExport: backslash, pipe, line break and carriage return are written as \\\\ \\| \\n \\r', () => {
+  const rows = sandbox.buildTxtExport(awkwardTxtList, false).split('\r\n');
+  assert.ok(rows.some((l) => l.startsWith('Line\\nBreak\\r\\nTool ')), 'line breaks');
+  assert.ok(rows.some((l) => l.startsWith('Foo \\| Bar ')), 'pipe');
+  assert.ok(rows.some((l) => l.startsWith('\\| Leading and trailing \\| ')), 'pipe at both ends');
+  assert.ok(rows.some((l) => l.startsWith('C:\\\\Tools\\\\new \\| \\\\\\| ')), 'backslashes, also in front of a pipe');
+});
+
+test('buildTxtExport: a space at the very start or end of a name is written as \\s (the columns are padded with spaces)', () => {
+  const txt = sandbox.buildTxtExport([{ id: 'sp@example.com', name: '  Padded Name ', version: '1', enabled: true, type: 'extension', link: 'https://example.com/p', linkType: 'homepage' }], false);
+  assert.ok(txt.includes('\\s\\sPadded Name\\s '), txt);
+});
+
+test('buildTxtExport: the link and id columns are escaped the same way', () => {
+  const row = sandbox.buildTxtExport(awkwardTxtList, false).split('\r\n').find((l) => l.endsWith('url@example.com'));
+  assert.ok(row.includes('https://example.com/x y \\| z\\nw'), row);
+});
+
+test('buildTxtExport: names without any of these characters are written exactly as before', () => {
+  const plain = [{ id: 'p@example.com', name: 'Plain Name', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/p', linkType: 'amo-exact' }];
+  assert.ok(sandbox.buildTxtExport(plain, false).includes('Plain Name | 1.0 | Extension | Enabled  | https://example.com/p | p@example.com'));
+});

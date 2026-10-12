@@ -6,7 +6,7 @@ const EXPORT_FORMAT_VERSION = 1;
 
 // Storage key for the user's chosen export file format(s).
 // Each valid value is 'html' | 'json' | 'csv' | 'txt'. One format is stored
-// as that plain string (exactly what older versions wrote); more than one is
+// as that plain string; more than one is
 // stored as an array of them, e.g. ['html', 'json']. Defaults to 'html' when
 // unset.
 const EXPORT_FORMAT_STORAGE_KEY = 'exportFormat';
@@ -63,8 +63,7 @@ function resolveExportFormats(val) {
 }
 
 // The form to store a list of formats in: a lone format as its plain string
-// (so a profile with one format looks exactly as it always did, and older
-// versions can still read it), several as an array.
+// (a plain string, the simplest thing to store), several as an array.
 function serializeExportFormats(list) {
   const formats = resolveExportFormats(list);
   return formats.length === 1 ? formats[0] : formats;
@@ -92,8 +91,7 @@ function appendFormatLabels(container, fmts) {
 
 // Shared value-checking for two of the three settings (the third, theme,
 // is already centralized in theme.js's resolveTheme()) - storage can
-// hold anything (a stale value from an older version, or something
-// written directly), so a stored value is checked against its known-good
+// hold anything (a stale value, or something written directly), so a stored value is checked against its known-good
 // set rather than trusted as-is. Previously each of export.js, settings.js
 // and background.js had its own copy of this same check.
 function isValidExportFormat(val) {

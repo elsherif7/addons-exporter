@@ -1,1 +1,2 @@
 tests/golden/** -text
+tests/fixtures/** -text

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Add-ons Exporter</title>
+<link rel="icon" href="data:image/png;base64,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">
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f4f5f7; margin: 0; padding: 60px 20px; color: #222; }
+  .card { max-width: 640px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 40px; text-align: center; }
+  h1 { font-size: 28px; margin: 0 0 16px; }
+  p { font-size: 16px; color: #444; line-height: 1.7; margin: 0 0 28px; }
+  .cta-link { color: #0060df; font-weight: bold; text-decoration: underline; }
+  .search-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    border: 1px solid #d0d3d9;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .search-input:focus { outline: none; border-color: #1f2937; }
+  .placeholder-text { padding: 20px; color: #666; font-size: 14px; margin: 0; }
+  .checklist-box {
+    text-align: left;
+    max-height: 360px;
+    overflow-y: auto;
+    border: 1px solid #e2e4e8;
+    border-radius: 8px;
+    padding: 4px 0;
+    margin-bottom: 30px;
+  }
+  .group-heading {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #555;
+    padding: 10px 14px 4px;
+  }
+  .addon-row {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f0f1f3;
+  }
+  .addon-row:last-child { border-bottom: none; }
+  .addon-name { font-size: 14px; font-weight: 600; color: #0060df; text-decoration: none; }
+  .addon-name:hover { text-decoration: underline; }
+  .addon-version { color: #888; font-size: 12px; margin-left: 6px; }
+  .match-label { font-size: 11px; color: #666; margin-left: 8px; }
+  .match-uncertain { color: #b45309; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="card">
+  <h1>Add-ons Exporter</h1>
+  <p><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Exporter</a> installed, click its toolbar icon and choose <strong>Import Add-ons</strong> to open every link below as a tab automatically.</p>
+
+  <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
+
+  <div class="checklist-box">
+    <div id="addonList">
+      <div class="group-heading">Enabled (14)</div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/" target="_blank" rel="noopener">Add-ons Exporter</a>
+      <span class="addon-version">1.2.0</span>
+      
+    </div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/buster-captcha-solver/" target="_blank" rel="noopener">Buster: Captcha Solver for Humans</a>
+      <span class="addon-version">3.4.0</span>
+      
+    </div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/clearurls/" target="_blank" rel="noopener">ClearURLs</a>
+      <span class="addon-version">1.27.3</span>
+      
+    </div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/darkreader/" target="_blank" rel="noopener">Dark Reader</a>
+      <span class="addon-version">4.9.133</span>
+      
+    </div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/facebook-container/" target="_blank" rel="noopener">Facebook Container</a>
+      <span class="addon-version">2.3.12</span>
+      
+    </div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/flagfox/" target="_blank" rel="noopener">Flagfox</a>
+      <span class="addon-version">6.2.6</span>
+      
+    </div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/istilldontcareaboutcookies/" target="_blank" rel="noopener">I still don&#39;t care about cookies</a>
+      <span class="addon-version">1.1.9</span>
+      
+    </div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/kaspersky-protection-2021/" target="_blank" rel="noopener">Kaspersky Protection</a>
+      <span class="addon-version">2.14.56.9</span>
+      
+    </div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/leechblock-ng/" target="_blank" rel="noopener">LeechBlock NG</a>
+      <span class="addon-version">1.8</span>
+      
+    </div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/instant-translate/" target="_blank" rel="noopener">Mate Translate – translator, dictionary</a>
+      <span class="addon-version">10.1.17</span>
+      
+    </div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/news-feed-eradicator/" target="_blank" rel="noopener">News Feed Eradicator</a>
+      <span class="addon-version">3.0.5</span>
+      
+    </div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/privacy-badger17/" target="_blank" rel="noopener">Privacy Badger</a>
+      <span class="addon-version">2026.9.15</span>
+      
+    </div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/" target="_blank" rel="noopener">uBlock Origin</a>
+      <span class="addon-version">1.75.0</span>
+      
+    </div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/youtube-recommended-videos/" target="_blank" rel="noopener">Unhook - Remove YouTube Recommended &amp; Shorts</a>
+      <span class="addon-version">1.6.9</span>
+      
+    </div>
+      <div class="group-heading">Disabled (1)</div><div class="addon-row">
+      <a class="addon-name" href="https://addons.mozilla.org/en-US/firefox/addon/proxy-universe-dark-orangeneon/" target="_blank" rel="noopener">Proxy Universe — Dark Orange Neon</a>
+      <span class="addon-version">1.4</span>
+      
+    </div>
+    </div>
+    <p id="noSearchMatches" class="placeholder-text" style="display:none;">No add-ons match your search.</p>
+  </div>
+  </div>
+
+  <script type="application/json" id="addons-exporter-data">{"formatVersion":1,"addons":[{"id":"jid1-TMndP6cdKgxLcQ@jetpack","name":"Mate Translate – translator, dictionary","version":"10.1.17","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/instant-translate/","linkType":"amo-exact"},{"id":"myallychou@gmail.com","name":"Unhook - Remove YouTube Recommended & Shorts","version":"1.6.9","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/youtube-recommended-videos/","linkType":"amo-exact"},{"id":"light_plugin_7571494CE0B94E11BB762B659A4AD71F@kaspersky.com","name":"Kaspersky Protection","version":"2.14.56.9","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/kaspersky-protection-2021/","linkType":"amo-exact"},{"id":"@news-feed-eradicator","name":"News Feed Eradicator","version":"3.0.5","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/news-feed-eradicator/","linkType":"amo-exact"},{"id":"theme@proxyuniverse.org","name":"Proxy Universe — Dark Orange Neon","version":"1.4","enabled":false,"type":"theme","link":"https://addons.mozilla.org/en-US/firefox/addon/proxy-universe-dark-orangeneon/","linkType":"amo-exact"},{"id":"addons-exporter@local","name":"Add-ons Exporter","version":"1.2.0","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/add-ons-exporter/","linkType":"amo-exact"},{"id":"{e58d3966-3d76-4cd9-8552-1582fbc800c1}","name":"Buster: Captcha Solver for Humans","version":"3.4.0","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/buster-captcha-solver/","linkType":"amo-exact"},{"id":"{74145f27-f039-47ce-a470-a662b129930a}","name":"ClearURLs","version":"1.27.3","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/clearurls/","linkType":"amo-exact"},{"id":"@contain-facebook","name":"Facebook Container","version":"2.3.12","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/facebook-container/","linkType":"amo-exact"},{"id":"idcac-pub@guus.ninja","name":"I still don't care about cookies","version":"1.1.9","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/istilldontcareaboutcookies/","linkType":"amo-exact"},{"id":"jid1-MnnxcxisBPnSXQ@jetpack","name":"Privacy Badger","version":"2026.9.15","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/privacy-badger17/","linkType":"amo-exact"},{"id":"uBlock0@raymondhill.net","name":"uBlock Origin","version":"1.75.0","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/","linkType":"amo-exact"},{"id":"addon@darkreader.org","name":"Dark Reader","version":"4.9.133","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/darkreader/","linkType":"amo-exact"},{"id":"leechblockng@proginosko.com","name":"LeechBlock NG","version":"1.8","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/leechblock-ng/","linkType":"amo-exact"},{"id":"{1018e4d6-728f-4b20-ad56-37578a4de76b}","name":"Flagfox","version":"6.2.6","enabled":true,"type":"extension","link":"https://addons.mozilla.org/en-US/firefox/addon/flagfox/","linkType":"amo-exact"}]}</script>
+  <script>
+    // Self-contained - this file has no access to the extension's own
+    // scripts or APIs once it's saved and opened on its own.
+    var addonListEl = document.getElementById('addonList');
+    var noSearchMatchesEl = document.getElementById('noSearchMatches');
+
+    function filterAddonRows(query) {
+      var q = query.trim().toLowerCase();
+      var heading = null;
+      var headingHasMatch = false;
+      var anyMatch = false;
+      var finishHeading = function () {
+        if (heading) heading.style.display = headingHasMatch ? '' : 'none';
+      };
+      var children = addonListEl.children;
+      for (var i = 0; i < children.length; i++) {
+        var el = children[i];
+        if (el.classList.contains('group-heading')) {
+          finishHeading();
+          heading = el;
+          headingHasMatch = false;
+        } else if (el.classList.contains('addon-row')) {
+          var match = q === '' || el.textContent.toLowerCase().indexOf(q) !== -1;
+          el.style.display = match ? '' : 'none';
+          if (match) { headingHasMatch = true; anyMatch = true; }
+        }
+      }
+      finishHeading();
+      return anyMatch;
+    }
+
+    document.getElementById('searchInput').addEventListener('input', function (e) {
+      var anyMatch = filterAddonRows(e.target.value);
+      noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
+    });
+  </script>
+</body>
+</html>

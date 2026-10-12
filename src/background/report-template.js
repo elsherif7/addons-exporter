@@ -94,34 +94,52 @@ function buildCsvExport(list, shorten = true) {
 // "Enabled" and a "Disabled" section (each A-Z) with the columns lined up.
 // One add-on per line:
 //   Name | Version | Type | Status | Link | Id
-// The id is last, so an older reader that only knows the first five columns
-// still works; the Importer uses it to match add-ons even though the name
+// The Importer uses the id (last column) to match add-ons even though the name
 // may be shortened (shorten, the Settings choice, on by default).
 // First line is a format-version comment so the format is identifiable.
 // The importer ignores every line without " | " in it (the title, the
 // section headings and the underlines), so none of those may contain it.
+//
+// Text written into a column is escaped so one add-on always stays on one line
+// and a name can never be mistaken for a column separator, and so the Importer
+// can restore it exactly:
+//   \\  a backslash          \|  a pipe
+//   \n  a line break         \r  a carriage return
+//   \s  a space at the very start or end of the text (the columns are padded
+//       with spaces, so edge spaces would otherwise be lost)
+// Everything else is written as it is, so ordinary names look exactly as before.
+// import.js's txtUnescape() is the reverse of this.
+function txtEscape(value) {
+  return String(value == null ? '' : value)
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/^ +| +$/g, (spaces) => '\\s'.repeat(spaces.length));
+}
+
 function buildTxtExport(list, shorten = true) {
   const enabled = list.filter((a) => a.enabled).sort(byName);
   const disabled = list.filter((a) => !a.enabled).sort(byName);
   const all = [...enabled, ...disabled];
-  const nameOf = (a) => String(shorten ? shortName(a.name) : a.name);
+  const nameOf = (a) => txtEscape(shorten ? shortName(a.name) : a.name);
 
   // Column widths, so every line lines up. A very long name is allowed to
   // push its own line out rather than widening every other line.
   const NAME_MAX = 40;
   const nameWidth = Math.min(NAME_MAX, Math.max(0, ...all.map((a) => nameOf(a).length)));
-  const versionWidth = Math.max(0, ...all.map((a) => String(a.version).length));
-  const linkWidth = Math.max(0, ...all.map((a) => String(a.link).length));
+  const versionWidth = Math.max(0, ...all.map((a) => txtEscape(a.version).length));
+  const linkWidth = Math.max(0, ...all.map((a) => txtEscape(a.link).length));
   const line = (a) => {
     const type = a.type === 'theme' ? 'Theme' : 'Extension';
     const status = a.enabled ? 'Enabled' : 'Disabled';
     return [
       nameOf(a).padEnd(nameWidth),
-      String(a.version).padEnd(versionWidth),
+      txtEscape(a.version).padEnd(versionWidth),
       type.padEnd('Extension'.length),
       status.padEnd('Disabled'.length),
-      String(a.link).padEnd(linkWidth),
-      a.id,
+      txtEscape(a.link).padEnd(linkWidth),
+      txtEscape(a.id),
     ].join(' | ');
   };
   const section = (title, items) => {

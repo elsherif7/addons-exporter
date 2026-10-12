@@ -7,9 +7,8 @@
 
 const SETTINGS_FILE_FORMAT_VERSION = 1;
 
-// The settings keys this page knows about. Only these are written on
-// import - unknown keys from future versions are silently ignored so a
-// file from a newer version can still be imported safely.
+// The settings keys this page knows about: exactly the ones an export holds
+// and an import requires.
 const KNOWN_SETTINGS_KEYS = [
   THEME_STORAGE_KEY,
   EXPORT_FORMAT_STORAGE_KEY,
@@ -26,16 +25,24 @@ function buildSettingsExport(settings) {
   return JSON.stringify({ formatVersion: SETTINGS_FILE_FORMAT_VERSION, settings: out }, null, 2);
 }
 
-// Validates and parses a settings file's text. Returns
-// { ok: true, settings: {...} } or { ok: false, error: '...' }.
-// Throws on malformed JSON - callers handle that in their own try/catch.
+// Validates and parses a settings file's text. Accepts only what
+// buildSettingsExport() writes (given withSettingsDefaults()'s values):
+//   { "formatVersion": 1, "settings": { theme, exportFormat, shortenNames } }
+// with exactly those three settings, in that order, each a valid value. Anything else - a
+// missing or unknown setting, an invalid value - rejects the whole file,
+// naming the problem; nothing is dropped or guessed at. exportFormat is one
+// format as a string, or two or more as an array in the fixed order.
+// Returns { ok: true, settings: {...} } or { ok: false, error: '...' }.
+// Throws on malformed JSON - the caller's try/catch handles it.
+const settingsError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Hub settings format (${detail}).` });
+
 function parseSettingsFile(text) {
   const parsed = JSON.parse(text);
 
-  if (!parsed || typeof parsed !== 'object') {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return { ok: false, error: 'This file doesn\'t look like an Add-ons Hub settings file.' };
   }
-  if (typeof parsed.formatVersion !== 'number') {
+  if (!Number.isInteger(parsed.formatVersion) || parsed.formatVersion < 1) {
     return { ok: false, error: 'This file is missing its format version and can\'t be imported.' };
   }
   if (parsed.formatVersion > SETTINGS_FILE_FORMAT_VERSION) {
@@ -44,23 +51,33 @@ function parseSettingsFile(text) {
   if (!parsed.settings || typeof parsed.settings !== 'object' || Array.isArray(parsed.settings)) {
     return { ok: false, error: 'This file doesn\'t contain valid settings.' };
   }
+  if (Object.keys(parsed).join() !== 'formatVersion,settings') {
+    return settingsError('the file is not exactly formatVersion, then settings');
+  }
 
-  // Only keep known, valid values — unknown keys from future versions
-  // are dropped rather than stored, so stale or unrecognised values
-  // can't silently corrupt the stored settings.
-  const validated = {};
-  const t = parsed.settings[THEME_STORAGE_KEY];
-  if (t === 'light' || t === 'dark') validated[THEME_STORAGE_KEY] = t;
+  const given = parsed.settings;
+  const keys = Object.keys(given);
+  const unknown = keys.find((k) => !KNOWN_SETTINGS_KEYS.includes(k));
+  if (unknown !== undefined) return settingsError(`unknown setting "${unknown}"`);
+  const missing = KNOWN_SETTINGS_KEYS.find((k) => !keys.includes(k));
+  if (missing !== undefined) return settingsError(`the setting "${missing}" is missing`);
+  if (keys.join() !== KNOWN_SETTINGS_KEYS.join()) {
+    return settingsError('the settings must be in the order ' + KNOWN_SETTINGS_KEYS.join(', '));
+  }
 
-  // One format as a string (any version's file), or several as an array.
-  const f = parsed.settings[EXPORT_FORMAT_STORAGE_KEY];
-  const fList = Array.isArray(f) ? f.filter(isValidExportFormat) : (isValidExportFormat(f) ? [f] : []);
-  if (fList.length > 0) validated[EXPORT_FORMAT_STORAGE_KEY] = serializeExportFormats(fList);
+  const t = given[THEME_STORAGE_KEY];
+  if (t !== 'light' && t !== 'dark') return settingsError('theme must be "light" or "dark"');
 
-  const s = parsed.settings[SHORT_NAME_STORAGE_KEY];
-  if (s === 'on' || s === 'off') validated[SHORT_NAME_STORAGE_KEY] = s;
+  const f = given[EXPORT_FORMAT_STORAGE_KEY];
+  const formatOk = Array.isArray(f)
+    ? f.length > 1 && f.every(isValidExportFormat) && resolveExportFormats(f).join() === f.join()
+    : isValidExportFormat(f);
+  if (!formatOk) return settingsError('exportFormat must be one format, or two or more in the usual order');
 
-  return { ok: true, settings: validated };
+  const s = given[SHORT_NAME_STORAGE_KEY];
+  if (s !== 'on' && s !== 'off') return settingsError('shortenNames must be "on" or "off"');
+
+  return { ok: true, settings: { [THEME_STORAGE_KEY]: t, [EXPORT_FORMAT_STORAGE_KEY]: f, [SHORT_NAME_STORAGE_KEY]: s } };
 }
 
 // --- DOM wiring ---
@@ -379,10 +396,6 @@ settingsFileInput.addEventListener('change', async () => {
     const result = parseSettingsFile(text);
     if (!result.ok) {
       importRow.setMsg(result.error, true);
-      return;
-    }
-    if (Object.keys(result.settings).length === 0) {
-      importRow.setMsg('No recognised settings found in that file.', true);
       return;
     }
     await browser.storage.local.set(result.settings);

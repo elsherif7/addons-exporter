@@ -37,8 +37,7 @@ function buildInstalledIndex(installed) {
 
 // Matches a file's add-on to an installed one: the id first (the reliable
 // way, and what makes shortened names safe), then - for an add-on with no
-// id, such as an older export or a TXT file from before ids were included,
-// or one whose id isn't installed - the name: the exact name
+// id, or one whose id isn't installed - the name: the exact name
 // (case-insensitive), then the shortened form, so a short name in the file
 // still finds the full installed name and the other way round.
 function findInstalledMatch(item, index) {
@@ -51,18 +50,6 @@ function findInstalledMatch(item, index) {
   return index.byShortName.get(short) || null;
 }
 
-// Validates and normalizes the embedded addons payload from an exported
-// report. Takes the raw text of the #addons-exporter-data script tag (or
-// null if that tag wasn't found in the file) and returns either the
-// ready-to-render addon list or a user-facing reason the file was
-// rejected. The file isn't trusted - could be hand-edited or corrupted -
-// so every shape assumption here is checked rather than assumed.
-// Pulled out of loadFile() as a pure function so it can be unit tested
-// without a DOM; loadFile() still owns actually reading/parsing the file
-// and reacting to the result.
-// Throws if jsonText is present but isn't valid JSON - loadFile()'s
-// existing try/catch around the whole read handles that the same way it
-// always has, so this doesn't catch it separately.
 // De-duplicates by id+link (or, lacking an id, name+link) - an exact
 // repeat entry would otherwise show up as two rows, and if both got
 // selected in the Importer, open the same add-on's page twice. Shared by
@@ -82,27 +69,68 @@ function dedupeAddons(list) {
   return out;
 }
 
-function parseAddonsPayload(jsonText) {
+// Validates the add-ons payload of an export: the JSON file, and the data
+// embedded in an HTML report (the script tag #addons-exporter-data). Takes the
+// raw text (or null if that tag wasn't found in the HTML file) and returns
+// either the ready-to-render list or a user-facing reason the file was
+// rejected.
+//
+// The check is strict: the file must be exactly what the exporter writes,
+// including the HTML report from the version released on addons.mozilla.org
+// (the same payload):
+//   { "formatVersion": 1, "addons": [ { id, name, version, enabled, type, link, linkType }, ... ] }
+// Anything else - another key, a missing field, a field of the wrong type - is
+// rejected as a whole, naming the first problem, rather than guessed at.
+// Pulled out of loadFile() as a pure function so it can be unit tested without
+// a DOM. Throws if jsonText is present but isn't valid JSON - loadFile()'s
+// try/catch handles that.
+// The field order of an entry in each file: the HTML report's embedded data
+// (also what the AMO release wrote) starts with the id; the JSON export lists
+// the name first and the id last. A file must use its own format's order.
+const HTML_ENTRY_KEYS = ['id', 'name', 'version', 'enabled', 'type', 'link', 'linkType'];
+const JSON_ENTRY_KEYS = ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id'];
+const payloadError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter format (${detail}).` });
+// Exactly these keys, in exactly this order (JSON.parse keeps the file's order).
+const sameKeys = (obj, keys) => {
+  const have = Object.keys(obj);
+  return have.length === keys.length && keys.every((k, i) => have[i] === k);
+};
+
+// Returns null when the entry is exactly what the exporter writes, otherwise a
+// short reason.
+function addonEntryProblem(a, keys) {
+  if (!a || typeof a !== 'object' || Array.isArray(a)) return 'it is not an object';
+  if (!sameKeys(a, keys)) return 'its fields are not exactly ' + keys.join(', ') + ', in that order';
+  if (typeof a.id !== 'string' || a.id === '') return 'it has no id';
+  if (typeof a.name !== 'string' || a.name.trim() === '') return 'it has no name';
+  if (typeof a.version !== 'string') return 'its version is not text';
+  if (typeof a.enabled !== 'boolean') return 'enabled is not true or false';
+  if (a.type !== 'extension' && a.type !== 'theme') return 'its type is not extension or theme';
+  if (typeof a.link !== 'string') return 'its link is not text';
+  if (typeof a.linkType !== 'string') return 'its linkType is not text';
+  return null;
+}
+
+function parseAddonsPayload(jsonText, entryKeys = HTML_ENTRY_KEYS) {
   if (jsonText == null) {
     return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no embedded data found)' };
   }
 
   const parsed = JSON.parse(jsonText);
 
-  // A v1.0.0 export was a bare array with no formatVersion/addons wrapper
-  // at all - checked for specifically, and first, so it gets a message
-  // that actually explains why, instead of falling through to the
-  // generic "no add-ons found" the old code order produced here (since a
-  // bare array's own .addons property is undefined either way).
+  // A v1.0.0 export was a bare array with no formatVersion/addons wrapper at
+  // all - checked for specifically, and first, so it gets a message that
+  // explains why.
   if (Array.isArray(parsed)) {
     return { ok: false, error: 'This file appears to be from an old, unsupported version of Add-ons Exporter and can\'t be imported.' };
   }
+  if (!parsed || typeof parsed !== 'object') {
+    return payloadError('the data is not an object');
+  }
 
-  // Format version is checked before anything about the add-ons list
-  // itself, so any other incompatible/malformed file gets a version-
-  // specific message rather than "No valid add-ons found" or similar,
-  // which didn't explain the real reason.
-  const formatVersion = parsed && parsed.formatVersion;
+  // Format version is checked before anything about the add-ons list itself,
+  // so an incompatible file gets a version-specific message.
+  const formatVersion = parsed.formatVersion;
   if (!Number.isInteger(formatVersion) || formatVersion < 1) {
     return { ok: false, error: 'This file is missing its export format version and can\'t be imported.' };
   }
@@ -110,32 +138,20 @@ function parseAddonsPayload(jsonText) {
     return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
   }
 
-  const list = parsed && Array.isArray(parsed.addons) ? parsed.addons : null;
-  if (!Array.isArray(list) || list.length === 0) {
+  const list = Array.isArray(parsed.addons) ? parsed.addons : null;
+  if (!list || list.length === 0) {
     return { ok: false, error: 'No add-ons found in that file' };
   }
-
-  // A name is the one field every row needs; entries missing one are
-  // dropped instead of failing the whole import. id/version/link are
-  // coerced to undefined (dropped, not trusted as-is) when they aren't
-  // strings - a hand-edited or malformed file could have any type here,
-  // and a wrong-typed id in particular would otherwise reach
-  // findInstalledMatch()/isPlausibleNameMatch() unchecked.
-  const validList = [];
-  for (const a of list) {
-    if (!a || typeof a.name !== 'string' || a.name.trim() === '') continue;
-    validList.push({
-      ...a,
-      id: typeof a.id === 'string' ? a.id : undefined,
-      version: typeof a.version === 'string' ? a.version : undefined,
-      link: typeof a.link === 'string' ? a.link : undefined,
-    });
-  }
-  if (validList.length === 0) {
-    return { ok: false, error: 'No valid add-ons found in that file' };
+  if (!sameKeys(parsed, ['formatVersion', 'addons'])) {
+    return payloadError('the data is not exactly formatVersion, then addons');
   }
 
-  return { ok: true, addons: migrateAddonsData(dedupeAddons(validList), formatVersion) };
+  for (let n = 0; n < list.length; n++) {
+    const problem = addonEntryProblem(list[n], entryKeys);
+    if (problem) return payloadError(`add-on ${n + 1}: ${problem}`);
+  }
+
+  return { ok: true, addons: migrateAddonsData(dedupeAddons(list), formatVersion) };
 }
 
 // Validates and parses a JSON export file's text content. Same return
@@ -145,7 +161,7 @@ function parseJsonPayload(text) {
   const parsed = JSON.parse(text);
   return parseAddonsPayload(parsed && typeof parsed === 'object'
     ? JSON.stringify(parsed)
-    : text);
+    : text, JSON_ENTRY_KEYS);
 }
 
 // Undoes the leading-apostrophe formula-injection guard buildCsvExport()
@@ -158,24 +174,27 @@ function stripCsvFormulaGuard(s) {
   return /^'[=+\-@\t\r]/.test(s) ? s.slice(1) : s;
 }
 
-// Validates and parses a CSV export file's text content. Expects:
+// The one header row buildCsvExport() (report-template.js) writes.
+const CSV_HEADER = ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id'];
+
+const csvError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter CSV format (${detail}).` });
+
+// Validates and parses a CSV export file's text content. Accepts only what
+// buildCsvExport() writes:
 //   line 1: # addons-hub-format-version: <n>
-//   line 2: header row (id,name,version,enabled,type,link,linkType)
-//   line 3+: one data row per add-on
+//   line 2: name,version,type,enabled,link,linkType,id (this exact header)
+//   line 3+: one row per add-on, exactly seven fields, no blank lines
+// Anything else is rejected, with the first problem found named.
 // Returns { ok, addons } or { ok: false, error }.
 function parseCsvPayload(text) {
-  // A leading byte-order mark (the export adds one so Excel reads UTF-8) is not part of the text.
+  // The export starts with a byte-order mark (so Excel reads UTF-8); it is not part of the text.
   const normalized = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-  // Line 1 (the format-version comment) is pulled out as plain text,
-  // ahead of any CSV-field parsing - a spreadsheet that pads it with
-  // extra commas on re-save (e.g. "...version: 1,,,,,,") shouldn't
-  // matter, since the version number itself is never after a comma.
   const firstNewline = normalized.indexOf('\n');
   const firstLine = firstNewline === -1 ? normalized : normalized.slice(0, firstNewline);
   const rest = firstNewline === -1 ? '' : normalized.slice(firstNewline + 1);
 
-  const versionMatch = firstLine.match(/^#\s*addons-hub-format-version:\s*(\d+)/);
+  const versionMatch = firstLine.match(/^# addons-hub-format-version: (\d+)$/);
   if (!versionMatch) {
     return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no format-version comment found)' };
   }
@@ -184,57 +203,47 @@ function parseCsvPayload(text) {
     return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
   }
 
-  // Everything from the header row on is parsed as a whole, rather than
-  // being split into lines first and each line parsed on its own - a
-  // quoted field containing a literal newline would otherwise be cut in
-  // two before parseCsvRecords ever saw it, turning one add-on into two
-  // broken rows.
-  const records = parseCsvRecords(rest).filter((fields) => !(fields.length === 1 && fields[0] === ''));
-
-  if (records.length === 0) {
-    return { ok: false, error: 'This file is missing expected CSV columns and can\'t be imported.' };
+  // The rest is parsed as a whole, not line by line, so a quoted name that
+  // contains a line break stays one field.
+  let records;
+  try {
+    records = parseCsvRecords(rest);
+  } catch (err) {
+    return csvError(err.message);
   }
 
-  // Header row — validate expected columns are present.
-  const expectedHeaders = ['id', 'name', 'version', 'enabled', 'type', 'link', 'linkType'];
-  const headers = records[0];
-  const missingHeaders = expectedHeaders.filter((h) => !headers.includes(h));
-  if (missingHeaders.length > 0) {
-    return { ok: false, error: 'This file is missing expected CSV columns and can\'t be imported.' };
+  if (records.length === 0 || records[0].join(',') !== CSV_HEADER.join(',')) {
+    return csvError('the header row must be: ' + CSV_HEADER.join(','));
   }
-
-  const dataRecords = records.slice(1);
-  if (dataRecords.length === 0) {
+  if (records.length === 1) {
     return { ok: false, error: 'No add-ons found in that file' };
   }
 
   const addons = [];
-  for (const fields of dataRecords) {
-    const row = {};
-    headers.forEach((h, i) => { row[h] = fields[i] !== undefined ? stripCsvFormulaGuard(fields[i]) : ''; });
-    // enabled: CSV stores 'true'/'false' strings - convert back to
-    // boolean, case-insensitively (a spreadsheet that re-saves the file
-    // often capitalizes it as TRUE/FALSE).
-    row.enabled = row.enabled.toLowerCase() === 'true';
-    if (typeof row.name === 'string' && row.name.trim() !== '') {
-      addons.push(row);
+  for (let n = 1; n < records.length; n++) {
+    const fields = records[n];
+    const where = `row ${n}`;
+    if (fields.length !== CSV_HEADER.length) {
+      return csvError(`${where} has ${fields.length} fields instead of ${CSV_HEADER.length}`);
     }
-  }
-
-  if (addons.length === 0) {
-    return { ok: false, error: 'No valid add-ons found in that file' };
+    const [name, version, type, enabled, link, linkType, id] = fields.map(stripCsvFormulaGuard);
+    if (name.trim() === '') return csvError(`${where} has no name`);
+    if (id === '') return csvError(`${where} has no id`);
+    if (type !== 'extension' && type !== 'theme') return csvError(`${where} has an unknown type`);
+    if (enabled !== 'true' && enabled !== 'false') return csvError(`${where} has an unknown enabled value`);
+    addons.push({ name, version, type, enabled: enabled === 'true', link, linkType, id });
   }
 
   return { ok: true, addons: migrateAddonsData(dedupeAddons(addons), formatVersion) };
 }
 
-// Parses an entire CSV text (RFC 4180-ish) into an array of records, each
-// an array of field strings. Unlike parsing line by line, this walks the
-// whole text in one pass, so a quoted field containing a literal newline
-// stays part of that one field/record instead of being cut into two. A
-// stray character right after a field's closing quote (from a hand-edited
-// or oddly re-saved file) is folded into that same field rather than
-// starting a new, phantom column.
+// Parses an entire CSV text (RFC 4180) into an array of records, each an
+// array of field strings. It walks the whole text in one pass, so a quoted
+// field containing a literal newline stays part of that one field. Throws an
+// Error (with a short reason) for text buildCsvExport() never writes: a quote
+// inside an unquoted field, an unclosed quote, or anything between a closing
+// quote and the next comma or line end. A blank line is a record with one
+// empty field, which the caller rejects as having the wrong field count.
 function parseCsvRecords(text) {
   const records = [];
   let fields = [];
@@ -245,31 +254,34 @@ function parseCsvRecords(text) {
     let field = '';
     if (text[i] === '"') {
       i++; // skip opening quote
+      let closed = false;
       while (i < n) {
         if (text[i] === '"' && text[i + 1] === '"') {
           field += '"';
           i += 2;
         } else if (text[i] === '"') {
           i++; // skip closing quote
+          closed = true;
           break;
         } else {
           field += text[i++];
         }
       }
-      // Lenient: anything right after the closing quote that isn't a
-      // delimiter is folded into this same field instead of starting a
-      // phantom extra column.
-      while (i < n && text[i] !== ',' && text[i] !== '\n') {
-        field += text[i++];
+      if (!closed) throw new Error('a quoted value is never closed');
+      if (i < n && text[i] !== ',' && text[i] !== '\n') {
+        throw new Error('unexpected text after a closing quote');
       }
     } else {
       while (i < n && text[i] !== ',' && text[i] !== '\n') {
+        if (text[i] === '"') throw new Error('a quote inside an unquoted value');
         field += text[i++];
       }
     }
     return field;
   }
 
+  // No text at all is no records.
+  if (n === 0) return records;
   while (i <= n) {
     fields.push(readField());
     if (text[i] === ',') {
@@ -298,16 +310,38 @@ function parseCsvRow(line) {
 }
 
 
-// Validates and parses a TXT export file's text content. Expects:
-//   line 1: # addons-hub-format-version: <n>
-//   line 2: (blank)
-//   line 3+: Name | Version | Type | Enabled | Link
-// Returns { ok, addons } or { ok: false, error }.
-function parseTxtPayload(text) {
-  const lines = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+// Reverses the escaping buildTxtExport() (report-template.js) applies to every
+// column: \\ is a backslash, \| a pipe, \n a line break, \r a carriage
+// return, \s a space (used for a space at the very start or end of a value).
+// Returns null for a backslash followed by anything else, which the exporter
+// never writes.
+function txtUnescape(text) {
+  // Take the valid escapes out first; any backslash left over is not one.
+  if (text.replace(/\\[\\|nrs]/g, '').includes('\\')) return null;
+  return text.replace(/\\([\\|nrs])/g, (m, c) => ({ '\\': '\\', '|': '|', n: '\n', r: '\r', s: ' ' }[c]));
+}
 
-  // Line 1: format-version comment
-  const versionMatch = lines[0] && lines[0].match(/^#\s*addons-hub-format-version:\s*(\d+)/);
+// A column's text with only the padding spaces removed (not tabs or other
+// whitespace, which belong to the value), then unescaped. null if invalid.
+function readTxtCell(text) {
+  return txtUnescape(text.replace(/^ +| +$/g, ''));
+}
+
+const txtError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter TXT format (${detail}).` });
+
+// Validates and parses a TXT export file's text content. Accepts only what
+// buildTxtExport() writes:
+//   line 1: # addons-hub-format-version: <n>
+//   then the title, the section headings and their underlines (any line with
+//   no " | " in it is skipped)
+//   then one add-on per line, exactly six columns:
+//     Name | Version | Type | Status | Link | Id
+// A line with " | " in it that is not a valid add-on line rejects the whole
+// file, with its line number. Returns { ok, addons } or { ok: false, error }.
+function parseTxtPayload(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+
+  const versionMatch = lines[0] && lines[0].match(/^# addons-hub-format-version: (\d+)$/);
   if (!versionMatch) {
     return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no format-version comment found)' };
   }
@@ -316,35 +350,32 @@ function parseTxtPayload(text) {
     return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
   }
 
-  // Skip the header comment line and any blank lines at the top
-  const dataLines = lines.slice(1).filter((l) => l.trim() !== '');
-
-  if (dataLines.length === 0) {
-    return { ok: false, error: 'No add-ons found in that file' };
-  }
-
   const addons = [];
-  for (const line of dataLines) {
+  for (let n = 1; n < lines.length; n++) {
+    const line = lines[n];
+    if (!line.includes(' | ')) continue;
     const parts = line.split(' | ');
-    // Minimum: name and link (index 0 and 4). Other fields (including the
-    // id in column 6) are optional for resilience.
-    if (parts.length < 2) continue;
-    const name = parts[0] ? parts[0].trim() : '';
-    if (!name) continue;
+    const where = `line ${n + 1}`;
+    if (parts.length !== 6) return txtError(`${where} has ${parts.length} columns instead of 6`);
+    const cells = parts.map(readTxtCell);
+    if (cells.includes(null)) return txtError(`${where} has a backslash that is not an escape`);
+    const [name, version, type, status, link, id] = cells;
+    if (name === '') return txtError(`${where} has no name`);
+    if (id === '') return txtError(`${where} has no id`);
+    if (type !== 'Extension' && type !== 'Theme') return txtError(`${where} has an unknown type`);
+    if (status !== 'Enabled' && status !== 'Disabled') return txtError(`${where} has an unknown status`);
     addons.push({
       name,
-      version: parts[1] ? parts[1].trim() : undefined,
-      type:    parts[2] ? (parts[2].trim().toLowerCase() === 'theme' ? 'theme' : 'extension') : undefined,
-      enabled: parts[3] ? parts[3].trim().toLowerCase() === 'enabled' : undefined,
-      link:    parts[4] ? parts[4].trim() : undefined,
-      // Newer files end each line with the add-on's id; older ones have only
-      // the five columns above.
-      id:      parts[5] && parts[5].trim() ? parts[5].trim() : undefined,
+      version,
+      type: type === 'Theme' ? 'theme' : 'extension',
+      enabled: status === 'Enabled',
+      link,
+      id,
     });
   }
 
   if (addons.length === 0) {
-    return { ok: false, error: 'No valid add-ons found in that file' };
+    return { ok: false, error: 'No add-ons found in that file' };
   }
 
   return { ok: true, addons: migrateAddonsData(dedupeAddons(addons), formatVersion) };

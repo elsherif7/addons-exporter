@@ -88,28 +88,55 @@ test('parseAddonsPayload: empty addons array', () => {
   assert.match(result.error, /No add-ons found/);
 });
 
-test('parseAddonsPayload: drops entries with missing/blank/non-string name, keeps valid ones', () => {
-  const result = parseAddonsPayload(payload([
-    { name: 'uBlock Origin' },
-    { name: '' },
-    { name: '   ' },
-    { name: 42 },
-    {},
-    null,
-    { name: 'Dark Reader' },
-  ]));
-  assert.strictEqual(result.ok, true);
-  // Array.from (called in this realm) normalizes the foreign-realm array
-  // that comes back from the vm sandbox, so deepStrictEqual can compare
-  // it against a plain literal instead of tripping over cross-realm
-  // Array identity.
-  assert.deepStrictEqual(Array.from(result.addons, (a) => a.name), ['uBlock Origin', 'Dark Reader']);
+// A complete entry, exactly as the exporter writes it (HTML report and JSON).
+const entry = (o = {}) => ({ id: 'ext1@example.com', name: 'uBlock Origin', version: '1.58.0', enabled: true, type: 'extension', link: 'https://addons.mozilla.org/x', linkType: 'amo-exact', ...o });
+const entryRejects = (o, pattern) => {
+  const result = parseAddonsPayload(payload([entry(), o]));
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, pattern);
+};
+
+test('parseAddonsPayload: one bad entry rejects the whole file, naming it', () => {
+  entryRejects(entry({ name: '' }), /add-on 2: it has no name/);
+  entryRejects(entry({ name: '   ' }), /no name/);
+  entryRejects(entry({ name: 42 }), /no name/);
+  entryRejects(entry({ id: '' }), /no id/);
+  entryRejects(null, /not an object/);
+  entryRejects('text', /not an object/);
 });
 
-test('parseAddonsPayload: every entry invalid -> rejected as no valid add-ons', () => {
-  const result = parseAddonsPayload(payload([{ name: '' }, { notAName: 'x' }]));
+test('parseAddonsPayload: every field must be present and of the right type', () => {
+  for (const key of ['id', 'name', 'version', 'enabled', 'type', 'link', 'linkType']) {
+    const e = entry();
+    delete e[key];
+    entryRejects(e, /fields are not exactly/);
+  }
+  entryRejects(entry({ id: 12345 }), /no id/);
+  entryRejects(entry({ version: 5 }), /version is not text/);
+  entryRejects(entry({ link: ['not', 'a', 'string'] }), /link is not text/);
+  entryRejects(entry({ linkType: null }), /linkType is not text/);
+  entryRejects(entry({ enabled: 'true' }), /enabled is not true or false/);
+  entryRejects(entry({ type: 'Extension' }), /type is not extension or theme/);
+});
+
+test('parseAddonsPayload: a field the exporter does not write rejects the file', () => {
+  entryRejects(entry({ extra: 'x' }), /fields are not exactly/);
+  const result = parseAddonsPayload(JSON.stringify({ formatVersion: EXPORT_FORMAT_VERSION, addons: [entry()], note: 'x' }));
   assert.strictEqual(result.ok, false);
-  assert.match(result.error, /No valid add-ons found/);
+  assert.match(result.error, /not exactly formatVersion, then addons/);
+});
+
+test('parseAddonsPayload: the fields must come in the order the HTML report writes them (id first)', () => {
+  const reordered = { name: 'X', version: '1', type: 'extension', enabled: true, link: 'https://addons.mozilla.org/x', linkType: 'amo-exact', id: 'x@e' };
+  const result = parseAddonsPayload(payload([reordered]));
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /exactly id, name, version, enabled, type, link, linkType, in that order/);
+  assert.strictEqual(parseAddonsPayload(payload([entry()])).ok, true);
+});
+
+test('parseAddonsPayload: the top-level fields must be formatVersion, then addons', () => {
+  const swapped = JSON.stringify({ addons: [entry()], formatVersion: EXPORT_FORMAT_VERSION });
+  assert.strictEqual(parseAddonsPayload(swapped).ok, false);
 });
 
 test('parseAddonsPayload: missing formatVersion', () => {
@@ -131,17 +158,31 @@ test('parseAddonsPayload: formatVersion newer than supported is rejected', () =>
 });
 
 test('parseAddonsPayload: formatVersion exactly at the supported boundary succeeds', () => {
-  const result = parseAddonsPayload(payload([{ name: 'X' }], EXPORT_FORMAT_VERSION));
+  const result = parseAddonsPayload(payload([entry()], EXPORT_FORMAT_VERSION));
   assert.strictEqual(result.ok, true);
 });
 
 test('parseAddonsPayload: valid file succeeds and returns the parsed addons', () => {
-  const result = parseAddonsPayload(payload([
-    { id: 'ext1@example.com', name: 'uBlock Origin', version: '1.58.0', link: 'https://addons.mozilla.org/x' },
-  ]));
+  const result = parseAddonsPayload(payload([entry()]));
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons.length, 1);
-  assert.strictEqual(result.addons[0].name, 'uBlock Origin');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(result.addons[0])), entry());
+});
+
+// The HTML report from the version released on addons.mozilla.org, saved
+// unchanged (tests/fixtures/amo-release.html). Its embedded data is read by
+// the same strict check as everything else.
+test('AMO release: the HTML report from the released version is read in full by the strict check', () => {
+  const html = require('fs').readFileSync(require('path').join(__dirname, 'fixtures', 'amo-release.html'), 'utf8');
+  const m = html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/);
+  assert.ok(m, 'the embedded data is there');
+  const result = parseAddonsPayload(m[1]);
+  assert.strictEqual(result.ok, true, result.error);
+  assert.strictEqual(result.addons.length, 15);
+  assert.ok(result.addons.some((a) => a.id === 'addons-exporter@local' && a.name === 'Add-ons Exporter'));
+  const theme = result.addons.find((a) => a.type === 'theme');
+  assert.strictEqual(theme.enabled, false);
+  assert.ok(result.addons.every((a) => a.id && a.link.startsWith('https://addons.mozilla.org/')));
 });
 
 // --- A6: a v1.0.0 (bare-array) export is rejected with a clear reason ---
@@ -170,30 +211,14 @@ test('parseAddonsPayload: a fractional formatVersion is rejected', () => {
   assert.match(result.error, /missing its export format version/);
 });
 
-test('parseAddonsPayload: a non-string id/version/link is dropped rather than trusted as-is', () => {
-  const result = parseAddonsPayload(payload([
-    { name: 'Weird Types', id: 12345, version: 5, link: ['not', 'a', 'string'] },
-  ]));
-  assert.strictEqual(result.ok, true);
-  const a = result.addons[0];
-  assert.strictEqual(a.id, undefined);
-  assert.strictEqual(a.version, undefined);
-  assert.strictEqual(a.link, undefined);
-  assert.strictEqual(a.name, 'Weird Types', 'the valid name field should be unaffected');
-});
-
 test('parseAddonsPayload: an exact duplicate entry is de-duplicated', () => {
-  const entry = { id: 'a@x', name: 'Same', version: '1', link: 'https://example.com/a' };
-  const result = parseAddonsPayload(payload([entry, { ...entry }]));
+  const result = parseAddonsPayload(payload([entry(), entry()]));
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons.length, 1, 'the duplicate entry should not produce a second row');
 });
 
-test('parseAddonsPayload: two different add-ons sharing no id/link are not treated as duplicates', () => {
-  const result = parseAddonsPayload(payload([
-    { name: 'Alpha' },
-    { name: 'Beta' },
-  ]));
+test('parseAddonsPayload: two different add-ons are not treated as duplicates', () => {
+  const result = parseAddonsPayload(payload([entry({ id: 'a@x', name: 'Alpha' }), entry({ id: 'b@x', name: 'Beta' })]));
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons.length, 2);
 });
@@ -519,13 +544,28 @@ function jsonFile(addons, formatVersion = EXPORT_FORMAT_VERSION) {
   return JSON.stringify({ formatVersion, addons });
 }
 
+const jsonEntry = { name: 'uBlock Origin', version: '1.58.0', type: 'extension', enabled: true, link: 'https://addons.mozilla.org/x', linkType: 'amo-exact', id: 'ext1@example.com' };
+
 test('parseJsonPayload: valid JSON file succeeds and returns the parsed addons', () => {
-  const result = parseJsonPayload(jsonFile([
-    { id: 'ext1@example.com', name: 'uBlock Origin', version: '1.58.0', enabled: true, type: 'extension', link: 'https://addons.mozilla.org/x', linkType: 'amo-exact' },
-  ]));
+  const result = parseJsonPayload(jsonFile([jsonEntry]));
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons.length, 1);
   assert.strictEqual(result.addons[0].name, 'uBlock Origin');
+});
+
+test('parseJsonPayload: the fields must come in the JSON export\'s order (name first, id last), not the HTML report\'s', () => {
+  const htmlOrder = { id: 'ext1@example.com', name: 'uBlock Origin', version: '1.58.0', enabled: true, type: 'extension', link: 'https://addons.mozilla.org/x', linkType: 'amo-exact' };
+  const result = parseJsonPayload(jsonFile([htmlOrder]));
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /exactly name, version, type, enabled, link, linkType, id, in that order/);
+});
+
+test('parseJsonPayload: the real JSON export is accepted, with and without shortened names', () => {
+  for (const shorten of [true, false]) {
+    const list = [{ id: 'b@x', name: 'Buster: Captcha Solver', version: '1', enabled: true, type: 'extension', link: 'https://example.com/b', linkType: 'amo-exact' },
+      { id: 't@x', name: 'Night - Theme', version: '2', enabled: false, type: 'theme', link: 'https://example.com/t', linkType: 'homepage' }];
+    assert.strictEqual(parseJsonPayload(sandbox.buildJsonExport(list, shorten)).ok, true);
+  }
 });
 
 test('parseJsonPayload: throws on malformed JSON', () => {
@@ -563,121 +603,99 @@ test('parseCsvRow: handles an empty field', () => {
 });
 
 // --- parseCsvPayload ---
+// The importer accepts exactly what buildCsvExport() writes and nothing else.
 
-function csvFile(addons, formatVersion = EXPORT_FORMAT_VERSION) {
-  const header = 'id,name,version,enabled,type,link,linkType';
-  const rows = addons.map((a) =>
-    [a.id || '', a.name || '', a.version || '', a.enabled, a.type || '', a.link || '', a.linkType || ''].join(',')
-  );
-  return [`# addons-hub-format-version: ${formatVersion}`, header, ...rows].join('\r\n');
-}
+const CSV_HEAD = 'name,version,type,enabled,link,linkType,id';
+const csvLines = (rows, formatVersion = EXPORT_FORMAT_VERSION, header = CSV_HEAD) =>
+  [`# addons-hub-format-version: ${formatVersion}`, header, ...rows].join('\r\n');
+const csvRow = (o = {}) => {
+  const a = { name: 'uBlock Origin', version: '1.0', type: 'extension', enabled: 'true', link: 'https://x.com/', linkType: 'amo-exact', id: 'a@e.com', ...o };
+  return [a.name, a.version, a.type, a.enabled, a.link, a.linkType, a.id].join(',');
+};
+const csvRejects = (text, pattern) => {
+  const r = parseCsvPayload(text);
+  assert.strictEqual(r.ok, false);
+  assert.match(r.error, pattern);
+};
 
-test('parseCsvPayload: valid CSV file succeeds and returns the parsed addons', () => {
-  const result = parseCsvPayload(csvFile([
-    { id: 'ext1@example.com', name: 'uBlock Origin', version: '1.58.0', enabled: true, type: 'extension', link: 'https://addons.mozilla.org/x', linkType: 'amo-exact' },
-  ]));
+test('parseCsvPayload: a file the exporter wrote is read back, every field', () => {
+  const result = parseCsvPayload(csvLines([csvRow(), csvRow({ name: 'Midnight', type: 'theme', enabled: 'false', id: 'b@e.com' })]));
   assert.strictEqual(result.ok, true);
-  assert.strictEqual(result.addons.length, 1);
-  assert.strictEqual(result.addons[0].name, 'uBlock Origin');
-});
-
-test('parseCsvPayload: converts enabled field from string to boolean', () => {
-  const result = parseCsvPayload(csvFile([
-    { id: 'a@e.com', name: 'Enabled One', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' },
-    { id: 'b@e.com', name: 'Disabled One', version: '1.0', enabled: false, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' },
-  ]));
-  assert.strictEqual(result.ok, true);
-  assert.strictEqual(result.addons[0].enabled, true);
+  assert.strictEqual(result.addons.length, 2);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(result.addons[0])),
+    { name: 'uBlock Origin', version: '1.0', type: 'extension', enabled: true, link: 'https://x.com/', linkType: 'amo-exact', id: 'a@e.com' });
+  assert.strictEqual(result.addons[1].type, 'theme');
   assert.strictEqual(result.addons[1].enabled, false);
 });
 
 test('parseCsvPayload: missing format-version comment is rejected', () => {
-  const result = parseCsvPayload('id,name,version,enabled,type,link,linkType\next1,uBlock Origin,1.0,true,extension,https://x.com/,amo-exact');
-  assert.strictEqual(result.ok, false);
-  assert.match(result.error, /no format-version comment found/);
+  csvRejects(`${CSV_HEAD}\n${csvRow()}`, /no format-version comment found/);
+});
+
+test('parseCsvPayload: the format-version comment must be exactly the exporter\'s (no padding commas, no extra spaces)', () => {
+  csvRejects(`# addons-hub-format-version: ${EXPORT_FORMAT_VERSION},,,,,,\r\n${CSV_HEAD}\r\n${csvRow()}`, /no format-version comment found/);
+  csvRejects(`#addons-hub-format-version: ${EXPORT_FORMAT_VERSION}\r\n${CSV_HEAD}\r\n${csvRow()}`, /no format-version comment found/);
 });
 
 test('parseCsvPayload: rejects a newer formatVersion', () => {
-  const result = parseCsvPayload(csvFile([{ id: 'x@e.com', name: 'X', version: '1.0', enabled: true, type: 'extension', link: 'https://x.com/', linkType: 'amo-exact' }], EXPORT_FORMAT_VERSION + 1));
-  assert.strictEqual(result.ok, false);
-  assert.match(result.error, /newer version of Add-ons Exporter/);
+  csvRejects(csvLines([csvRow()], EXPORT_FORMAT_VERSION + 1), /newer version of Add-ons Exporter/);
 });
 
-test('parseCsvPayload: missing expected columns is rejected', () => {
-  const result = parseCsvPayload(`# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}\r\nid,name\r\next1,uBlock Origin`);
-  assert.strictEqual(result.ok, false);
-  assert.match(result.error, /missing expected CSV columns/);
+test('parseCsvPayload: the header must be exactly the exporter\'s: a different column order, a missing or an extra column is rejected', () => {
+  csvRejects(csvLines([csvRow()], EXPORT_FORMAT_VERSION, 'id,name,version,enabled,type,link,linkType'), /header row must be/);
+  csvRejects(csvLines([csvRow()], EXPORT_FORMAT_VERSION, 'name,version,type,enabled,link,linkType'), /header row must be/);
+  csvRejects(csvLines([csvRow()], EXPORT_FORMAT_VERSION, CSV_HEAD + ',extra'), /header row must be/);
+  csvRejects(csvLines([csvRow()], EXPORT_FORMAT_VERSION, 'Name,Version,Type,Enabled,Link,LinkType,Id'), /header row must be/);
 });
 
 test('parseCsvPayload: no data rows is rejected', () => {
-  const result = parseCsvPayload(`# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}\r\nid,name,version,enabled,type,link,linkType`);
-  assert.strictEqual(result.ok, false);
-  assert.match(result.error, /No add-ons found/);
+  csvRejects(csvLines([]), /No add-ons found/);
 });
 
-test('parseCsvPayload: drops rows with blank names, keeps valid ones', () => {
-  const result = parseCsvPayload(csvFile([
-    { id: 'a@e.com', name: 'uBlock Origin', version: '1.0', enabled: true, type: 'extension', link: 'https://x.com/', linkType: 'amo-exact' },
-    { id: 'b@e.com', name: '', version: '1.0', enabled: true, type: 'extension', link: 'https://x.com/', linkType: 'amo-exact' },
-  ]));
+test('parseCsvPayload: a row with too few or too many fields rejects the whole file, naming the row', () => {
+  csvRejects(csvLines([csvRow(), 'Short,1.0,extension,true']), /row 2 has 4 fields instead of 7/);
+  csvRejects(csvLines([csvRow() + ',extra']), /row 1 has 8 fields instead of 7/);
+});
+
+test('parseCsvPayload: a row with no name or no id rejects the whole file', () => {
+  csvRejects(csvLines([csvRow({ name: '' })]), /row 1 has no name/);
+  csvRejects(csvLines([csvRow({ id: '' })]), /row 1 has no id/);
+});
+
+test('parseCsvPayload: type must be extension or theme, enabled must be true or false (exactly, lower case)', () => {
+  csvRejects(csvLines([csvRow({ type: 'Extension' })]), /unknown type/);
+  csvRejects(csvLines([csvRow({ type: '' })]), /unknown type/);
+  csvRejects(csvLines([csvRow({ enabled: 'TRUE' })]), /unknown enabled value/);
+  csvRejects(csvLines([csvRow({ enabled: 'yes' })]), /unknown enabled value/);
+});
+
+test('parseCsvPayload: a blank line, including a trailing one, is rejected', () => {
+  csvRejects(csvLines([csvRow(), '']), /row 2 has 1 fields instead of 7/);
+  csvRejects(csvLines([csvRow(), '', csvRow({ id: 'b@e.com' })]), /row 2 has 1 fields/);
+});
+
+test('parseCsvPayload: CRLF or LF line endings are both read (a checkout may convert them)', () => {
+  const result = parseCsvPayload(csvLines([csvRow()]).replace(/\r\n/g, '\n'));
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons.length, 1);
-  assert.strictEqual(result.addons[0].name, 'uBlock Origin');
 });
 
-test('parseCsvPayload: handles CRLF and LF line endings', () => {
-  const withLf = csvFile([
-    { id: 'a@e.com', name: 'uBlock Origin', version: '1.0', enabled: true, type: 'extension', link: 'https://x.com/', linkType: 'amo-exact' },
-  ]).replace(/\r\n/g, '\n');
-  const result = parseCsvPayload(withLf);
-  assert.strictEqual(result.ok, true);
-  assert.strictEqual(result.addons.length, 1);
-});
+// --- whole-text CSV parsing (parseCsvRecords) ---
 
-// --- A25: whole-text CSV parsing (parseCsvRecords) ---
-
-test('parseCsvRow: a stray character right after a closing quote folds into that field, not a phantom column', () => {
-  assert.deepStrictEqual(Array.from(parseCsvRow('"abc"def,x')), ['abcdef', 'x']);
+test('parseCsvPayload: text a CSV writer never produces is rejected, not repaired', () => {
+  csvRejects(csvLines([csvRow({ name: '"abc"def' })]), /unexpected text after a closing quote/);
+  csvRejects(csvLines([csvRow({ name: 'ab"c' })]), /quote inside an unquoted value/);
+  csvRejects(csvLines([csvRow({ name: '"never closed' })]), /never closed/);
 });
 
 test('parseCsvPayload: a quoted field containing a real newline stays one field, not two rows', () => {
-  const text = [
-    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
-    'id,name,version,enabled,type,link,linkType',
-    'a@e.com,"Line1\nLine2",1.0,true,extension,https://x.com/,amo-exact',
-  ].join('\r\n');
-  const result = parseCsvPayload(text);
+  const result = parseCsvPayload(csvLines([csvRow({ name: '"Line1\nLine2"' })]));
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons.length, 1, 'should be one add-on, not two');
   assert.strictEqual(result.addons[0].name, 'Line1\nLine2');
 });
 
-test('parseCsvPayload: a spreadsheet-padded format-version comment line is still recognised', () => {
-  const text = [
-    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION},,,,,,`,
-    'id,name,version,enabled,type,link,linkType',
-    'a@e.com,X,1.0,true,extension,https://x.com/,amo-exact',
-  ].join('\r\n');
-  const result = parseCsvPayload(text);
-  assert.strictEqual(result.ok, true);
-});
-
-// --- A26: enabled is parsed case-insensitively ---
-
-test('parseCsvPayload: enabled is parsed case-insensitively (a spreadsheet often capitalizes it)', () => {
-  const text = [
-    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
-    'id,name,version,enabled,type,link,linkType',
-    'a@e.com,A,1.0,TRUE,extension,https://x.com/,amo-exact',
-    'b@e.com,B,1.0,False,extension,https://x.com/,amo-exact',
-  ].join('\r\n');
-  const result = parseCsvPayload(text);
-  assert.strictEqual(result.ok, true);
-  assert.strictEqual(result.addons[0].enabled, true);
-  assert.strictEqual(result.addons[1].enabled, false);
-});
-
-// --- A24 (import side): stripping the formula-injection guard ---
+// --- stripping the formula-injection guard ---
 
 test('parseCsvPayload: strips the leading-apostrophe formula guard back off on import', () => {
   const csv = buildCsvExport([
@@ -690,26 +708,16 @@ test('parseCsvPayload: strips the leading-apostrophe formula guard back off on i
 });
 
 test('parseCsvPayload: a name that genuinely starts with an apostrophe (not our guard) is left alone', () => {
-  const text = [
-    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
-    'id,name,version,enabled,type,link,linkType',
-    `a@e.com,"'Twas Great",1.0,true,extension,https://x.com/,amo-exact`,
-  ].join('\r\n');
-  const result = parseCsvPayload(text);
+  const result = parseCsvPayload(csvLines([csvRow({ name: `"'Twas Great"` })]));
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons[0].name, "'Twas Great");
 });
 
-// --- A27: de-duplication ---
+// --- de-duplication ---
 
 test('parseCsvPayload: an exact duplicate row is de-duplicated', () => {
-  const text = [
-    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
-    'id,name,version,enabled,type,link,linkType',
-    'a@e.com,Same,1.0,true,extension,https://x.com/a,amo-exact',
-    'a@e.com,Same,1.0,true,extension,https://x.com/a,amo-exact',
-  ].join('\r\n');
-  const result = parseCsvPayload(text);
+  const row = csvRow({ name: 'Same', link: 'https://x.com/a' });
+  const result = parseCsvPayload(csvLines([row, row]));
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons.length, 1, 'the duplicate row should not produce a second entry');
 });
@@ -720,8 +728,15 @@ test('parseCsvPayload: an exact duplicate row is de-duplicated', () => {
 // a real element tree with makeFakeDom, then drives the real
 // searchInput/selectAllBtn handlers.
 
+// Test fixtures name only what a test cares about; the rest is filled in so
+// the file passes the importer's strict check, as a real export does.
+const completeAddon = (a, i) => {
+  const full = { id: `fixture-${i}@example.com`, version: '1.0', enabled: true, type: 'extension', link: `https://example.com/${i}`, linkType: 'amo-exact', ...a };
+  // The JSON export's field order.
+  return { name: full.name, version: full.version, type: full.type, enabled: full.enabled, link: full.link, linkType: full.linkType, id: full.id };
+};
 function jsonAddonsFile(addons, formatVersion = EXPORT_FORMAT_VERSION) {
-  return { name: 'addons.json', text: async () => JSON.stringify({ formatVersion, addons }) };
+  return { name: 'addons.json', text: async () => JSON.stringify({ formatVersion, addons: addons.map(completeAddon) }) };
 }
 
 async function renderRealImportList(addons, installed = []) {
@@ -1167,7 +1182,7 @@ testAsync('remove file (x): choosing another file while it is animating out keep
 
 testAsync('remove file (x): a load that is still in flight can no longer draw anything once x is pressed', async () => {
   let release;
-  const slowFile = { name: 'slow.json', size: 10, text: () => new Promise((resolve) => { release = () => resolve(JSON.stringify({ formatVersion: 1, addons: [{ id: 'z@x', name: 'Late', version: '1', link: 'https://example.com/z' }] })); }) };
+  const slowFile = { name: 'slow.json', size: 10, text: () => new Promise((resolve) => { release = () => resolve(JSON.stringify({ formatVersion: 1, addons: [{ name: 'Late', version: '1', type: 'extension', enabled: true, link: 'https://example.com/z', linkType: 'amo-exact', id: 'z@x' }] })); }) };
   const { elements, finishAll } = await renderImportForRemoval(REMOVAL_ADDONS, { slowFile });
   elements.removeFileBtn.click();
   release();
@@ -1247,14 +1262,14 @@ test('TXT export: a title, Enabled and Disabled sections, and lined-up columns',
   assert.ok(!/\r\n$/.test(txt), 'no blank line left at the end');
 });
 
-test('CSV export: begins with a byte-order mark, which the importer ignores', () => {
+test('CSV export: begins with a byte-order mark, which the importer ignores (the TXT export has none)', () => {
   const csv = sandbox.buildCsvExport(readableSample, false);
   assert.strictEqual(csv.charCodeAt(0), 0xFEFF);
   assert.strictEqual(sandbox.parseCsvPayload(csv).ok, true);
-  assert.strictEqual(sandbox.parseTxtPayload('﻿' + sandbox.buildTxtExport(readableSample, false)).ok, true);
+  assert.notStrictEqual(sandbox.buildTxtExport(readableSample, false).charCodeAt(0), 0xFEFF);
 });
 
-// --- shortened names, ids, and older exports without ids ---
+// --- shortened names and ids ---
 
 const longNameAddons = [
   { id: 'buster@x', name: 'Buster: Captcha Solver for Humans', version: '3.4.0', enabled: true, type: 'extension', link: 'https://example.com/buster', linkType: 'amo-exact' },
@@ -1297,42 +1312,6 @@ test('TXT export: the id is the sixth column, after the link (the first five are
     assert.match(parts[4], /^https:\/\/example\.com\//);
     assert.match(parts[5], /@x$/);
   }
-});
-
-test('older TXT export (five columns, no id) still imports, with no id', () => {
-  const old = [
-    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
-    '',
-    'uBlock Origin | 1.60.0 | Extension | Enabled | https://example.com/ub',
-    'Old Theme | 1.0 | Theme | Disabled | https://example.com/ot',
-  ].join('\r\n');
-  const r = sandbox.parseTxtPayload(old);
-  assert.strictEqual(r.ok, true);
-  assert.strictEqual(r.addons.length, 2);
-  assert.strictEqual(r.addons[0].name, 'uBlock Origin');
-  assert.strictEqual(r.addons[0].id, undefined);
-  assert.strictEqual(r.addons[1].type, 'theme');
-});
-
-test('older JSON export (no ids, full names) still imports', () => {
-  const r = sandbox.parseJsonPayload(JSON.stringify({ formatVersion: EXPORT_FORMAT_VERSION, addons: [
-    { name: 'Buster: Captcha Solver for Humans', version: '3.4.0', enabled: true, type: 'extension', link: 'https://example.com/b' },
-  ] }));
-  assert.strictEqual(r.ok, true);
-  assert.strictEqual(r.addons[0].name, 'Buster: Captcha Solver for Humans');
-  assert.strictEqual(r.addons[0].id, undefined);
-});
-
-test('older CSV export (the old column order, id first) still imports', () => {
-  const csv = [
-    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
-    'id,name,version,enabled,type,link,linkType',
-    'buster@x,Buster,3.4.0,true,extension,https://example.com/b,amo-exact',
-  ].join('\r\n');
-  const r = sandbox.parseCsvPayload(csv);
-  assert.strictEqual(r.ok, true);
-  assert.strictEqual(r.addons[0].id, 'buster@x');
-  assert.strictEqual(r.addons[0].name, 'Buster');
 });
 
 const installedFull = [
@@ -1392,9 +1371,130 @@ test('end to end: shortened exports in all three formats still match every insta
   }
 });
 
-test('end to end: an older shortened-name TXT with no ids still matches by name', () => {
-  const index = sandbox.buildInstalledIndex(installedFull);
-  const old = [`# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`, '', 'Buster | 3.4.0 | Extension | Enabled | https://example.com/b'].join('\r\n');
-  const r = sandbox.parseTxtPayload(old);
-  assert.strictEqual(sandbox.findInstalledMatch(r.addons[0], index).id, 'buster@x');
+
+// --- TXT: names are restored exactly (escaping) ---
+
+const exactNames = [
+  'Plain Name',
+  'Foo | Bar',
+  '| Leading and trailing |',
+  'Line\nBreak\r\nTool',
+  'C:\\Tools\\new',
+  'Ends with a backslash\\',
+  'Backslash then pipe \\| and \\\\ and \\n written out',
+  '  Padded on both sides  ',
+  'Tab\tinside',
+  '\ttab at the start',
+  'Caf\u00E9 \u5E83\u544A - Pro: Edition, Plus',
+];
+const exactAddons = exactNames.map((name, i) => ({
+  id: `exact${i}@example.com`, name, version: `${i}.0`, enabled: i % 2 === 0, type: i % 3 === 0 ? 'theme' : 'extension',
+  link: `https://example.com/${i}`, linkType: 'homepage',
+}));
+
+test('TXT round trip: every awkward name comes back exactly, with its other fields, one add-on each', () => {
+  const r = sandbox.parseTxtPayload(sandbox.buildTxtExport(exactAddons, false));
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.addons.length, exactAddons.length, 'none lost, none split in two');
+  for (const original of exactAddons) {
+    const back = r.addons.find((a) => a.id === original.id);
+    assert.ok(back, `${original.id} missing`);
+    assert.strictEqual(back.name, original.name);
+    assert.strictEqual(back.version, original.version);
+    assert.strictEqual(back.link, original.link);
+    assert.strictEqual(back.enabled, original.enabled);
+    assert.strictEqual(back.type, original.type);
+  }
+});
+
+test('TXT round trip: with Shorten names on, the shortened name is what comes back, escaped the same way', () => {
+  const list = [{ id: 'sh@example.com', name: 'Foo | Bar \u2013 with a\nline break and \\ too', version: '1', enabled: true, type: 'extension', link: 'https://example.com/s', linkType: 'homepage' }];
+  const r = sandbox.parseTxtPayload(sandbox.buildTxtExport(list, true));
+  assert.strictEqual(r.addons[0].name, sandbox.shortName(list[0].name));
+  assert.strictEqual(r.addons[0].name, 'Foo | Bar');
+});
+
+test('TXT round trip: links with spaces, pipes or line breaks come back as written', () => {
+  const list = [{ id: 'l@example.com', name: 'L', version: '1', enabled: true, type: 'extension', link: 'https://example.com/a b | c\\d', linkType: 'homepage' }];
+  const r = sandbox.parseTxtPayload(sandbox.buildTxtExport(list, false));
+  assert.strictEqual(r.addons[0].link, 'https://example.com/a b | c\\d');
+});
+
+test('TXT round trip: those add-ons still match the installed ones by id', () => {
+  const index = sandbox.buildInstalledIndex(exactAddons.map((a) => ({ id: a.id, name: a.name })));
+  const r = sandbox.parseTxtPayload(sandbox.buildTxtExport(exactAddons, true));
+  for (const item of r.addons) {
+    const m = sandbox.findInstalledMatch(item, index);
+    assert.ok(m && m.id === item.id, `${item.name} should match ${item.id}`);
+  }
+});
+
+test('TXT round trip: with Shorten names off, the exact name also matches by name when the id is unknown', () => {
+  const index = sandbox.buildInstalledIndex(exactAddons.map((a) => ({ id: 'other-' + a.id, name: a.name })));
+  const r = sandbox.parseTxtPayload(sandbox.buildTxtExport(exactAddons, false));
+  for (const item of r.addons) {
+    const m = sandbox.findInstalledMatch(item, index);
+    assert.ok(m && m.id === 'other-' + item.id, `${item.name} should match by name`);
+  }
+});
+
+// --- TXT: only what buildTxtExport() writes is accepted ---
+
+const txtLines = (lines, formatVersion = EXPORT_FORMAT_VERSION) => [`# addons-hub-format-version: ${formatVersion}`, '', ...lines].join('\r\n');
+const txtLine = (o = {}) => {
+  const a = { name: 'Dark Reader', version: '4.9', type: 'Extension', status: 'Enabled', link: 'https://example.com/d', id: 'dr@x', ...o };
+  return [a.name, a.version, a.type, a.status, a.link, a.id].join(' | ');
+};
+const txtRejects = (text, pattern) => {
+  const r = sandbox.parseTxtPayload(text);
+  assert.strictEqual(r.ok, false);
+  assert.match(r.error, pattern);
+};
+
+test('TXT strict: a line with the id missing (five columns) rejects the whole file, naming the line', () => {
+  txtRejects(txtLines([txtLine(), 'Midnight | 1.0 | Theme | Disabled | https://example.com/m']), /line 4 has 5 columns instead of 6/);
+});
+
+test('TXT strict: more than six columns rejects the file', () => {
+  txtRejects(txtLines([txtLine() + ' | extra']), /line 3 has 7 columns instead of 6/);
+});
+
+test('TXT strict: type must be Extension or Theme and status Enabled or Disabled, exactly', () => {
+  txtRejects(txtLines([txtLine({ type: 'extension' })]), /unknown type/);
+  txtRejects(txtLines([txtLine({ type: 'Addon' })]), /unknown type/);
+  txtRejects(txtLines([txtLine({ status: 'enabled' })]), /unknown status/);
+  txtRejects(txtLines([txtLine({ status: '' })]), /unknown status/);
+});
+
+test('TXT strict: no name or no id rejects the file', () => {
+  txtRejects(txtLines([txtLine({ name: '' })]), /no name/);
+  txtRejects(txtLines([txtLine({ id: '' })]), /no id/);
+});
+
+test('TXT strict: a backslash that is not one of the exporter\'s escapes rejects the file', () => {
+  txtRejects(txtLines([txtLine({ name: 'C:\\Tools' })]), /backslash that is not an escape/);
+  txtRejects(txtLines([txtLine({ name: 'Ends with one\\' })]), /backslash that is not an escape/);
+});
+
+test('TXT strict: an unescaped pipe inside a column cannot be mistaken for a name; a bare pipe with no spaces stays text', () => {
+  // "A|B" has no " | ", so it is part of the name only if the exporter left it
+  // unescaped - it never does, but nothing here splits on it either.
+  txtRejects(txtLines([txtLine({ name: 'A | B' })]), /7 columns/);
+});
+
+test('TXT strict: the format-version comment must be exactly the first line, and a byte-order mark is not accepted', () => {
+  txtRejects('\uFEFF' + txtLines([txtLine()]), /no format-version comment found/);
+  txtRejects(`#addons-hub-format-version: ${EXPORT_FORMAT_VERSION}\r\n${txtLine()}`, /no format-version comment found/);
+  txtRejects(`\r\n# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}\r\n${txtLine()}`, /no format-version comment found/);
+});
+
+test('TXT strict: title, section headings and blank lines (no " | " in them) are skipped, as the exporter writes them', () => {
+  const r = sandbox.parseTxtPayload(txtLines(['Firefox Add-ons - 1 in total (1 enabled, 0 disabled)', '', 'Enabled (1)', '-----------', txtLine(), '']));
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.addons.length, 1);
+  assert.strictEqual(r.addons[0].id, 'dr@x');
+});
+
+test('TXT strict: a file with headings only is "No add-ons found"', () => {
+  txtRejects(txtLines(['Firefox Add-ons - 0 in total (0 enabled, 0 disabled)']), /No add-ons found/);
 });
