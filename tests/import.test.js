@@ -39,7 +39,7 @@ const {
   parseAddonsPayload,
   parseJsonPayload,
   parseCsvPayload,
-  parseCsvRow,
+  parseCsvRecords,
   buildInstalledIndex,
   findInstalledMatch,
   migrateAddonsData,
@@ -584,22 +584,15 @@ test('parseJsonPayload: rejects an empty addons array', () => {
   assert.match(result.error, /No add-ons found/);
 });
 
-// --- parseCsvRow ---
+// --- parseCsvRecords ---
 
-test('parseCsvRow: splits a plain unquoted row', () => {
-  assert.deepStrictEqual(Array.from(parseCsvRow('a,b,c')), ['a', 'b', 'c']);
-});
-
-test('parseCsvRow: handles a quoted field containing a comma', () => {
-  assert.deepStrictEqual(Array.from(parseCsvRow('"Hello, World",b,c')), ['Hello, World', 'b', 'c']);
-});
-
-test('parseCsvRow: handles doubled double-quotes inside a quoted field', () => {
-  assert.deepStrictEqual(Array.from(parseCsvRow('"Say ""Hi""",b')), ['Say "Hi"', 'b']);
-});
-
-test('parseCsvRow: handles an empty field', () => {
-  assert.deepStrictEqual(Array.from(parseCsvRow('a,,c')), ['a', '', 'c']);
+test('parseCsvRecords: plain, quoted (comma, doubled quote, line break) and empty fields', () => {
+  const rows = parseCsvRecords('a,b,c\n"Hello, World","Say ""Hi""","two\nlines"\nx,,z');
+  assert.deepStrictEqual(Array.from(rows, (r) => Array.from(r)), [
+    ['a', 'b', 'c'],
+    ['Hello, World', 'Say "Hi"', 'two\nlines'],
+    ['x', '', 'z'],
+  ]);
 });
 
 // --- parseCsvPayload ---

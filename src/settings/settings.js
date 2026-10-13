@@ -83,7 +83,7 @@ function parseSettingsFile(text) {
 // --- DOM wiring ---
 
 const themeRadios = document.querySelectorAll('input[name="theme"]');
-const formatRadios = document.querySelectorAll('input[name="exportFormat"]');
+const formatBoxes = document.querySelectorAll('input[name="exportFormat"]');
 const shortenRadios = document.querySelectorAll('input[name="shortenNames"]');
 const exportSettingsBtn = document.getElementById('exportSettingsBtn');
 const importSettingsBtn = document.getElementById('importSettingsBtn');
@@ -250,7 +250,7 @@ async function loadCurrentExportFormat() {
     stored = {};
   }
   const current = resolveExportFormats(stored && stored[EXPORT_FORMAT_STORAGE_KEY]);
-  for (const box of formatRadios) {
+  for (const box of formatBoxes) {
     box.checked = current.includes(box.value);
   }
   // Keep the localStorage cache in sync so settings-init.js can apply
@@ -275,9 +275,9 @@ for (const radio of themeRadios) {
 
 // The export formats are tick boxes: any number can be on, but never none -
 // unticking the last one just puts it back (there must be something to export).
-for (const box of formatRadios) {
+for (const box of formatBoxes) {
   box.addEventListener('change', async () => {
-    const ticked = Array.from(formatRadios).filter((b) => b.checked).map((b) => b.value);
+    const ticked = Array.from(formatBoxes).filter((b) => b.checked).map((b) => b.value);
     if (ticked.length === 0) {
       box.checked = true;
       return;
@@ -421,7 +421,7 @@ settingsFileInput.addEventListener('change', async () => {
     radio.checked = radio.value === theme;
   }
   applyTheme(theme);
-  for (const box of formatRadios) {
+  for (const box of formatBoxes) {
     box.checked = exportFormats.includes(box.value);
   }
   for (const radio of shortenRadios) {
@@ -614,7 +614,7 @@ if (browser.runtime.onMessage) {
 // Keep this page's options in step with the stored settings when they change
 // from somewhere else: another Settings tab, a settings import, a reset. (The
 // theme itself is applied by theme.js; this keeps the radio buttons honest.)
-// Programmatically ticking a radio does not fire its change event, so this
+// Programmatically ticking a radio or box does not fire its change event, so this
 // cannot loop back into saving.
 if (browser.storage && browser.storage.onChanged) {
   browser.storage.onChanged.addListener((changes, area) => {

@@ -74,7 +74,7 @@ async function captureExportClick({ selectedIds, exportResponse }) {
 testAsync('export.js click handler: saves nothing itself and replaces its page with confirmation.html', async () => {
   const { createdTabUrls, navigatedUrls } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
-    exportResponse: { format: 'html', stats: { total: 1, lookupFailures: 0 } },
+    exportResponse: { formats: ['html'], stats: { total: 1, lookupFailures: 0 } },
   });
   assert.strictEqual(createdTabUrls.length, 0, 'no second tab');
   assert.deepStrictEqual(navigatedUrls, [
@@ -86,7 +86,7 @@ testAsync('export.js click handler: on desktop, the confirmation URL carries the
   for (const format of ['json', 'csv']) {
     const { navigatedUrls } = await captureExportClick({
       selectedIds: ['ext1@example.com'],
-      exportResponse: { format, stats: { total: 1, lookupFailures: 0 } },
+      exportResponse: { formats: [format], stats: { total: 1, lookupFailures: 0 } },
     });
     assert.match(navigatedUrls[0], new RegExp(`confirmation\\.html\\?from=export&format=${format}$`));
   }
@@ -97,7 +97,7 @@ testAsync('export.js click handler: on desktop, the confirmation URL carries the
 testAsync('export.js click handler: re-enables Export Selected after a successful desktop export', async () => {
   const { exportBtnEl } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
-    exportResponse: { format: 'html', stats: { total: 1, lookupFailures: 0 } },
+    exportResponse: { formats: ['html'], stats: { total: 1, lookupFailures: 0 } },
   });
   assert.strictEqual(exportBtnEl.disabled, false, 'the button should not stay stuck disabled after success');
 });
@@ -105,7 +105,7 @@ testAsync('export.js click handler: re-enables Export Selected after a successfu
 testAsync('export.js click handler: success message names a non-HTML format', async () => {
   const { statusEl } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
-    exportResponse: { format: 'json', stats: { total: 1, lookupFailures: 0 } },
+    exportResponse: { formats: ['json'], stats: { total: 1, lookupFailures: 0 } },
   });
   assert.match(statusEl.textContent, /JSON file/);
   assert.doesNotMatch(statusEl.textContent, /report/);
@@ -114,7 +114,7 @@ testAsync('export.js click handler: success message names a non-HTML format', as
 testAsync('export.js click handler: success message reports lookup failures when there were any', async () => {
   const { statusEl } = await captureExportClick({
     selectedIds: ['ext1@example.com', 'ext2@example.com'],
-    exportResponse: { format: 'html', stats: { total: 2, lookupFailures: 1 } },
+    exportResponse: { formats: ['html'], stats: { total: 2, lookupFailures: 1 } },
   });
   assert.match(statusEl.textContent, /1 of 2 add\u2011ons couldn\u2019t be looked up on AMO/);
 });
@@ -122,7 +122,7 @@ testAsync('export.js click handler: success message reports lookup failures when
 testAsync('export.js click handler: no lookup-failure mention when there weren\'t any', async () => {
   const { statusEl } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
-    exportResponse: { format: 'html', stats: { total: 1, lookupFailures: 0 } },
+    exportResponse: { formats: ['html'], stats: { total: 1, lookupFailures: 0 } },
   });
   assert.doesNotMatch(statusEl.textContent, /couldn't be looked up/);
 });
@@ -132,7 +132,7 @@ testAsync('export.js click handler: no lookup-failure mention when there weren\'
 testAsync('export.js success message: shows "all found on AMO" when all are exact/search matches', async () => {
   const { statusEl } = await captureExportClick({
     selectedIds: ['ext1@example.com', 'ext2@example.com'],
-    exportResponse: { format: 'html', stats: { total: 2, amoExact: 1, amoSearch: 1, homepage: 0, searchFallback: 0, lookupFailures: 0, lookupsSkipped: 0 } },
+    exportResponse: { formats: ['html'], stats: { total: 2, amoExact: 1, amoSearch: 1, homepage: 0, searchFallback: 0, lookupFailures: 0, lookupsSkipped: 0 } },
   });
   assert.match(statusEl.textContent, /All 2 add\u2011ons found on AMO/);
 });
@@ -140,7 +140,7 @@ testAsync('export.js success message: shows "all found on AMO" when all are exac
 testAsync('export.js success message: shows mixed breakdown when some are AMO and some are fallback', async () => {
   const { statusEl } = await captureExportClick({
     selectedIds: ['ext1@example.com', 'ext2@example.com', 'ext3@example.com'],
-    exportResponse: { format: 'html', stats: { total: 3, amoExact: 2, amoSearch: 0, homepage: 1, searchFallback: 0, lookupFailures: 0, lookupsSkipped: 0 } },
+    exportResponse: { formats: ['html'], stats: { total: 3, amoExact: 2, amoSearch: 0, homepage: 1, searchFallback: 0, lookupFailures: 0, lookupsSkipped: 0 } },
   });
   assert.match(statusEl.textContent, /2 found on AMO, 1 got a fallback link/);
 });
@@ -148,7 +148,7 @@ testAsync('export.js success message: shows mixed breakdown when some are AMO an
 testAsync('export.js success message: shows fallback-only message when AMO found nothing', async () => {
   const { statusEl } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
-    exportResponse: { format: 'html', stats: { total: 1, amoExact: 0, amoSearch: 0, homepage: 0, searchFallback: 1, lookupFailures: 0, lookupsSkipped: 0 } },
+    exportResponse: { formats: ['html'], stats: { total: 1, amoExact: 0, amoSearch: 0, homepage: 0, searchFallback: 1, lookupFailures: 0, lookupsSkipped: 0 } },
   });
   assert.match(statusEl.textContent, /1 add\u2011on got a fallback link \(AMO had no match\)/);
 });
@@ -156,7 +156,7 @@ testAsync('export.js success message: shows fallback-only message when AMO found
 testAsync('export.js success message: shows skipped-lookups note when deadline was hit', async () => {
   const { statusEl } = await captureExportClick({
     selectedIds: ['ext1@example.com', 'ext2@example.com'],
-    exportResponse: { format: 'html', stats: { total: 2, amoExact: 1, amoSearch: 0, homepage: 0, searchFallback: 1, lookupFailures: 0, lookupsSkipped: 1 } },
+    exportResponse: { formats: ['html'], stats: { total: 2, amoExact: 1, amoSearch: 0, homepage: 0, searchFallback: 1, lookupFailures: 0, lookupsSkipped: 1 } },
   });
   assert.match(statusEl.textContent, /1 add\u2011on skipped AMO \(deadline reached\)/);
 });

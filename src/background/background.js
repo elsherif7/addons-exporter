@@ -6,14 +6,13 @@ browser.runtime.onMessage.addListener((message) => {
     return Promise.resolve(queueTabOpens(message.urls));
   }
   if (message.type === 'export') {
-    return doExport(message.ids).then(async ({ html, filename, files, formats, format, stats }) => {
-      // One format: that file, as it always was. Several: they are bundled
-      // into ONE zip, so there is a single Save dialog instead of one per file.
-      const list = files || [{ html, filename, format }];
+    return doExport(message.ids).then(async ({ files: list, formats, stats }) => {
+      // One format: that file. Several: they are bundled into ONE zip, so
+      // there is a single Save dialog instead of one per file.
       let blob;
       let saveName;
       if (list.length > 1) {
-        const zipBytes = buildZip(list.map((f) => ({ name: f.filename, content: f.html })));
+        const zipBytes = buildZip(list.map((f) => ({ name: f.filename, content: f.content })));
         blob = new Blob([zipBytes], { type: 'application/zip' });
         saveName = list[0].filename.replace(/\.\w+$/, '') + '.zip';
       } else {
@@ -21,7 +20,7 @@ browser.runtime.onMessage.addListener((message) => {
           : list[0].format === 'csv' ? 'text/csv'
           : list[0].format === 'txt' ? 'text/plain'
           : 'text/html';
-        blob = new Blob([list[0].html], { type: mimeType });
+        blob = new Blob([list[0].content], { type: mimeType });
         saveName = list[0].filename;
       }
       const url = URL.createObjectURL(blob);
@@ -33,7 +32,7 @@ browser.runtime.onMessage.addListener((message) => {
 
       // No tab is opened from here: export.js replaces its own page with
       // the confirmation page once it gets this result back.
-      return { format, formats: formats || [format], zipped: list.length > 1, stats };
+      return { formats, zipped: list.length > 1, stats };
     });
   }
 });
@@ -304,15 +303,11 @@ async function doExport(ids, {
     else if (fmt === 'csv') content = buildCsvExport(list, shorten);
     else if (fmt === 'txt') content = buildTxtExport(list, shorten);
     else content = buildHtmlReport(list, theme, shorten);
-    return { html: content, filename: `Firefox Add-ons (${timestamp}).${fmt}`, format: fmt };
+    return { content, filename: `Firefox Add-ons (${timestamp}).${fmt}`, format: fmt };
   });
 
-  // html / filename / format are the first file's, kept for anything that
-  // only deals with one; files and formats carry every one.
+  // files carries each exported file ({ content, filename, format }).
   return {
-    html: files[0].html,
-    filename: files[0].filename,
-    format: files[0].format,
     files,
     formats: files.map((f) => f.format),
     stats,

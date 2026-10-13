@@ -16,7 +16,7 @@ const HTML_PAGES = [
 ];
 
 // --- settings-option-row refactor ---
-// Every Settings option row (radio rows and action rows) must use the
+// Every Settings option row (radio and tick-box rows, and action rows) must use the
 // shared settings-option-row class. These tests act as tripwires: they
 // catch regressions where someone adds a new row with a specialized
 // class instead of the canonical one, or accidentally reintroduces the
@@ -24,24 +24,11 @@ const HTML_PAGES = [
 
 const settingsHtml = readSrc('src/settings/settings.html');
 
-// Tripwire: old specialized class names must not exist anywhere in
-// settings.html. If any of these appear it means someone added a row
-// without using the shared implementation.
-test('settings-option-row: theme-option class no longer exists in settings.html', () => {
-  assert.doesNotMatch(settingsHtml, /class="[^"]*theme-option[^"]*"/,
-    'theme-option found — use settings-option-row instead');
-});
-
-test('settings-option-row: about-block-hover class no longer exists in settings.html', () => {
-  assert.doesNotMatch(settingsHtml, /class="[^"]*about-block-hover[^"]*"/,
-    'about-block-hover found — the Reset row should use settings-option-row instead');
-});
-
 // Structural: all 8 option rows use settings-option-row.
-test('settings-option-row: all 8 radio label rows use settings-option-row', () => {
+test('settings-option-row: all 8 option label rows (radios and tick boxes) use settings-option-row', () => {
   const matches = [...settingsHtml.matchAll(/<label[^>]+class="settings-option-row"[^>]*>/g)];
   assert.strictEqual(matches.length, 8,
-    `expected 8 radio label rows with class="settings-option-row", found ${matches.length}`);
+    `expected 8 option label rows with class="settings-option-row", found ${matches.length}`);
 });
 
 test('settings-option-row: the Reset Settings action row uses settings-option-row', () => {
@@ -49,8 +36,8 @@ test('settings-option-row: the Reset Settings action row uses settings-option-ro
     'Reset Settings row should be a <div class="settings-option-row"> containing resetSettingsBtn');
 });
 
-// Semantics: radio rows use <label> (not <div>), Reset uses <div> (not <label>).
-test('settings-option-row: radio rows are <label> elements (not <div>)', () => {
+// Semantics: option rows use <label> (not <div>), Reset uses <div> (not <label>).
+test('settings-option-row: option rows are <label> elements (not <div>)', () => {
   // A <div class="settings-option-row"> that contains a radio input would be wrong.
   assert.doesNotMatch(settingsHtml,
     /<div class="settings-option-row">[^<]*<input type="radio"/,
@@ -68,7 +55,7 @@ test('settings-option-row: Reset Settings uses a native <button> (not a radio in
     'Reset Settings row must not contain a radio input');
 });
 
-// Radio IDs, names, and values unchanged after the refactor.
+// Option input IDs, names, and values unchanged after the refactor.
 for (const [id, name, value] of [
   ['themeLight',      'theme',        'light'],
   ['themeDark',       'theme',        'dark'],
@@ -79,7 +66,7 @@ for (const [id, name, value] of [
   ['shortenNamesOn',  'shortenNames', 'on'],
   ['shortenNamesOff', 'shortenNames', 'off'],
 ]) {
-  test(`settings-option-row: radio #${id} has name="${name}" and value="${value}"`, () => {
+  test(`settings-option-row: input #${id} has name="${name}" and value="${value}"`, () => {
     const re = new RegExp(`id="${id}"[^>]*name="${name}"[^>]*value="${value}"|id="${id}"[^>]*value="${value}"[^>]*name="${name}"`);
     // The input tag itself carries id/name/value; order may vary.
     const inputRe = new RegExp(`<input[^>]*\\bid="${id}"[^>]*>`);
@@ -90,8 +77,8 @@ for (const [id, name, value] of [
   });
 }
 
-// label/input associations: every radio <label> must have a for= that
-// matches its radio's id.
+// label/input associations: every option <label> must have a for= that
+// matches its input's id.
 for (const [labelFor, radioId] of [
   ['themeLight',      'themeLight'],
   ['themeDark',       'themeDark'],
@@ -108,7 +95,7 @@ for (const [labelFor, radioId] of [
       `label with for="${labelFor}" not found using settings-option-row`);
     assert.match(settingsHtml,
       new RegExp(`<input[^>]+id="${radioId}"`),
-      `radio input with id="${radioId}" not found`);
+      `option input with id="${radioId}" not found`);
   });
 }
 
@@ -333,12 +320,6 @@ test('motion: the theme switch is a plain cross-fade (no blur, no zoom)', () => 
   }
 });
 
-test('motion: nothing leaves a full-screen overlay behind (the old .theme-flash veil is gone)', () => {
-  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
-    assert.doesNotMatch(src, /\.theme-flash/, `${name} still has .theme-flash`);
-  }
-});
-
 test('motion: shared.css has the .replay-reset rule replayEntrance() depends on (covers everything inside the card)', () => {
   assert.match(sharedCssForMotion, /\.replay-reset,\s*\.replay-reset \*\s*\{\s*animation:\s*none/);
 });
@@ -387,6 +368,20 @@ test('settings: pressing Settings again (popup message) scrolls to the top and r
   assert.match(onMessage[1], /replayEntranceIfIdle\(\)/);
   // Switching back to the tab must not replay the ~2s reveal or reset scroll.
   assert.doesNotMatch(src, /addEventListener\('visibilitychange'/);
+});
+
+// The Settings card and its title set their animation one property at a time
+// (name, duration, timing, delay), so the fill mode has to be set there too.
+// Without "backwards" the title is fully visible during its 0.55s wait, then
+// jumps to hidden and plays: it looks like it happens twice. (This once came
+// from a shared rule that was deleted as unused: it had been supplying the
+// fill mode.)
+test('settings: the card and its title hold hidden until their turn (backwards fill set on each)', () => {
+  for (const selector of ['\\.card', '\\.card > h1:first-child']) {
+    const rule = settingsHtml.match(new RegExp(`\\n\\s*${selector} \\{([^}]*animation-name:[^}]*)\\}`));
+    assert.ok(rule, `${selector}: the rule that sets animation-name was not found`);
+    assert.match(rule[1], /animation-fill-mode:\s*backwards;/, `${selector} must set animation-fill-mode: backwards`);
+  }
 });
 
 test('popup: opens in order - card, then title, then the three buttons top to bottom', () => {
@@ -523,10 +518,6 @@ test('staged reveal: the Exporter search box takes its place in the order even t
   assert.doesNotMatch(readSrc('src/import/import.html'), /id="searchInput"[^>]*data-stage/);
 });
 
-test('staged reveal: no leftover rule makes the search box appear at once, ahead of the text above it', () => {
-  assert.doesNotMatch(sharedCssForMotion, /#searchInput, #listControls, #checklistBox, #fileNameRow \{ animation-delay: 0s; \}/);
-});
-
 // The Settings page is the reference: the other pages must animate exactly like it.
 function keyframesBody(src, name) {
   const m = src.match(new RegExp(`@keyframes ${name} \\{([\\s\\S]*?)\\n\\s*\\}\\n`));
@@ -570,12 +561,6 @@ test('same as Settings: the same spacing - one part every 0.16s, one row every 0
   const tpl = readSrc('src/background/report-template.js');
   assert.match(tpl, /PART_STEP = 0\.16/);
   assert.match(tpl, /ROW_STEP = 0\.08/);
-});
-
-test('same as Settings: nothing from the older versions is left over (no typewriter, no box-then-label, no line reveal)', () => {
-  for (const [name, src] of [['shared.css', sharedCssForMotion], ['report.css', reportCssForMotion], ['reveal.js', readSrc('src/common/reveal.js')]]) {
-    assert.doesNotMatch(src, /tw-char|hub-lines-in|reveal-lines|type-text|label-in|hub-row-in|--dt/, `${name} still has an older reveal`);
-  }
 });
 
 test('staged reveal: shared.css order is card (0.15s) -> title (0.55s) -> parts (from --d)', () => {

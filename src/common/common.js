@@ -100,9 +100,6 @@ function isValidExportFormat(val) {
 function isValidShortenNames(val) {
   return val === 'on' || val === 'off';
 }
-function resolveExportFormat(val) {
-  return isValidExportFormat(val) ? val : EXPORT_FORMAT_DEFAULT;
-}
 function resolveShortenNames(val) {
   return isValidShortenNames(val) ? val : SHORT_NAME_DEFAULT;
 }
@@ -120,14 +117,26 @@ async function getStoredSettings() {
     const stored = await browser.storage.local.get(['theme', EXPORT_FORMAT_STORAGE_KEY, SHORT_NAME_STORAGE_KEY]);
     return {
       theme: stored.theme === 'dark' ? 'dark' : 'light',
-      // exportFormat is the first chosen format; exportFormats is all of them.
-      exportFormat: resolveExportFormats(stored[EXPORT_FORMAT_STORAGE_KEY])[0],
+      // Every chosen format, in the fixed order (a stored lone string is one).
       exportFormats: resolveExportFormats(stored[EXPORT_FORMAT_STORAGE_KEY]),
       shortenNames: resolveShortenNames(stored[SHORT_NAME_STORAGE_KEY]),
     };
   } catch {
-    return { theme: 'light', exportFormat: EXPORT_FORMAT_DEFAULT, exportFormats: [EXPORT_FORMAT_DEFAULT], shortenNames: SHORT_NAME_DEFAULT };
+    return { theme: 'light', exportFormats: [EXPORT_FORMAT_DEFAULT], shortenNames: SHORT_NAME_DEFAULT };
   }
+}
+
+// How an add-on's type is written for people (the TXT export, the report, the
+// Exporter and Importer lists) and the reverse, for reading it back. Anything
+// that is not exactly "Theme" or "Extension" is not a type: parseType()
+// returns null for it.
+function typeLabel(type) {
+  return type === 'theme' ? 'Theme' : 'Extension';
+}
+function parseType(label) {
+  if (label === 'Theme') return 'theme';
+  if (label === 'Extension') return 'extension';
+  return null;
 }
 
 // "a" or "an" for a label that might start with a capitalized acronym

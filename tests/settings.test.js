@@ -218,13 +218,13 @@ function makeRadioEl(value) {
 
 function makeSettingsSandboxWithRadios(storageSet, { stored = {} } = {}) {
   const themeRadioEls = [makeRadioEl('light'), makeRadioEl('dark')];
-  const formatRadioEls = [makeRadioEl('html'), makeRadioEl('json'), makeRadioEl('csv')];
+  const formatBoxEls = [makeRadioEl('html'), makeRadioEl('json'), makeRadioEl('csv')];
   const shortenRadioEls = [makeRadioEl('on'), makeRadioEl('off')];
   const statusEl = { textContent: '', className: '' };
   const fakeDocument = {
     querySelectorAll: (sel) => {
       if (sel.includes('"theme"')) return themeRadioEls;
-      if (sel.includes('"exportFormat"')) return formatRadioEls;
+      if (sel.includes('"exportFormat"')) return formatBoxEls;
       if (sel.includes('"shortenNames"')) return shortenRadioEls;
       return [];
     },
@@ -257,7 +257,7 @@ function makeSettingsSandboxWithRadios(storageSet, { stored = {} } = {}) {
   vm.runInContext(themeSrc, sb);
   vm.runInContext(commonSrc, sb);
   vm.runInContext(settingsSrc, sb);
-  return { themeRadioEls, formatRadioEls, shortenRadioEls, statusEl, setCalls, sandbox: sb, stored, changeListeners };
+  return { themeRadioEls, formatBoxEls, shortenRadioEls, statusEl, setCalls, sandbox: sb, stored, changeListeners };
 }
 
 testAsync('theme radio: a storage write failure shows an error and reverts the radio, instead of an unhandled rejection', async () => {
@@ -286,15 +286,15 @@ testAsync('theme radio: a successful write applies the theme and reports no erro
   assert.strictEqual(setCalls[0][THEME_STORAGE_KEY], 'dark');
 });
 
-testAsync('exportFormat radio: a storage write failure shows an error and reverts the radio', async () => {
-  const { formatRadioEls, statusEl } = makeSettingsSandboxWithRadios(async () => { throw new Error('disk full'); });
-  const jsonRadio = formatRadioEls[1];
+testAsync('exportFormat tick box: a storage write failure shows an error and reverts the box', async () => {
+  const { formatBoxEls, statusEl } = makeSettingsSandboxWithRadios(async () => { throw new Error('disk full'); });
+  const jsonRadio = formatBoxEls[1];
   jsonRadio.checked = true;
   await jsonRadio._onChange();
 
   assert.match(statusEl.textContent, /Could not save export format/);
-  assert.strictEqual(formatRadioEls[0].checked, true, 'html (the default) should be re-checked');
-  assert.strictEqual(formatRadioEls[1].checked, false, 'json should be reverted since the write failed');
+  assert.strictEqual(formatBoxEls[0].checked, true, 'html (the default) should be re-checked');
+  assert.strictEqual(formatBoxEls[1].checked, false, 'json should be reverted since the write failed');
 });
 
 testAsync('shortenNames radio: a storage write failure shows an error and reverts the radio', async () => {
@@ -1106,7 +1106,7 @@ const ticked = (radios) => radios.filter((r) => r.checked).map((r) => r.value);
 testAsync('live settings (Settings page): options changed elsewhere (another tab, an import, a reset) show here at once', async () => {
   const ctx = makeSettingsSandboxWithRadios(undefined, { stored: {} });
   await settleSettingsInit();
-  assert.deepStrictEqual([ticked(ctx.themeRadioEls), ticked(ctx.formatRadioEls), ticked(ctx.shortenRadioEls)], [['light'], ['html'], ['on']]);
+  assert.deepStrictEqual([ticked(ctx.themeRadioEls), ticked(ctx.formatBoxEls), ticked(ctx.shortenRadioEls)], [['light'], ['html'], ['on']]);
 
   // Another tab (or a settings import) saves new choices.
   Object.assign(ctx.stored, { theme: 'dark', exportFormat: 'json', shortenNames: 'off' });
@@ -1114,7 +1114,7 @@ testAsync('live settings (Settings page): options changed elsewhere (another tab
     theme: { newValue: 'dark' }, exportFormat: { newValue: 'json' }, shortenNames: { newValue: 'off' },
   }, 'local'));
   await settleSettingsInit();
-  assert.deepStrictEqual([ticked(ctx.themeRadioEls), ticked(ctx.formatRadioEls), ticked(ctx.shortenRadioEls)], [['dark'], ['json'], ['off']]);
+  assert.deepStrictEqual([ticked(ctx.themeRadioEls), ticked(ctx.formatBoxEls), ticked(ctx.shortenRadioEls)], [['dark'], ['json'], ['off']]);
 
   // A reset removes them: back to the defaults.
   delete ctx.stored.theme; delete ctx.stored.exportFormat; delete ctx.stored.shortenNames;
@@ -1122,7 +1122,7 @@ testAsync('live settings (Settings page): options changed elsewhere (another tab
     theme: { oldValue: 'dark' }, exportFormat: { oldValue: 'json' }, shortenNames: { oldValue: 'off' },
   }, 'local'));
   await settleSettingsInit();
-  assert.deepStrictEqual([ticked(ctx.themeRadioEls), ticked(ctx.formatRadioEls), ticked(ctx.shortenRadioEls)], [['light'], ['html'], ['on']]);
+  assert.deepStrictEqual([ticked(ctx.themeRadioEls), ticked(ctx.formatBoxEls), ticked(ctx.shortenRadioEls)], [['light'], ['html'], ['on']]);
 });
 
 testAsync('live settings (Settings page): only the option that changed is reloaded, and other storage areas are ignored', async () => {

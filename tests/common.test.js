@@ -550,14 +550,6 @@ test('indefiniteArticleFor: falls back to ordinary spelling for a non-acronym wo
   assert.strictEqual(sandbox.indefiniteArticleFor('theme'), 'a');
 });
 
-// --- A30: dead code cleanup ---
-
-test('A30: the legacy flat-structure branches are gone from filterAddonRows', () => {
-  const commonSrcRaw = readSrc('src/common/common.js');
-  assert.doesNotMatch(commonSrcRaw, /Legacy flat group-box/);
-  assert.doesNotMatch(commonSrcRaw, /Fallback: flat structure/);
-});
-
 // --- A34: getStoredSettings ---
 
 function bootSettingsSandbox(storageGetImpl) {
@@ -571,7 +563,7 @@ testAsync('getStoredSettings: valid stored values are used as-is', async () => {
   const sb = bootSettingsSandbox(async () => ({ theme: 'dark', exportFormat: 'json', shortenNames: 'off' }));
   const result = await sb.getStoredSettings();
   assert.strictEqual(result.theme, 'dark');
-  assert.strictEqual(result.exportFormat, 'json');
+  assert.deepStrictEqual(Array.from(result.exportFormats), ['json']);
   assert.strictEqual(result.shortenNames, 'off');
 });
 
@@ -579,7 +571,7 @@ testAsync('getStoredSettings: invalid stored values fall back to their defaults'
   const sb = bootSettingsSandbox(async () => ({ theme: 'sepia', exportFormat: 'xml', shortenNames: 'maybe' }));
   const result = await sb.getStoredSettings();
   assert.strictEqual(result.theme, 'light');
-  assert.strictEqual(result.exportFormat, 'html');
+  assert.deepStrictEqual(Array.from(result.exportFormats), ['html']);
   assert.strictEqual(result.shortenNames, 'on');
 });
 
@@ -587,7 +579,7 @@ testAsync('getStoredSettings: a pristine (empty) profile gets every default', as
   const sb = bootSettingsSandbox(async () => ({}));
   const result = await sb.getStoredSettings();
   assert.strictEqual(result.theme, 'light');
-  assert.strictEqual(result.exportFormat, 'html');
+  assert.deepStrictEqual(Array.from(result.exportFormats), ['html']);
   assert.strictEqual(result.shortenNames, 'on');
 });
 
@@ -595,7 +587,7 @@ testAsync('getStoredSettings: a throwing storage.get falls back to every default
   const sb = bootSettingsSandbox(async () => { throw new Error('storage unavailable'); });
   const result = await sb.getStoredSettings();
   assert.strictEqual(result.theme, 'light');
-  assert.strictEqual(result.exportFormat, 'html');
+  assert.deepStrictEqual(Array.from(result.exportFormats), ['html']);
   assert.strictEqual(result.shortenNames, 'on');
 });
 
@@ -606,11 +598,7 @@ testAsync('getStoredSettings: reads all three keys in a single storage.get call'
   assert.strictEqual(callCount, 1, 'should be exactly one storage.get call, not one per setting');
 });
 
-test('resolveExportFormat / resolveShortenNames: valid values pass through, invalid ones fall back', () => {
-  assert.strictEqual(sandbox.resolveExportFormat('json'), 'json');
-  assert.strictEqual(sandbox.resolveExportFormat('csv'), 'csv');
-  assert.strictEqual(sandbox.resolveExportFormat('txt'), 'txt');
-  assert.strictEqual(sandbox.resolveExportFormat('xml'), 'html');
+test('resolveShortenNames: valid values pass through, invalid ones fall back', () => {
   assert.strictEqual(sandbox.resolveShortenNames('off'), 'off');
   assert.strictEqual(sandbox.resolveShortenNames('maybe'), 'on');
 });
@@ -641,13 +629,6 @@ test('A34: formatLabel maps each export format to its label', () => {
   assert.strictEqual(sandbox.formatLabel('txt'), 'TXT file');
   assert.strictEqual(sandbox.formatLabel('html'), 'HTML report');
   assert.strictEqual(sandbox.formatLabel('nonsense'), 'HTML report');
-});
-
-test('A34: formatLabel is no longer duplicated in export.js or confirmation.js', () => {
-  const exportSrcRaw = readSrc('src/export/export.js');
-  const confirmationSrcRaw = readSrc('src/confirmation/confirmation.js');
-  assert.doesNotMatch(exportSrcRaw, /function formatLabel/);
-  assert.doesNotMatch(confirmationSrcRaw, /function exportFormatLabel|FORMAT_LABELS/);
 });
 
 // --- common.js: fadeOutPage() / goToConfirmation() ---
@@ -1064,11 +1045,29 @@ test('formatLabelsText: labels are joined like a sentence', () => {
   assert.strictEqual(sandbox.formatLabelsText(['html', 'json', 'csv', 'txt']), 'HTML report, JSON file, CSV file and TXT file');
 });
 
-test('getStoredSettings: exportFormats lists every stored format, exportFormat is the first', async () => {
+test('getStoredSettings: exportFormats lists every stored format, in the fixed order, and there is no single exportFormat field', async () => {
   const sb = { URL, browser: { storage: { local: { get: async () => ({ exportFormat: ['json', 'html'] }) } } } };
   vm.createContext(sb);
   vm.runInContext(commonSrc, sb);
   const s = await sb.getStoredSettings();
   assert.deepStrictEqual(Array.from(s.exportFormats), ['html', 'json']);
-  assert.strictEqual(s.exportFormat, 'html');
+  assert.ok(!('exportFormat' in s), 'only the list is returned');
+});
+
+// --- typeLabel() / parseType(): how an add-on's type is written for people and read back ---
+
+test('typeLabel: "theme" is Theme, anything else is Extension', () => {
+  assert.strictEqual(sandbox.typeLabel('theme'), 'Theme');
+  assert.strictEqual(sandbox.typeLabel('extension'), 'Extension');
+  assert.strictEqual(sandbox.typeLabel(undefined), 'Extension');
+});
+
+test('parseType: reads exactly Theme and Extension back, anything else is null', () => {
+  assert.strictEqual(sandbox.parseType('Theme'), 'theme');
+  assert.strictEqual(sandbox.parseType('Extension'), 'extension');
+  for (const bad of ['theme', 'extension', 'THEME', '', ' Theme', 'Addon', undefined]) assert.strictEqual(sandbox.parseType(bad), null, String(bad));
+});
+
+test('typeLabel and parseType are inverses for both types', () => {
+  for (const t of ['theme', 'extension']) assert.strictEqual(sandbox.parseType(sandbox.typeLabel(t)), t);
 });

@@ -299,16 +299,6 @@ function parseCsvRecords(text) {
   return records;
 }
 
-// Parses a single CSV row per RFC 4180: handles quoted fields (including
-// embedded commas and doubled double-quotes inside quotes). A thin
-// wrapper around parseCsvRecords() (which parseCsvPayload() above uses
-// directly, since it needs to handle newlines *inside* a field spanning
-// what would otherwise look like a row break) - kept for anything that
-// only ever needs to parse one already-separated line at a time.
-function parseCsvRow(line) {
-  return parseCsvRecords(line)[0] || [];
-}
-
 
 // Reverses the escaping buildTxtExport() (report-template.js) applies to every
 // column: \\ is a backslash, \| a pipe, \n a line break, \r a carriage
@@ -362,12 +352,13 @@ function parseTxtPayload(text) {
     const [name, version, type, status, link, id] = cells;
     if (name === '') return txtError(`${where} has no name`);
     if (id === '') return txtError(`${where} has no id`);
-    if (type !== 'Extension' && type !== 'Theme') return txtError(`${where} has an unknown type`);
+    const parsedType = parseType(type);
+    if (!parsedType) return txtError(`${where} has an unknown type`);
     if (status !== 'Enabled' && status !== 'Disabled') return txtError(`${where} has an unknown status`);
     addons.push({
       name,
       version,
-      type: type === 'Theme' ? 'theme' : 'extension',
+      type: parsedType,
       enabled: status === 'Enabled',
       link,
       id,
@@ -473,7 +464,7 @@ function createAddonRow(a, i, isInstalled, shorten) {
 
   const typeSpan = document.createElement('span');
   typeSpan.className = 'match-label';
-  typeSpan.textContent = (a.type === 'theme') ? 'Theme' : 'Extension';
+  typeSpan.textContent = typeLabel(a.type);
 
   const label = document.createElement('label');
   label.htmlFor = `icb-${i}`;

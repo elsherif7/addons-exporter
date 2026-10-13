@@ -129,7 +129,7 @@ function createAddonRow(a, i, shorten) {
 
   const typeSpan = document.createElement('span');
   typeSpan.className = 'match-label';
-  typeSpan.textContent = a.type === 'theme' ? 'Theme' : 'Extension';
+  typeSpan.textContent = typeLabel(a.type);
 
   const amoLink = document.createElement('a');
   amoLink.className = 'match-label';
@@ -274,8 +274,8 @@ exportBtn.addEventListener('click', async () => {
   try {
     const result = await browser.runtime.sendMessage({ type: 'export', ids });
 
-    setStatus(buildExportSuccessStatus(result.formats || result.format, result.stats));
-    await goToConfirmation(`from=export&format=${(result.formats || [result.format]).join(',')}${result.zipped ? '&zip=1' : ''}`);
+    setStatus(buildExportSuccessStatus(result.formats, result.stats));
+    await goToConfirmation(`from=export&format=${result.formats.join(',')}${result.zipped ? '&zip=1' : ''}`);
   } catch (e) {
     setStatus('Error: ' + e.message);
   } finally {

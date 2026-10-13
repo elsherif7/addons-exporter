@@ -1,9 +1,9 @@
-// Pre-applies saved radio states from the localStorage cache before the
+// Pre-applies the saved option states (radios and tick boxes) from the localStorage cache before the
 // browser paints the Settings page for the first time.
 //
 // PLACEMENT: This script is loaded via a parser-blocking <script src> tag
-// placed immediately after the three radio groups in settings.html. At that
-// parse position, all radio inputs exist in the DOM but the browser has not
+// placed immediately after the three option groups in settings.html. At that
+// parse position, all the inputs exist in the DOM but the browser has not
 // yet painted — a parser-blocking external script halts parsing, runs
 // synchronously, then resumes. The browser can only paint after the parser
 // yields the call stack, so correcting .checked here is guaranteed to happen

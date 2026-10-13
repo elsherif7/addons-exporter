@@ -1,4 +1,3 @@
-// Builds the standalone, self-contained HTML report handed back by
 // Builds every export format returned by doExport() in background.js:
 // buildHtmlReport(), buildJsonExport(), buildCsvExport(), buildTxtExport().
 // Pure string templating only - nothing
@@ -19,9 +18,6 @@ function safeJsonForScriptTag(value) {
 // extension's icons folder sitting next to it once it's saved elsewhere.
 const REPORT_ICON_DATA_URI = 'data:image/png;base64,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';
 
-// Builds a plain JSON export. Same payload shape as the embedded
-// #addons-exporter-data in the HTML report, just saved as a standalone
-// .json file. Importable by the importer the same way HTML is.
 // The plain-data exports (JSON, CSV, TXT) list enabled add-ons first and
 // disabled ones after, each group A-Z, the same way the HTML report groups
 // them - easier to read than one long mixed list.
@@ -45,6 +41,8 @@ function jsonAddon(a, shorten = true) {
   };
 }
 
+// Builds the JSON export: the same add-ons as the HTML report's embedded data,
+// saved as a standalone .json file the Importer reads the same way.
 // shorten (the Settings "Shorten add-on names" choice, on by default) cuts
 // each name at its first separator, exactly as the HTML report does. The
 // id is always included, and the Importer matches by id first, so a short
@@ -131,7 +129,7 @@ function buildTxtExport(list, shorten = true) {
   const versionWidth = Math.max(0, ...all.map((a) => txtEscape(a.version).length));
   const linkWidth = Math.max(0, ...all.map((a) => txtEscape(a.link).length));
   const line = (a) => {
-    const type = a.type === 'theme' ? 'Theme' : 'Extension';
+    const type = typeLabel(a.type);
     const status = a.enabled ? 'Enabled' : 'Disabled';
     return [
       nameOf(a).padEnd(nameWidth),
@@ -196,11 +194,11 @@ function buildHtmlReport(list, theme, shorten = true) {
     const matchClass = UNCERTAIN_LINK_TYPES.has(a.linkType) ? ' match-uncertain' : '';
     const match = matchLabel ? `<span class="match-label${matchClass}">${escapeHtml(matchLabel)}</span>` : '';
     const displayShortName = escapeHtml(shorten ? shortName(a.name) : a.name);
-    const typeLabel = a.type === 'theme' ? 'Theme' : 'Extension';
+    const typeText = typeLabel(a.type);
     return `<div class="addon-row">
       <span class="addon-row-info"><span class="addon-name">${displayShortName}</span>
       <span class="addon-version">${escapeHtml(a.version)}</span>
-      <span class="match-label">${escapeHtml(typeLabel)}</span>
+      <span class="match-label">${escapeHtml(typeText)}</span>
       ${match}</span>
       <a class="match-label" href="${escapeHtml(a.link)}" target="_blank" rel="noopener" style="color:var(--link-accent);text-decoration:none;flex-shrink:0;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">AMO</a>
     </div>`;

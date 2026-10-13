@@ -313,7 +313,7 @@ for (const [selector, property] of sharedRules) {
   });
 }
 
-// --- WP4.1: CSS custom property (variable) drift ---
+// --- CSS custom property (variable) drift ---
 // Previously excluded entirely ("CSS custom property blocks differ by
 // design" above) - in practice only a few variables are genuinely
 // report-specific; the rest should match exactly, and didn't (A29).
@@ -414,12 +414,7 @@ test('A36: the report tip accurately describes selecting the file and pre-select
 
 // --- A30: dead code cleanup ---
 
-test('A30: --btn-text is gone (it was never actually consumed anywhere)', () => {
-  assert.doesNotMatch(sharedCssSrc, /--btn-text/);
-  assert.doesNotMatch(reportTemplateSrcRaw, /--btn-text/);
-});
-
-// --- 5.1: report.css is the source of truth for the report's inline CSS ---
+// --- report.css is the source of truth for the report's inline CSS ---
 // src/background/report.css is the editable source; scripts/build-report-css.js
 // inlines it into the <style> block of report-template.js. This test catches
 // the case where report.css was edited but `npm run build` wasn't re-run.

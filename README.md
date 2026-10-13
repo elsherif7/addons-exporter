@@ -12,7 +12,7 @@
 addons-hub/
 ├── manifest.json         # Extension manifest: config, permissions, and background script list
 ├── icons/                 # Toolbar and extension icons in several standard sizes
-├── scripts/               # Build helpers: embed the report icon, inline report.css, syntax-check every source file
+├── scripts/               # Build helpers: embed the report icon, inline report.css, syntax-check every source file, set the version
 ├── tests/                 # Plain Node.js test suite, run via `npm test`
 │   ├── run.js                   # Requires every test file, then prints the combined summary
 │   ├── golden/                  # Expected output files used by golden.test.js
@@ -26,6 +26,7 @@ addons-hub/
 │   ├── export.test.js           # Tests covering the export page's picker and click logic
 │   ├── golden.test.js           # Compares the exact text of every export format with the files in tests/golden/ (`UPDATE_GOLDEN=1 node tests/run.js` regenerates them)
 │   ├── format-contract.test.js  # Pins the data layout of every export next to the format version, so a data change cannot happen without bumping it (a change to only the page's look never needs that)
+│   ├── set-version.test.js      # Tests for scripts/set-version.js (the version is changed in package.json and manifest.json together)
 │   ├── zip-external.test.js     # Checks the .zip with unzip, Python and bsdtar (whichever are installed), not just with this project's own reader
 │   ├── press.test.js            # Tests for the click/tap press-ring feedback in press.js
 │   ├── reveal.test.js           # Tests for the opening-reveal timing in reveal.js (including the Export button waiting for the last add-on)
@@ -167,6 +168,16 @@ Bug reports and feature requests are welcome via [GitHub Issues](https://github.
 ```
 npm test
 ```
+
+**Changing the version**
+
+The version is written in two files, `package.json` and `manifest.json`, and a test fails if they differ. To change both at once:
+
+```
+npm run set-version -- 1.3.0
+```
+
+Only the `"version"` line of each file changes.
 
 **Updating the report icon**
 

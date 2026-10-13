@@ -8,6 +8,7 @@
     "pretest": "node scripts/build-report-css.js --check && node scripts/embed-icon.js --check && node scripts/check-syntax.js",
     "test": "node tests/run.js",
     "embed-icon": "node scripts/embed-icon.js",
+    "set-version": "node scripts/set-version.js",
     "build:check": "node scripts/build-report-css.js --check && node scripts/embed-icon.js --check"
   },
   "engines": {

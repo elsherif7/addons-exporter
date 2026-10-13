@@ -125,9 +125,8 @@ body {
   box-sizing: border-box;
 }
 
-/* Entrance animations. The card springs up into place, then its direct
-   children follow one after another (delays capped at the sixth child, so
-   a long page still finishes in about a second).
+/* Entrance animation keyframes (the pages' own opening is the staged reveal
+   below; Settings spells its own out in settings.html).
    IMPORTANT: these use backwards fill, never both/forwards. A held final
    keyframe would override the :hover transform on buttons and inputs that
    are direct children of the card. */
@@ -147,14 +146,6 @@ body {
   from { transform: scale(0.4); }
   to   { transform: none; }
 }
-.card { animation: hub-card-in 0.7s var(--motion-spring) backwards; }
-.card > * { animation: hub-rise-in 0.6s var(--motion-spring) backwards; }
-.card > :nth-child(1) { animation-delay: 0.08s; }
-.card > :nth-child(2) { animation-delay: 0.16s; }
-.card > :nth-child(3) { animation-delay: 0.24s; }
-.card > :nth-child(4) { animation-delay: 0.32s; }
-.card > :nth-child(5) { animation-delay: 0.4s; }
-.card > :nth-child(n+6) { animation-delay: 0.48s; }
 /* Staged opening reveal - add the class "staged" to a page's card (the
    Exporter and Importer do). It is the SAME reveal the Settings page has,
    with the same animations, durations and spacing: first only the page

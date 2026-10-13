@@ -98,13 +98,14 @@ async function captureExportMessageResult(storageLocalGetImpl) {
   return { downloadOptions, createdTabUrls, result };
 }
 
-testAsync('export message: downloads with saveAs, opens no tab itself, and returns {format, stats}', async () => {
+testAsync('export message: downloads with saveAs, opens no tab itself, and returns {formats, stats}', async () => {
   const { downloadOptions, createdTabUrls, result } = await captureExportMessageResult();
   assert.strictEqual(downloadOptions.saveAs, true);
   assert.match(downloadOptions.url, /^blob:/);
   // export.js replaces its own page with the confirmation page instead.
   assert.strictEqual(createdTabUrls.length, 0);
-  assert.strictEqual(result.format, 'html');
+  assert.deepStrictEqual(Array.from(result.formats), ['html']);
+  assert.strictEqual(result.zipped, false);
   assert.strictEqual(result.stats.total, 1);
 });
 
@@ -136,7 +137,7 @@ async function runDoExportWithFetch(addon, fetchImpl) {
   vm.runInContext(commonSrc, bgSandbox);
   vm.runInContext(reportTemplateSrc, bgSandbox);
   vm.runInContext(backgroundSrc, bgSandbox);
-  const { html } = await bgSandbox.doExport([addon.id]);
+  const { files: [{ content: html }] } = await bgSandbox.doExport([addon.id]);
   const dataMatch = html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/);
   return JSON.parse(dataMatch[1]).addons[0];
 }
@@ -299,7 +300,7 @@ async function runDoExportForTheme(storageLocalGetImpl) {
   vm.runInContext(commonSrc, bgSandbox);
   vm.runInContext(reportTemplateSrc, bgSandbox);
   vm.runInContext(backgroundSrc, bgSandbox);
-  const { html } = await bgSandbox.doExport([baseAddon.id]);
+  const { files: [{ content: html }] } = await bgSandbox.doExport([baseAddon.id]);
   return html;
 }
 
@@ -381,7 +382,7 @@ async function runDoExportForFormat(storageLocalGetImpl) {
   vm.runInContext(commonSrc, bgSandbox);
   vm.runInContext(reportTemplateSrc, bgSandbox);
   vm.runInContext(backgroundSrc, bgSandbox);
-  const { html: content, filename } = await bgSandbox.doExport([baseAddon.id]);
+  const { files: [{ content, filename }] } = await bgSandbox.doExport([baseAddon.id]);
   return { content, filename };
 }
 
@@ -426,12 +427,12 @@ testAsync('doExport: defaults to .html when storage.local.get throws for exportF
 
 testAsync('export message: on desktop with JSON format, the result reports format=json', async () => {
   const { result } = await captureExportMessageResult(async () => ({ exportFormat: 'json' }));
-  assert.strictEqual(result.format, 'json');
+  assert.deepStrictEqual(Array.from(result.formats), ['json']);
 });
 
 testAsync('export message: on desktop with CSV format, the result reports format=csv', async () => {
   const { result } = await captureExportMessageResult(async () => ({ exportFormat: 'csv' }));
-  assert.strictEqual(result.format, 'csv');
+  assert.deepStrictEqual(Array.from(result.formats), ['csv']);
 });
 
 // --- listInstalledAddons: includes optionsUrl ---
@@ -590,8 +591,8 @@ testAsync('doExport: with several formats ticked it builds one file per format, 
   const stamps = result.files.map((f) => f.filename.replace(/\.\w+$/, ''));
   assert.strictEqual(new Set(stamps).size, 1, 'one shared timestamp');
   assert.deepStrictEqual(Array.from(result.files.map((f) => f.filename.split('.').pop())), ['html', 'json', 'csv']);
-  assert.strictEqual(result.format, 'html', 'format / html / filename stay the first file\'s');
-  assert.strictEqual(result.filename, result.files[0].filename);
+  assert.deepStrictEqual(Array.from(Object.keys(result)).sort(), ['files', 'formats', 'stats'], 'only files, formats and stats come back');
+  assert.deepStrictEqual(Array.from(Object.keys(result.files[0])).sort(), ['content', 'filename', 'format'], 'each file is { content, filename, format }');
 });
 
 // --- several formats are saved as ONE zip (one Save dialog) ---
@@ -686,7 +687,7 @@ async function exportContent(storage, addon = longNameAddon) {
   vm.runInContext(commonSrc, bgSandbox);
   vm.runInContext(reportTemplateSrc, bgSandbox);
   vm.runInContext(backgroundSrc, bgSandbox);
-  return (await bgSandbox.doExport([addon.id])).html;
+  return (await bgSandbox.doExport([addon.id])).files[0].content;
 }
 
 for (const fmt of ['json', 'csv', 'txt']) {
