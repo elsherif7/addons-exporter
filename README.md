@@ -25,6 +25,7 @@ addons-hub/
 │   ├── background.test.js       # Tests covering messaging, AMO lookups, and export logic
 │   ├── export.test.js           # Tests covering the export page's picker and click logic
 │   ├── golden.test.js           # Compares the exact text of every export format with the files in tests/golden/ (`UPDATE_GOLDEN=1 node tests/run.js` regenerates them)
+│   ├── format-contract.test.js  # Pins the data layout of every export next to the format version, so a data change cannot happen without bumping it (a change to only the page's look never needs that)
 │   ├── zip-external.test.js     # Checks the .zip with unzip, Python and bsdtar (whichever are installed), not just with this project's own reader
 │   ├── press.test.js            # Tests for the click/tap press-ring feedback in press.js
 │   ├── reveal.test.js           # Tests for the opening-reveal timing in reveal.js (including the Export button waiting for the last add-on)

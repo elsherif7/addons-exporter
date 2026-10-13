@@ -1225,3 +1225,17 @@ test('withSettingsDefaults: a stored list of formats is kept, a bad one falls ba
   assert.deepStrictEqual(Array.from(withSettingsDefaults({ [EXPORT_FORMAT_STORAGE_KEY]: ['html', 'csv'] })[EXPORT_FORMAT_STORAGE_KEY]), ['html', 'csv']);
   assert.strictEqual(withSettingsDefaults({ [EXPORT_FORMAT_STORAGE_KEY]: 'xml' })[EXPORT_FORMAT_STORAGE_KEY], 'html');
 });
+
+// --- The data contract of the settings file (see tests/format-contract.test.js
+// for the same idea for the add-on exports): the version and the layout change
+// together, on purpose. If this fails after you changed the settings file:
+// bump SETTINGS_FILE_FORMAT_VERSION in src/settings/settings.js, decide whether
+// old files must still be read, and update the numbers and keys here. ---
+test('contract: the settings file is formatVersion 1 then settings: theme, exportFormat, shortenNames', () => {
+  assert.strictEqual(SETTINGS_FILE_FORMAT_VERSION, 1, 'the settings format version and this contract must change together');
+  const data = JSON.parse(buildSettingsExport(withSettingsDefaults({})));
+  assert.deepStrictEqual(Array.from(Object.keys(data)), ['formatVersion', 'settings']);
+  assert.strictEqual(data.formatVersion, 1);
+  assert.deepStrictEqual(Array.from(Object.keys(data.settings)), ['theme', 'exportFormat', 'shortenNames'],
+    'the settings changed - bump the format version on purpose');
+});

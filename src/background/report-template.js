@@ -161,6 +161,27 @@ function buildTxtExport(list, shorten = true) {
   while (lines.length && lines[lines.length - 1] === '') lines.pop();
   return lines.join('\r\n');
 }
+// THE DATA CONTRACT OF THE HTML REPORT. The page around it (layout, colours,
+// the theme button, animation) can change freely, but the data block that
+// goes into #addons-exporter-data is what the Importer reads, and it must stay
+// exactly what the version released on addons.mozilla.org wrote:
+//   { "formatVersion": 1, "addons": [ { id, name, version, enabled, type, link, linkType }, ... ] }
+// in that order, with full (never shortened) names. Writing the fields out one
+// by one here keeps the order fixed whatever the caller's objects look like.
+// Changing any of this means bumping EXPORT_FORMAT_VERSION (see
+// tests/format-contract.test.js, which fails until the change is deliberate).
+function htmlDataAddon(a) {
+  return {
+    id: a.id,
+    name: a.name,
+    version: a.version,
+    enabled: a.enabled,
+    type: a.type,
+    link: a.link,
+    linkType: a.linkType,
+  };
+}
+
 // theme is 'light' or 'dark' - the report's starting appearance,
 // baked in from whatever the exporter's own Settings said at export
 // time (see doExport()'s call site). The toggle button lets anyone
@@ -507,7 +528,7 @@ function buildHtmlReport(list, theme, shorten = true) {
   </div>
   </div>
 
-  <script type="application/json" id="addons-exporter-data">${safeJsonForScriptTag({ formatVersion: EXPORT_FORMAT_VERSION, addons: list })}</script>
+  <script type="application/json" id="addons-exporter-data">${safeJsonForScriptTag({ formatVersion: EXPORT_FORMAT_VERSION, addons: list.map(htmlDataAddon) })}</script>
   <script>
     // @inline-script-start
     // Self-contained - this file has no access to the extension's own
