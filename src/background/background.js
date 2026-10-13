@@ -16,11 +16,7 @@ browser.runtime.onMessage.addListener((message) => {
         blob = new Blob([zipBytes], { type: 'application/zip' });
         saveName = list[0].filename.replace(/\.\w+$/, '') + '.zip';
       } else {
-        const mimeType = list[0].format === 'json' ? 'application/json'
-          : list[0].format === 'csv' ? 'text/csv'
-          : list[0].format === 'txt' ? 'text/plain'
-          : 'text/html';
-        blob = new Blob([list[0].content], { type: mimeType });
+        blob = new Blob([list[0].content], { type: getExportFormat(list[0].format).mime });
         saveName = list[0].filename;
       }
       const url = URL.createObjectURL(blob);
@@ -288,9 +284,9 @@ async function doExport(ids, {
   // background.js has no document to apply a theme to, so it doesn't
   // load theme.js - it only needs the resolved value here, to bake into
   // the report's starting state (see report-template.js's
-  // buildHtmlReport). getStoredSettings() (common.js) falls back to every
+  // buildHtmlReport). loadSettings() (common.js) falls back to every
   // default if storage is ever unavailable.
-  const { theme, exportFormats, shortenNames } = await getStoredSettings();
+  const { theme, exportFormats, shortenNames } = await loadSettings();
   const shorten = shortenNames !== 'off';
 
   // One file per chosen format, all named with the same timestamp. They are
@@ -303,7 +299,7 @@ async function doExport(ids, {
     else if (fmt === 'csv') content = buildCsvExport(list, shorten);
     else if (fmt === 'txt') content = buildTxtExport(list, shorten);
     else content = buildHtmlReport(list, theme, shorten);
-    return { content, filename: `Firefox Add-ons (${timestamp}).${fmt}`, format: fmt };
+    return { content, filename: `Firefox Add-ons (${timestamp}).${getExportFormat(fmt).extension}`, format: fmt };
   });
 
   // files carries each exported file ({ content, filename, format }).

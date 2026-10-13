@@ -5,7 +5,8 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { test, readSrc } = require('./helpers');
+const vm = require('vm');
+const { test, readSrc, evalInContext } = require('./helpers');
 
 const HTML_PAGES = [
   'src/popup/popup.html',
@@ -651,15 +652,15 @@ test('favicon: every full page (the ones that open in a tab) links an icon, and 
 
 test('live settings: the theme, export format and name shortening each have a live listener on the pages that use them', () => {
   assert.match(readSrc('src/common/theme.js'), /changes\[THEME_STORAGE_KEY\][\s\S]*applyTheme\(/, 'every page follows the theme');
-  assert.match(readSrc('src/export/export.js'), /changes\[EXPORT_FORMAT_STORAGE_KEY\][\s\S]*updateExportDesc\(\)/, 'the Exporter follows the export format');
+  assert.match(readSrc('src/export/export.js'), /onSettingsChanged\([\s\S]*'exportFormats'[\s\S]*updateExportDesc\(\)/, 'the Exporter follows the export format');
   for (const page of ['src/export/export.js', 'src/import/import.js']) {
     const src = readSrc(page);
     assert.match(src, /onShortenNamesChanged\(\(shorten\) => \{/, `${page} follows "Shorten add-on names"`);
     assert.match(src, /nameSpan\.dataset\.fullName = a\.name|nameEl\.dataset\.fullName = a\.name/, `${page} rows remember their full name`);
   }
   const settings = readSrc('src/settings/settings.js');
-  for (const key of ['THEME_STORAGE_KEY', 'EXPORT_FORMAT_STORAGE_KEY', 'SHORT_NAME_STORAGE_KEY']) {
-    assert.match(settings, new RegExp(`changes\\[${key}\\]\\) load`), `the Settings page follows ${key}`);
+  for (const [name, load] of [['theme', 'loadCurrentTheme'], ['exportFormats', 'loadCurrentExportFormat'], ['shortenNames', 'loadCurrentShortenNames']]) {
+    assert.match(settings, new RegExp(`changed\\.includes\\('${name}'\\)\\) ${load}\\(`), `the Settings page follows ${name}`);
   }
 });
 
@@ -710,4 +711,19 @@ test('selection badge: a slot for the rolling number exists in the stylesheet', 
   const css = readSrc('src/common/shared.css');
   assert.match(css, /#selectionCount \.count-roll \{[^}]*overflow: hidden;/);
   assert.match(css, /#selectionCount \.count-roll-old \{[^}]*position: absolute;/);
+});
+
+test('settings.html: the Export Format tick boxes are exactly the registry formats, in order, with the registry text', () => {
+  const html = readSrc('src/settings/settings.html');
+  const sb = {};
+  vm.createContext(sb);
+  vm.runInContext(readSrc('src/common/common.js'), sb);
+  const reg = Array.from(evalInContext(sb, 'EXPORT_FORMAT_REGISTRY'));
+  const boxes = [...html.matchAll(/<input type="checkbox" name="exportFormat" id="(\w+)" value="(\w+)">/g)];
+  assert.deepStrictEqual(boxes.map((m) => m[2]), reg.map((f) => f.id), 'same formats, same order');
+  reg.forEach((f, i) => {
+    assert.strictEqual(boxes[i][1], 'format' + f.id[0].toUpperCase() + f.id.slice(1), `${f.id} box id (settings-init.js relies on it)`);
+    assert.ok(html.includes(`>${f.title}</span>`), `${f.id} title`);
+    assert.ok(html.includes(f.description), `${f.id} description`);
+  });
 });

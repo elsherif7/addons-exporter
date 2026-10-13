@@ -467,6 +467,7 @@ function makeSettingsInitDom(cachedFormat, cachedShorten) {
     formatHtml:      makeRadio('formatHtml',      'html', false),
     formatJson:      makeRadio('formatJson',      'json', false),
     formatCsv:       makeRadio('formatCsv',       'csv',  false),
+    formatTxt:       makeRadio('formatTxt',       'txt',  false),
     shortenNamesOn:  makeRadio('shortenNamesOn',  'on',   false),
     shortenNamesOff: makeRadio('shortenNamesOff', 'off',  false),
   };
@@ -481,6 +482,8 @@ function makeSettingsInitDom(cachedFormat, cachedShorten) {
   };
   const sb = { document, localStorage };
   vm.createContext(sb);
+  // settings.html loads common.js (the format registry) before settings-init.js.
+  vm.runInContext(commonSrc, sb);
   vm.runInContext(settingsInitSrc, sb);
   return radios;
 }
@@ -547,6 +550,7 @@ test('settings-init: localStorage throwing still applies defaults', () => {
     localStorage: { getItem() { throw new Error('storage unavailable'); } },
   };
   vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
   assert.doesNotThrow(() => vm.runInContext(settingsInitSrc, sb));
   assert.strictEqual(radios.formatHtml.checked,    true,  'html default applied after localStorage error');
   assert.strictEqual(radios.shortenNamesOn.checked, true,  'on default applied after localStorage error');
@@ -559,6 +563,7 @@ test('settings-init: null getElementById (element not found) does not throw', ()
     localStorage: { getItem: () => 'json' },
   };
   vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
   assert.doesNotThrow(() => vm.runInContext(settingsInitSrc, sb));
 });
 
@@ -598,7 +603,7 @@ testAsync('settings.js batched init writes exportFormat to the localStorage cach
     browser: {
       storage: {
         local: {
-          // getStoredSettings reads all three keys at once as an array.
+          // loadSettings reads all three keys at once as an array.
           get: async () => ({ theme: 'light', exportFormat: 'csv', shortenNames: 'on' }),
           set: async () => {}, remove: async () => {},
         },

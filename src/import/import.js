@@ -628,15 +628,9 @@ async function loadFile(file) {
     }
 
     setStatus('');
-    let shorten = true;
-    try {
-      const s = await browser.storage.local.get(SHORT_NAME_STORAGE_KEY);
-      if (myGeneration !== loadGeneration) return;
-      if (s && s[SHORT_NAME_STORAGE_KEY] === 'off') shorten = false;
-    } catch {
-      if (myGeneration !== loadGeneration) return;
-      /* default to true */
-    }
+    const settings = await loadSettings();
+    if (myGeneration !== loadGeneration) return;
+    const shorten = settings.shortenNames !== 'off';
     renderAddonList(result.addons, installed, shorten);
   } catch (err) {
     if (myGeneration !== loadGeneration) return;

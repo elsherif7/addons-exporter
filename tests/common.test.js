@@ -550,7 +550,7 @@ test('indefiniteArticleFor: falls back to ordinary spelling for a non-acronym wo
   assert.strictEqual(sandbox.indefiniteArticleFor('theme'), 'a');
 });
 
-// --- A34: getStoredSettings ---
+// --- A34: loadSettings ---
 
 function bootSettingsSandbox(storageGetImpl) {
   const sb = { browser: { storage: { local: { get: storageGetImpl } } } };
@@ -559,42 +559,42 @@ function bootSettingsSandbox(storageGetImpl) {
   return sb;
 }
 
-testAsync('getStoredSettings: valid stored values are used as-is', async () => {
+testAsync('loadSettings: valid stored values are used as-is', async () => {
   const sb = bootSettingsSandbox(async () => ({ theme: 'dark', exportFormat: 'json', shortenNames: 'off' }));
-  const result = await sb.getStoredSettings();
+  const result = await sb.loadSettings();
   assert.strictEqual(result.theme, 'dark');
   assert.deepStrictEqual(Array.from(result.exportFormats), ['json']);
   assert.strictEqual(result.shortenNames, 'off');
 });
 
-testAsync('getStoredSettings: invalid stored values fall back to their defaults', async () => {
+testAsync('loadSettings: invalid stored values fall back to their defaults', async () => {
   const sb = bootSettingsSandbox(async () => ({ theme: 'sepia', exportFormat: 'xml', shortenNames: 'maybe' }));
-  const result = await sb.getStoredSettings();
+  const result = await sb.loadSettings();
   assert.strictEqual(result.theme, 'light');
   assert.deepStrictEqual(Array.from(result.exportFormats), ['html']);
   assert.strictEqual(result.shortenNames, 'on');
 });
 
-testAsync('getStoredSettings: a pristine (empty) profile gets every default', async () => {
+testAsync('loadSettings: a pristine (empty) profile gets every default', async () => {
   const sb = bootSettingsSandbox(async () => ({}));
-  const result = await sb.getStoredSettings();
+  const result = await sb.loadSettings();
   assert.strictEqual(result.theme, 'light');
   assert.deepStrictEqual(Array.from(result.exportFormats), ['html']);
   assert.strictEqual(result.shortenNames, 'on');
 });
 
-testAsync('getStoredSettings: a throwing storage.get falls back to every default, not a rejection', async () => {
+testAsync('loadSettings: a throwing storage.get falls back to every default, not a rejection', async () => {
   const sb = bootSettingsSandbox(async () => { throw new Error('storage unavailable'); });
-  const result = await sb.getStoredSettings();
+  const result = await sb.loadSettings();
   assert.strictEqual(result.theme, 'light');
   assert.deepStrictEqual(Array.from(result.exportFormats), ['html']);
   assert.strictEqual(result.shortenNames, 'on');
 });
 
-testAsync('getStoredSettings: reads all three keys in a single storage.get call', async () => {
+testAsync('loadSettings: reads all three keys in a single storage.get call', async () => {
   let callCount = 0;
   const sb = bootSettingsSandbox(async () => { callCount++; return {}; });
-  await sb.getStoredSettings();
+  await sb.loadSettings();
   assert.strictEqual(callCount, 1, 'should be exactly one storage.get call, not one per setting');
 });
 
@@ -603,11 +603,11 @@ test('resolveShortenNames: valid values pass through, invalid ones fall back', (
   assert.strictEqual(sandbox.resolveShortenNames('maybe'), 'on');
 });
 
-// A34 tripwire: getStoredSettings() (used by background.js, which can't
+// A34 tripwire: loadSettings() (used by background.js, which can't
 // load theme.js) hardcodes the literal 'theme' key rather than importing
 // theme.js's THEME_STORAGE_KEY constant. If that constant's value is ever
 // changed, this test is what would catch the two falling out of sync.
-test('A34 tripwire: getStoredSettings\' literal theme key matches theme.js\'s THEME_STORAGE_KEY', () => {
+test('A34 tripwire: loadSettings\' literal theme key matches theme.js\'s THEME_STORAGE_KEY', () => {
   const themeSrc = readSrc('src/common/theme.js');
   const themeSandbox = {
     browser: { storage: { local: { get: async () => ({}) } } },
@@ -619,8 +619,8 @@ test('A34 tripwire: getStoredSettings\' literal theme key matches theme.js\'s TH
   const themeKey = evalInContext(themeSandbox, 'THEME_STORAGE_KEY');
 
   assert.strictEqual(themeKey, 'theme');
-  assert.match(commonSrc, /storage\.local\.get\(\['theme', EXPORT_FORMAT_STORAGE_KEY/,
-    'getStoredSettings should read the literal \'theme\' key, matching THEME_STORAGE_KEY\'s value above');
+  assert.match(commonSrc, /theme: \{ key: 'theme'/,
+    'the settings schema should use the literal \'theme\' key, matching THEME_STORAGE_KEY\'s value above');
 });
 
 test('A34: formatLabel maps each export format to its label', () => {
@@ -1045,11 +1045,11 @@ test('formatLabelsText: labels are joined like a sentence', () => {
   assert.strictEqual(sandbox.formatLabelsText(['html', 'json', 'csv', 'txt']), 'HTML report, JSON file, CSV file and TXT file');
 });
 
-test('getStoredSettings: exportFormats lists every stored format, in the fixed order, and there is no single exportFormat field', async () => {
+test('loadSettings: exportFormats lists every stored format, in the fixed order, and there is no single exportFormat field', async () => {
   const sb = { URL, browser: { storage: { local: { get: async () => ({ exportFormat: ['json', 'html'] }) } } } };
   vm.createContext(sb);
   vm.runInContext(commonSrc, sb);
-  const s = await sb.getStoredSettings();
+  const s = await sb.loadSettings();
   assert.deepStrictEqual(Array.from(s.exportFormats), ['html', 'json']);
   assert.ok(!('exportFormat' in s), 'only the list is returned');
 });
@@ -1070,4 +1070,74 @@ test('parseType: reads exactly Theme and Extension back, anything else is null',
 
 test('typeLabel and parseType are inverses for both types', () => {
   for (const t of ['theme', 'extension']) assert.strictEqual(sandbox.parseType(sandbox.typeLabel(t)), t);
+});
+
+// --- Phase 2: format registry, settings schema, shared loader ---
+
+test('registry: every format has an id, label, title, extension, MIME type and description; ids are unique and in the fixed order', () => {
+  const reg = Array.from(evalInContext(sandbox, 'EXPORT_FORMAT_REGISTRY'));
+  assert.deepStrictEqual(reg.map((f) => f.id), ['html', 'json', 'csv', 'txt']);
+  assert.deepStrictEqual(Array.from(evalInContext(sandbox, 'EXPORT_FORMATS')), ['html', 'json', 'csv', 'txt']);
+  for (const f of reg) {
+    for (const k of ['id', 'label', 'title', 'extension', 'mime', 'description']) {
+      assert.ok(typeof f[k] === 'string' && f[k].length > 0, `${f.id}.${k}`);
+    }
+    assert.strictEqual(f.extension, f.id, 'the extension is the id today');
+  }
+  assert.deepStrictEqual(reg.map((f) => f.mime), ['text/html', 'application/json', 'text/csv', 'text/plain']);
+});
+
+test('registry: getExportFormat falls back to the default for anything unknown', () => {
+  assert.strictEqual(sandbox.getExportFormat('csv').id, 'csv');
+  assert.strictEqual(sandbox.getExportFormat('nope').id, 'html');
+  assert.strictEqual(sandbox.getExportFormat(undefined).id, 'html');
+});
+
+async function loadWith(stored) {
+  const sb = { browser: { storage: { local: { get: async () => stored } } } };
+  vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
+  return sb.loadSettings();
+}
+
+testAsync('loadSettings: stored value shapes - lone string, array, comma string, junk, nothing', async () => {
+  const shape = (r) => ({ theme: r.theme, exportFormats: Array.from(r.exportFormats), shortenNames: r.shortenNames });
+  assert.deepStrictEqual(shape(await loadWith({ exportFormat: 'csv' })), { theme: 'light', exportFormats: ['csv'], shortenNames: 'on' });
+  assert.deepStrictEqual(shape(await loadWith({ exportFormat: ['txt', 'html'], theme: 'dark', shortenNames: 'off' })), { theme: 'dark', exportFormats: ['html', 'txt'], shortenNames: 'off' });
+  assert.deepStrictEqual(shape(await loadWith({ exportFormat: 'json,csv' })).exportFormats, ['json', 'csv']);
+  assert.deepStrictEqual(shape(await loadWith({ exportFormat: 42, theme: 'purple', shortenNames: 'maybe' })), { theme: 'light', exportFormats: ['html'], shortenNames: 'on' });
+  assert.deepStrictEqual(shape(await loadWith({})), { theme: 'light', exportFormats: ['html'], shortenNames: 'on' });
+});
+
+testAsync('loadSettings: one storage read for everything; a failing read gives every default', async () => {
+  let calls = 0, asked;
+  const sb = { browser: { storage: { local: { get: async (k) => { calls++; asked = k; return {}; } } } } };
+  vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
+  await sb.loadSettings();
+  assert.strictEqual(calls, 1);
+  assert.deepStrictEqual(Array.from(asked).sort(), ['exportFormat', 'shortenNames', 'theme']);
+  const bad = { browser: { storage: { local: { get: async () => { throw new Error('x'); } } } } };
+  vm.createContext(bad);
+  vm.runInContext(commonSrc, bad);
+  const r = await bad.loadSettings();
+  assert.deepStrictEqual([r.theme, Array.from(r.exportFormats), r.shortenNames], ['light', ['html'], 'on']);
+});
+
+testAsync('onSettingsChanged: reports which settings changed with fresh values; other areas/keys ignored; no storage.onChanged is safe', async () => {
+  const listeners = [];
+  const sb = { browser: { storage: { local: { get: async () => ({ exportFormat: ['html', 'csv'] }) }, onChanged: { addListener: (fn) => listeners.push(fn) } } } };
+  vm.createContext(sb);
+  vm.runInContext(commonSrc, sb);
+  const seen = [];
+  sb.onSettingsChanged((changed, settings) => seen.push([Array.from(changed), Array.from(settings.exportFormats)]));
+  listeners[0]({ exportFormat: { newValue: ['html', 'csv'] } }, 'local');
+  listeners[0]({ exportFormat: {} }, 'sync');
+  listeners[0]({ unrelated: {} }, 'local');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepStrictEqual(seen, [[['exportFormats'], ['html', 'csv']]]);
+  const bare = { browser: {} };
+  vm.createContext(bare);
+  vm.runInContext(commonSrc, bare);
+  bare.onSettingsChanged(() => {}); // must not throw
 });

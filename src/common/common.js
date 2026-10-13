@@ -5,14 +5,35 @@
 const EXPORT_FORMAT_VERSION = 1;
 
 // Storage key for the user's chosen export file format(s).
-// Each valid value is 'html' | 'json' | 'csv' | 'txt'. One format is stored
-// as that plain string; more than one is
-// stored as an array of them, e.g. ['html', 'json']. Defaults to 'html' when
-// unset.
+// One format is stored as its plain string; more than one as an array of them,
+// e.g. ['html', 'json']. Defaults to 'html' when unset.
 const EXPORT_FORMAT_STORAGE_KEY = 'exportFormat';
 const EXPORT_FORMAT_DEFAULT = 'html';
-// Every format, in the fixed order they are listed and exported in.
-const EXPORT_FORMATS = ['html', 'json', 'csv', 'txt'];
+
+// The ONE list of export formats. Everything that needs to know about a
+// format reads it from here: the order they are listed and exported in, the
+// name shown in messages, the file extension, the MIME type of a single saved
+// file, and the text on the Settings page. Adding a format starts here (the
+// builder in report-template.js, the case in background.js and the importer
+// still need their own code; a test checks Settings lists exactly these).
+const EXPORT_FORMAT_REGISTRY = [
+  { id: 'html', label: 'HTML report', title: 'HTML', extension: 'html', mime: 'text/html',
+    description: 'A readable report you can open in any browser. Add-ons Importer can read it back.' },
+  { id: 'json', label: 'JSON file', title: 'JSON', extension: 'json', mime: 'application/json',
+    description: 'Plain data for other tools. Add-ons Importer can read it back.' },
+  { id: 'csv', label: 'CSV file', title: 'CSV', extension: 'csv', mime: 'text/csv',
+    description: 'A table for Excel or any spreadsheet. Add-ons Importer can read it back.' },
+  { id: 'txt', label: 'TXT file', title: 'TXT', extension: 'txt', mime: 'text/plain',
+    description: 'A simple list, one add-on per line. Add-ons Importer can read it back.' },
+];
+// Every format id, in the fixed order they are listed and exported in.
+const EXPORT_FORMATS = EXPORT_FORMAT_REGISTRY.map((f) => f.id);
+
+// The registry entry for a format id; an unknown one gets the default's.
+function getExportFormat(fmt) {
+  return EXPORT_FORMAT_REGISTRY.find((f) => f.id === fmt) ||
+    EXPORT_FORMAT_REGISTRY.find((f) => f.id === EXPORT_FORMAT_DEFAULT);
+}
 
 // Storage key for the shorten-add-on-names setting.
 // Valid values: 'on' | 'off'. Defaults to 'on' when unset.
@@ -40,14 +61,11 @@ function byName(a, b) {
   return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 }
 
-// Maps the stored exportFormat value to a human-readable file type label.
-// Shared by export.js (the description text) and confirmation.js (the
-// "done" message) - previously each had its own copy of this.
+// The human-readable file type for a format id ("HTML report", "JSON file"...).
+// Shared by export.js (the description text) and confirmation.js (the "done"
+// message). Anything unknown reads as the default format.
 function formatLabel(fmt) {
-  if (fmt === 'json') return 'JSON file';
-  if (fmt === 'csv') return 'CSV file';
-  if (fmt === 'txt') return 'TXT file';
-  return 'HTML report';
+  return getExportFormat(fmt).label;
 }
 
 // Turns whatever is stored (or passed around) for the export format - a
@@ -95,7 +113,7 @@ function appendFormatLabels(container, fmts) {
 // set rather than trusted as-is. Previously each of export.js, settings.js
 // and background.js had its own copy of this same check.
 function isValidExportFormat(val) {
-  return val === 'html' || val === 'json' || val === 'csv' || val === 'txt';
+  return EXPORT_FORMATS.includes(val);
 }
 function isValidShortenNames(val) {
   return val === 'on' || val === 'off';
@@ -104,26 +122,58 @@ function resolveShortenNames(val) {
   return isValidShortenNames(val) ? val : SHORT_NAME_DEFAULT;
 }
 
-// Reads all three settings in a single storage.local.get call, applying
-// the same validation each individual reader already did on its own.
-// Falls back to every default if the read itself fails, matching how
-// each site already treated that case before this was consolidated.
-// Written for background.js in particular, which can't load theme.js
-// (it has no document to apply a theme to) - so the theme key here is
-// the literal 'theme' string, not theme.js's THEME_STORAGE_KEY constant.
-// A tripwire test confirms that literal matches theme.js's key.
-async function getStoredSettings() {
-  try {
-    const stored = await browser.storage.local.get(['theme', EXPORT_FORMAT_STORAGE_KEY, SHORT_NAME_STORAGE_KEY]);
-    return {
-      theme: stored.theme === 'dark' ? 'dark' : 'light',
-      // Every chosen format, in the fixed order (a stored lone string is one).
-      exportFormats: resolveExportFormats(stored[EXPORT_FORMAT_STORAGE_KEY]),
-      shortenNames: resolveShortenNames(stored[SHORT_NAME_STORAGE_KEY]),
-    };
-  } catch {
-    return { theme: 'light', exportFormats: [EXPORT_FORMAT_DEFAULT], shortenNames: SHORT_NAME_DEFAULT };
+// The settings schema: every stored setting, its storage key, its default and
+// how a stored value is turned into a safe one (storage can hold anything -
+// a stale value, or something written directly - so a value is checked
+// against its known-good set, never trusted). Theme's key is the literal
+// 'theme', not theme.js's THEME_STORAGE_KEY, because background.js cannot
+// load theme.js (it has no document to apply a theme to); a tripwire test
+// confirms the literal matches.
+const SETTINGS_SCHEMA = {
+  theme: { key: 'theme', default: 'light', resolve: (v) => (v === 'dark' ? 'dark' : 'light') },
+  exportFormats: { key: EXPORT_FORMAT_STORAGE_KEY, default: [EXPORT_FORMAT_DEFAULT], resolve: resolveExportFormats },
+  shortenNames: { key: SHORT_NAME_STORAGE_KEY, default: SHORT_NAME_DEFAULT, resolve: resolveShortenNames },
+};
+const SETTINGS_STORAGE_KEYS = Object.values(SETTINGS_SCHEMA).map((d) => d.key);
+
+function defaultSettings() {
+  const out = {};
+  for (const [name, def] of Object.entries(SETTINGS_SCHEMA)) {
+    out[name] = Array.isArray(def.default) ? def.default.slice() : def.default;
   }
+  return out;
+}
+
+// THE way to read settings: one storage.local.get for all of them, each
+// checked by the schema. Used by the Exporter, Importer, Settings page and
+// background alike. Every setting falls back to its default if the read
+// itself fails. Returns { theme, exportFormats, shortenNames }.
+async function loadSettings() {
+  try {
+    const stored = await browser.storage.local.get(SETTINGS_STORAGE_KEYS);
+    const out = {};
+    for (const [name, def] of Object.entries(SETTINGS_SCHEMA)) {
+      out[name] = def.resolve(stored[def.key]);
+    }
+    return out;
+  } catch {
+    return defaultSettings();
+  }
+}
+
+// Calls handler(changedNames, settings) whenever any stored setting changes
+// (from another tab, an import or a reset). changedNames lists the schema
+// names that changed; settings is a fresh loadSettings() result, so a reset
+// (value removed) arrives as the default. Pages without storage.onChanged are
+// left alone.
+function onSettingsChanged(handler) {
+  if (typeof browser === 'undefined' || !browser.storage || !browser.storage.onChanged) return;
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    const changed = Object.keys(SETTINGS_SCHEMA).filter((n) => changes[SETTINGS_SCHEMA[n].key]);
+    if (!changed.length) return;
+    loadSettings().then((settings) => handler(changed, settings));
+  });
 }
 
 // How an add-on's type is written for people (the TXT export, the report, the

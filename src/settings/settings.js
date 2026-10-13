@@ -228,34 +228,24 @@ function setSettingsStatus(msg, isError = false) {
   settingsStatusEl.className   = isError ? 'error' : '';
 }
 
+// Each of these re-reads ALL settings through the shared loader (one storage
+// read) and ticks its own controls. They also keep the localStorage cache in
+// step, so settings-init.js can apply the right values before the first paint
+// on the next open.
 async function loadCurrentTheme() {
-  let stored;
-  try {
-    stored = await browser.storage.local.get(THEME_STORAGE_KEY);
-  } catch {
-    stored = {};
-  }
-  const current = resolveTheme(stored);
+  const { theme } = await loadSettings();
   for (const radio of themeRadios) {
-    radio.checked = radio.value === current;
+    radio.checked = radio.value === theme;
   }
-  return current;
+  return theme;
 }
 
 async function loadCurrentExportFormat() {
-  let stored;
-  try {
-    stored = await browser.storage.local.get(EXPORT_FORMAT_STORAGE_KEY);
-  } catch {
-    stored = {};
-  }
-  const current = resolveExportFormats(stored && stored[EXPORT_FORMAT_STORAGE_KEY]);
+  const { exportFormats } = await loadSettings();
   for (const box of formatBoxes) {
-    box.checked = current.includes(box.value);
+    box.checked = exportFormats.includes(box.value);
   }
-  // Keep the localStorage cache in sync so settings-init.js can apply
-  // the correct value before the first paint on the next page open.
-  try { localStorage.setItem('addons-hub-settings-exportFormat', current.join(',')); } catch (e) {}
+  try { localStorage.setItem('addons-hub-settings-exportFormat', exportFormats.join(',')); } catch (e) {}
 }
 for (const radio of themeRadios) {
   radio.addEventListener('change', async () => {
@@ -293,22 +283,11 @@ for (const box of formatBoxes) {
 }
 
 async function loadCurrentShortenNames() {
-  let stored;
-  try {
-    stored = await browser.storage.local.get(SHORT_NAME_STORAGE_KEY);
-  } catch {
-    stored = {};
-  }
-  const current = (stored && (stored[SHORT_NAME_STORAGE_KEY] === 'on' ||
-                               stored[SHORT_NAME_STORAGE_KEY] === 'off'))
-    ? stored[SHORT_NAME_STORAGE_KEY]
-    : SHORT_NAME_DEFAULT;
+  const { shortenNames } = await loadSettings();
   for (const radio of shortenRadios) {
-    radio.checked = radio.value === current;
+    radio.checked = radio.value === shortenNames;
   }
-  // Keep the localStorage cache in sync so settings-init.js can apply
-  // the correct value before the first paint on the next page open.
-  try { localStorage.setItem('addons-hub-settings-shortenNames', current); } catch (e) {}
+  try { localStorage.setItem('addons-hub-settings-shortenNames', shortenNames); } catch (e) {}
 }
 
 for (const radio of shortenRadios) {
@@ -416,7 +395,7 @@ settingsFileInput.addEventListener('change', async () => {
 // applied at once — one round-trip instead of three sequential ones,
 // which reduces the window where the hardcoded HTML defaults are visible.
 (async () => {
-  const { theme, exportFormats, shortenNames } = await getStoredSettings();
+  const { theme, exportFormats, shortenNames } = await loadSettings();
   for (const radio of themeRadios) {
     radio.checked = radio.value === theme;
   }
@@ -616,14 +595,11 @@ if (browser.runtime.onMessage) {
 // theme itself is applied by theme.js; this keeps the radio buttons honest.)
 // Programmatically ticking a radio or box does not fire its change event, so this
 // cannot loop back into saving.
-if (browser.storage && browser.storage.onChanged) {
-  browser.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local') return;
-    if (changes[THEME_STORAGE_KEY]) loadCurrentTheme();
-    if (changes[EXPORT_FORMAT_STORAGE_KEY]) loadCurrentExportFormat();
-    if (changes[SHORT_NAME_STORAGE_KEY]) loadCurrentShortenNames();
-  });
-}
+onSettingsChanged((changed) => {
+  if (changed.includes('theme')) loadCurrentTheme();
+  if (changed.includes('exportFormats')) loadCurrentExportFormat();
+  if (changed.includes('shortenNames')) loadCurrentShortenNames();
+});
 
 // Clear the settings status message whenever the user interacts with
 // anything on the page — radio change, button click, file input — so it

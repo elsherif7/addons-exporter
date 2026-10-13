@@ -35,7 +35,7 @@ addons-hub/
 │   └── structure.test.js        # Cross-page checks: lang attributes, ARIA roles, version consistency
 └── src/
     ├── common/
-    │   ├── common.js   # Shared helper functions used across every page and script
+    │   ├── common.js   # Shared helpers: the export format registry, the settings schema and loadSettings(), used by every page and script
     │   ├── theme.js    # Applies the stored light/dark theme on page load
     │   ├── press.js    # Click/tap feedback: a ring bursts out of links/buttons; rows get an inward flash instead
     │   ├── reveal.js   # Opening of the Exporter and Importer pages, timed like the Settings page (parts top to bottom, add-ons cascading in, the Exporter's Export button last)

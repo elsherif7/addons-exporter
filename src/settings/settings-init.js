@@ -25,9 +25,11 @@
 // defaults are still applied from the explicit fallback paths below.
 
 (function () {
-  var DEFAULT_FORMAT  = 'html';
-  var DEFAULT_SHORTEN = 'on';
-  var VALID_FORMATS   = ['html', 'json', 'csv', 'txt'];
+  var DEFAULT_FORMAT  = EXPORT_FORMAT_DEFAULT;
+  var DEFAULT_SHORTEN = SHORT_NAME_DEFAULT;
+  // The format list comes from the registry in common.js (loaded before this
+  // script), so a new format needs no change here.
+  var VALID_FORMATS   = EXPORT_FORMATS;
   var VALID_SHORTEN   = ['on', 'off'];
 
   var fmt     = null;
@@ -51,14 +53,13 @@
   // Validate; fall back to defaults for missing or invalid cache values.
   if (VALID_SHORTEN.indexOf(shorten) === -1) shorten = DEFAULT_SHORTEN;
 
-  var fmtHtml = document.getElementById('formatHtml');
-  var fmtJson = document.getElementById('formatJson');
-  var fmtCsv  = document.getElementById('formatCsv');
-  var fmtTxt  = document.getElementById('formatTxt');
-  if (fmtHtml) fmtHtml.checked = (fmtList.indexOf('html') !== -1);
-  if (fmtJson) fmtJson.checked = (fmtList.indexOf('json') !== -1);
-  if (fmtCsv)  fmtCsv.checked  = (fmtList.indexOf('csv') !== -1);
-  if (fmtTxt)  fmtTxt.checked  = (fmtList.indexOf('txt') !== -1);
+  // One tick box per registry format, id "format" + the id with a capital
+  // first letter (html -> formatHtml). settings.html has to match the
+  // registry; a test checks it.
+  VALID_FORMATS.forEach(function (id) {
+    var box = document.getElementById('format' + id.charAt(0).toUpperCase() + id.slice(1));
+    if (box) box.checked = (fmtList.indexOf(id) !== -1);
+  });
 
   var sOn  = document.getElementById('shortenNamesOn');
   var sOff = document.getElementById('shortenNamesOff');

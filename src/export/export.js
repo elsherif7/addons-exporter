@@ -52,13 +52,7 @@ function buildExportSuccessStatus(fmt, stats) {
 
 // Updates the description paragraph to reflect the currently stored format.
 async function updateExportDesc() {
-  let formats = [EXPORT_FORMAT_DEFAULT];
-  try {
-    const stored = await browser.storage.local.get(EXPORT_FORMAT_STORAGE_KEY);
-    formats = resolveExportFormats(stored[EXPORT_FORMAT_STORAGE_KEY]);
-  } catch {
-    // keep default
-  }
+  const { exportFormats: formats } = await loadSettings();
   const article = indefiniteArticleFor(formatLabel(formats[0]));
 
   exportDescEl.textContent = '';
@@ -80,13 +74,9 @@ updateExportDesc();
 
 // Keep the description in sync if the export format is changed from
 // another tab (e.g. the settings page) while this one is still open.
-if (browser.storage && browser.storage.onChanged) {
-  browser.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes[EXPORT_FORMAT_STORAGE_KEY]) {
-      updateExportDesc();
-    }
-  });
-}
+onSettingsChanged((changed) => {
+  if (changed.includes('exportFormats')) updateExportDesc();
+});
 
 function setStatus(msg) {
   statusEl.textContent = msg;
@@ -207,14 +197,14 @@ function renderList(addons, shorten) {
 
 (async () => {
   try {
-    const [addons, stored] = await Promise.all([
+    const [addons, settings] = await Promise.all([
       browser.runtime.sendMessage({ type: 'listAddons' }),
-      browser.storage.local.get(SHORT_NAME_STORAGE_KEY),
+      loadSettings(),
     ]);
     if (!Array.isArray(addons)) {
       throw new Error('unexpected response from the extension');
     }
-    const shorten = !stored || stored[SHORT_NAME_STORAGE_KEY] !== 'off';
+    const shorten = settings.shortenNames !== 'off';
     renderList(addons, shorten);
   } catch (e) {
     const p = document.createElement('p');

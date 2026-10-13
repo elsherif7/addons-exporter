@@ -18,13 +18,14 @@ function safeJsonForScriptTag(value) {
 // extension's icons folder sitting next to it once it's saved elsewhere.
 const REPORT_ICON_DATA_URI = 'data:image/png;base64,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';
 
-// The plain-data exports (JSON, CSV, TXT) list enabled add-ons first and
-// disabled ones after, each group A-Z, the same way the HTML report groups
-// them - easier to read than one long mixed list.
-function orderForReading(list) {
+// Every export lists enabled add-ons first and disabled ones after, each
+// group A-Z - easier to read than one long mixed list. This is the ONE place
+// that grouping is done; the HTML report, TXT, CSV and JSON all use it.
+// Returns { enabled, disabled, all } (all = enabled then disabled).
+function groupForReading(list) {
   const enabled = list.filter((a) => a.enabled).sort(byName);
   const disabled = list.filter((a) => !a.enabled).sort(byName);
-  return [...enabled, ...disabled];
+  return { enabled, disabled, all: [...enabled, ...disabled] };
 }
 
 // Each add-on's fields in reading order (name first, the technical id last).
@@ -50,7 +51,7 @@ function jsonAddon(a, shorten = true) {
 function buildJsonExport(list, shorten = true) {
   return JSON.stringify({
     formatVersion: EXPORT_FORMAT_VERSION,
-    addons: orderForReading(list).map((a) => jsonAddon(a, shorten)),
+    addons: groupForReading(list).all.map((a) => jsonAddon(a, shorten)),
   }, null, 2);
 }
 
@@ -83,7 +84,7 @@ function buildCsvExport(list, shorten = true) {
   const lines = [
     `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
     row(['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id']),
-    ...orderForReading(list).map((a) => row([shorten ? shortName(a.name) : a.name, a.version, a.type, a.enabled, a.link, a.linkType, a.id])),
+    ...groupForReading(list).all.map((a) => row([shorten ? shortName(a.name) : a.name, a.version, a.type, a.enabled, a.link, a.linkType, a.id])),
   ];
   return '\uFEFF' + lines.join('\r\n');
 }
@@ -117,9 +118,7 @@ function txtEscape(value) {
 }
 
 function buildTxtExport(list, shorten = true) {
-  const enabled = list.filter((a) => a.enabled).sort(byName);
-  const disabled = list.filter((a) => !a.enabled).sort(byName);
-  const all = [...enabled, ...disabled];
+  const { enabled, disabled, all } = groupForReading(list);
   const nameOf = (a) => txtEscape(shorten ? shortName(a.name) : a.name);
 
   // Column widths, so every line lines up. A very long name is allowed to
@@ -188,6 +187,7 @@ function htmlDataAddon(a) {
 // Falls back to the baked-in value if localStorage is unavailable.
 function buildHtmlReport(list, theme, shorten = true) {
   const startingTheme = theme === 'dark' ? 'dark' : 'light';
+  const grouped = groupForReading(list);
 
   const row = (a) => {
     const matchLabel = LINK_TYPE_LABELS[a.linkType] || '';
@@ -518,8 +518,8 @@ function buildHtmlReport(list, theme, shorten = true) {
   <div class="checklist-box">
     <div id="addonList" class="revealing">
       <div class="groups-outer-box">
-        ${section('Enabled', list.filter(a => a.enabled).sort(byName))}
-        ${section('Disabled', list.filter(a => !a.enabled).sort(byName))}
+        ${section('Enabled', grouped.enabled)}
+        ${section('Disabled', grouped.disabled)}
       </div>
     </div>
     <p id="noSearchMatches" class="placeholder-text" style="display:none;">No add-ons match your search.</p>
