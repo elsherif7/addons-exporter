@@ -19,7 +19,7 @@ const assert = require('assert');
 const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
-const { test, readSrc, evalInContext, readCommon, readReportBuilders } = require('./helpers');
+const { test, readSrc, evalInContext, readCommon, readReportBuilders, readImport } = require('./helpers');
 
 const CONTRACT = {
   exportFormatVersion: 1,
@@ -110,7 +110,7 @@ test('contract: the Importer reads exactly what each export writes (the contract
   vm.createContext(importSb);
   vm.runInContext(readCommon(), importSb);
   vm.runInContext(readReportBuilders(), importSb);
-  vm.runInContext(readSrc('src/import/import.js'), importSb);
+  vm.runInContext(readImport(), importSb);
   const ids = (r) => { assert.strictEqual(r.ok, true, r.error); return Array.from(r.addons, (a) => a.id).sort(); };
   assert.deepStrictEqual(ids(importSb.parseAddonsPayload(JSON.stringify(htmlData(importSb.buildHtmlReport(list, 'light', false))))), ['a@x', 'n@x']);
   assert.deepStrictEqual(ids(importSb.parseJsonPayload(importSb.buildJsonExport(list, false))), ['a@x', 'n@x']);

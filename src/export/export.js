@@ -82,57 +82,25 @@ function setStatus(msg) {
   statusEl.textContent = msg;
 }
 
-function checkboxes() {
-  return listEl.querySelectorAll('input[type="checkbox"]');
-}
+const list = createAddonList({
+  listEl, countEl: selectionCountEl, actionBtn: exportBtn,
+  selectAllBtn, deselectAllBtn, searchInput, noMatchesEl: noSearchMatchesEl,
+});
 
-function updateSelectionCount() {
-  const boxes = checkboxes();
-  const checked = listEl.querySelectorAll('input[type="checkbox"]:checked').length;
-  setSelectionCount(selectionCountEl, boxes.length
-    ? `${checked} of ${boxes.length} selected`
-    : '');
-  exportBtn.disabled = checked === 0;
-}
-
-// Builds one <div class="addon-row"> via DOM APIs (not innerHTML) so
-// a.name/a.version never pass through HTML parsing - textContent and
-// property assignment don't need escapeHtml the way a template string did.
-function createAddonRow(a, i, shorten) {
-  const row = document.createElement('div');
-  row.className = 'addon-row';
-
-  const checkbox = document.createElement('input');
-  checkbox.type = 'checkbox';
-  checkbox.id = `cb-${i}`;
-  checkbox.dataset.id = a.id;
-  checkbox.checked = true;
-
-  const nameSpan = document.createElement('span');
-  nameSpan.className = 'addon-name';
-  nameSpan.textContent = shorten ? shortName(a.name) : a.name;
-  nameSpan.dataset.fullName = a.name; // so the name can follow the Shorten setting live
-
-  const versionSpan = document.createElement('span');
-  versionSpan.className = 'addon-version';
-  versionSpan.textContent = a.version;
-
-  const typeSpan = document.createElement('span');
-  typeSpan.className = 'match-label';
-  typeSpan.textContent = typeLabel(a.type);
+// The Exporter's row: the shared parts, plus a link that searches AMO for the
+// add-on (a guessed exact-id URL could 404 for a non-AMO add-on or a theme - a
+// name search always lands somewhere useful instead).
+function createAddonRow(a, index, shorten) {
+  const { row, label } = createAddonRowBase(a, index, {
+    idPrefix: 'cb', dataset: { id: a.id }, shorten,
+  });
 
   const amoLink = document.createElement('a');
   amoLink.className = 'match-label';
-  // A guessed exact-id URL could 404 for a non-AMO add-on or a theme -
-  // a name search always lands somewhere useful instead.
   amoLink.href = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
   amoLink.target = '_blank';
   amoLink.rel = 'noopener';
   amoLink.textContent = 'AMO';
-
-  const label = document.createElement('label');
-  label.htmlFor = `cb-${i}`;
-  label.append(nameSpan, ' ', versionSpan, ' ', typeSpan);
 
   // Kept out of the label, as a sibling rather than a child - inside it, a
   // <label for> makes the checkbox's accessible name absorb the link text
@@ -141,58 +109,24 @@ function createAddonRow(a, i, shorten) {
   // own click handler already skips anchor clicks, and
   // .match-label[href]:hover in shared.css already underlines on hover -
   // none of that needed its own JS here.
-  row.append(checkbox, label, amoLink);
+  row.append(amoLink);
   return row;
-}
-
-function appendGroup(fragment, title, items, nextIndex, shorten) {
-  if (items.length === 0) return;
-  const container = document.createElement('div');
-  container.className = 'group-container';
-
-  const heading = document.createElement('div');
-  heading.className = 'group-heading';
-  heading.textContent = `${title} (${items.length})`;
-
-  const box = document.createElement('div');
-  box.className = 'group-box';
-  items.forEach((a) => {
-    box.appendChild(createAddonRow(a, nextIndex(), shorten));
-  });
-
-  container.appendChild(heading);
-  container.appendChild(box);
-  fragment.appendChild(container);
 }
 
 function renderList(addons, shorten) {
   if (addons.length === 0) {
     listEl.innerHTML = '<p class="placeholder-text">No add-ons found to export.</p>';
-    updateSelectionCount();
+    list.updateSelectionCount();
     return;
   }
 
-  const enabled = addons.filter(a => a.enabled).sort(byName);
-  const disabled = addons.filter(a => !a.enabled).sort(byName);
-
-  // Single counter across both groups so every checkbox id stays unique.
-  let idx = 0;
-  const nextIndex = () => idx++;
-
-  const outerBox = document.createElement('div');
-  outerBox.className = 'groups-outer-box';
-  appendGroup(outerBox, 'Enabled', enabled, nextIndex, shorten);
-  appendGroup(outerBox, 'Disabled', disabled, nextIndex, shorten);
-  const fragment = document.createDocumentFragment();
-  fragment.appendChild(outerBox);
-  listEl.replaceChildren(fragment);
+  const { enabled, disabled } = groupForReading(addons);
+  list.render(createAddonGroups(
+    [{ title: 'Enabled', items: enabled }, { title: 'Disabled', items: disabled }],
+    (a, index) => createAddonRow(a, index, shorten)
+  ));
   searchInput.style.display = 'block';
-
-  checkboxes().forEach((cb) => {
-    cb.addEventListener('change', updateSelectionCount);
-  });
-
-  updateSelectionCount();
+  list.updateSelectionCount();
 }
 
 (async () => {
@@ -213,47 +147,6 @@ function renderList(addons, shorten) {
     listEl.replaceChildren(p);
   }
 })();
-
-selectAllBtn.addEventListener('click', () => {
-  visibleCheckboxes(checkboxes()).forEach((cb) => { cb.checked = true; });
-  updateSelectionCount();
-});
-
-deselectAllBtn.addEventListener('click', () => {
-  visibleCheckboxes(checkboxes()).forEach((cb) => { cb.checked = false; });
-  updateSelectionCount();
-});
-
-function applySearch() {
-  const anyMatch = filterAddonRows(listEl, searchInput.value);
-  setFilterVisible(listEl, anyMatch);
-  noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
-}
-searchInput.addEventListener('input', applySearch);
-
-// "Shorten add-on names" changed (Settings page, a settings import, a reset):
-// the names on this already-open page change at once. What the search box
-// matches changes with them, so a search in progress is applied again.
-onShortenNamesChanged((shorten) => {
-  if (applyNameShortening(listEl, shorten) > 0 && searchInput.value) applySearch();
-});
-
-// Makes the whole row clickable, not just the checkbox/label text.
-// Clicking the checkbox itself is left alone - its own native click
-// already toggles it. Anything else in the row calls cb.click(), which
-// fires the checkbox's own native toggle and change event. The
-// preventDefault stops a label click's own default forwarding to the
-// checkbox, so that path doesn't also fire and double the toggle.
-listEl.addEventListener('click', (e) => {
-  if (e.target.matches('input[type="checkbox"]')) return;
-  if (e.target.closest('a')) return;
-  const row = e.target.closest('.addon-row');
-  if (!row) return;
-  const cb = row.querySelector('input[type="checkbox"]');
-  if (!cb || cb.disabled) return;
-  e.preventDefault();
-  cb.click();
-});
 
 exportBtn.addEventListener('click', async () => {
   const ids = Array.from(listEl.querySelectorAll('input[type="checkbox"]:checked'))

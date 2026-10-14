@@ -653,10 +653,13 @@ test('favicon: every full page (the ones that open in a tab) links an icon, and 
 test('live settings: the theme, export format and name shortening each have a live listener on the pages that use them', () => {
   assert.match(readSrc('src/common/theme.js'), /changes\[THEME_STORAGE_KEY\][\s\S]*applyTheme\(/, 'every page follows the theme');
   assert.match(readSrc('src/export/export.js'), /onSettingsChanged\([\s\S]*'exportFormats'[\s\S]*updateExportDesc\(\)/, 'the Exporter follows the export format');
+  // Both pages get this from the shared list (addon-list.js).
+  const list = readSrc('src/common/addon-list.js');
+  assert.match(list, /onShortenNamesChanged\(\(shorten\) => \{/, 'the shared list follows "Shorten add-on names"');
+  assert.match(list, /nameEl\.dataset\.fullName = a\.name/, 'rows remember their full name');
   for (const page of ['src/export/export.js', 'src/import/import.js']) {
-    const src = readSrc(page);
-    assert.match(src, /onShortenNamesChanged\(\(shorten\) => \{/, `${page} follows "Shorten add-on names"`);
-    assert.match(src, /nameSpan\.dataset\.fullName = a\.name|nameEl\.dataset\.fullName = a\.name/, `${page} rows remember their full name`);
+    assert.match(readSrc(page), /createAddonList\(\{/, `${page} uses the shared list`);
+    assert.match(readSrc(page), /createAddonRowBase\(/, `${page} builds its rows from the shared row`);
   }
   const settings = readSrc('src/settings/settings.js');
   for (const [name, load] of [['theme', 'loadCurrentTheme'], ['exportFormats', 'loadCurrentExportFormat'], ['shortenNames', 'loadCurrentShortenNames']]) {
@@ -691,10 +694,9 @@ test('remove file (x): the Importer exits in reverse and releases its held frame
   assert.match(src, /a\.cancel\(\)/, 'the held end frames are cancelled afterwards');
 });
 
-test('selection badge: the Exporter and Importer set it through setSelectionCount, so a change animates', () => {
-  for (const page of ['src/export/export.js', 'src/import/import.js']) {
-    assert.match(readSrc(page), /setSelectionCount\(selectionCountEl, /, `${page} must use setSelectionCount`);
-  }
+test('selection badge: the Exporter and Importer (shared list) set it through setSelectionCount, so a change animates', () => {
+  assert.match(readSrc('src/common/addon-list.js'), /setSelectionCount\(countEl, /, 'the shared list must use setSelectionCount');
+  assert.doesNotMatch(readSrc('src/common/addon-list.js'), /countEl\.textContent =/);
   assert.doesNotMatch(readSrc('src/export/export.js'), /selectionCountEl\.textContent =/);
 });
 

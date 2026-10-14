@@ -4,11 +4,11 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readSettings } = require('./helpers');
 
 const themeSrc = readSrc('src/common/theme.js');
 const commonSrc = readCommon();
-const settingsSrc = readSrc('src/settings/settings.js');
+const settingsSrc = readSettings();
 
 // settings.js wires up DOM elements and event listeners at load time.
 // Provide a minimal stub document so it can load without throwing.

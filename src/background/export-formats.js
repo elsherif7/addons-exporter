@@ -1,17 +1,5 @@
-// The plain-data export builders: JSON, CSV and TXT (plus groupForReading(),
-// the one place add-ons are put in reading order, which the HTML report uses
-// too). Pure string building - nothing here touches browser.* APIs. Needs
-// core.js (byName, shortName, typeLabel, EXPORT_FORMAT_VERSION...) loaded first.
-
-// Every export lists enabled add-ons first and disabled ones after, each
-// group A-Z - easier to read than one long mixed list. This is the ONE place
-// that grouping is done; the HTML report, TXT, CSV and JSON all use it.
-// Returns { enabled, disabled, all } (all = enabled then disabled).
-function groupForReading(list) {
-  const enabled = list.filter((a) => a.enabled).sort(byName);
-  const disabled = list.filter((a) => !a.enabled).sort(byName);
-  return { enabled, disabled, all: [...enabled, ...disabled] };
-}
+// The plain-data export builders: JSON, CSV and TXT. Pure string building - nothing here touches browser.* APIs. Needs
+// core.js (groupForReading, shortName, typeLabel, EXPORT_FORMAT_VERSION...) loaded first.
 
 // Each add-on's fields in reading order (name first, the technical id last).
 // The importer finds fields by name, so the order is only for people.

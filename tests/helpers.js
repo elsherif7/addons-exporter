@@ -75,9 +75,17 @@ function readSrc(relativePath) {
 function readSrcs(...relativePaths) {
   return relativePaths.map(readSrc).join('\n');
 }
-// The shared helpers: core.js + page-ui.js + the background's amo.js.
+// The shared helpers: core.js + page-ui.js + addon-list.js + the background's amo.js.
 function readCommon() {
-  return readSrcs('src/common/core.js', 'src/common/page-ui.js', 'src/background/amo.js');
+  return readSrcs('src/common/core.js', 'src/common/page-ui.js', 'src/common/addon-list.js', 'src/background/amo.js');
+}
+// The Importer: its readers, its matching and the page script.
+function readImport() {
+  return readSrcs('src/import/parsers.js', 'src/import/match.js', 'src/import/import.js');
+}
+// The Settings page: the settings-file code and the page script.
+function readSettings() {
+  return readSrcs('src/settings/settings-file.js', 'src/settings/settings.js');
 }
 // Every export builder: JSON/CSV/TXT (export-formats.js) + the HTML report.
 function readReportBuilders() {
@@ -357,4 +365,4 @@ function makeFakeDom(ids = []) {
   return { document, elements };
 }
 
-module.exports = { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, evalInContext, finish, makeFakeDom };
+module.exports = { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, readImport, readSettings, evalInContext, finish, makeFakeDom };

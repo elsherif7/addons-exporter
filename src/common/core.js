@@ -64,6 +64,17 @@ function byName(a, b) {
   return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 }
 
+// Every export lists enabled add-ons first and disabled ones after, each
+// group A-Z - easier to read than one long mixed list. This is the ONE place
+// that grouping is done; the HTML report, TXT, CSV, JSON and the Exporter's
+// list all use it.
+// Returns { enabled, disabled, all } (all = enabled then disabled).
+function groupForReading(list) {
+  const enabled = list.filter((a) => a.enabled).sort(byName);
+  const disabled = list.filter((a) => !a.enabled).sort(byName);
+  return { enabled, disabled, all: [...enabled, ...disabled] };
+}
+
 // The human-readable file type for a format id ("HTML report", "JSON file"...).
 // Shared by export.js (the description text) and confirmation.js (the "done"
 // message). Anything unknown reads as the default format.

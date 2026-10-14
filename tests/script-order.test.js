@@ -20,12 +20,16 @@ const LIBRARIES = [
   'src/common/theme.js',
   'src/common/core.js',
   'src/common/page-ui.js',
+  'src/common/addon-list.js',
   'src/common/press.js',
   'src/common/reveal.js',
   'src/background/export-formats.js',
   'src/background/report-template.js',
   'src/background/zip.js',
   'src/background/amo.js',
+  'src/import/parsers.js',
+  'src/import/match.js',
+  'src/settings/settings-file.js',
 ];
 
 // The code of a script with comments and string contents blanked out, so that
@@ -159,7 +163,7 @@ test('script order: the background never loads page-only code, and no page loads
   for (const ctx of contexts()) {
     const files = ctx.files;
     if (ctx.name === 'background') {
-      for (const bad of ['src/common/page-ui.js', 'src/common/theme.js', 'src/common/press.js', 'src/common/reveal.js']) {
+      for (const bad of ['src/common/page-ui.js', 'src/common/addon-list.js', 'src/common/theme.js', 'src/common/press.js', 'src/common/reveal.js']) {
         assert.ok(!files.includes(bad), `the background must not load ${bad} (it has no document)`);
       }
     } else {

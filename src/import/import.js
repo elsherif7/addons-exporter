@@ -1,376 +1,5 @@
-// SUPPORTED_FORMAT_VERSION tracks EXPORT_FORMAT_VERSION, and
-// migrateAddonsData() below is what's supposed to handle any shape
-// change between them. These two are coupled: bumping the format
-// version without also updating migrateAddonsData means old-format
-// files get passed straight through unmigrated. A tripwire test in
-// tests/import.test.js hardcodes today's version number specifically
-// to fail when that happens - see "migrateAddonsData: bumping the
-// format version requires updating this test and migrateAddonsData".
-const SUPPORTED_FORMAT_VERSION = EXPORT_FORMAT_VERSION;
-
-// No-op for format version 1. Update this (and the tripwire test above)
-// before bumping EXPORT_FORMAT_VERSION for real.
-function migrateAddonsData(addons, formatVersion) {
-  return addons;
-}
-
 // TAB_OPEN_DELAY_MS (the stagger between opened tabs) lives in core.js.
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function buildInstalledIndex(installed) {
-  const byId = new Map();
-  const byName = new Map();
-  // Short form of each installed name (see shortName() in core.js): an
-  // export made with "Shorten add-on names" on has short names, so a file
-  // without ids can only be matched against installed add-ons by that. A
-  // short name shared by two installed add-ons is ambiguous and is
-  // stored as null, so it never guesses between them.
-  const byShortName = new Map();
-  for (const a of installed) {
-    byId.set(a.id, a);
-    byName.set(a.name.toLowerCase(), a);
-    const short = shortName(a.name).toLowerCase();
-    byShortName.set(short, byShortName.has(short) ? null : a);
-  }
-  return { byId, byName, byShortName };
-}
-
-// Matches a file's add-on to an installed one: the id first (the reliable
-// way, and what makes shortened names safe), then - for an add-on with no
-// id, or one whose id isn't installed - the name: the exact name
-// (case-insensitive), then the shortened form, so a short name in the file
-// still finds the full installed name and the other way round.
-function findInstalledMatch(item, index) {
-  if (item.id && index.byId.has(item.id)) {
-    return index.byId.get(item.id);
-  }
-  const name = item.name.toLowerCase();
-  if (index.byName.has(name)) return index.byName.get(name);
-  const short = shortName(item.name).toLowerCase();
-  return index.byShortName.get(short) || null;
-}
-
-// De-duplicates by id+link (or, lacking an id, name+link) - an exact
-// repeat entry would otherwise show up as two rows, and if both got
-// selected in the Importer, open the same add-on's page twice. Shared by
-// parseAddonsPayload() and parseCsvPayload() below.
-function dedupeAddonKey(a) {
-  return `${a.id || (a.name || '').toLowerCase()}\u0000${a.link || ''}`;
-}
-function dedupeAddons(list) {
-  const seen = new Set();
-  const out = [];
-  for (const a of list) {
-    const key = dedupeAddonKey(a);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(a);
-  }
-  return out;
-}
-
-// Validates the add-ons payload of an export: the JSON file, and the data
-// embedded in an HTML report (the script tag #addons-exporter-data). Takes the
-// raw text (or null if that tag wasn't found in the HTML file) and returns
-// either the ready-to-render list or a user-facing reason the file was
-// rejected.
-//
-// The check is strict: the file must be exactly what the exporter writes,
-// including the HTML report from the version released on addons.mozilla.org
-// (the same payload):
-//   { "formatVersion": 1, "addons": [ { id, name, version, enabled, type, link, linkType }, ... ] }
-// Anything else - another key, a missing field, a field of the wrong type - is
-// rejected as a whole, naming the first problem, rather than guessed at.
-// Pulled out of loadFile() as a pure function so it can be unit tested without
-// a DOM. Throws if jsonText is present but isn't valid JSON - loadFile()'s
-// try/catch handles that.
-// The field order of an entry in each file: the HTML report's embedded data
-// (also what the AMO release wrote) starts with the id; the JSON export lists
-// the name first and the id last. A file must use its own format's order.
-const HTML_ENTRY_KEYS = ['id', 'name', 'version', 'enabled', 'type', 'link', 'linkType'];
-const JSON_ENTRY_KEYS = ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id'];
-const payloadError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter format (${detail}).` });
-// Exactly these keys, in exactly this order (JSON.parse keeps the file's order).
-const sameKeys = (obj, keys) => {
-  const have = Object.keys(obj);
-  return have.length === keys.length && keys.every((k, i) => have[i] === k);
-};
-
-// Returns null when the entry is exactly what the exporter writes, otherwise a
-// short reason.
-function addonEntryProblem(a, keys) {
-  if (!a || typeof a !== 'object' || Array.isArray(a)) return 'it is not an object';
-  if (!sameKeys(a, keys)) return 'its fields are not exactly ' + keys.join(', ') + ', in that order';
-  if (typeof a.id !== 'string' || a.id === '') return 'it has no id';
-  if (typeof a.name !== 'string' || a.name.trim() === '') return 'it has no name';
-  if (typeof a.version !== 'string') return 'its version is not text';
-  if (typeof a.enabled !== 'boolean') return 'enabled is not true or false';
-  if (a.type !== 'extension' && a.type !== 'theme') return 'its type is not extension or theme';
-  if (typeof a.link !== 'string') return 'its link is not text';
-  if (typeof a.linkType !== 'string') return 'its linkType is not text';
-  return null;
-}
-
-function parseAddonsPayload(jsonText, entryKeys = HTML_ENTRY_KEYS) {
-  if (jsonText == null) {
-    return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no embedded data found)' };
-  }
-
-  const parsed = JSON.parse(jsonText);
-
-  // A v1.0.0 export was a bare array with no formatVersion/addons wrapper at
-  // all - checked for specifically, and first, so it gets a message that
-  // explains why.
-  if (Array.isArray(parsed)) {
-    return { ok: false, error: 'This file appears to be from an old, unsupported version of Add-ons Exporter and can\'t be imported.' };
-  }
-  if (!parsed || typeof parsed !== 'object') {
-    return payloadError('the data is not an object');
-  }
-
-  // Format version is checked before anything about the add-ons list itself,
-  // so an incompatible file gets a version-specific message.
-  const formatVersion = parsed.formatVersion;
-  if (!Number.isInteger(formatVersion) || formatVersion < 1) {
-    return { ok: false, error: 'This file is missing its export format version and can\'t be imported.' };
-  }
-  if (formatVersion > SUPPORTED_FORMAT_VERSION) {
-    return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
-  }
-
-  const list = Array.isArray(parsed.addons) ? parsed.addons : null;
-  if (!list || list.length === 0) {
-    return { ok: false, error: 'No add-ons found in that file' };
-  }
-  if (!sameKeys(parsed, ['formatVersion', 'addons'])) {
-    return payloadError('the data is not exactly formatVersion, then addons');
-  }
-
-  for (let n = 0; n < list.length; n++) {
-    const problem = addonEntryProblem(list[n], entryKeys);
-    if (problem) return payloadError(`add-on ${n + 1}: ${problem}`);
-  }
-
-  return { ok: true, addons: migrateAddonsData(dedupeAddons(list), formatVersion) };
-}
-
-// Validates and parses a JSON export file's text content. Same return
-// shape as parseAddonsPayload(): { ok, addons } or { ok: false, error }.
-// Throws on malformed JSON - loadFile()'s try/catch handles it.
-function parseJsonPayload(text) {
-  const parsed = JSON.parse(text);
-  return parseAddonsPayload(parsed && typeof parsed === 'object'
-    ? JSON.stringify(parsed)
-    : text, JSON_ENTRY_KEYS);
-}
-
-// Undoes the leading-apostrophe formula-injection guard buildCsvExport()
-// (report-template.js) adds to a field that would otherwise be read as a
-// formula by a spreadsheet app (one starting with =, +, -, @, tab, or
-// CR). Only strips it when the character right after it is one of those -
-// a value that genuinely starts with a literal apostrophe followed by
-// something else is left alone.
-function stripCsvFormulaGuard(s) {
-  return /^'[=+\-@\t\r]/.test(s) ? s.slice(1) : s;
-}
-
-// The one header row buildCsvExport() (report-template.js) writes.
-const CSV_HEADER = ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id'];
-
-const csvError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter CSV format (${detail}).` });
-
-// Validates and parses a CSV export file's text content. Accepts only what
-// buildCsvExport() writes:
-//   line 1: # addons-hub-format-version: <n>
-//   line 2: name,version,type,enabled,link,linkType,id (this exact header)
-//   line 3+: one row per add-on, exactly seven fields, no blank lines
-// Anything else is rejected, with the first problem found named.
-// Returns { ok, addons } or { ok: false, error }.
-function parseCsvPayload(text) {
-  // The export starts with a byte-order mark (so Excel reads UTF-8); it is not part of the text.
-  const normalized = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-  const firstNewline = normalized.indexOf('\n');
-  const firstLine = firstNewline === -1 ? normalized : normalized.slice(0, firstNewline);
-  const rest = firstNewline === -1 ? '' : normalized.slice(firstNewline + 1);
-
-  const versionMatch = firstLine.match(/^# addons-hub-format-version: (\d+)$/);
-  if (!versionMatch) {
-    return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no format-version comment found)' };
-  }
-  const formatVersion = parseInt(versionMatch[1], 10);
-  if (formatVersion > SUPPORTED_FORMAT_VERSION) {
-    return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
-  }
-
-  // The rest is parsed as a whole, not line by line, so a quoted name that
-  // contains a line break stays one field.
-  let records;
-  try {
-    records = parseCsvRecords(rest);
-  } catch (err) {
-    return csvError(err.message);
-  }
-
-  if (records.length === 0 || records[0].join(',') !== CSV_HEADER.join(',')) {
-    return csvError('the header row must be: ' + CSV_HEADER.join(','));
-  }
-  if (records.length === 1) {
-    return { ok: false, error: 'No add-ons found in that file' };
-  }
-
-  const addons = [];
-  for (let n = 1; n < records.length; n++) {
-    const fields = records[n];
-    const where = `row ${n}`;
-    if (fields.length !== CSV_HEADER.length) {
-      return csvError(`${where} has ${fields.length} fields instead of ${CSV_HEADER.length}`);
-    }
-    const [name, version, type, enabled, link, linkType, id] = fields.map(stripCsvFormulaGuard);
-    if (name.trim() === '') return csvError(`${where} has no name`);
-    if (id === '') return csvError(`${where} has no id`);
-    if (type !== 'extension' && type !== 'theme') return csvError(`${where} has an unknown type`);
-    if (enabled !== 'true' && enabled !== 'false') return csvError(`${where} has an unknown enabled value`);
-    addons.push({ name, version, type, enabled: enabled === 'true', link, linkType, id });
-  }
-
-  return { ok: true, addons: migrateAddonsData(dedupeAddons(addons), formatVersion) };
-}
-
-// Parses an entire CSV text (RFC 4180) into an array of records, each an
-// array of field strings. It walks the whole text in one pass, so a quoted
-// field containing a literal newline stays part of that one field. Throws an
-// Error (with a short reason) for text buildCsvExport() never writes: a quote
-// inside an unquoted field, an unclosed quote, or anything between a closing
-// quote and the next comma or line end. A blank line is a record with one
-// empty field, which the caller rejects as having the wrong field count.
-function parseCsvRecords(text) {
-  const records = [];
-  let fields = [];
-  let i = 0;
-  const n = text.length;
-
-  function readField() {
-    let field = '';
-    if (text[i] === '"') {
-      i++; // skip opening quote
-      let closed = false;
-      while (i < n) {
-        if (text[i] === '"' && text[i + 1] === '"') {
-          field += '"';
-          i += 2;
-        } else if (text[i] === '"') {
-          i++; // skip closing quote
-          closed = true;
-          break;
-        } else {
-          field += text[i++];
-        }
-      }
-      if (!closed) throw new Error('a quoted value is never closed');
-      if (i < n && text[i] !== ',' && text[i] !== '\n') {
-        throw new Error('unexpected text after a closing quote');
-      }
-    } else {
-      while (i < n && text[i] !== ',' && text[i] !== '\n') {
-        if (text[i] === '"') throw new Error('a quote inside an unquoted value');
-        field += text[i++];
-      }
-    }
-    return field;
-  }
-
-  // No text at all is no records.
-  if (n === 0) return records;
-  while (i <= n) {
-    fields.push(readField());
-    if (text[i] === ',') {
-      i++;
-      continue;
-    }
-    records.push(fields);
-    fields = [];
-    if (text[i] === '\n') {
-      i++;
-    } else {
-      break; // end of text
-    }
-  }
-  return records;
-}
-
-
-// Reverses the escaping buildTxtExport() (report-template.js) applies to every
-// column: \\ is a backslash, \| a pipe, \n a line break, \r a carriage
-// return, \s a space (used for a space at the very start or end of a value).
-// Returns null for a backslash followed by anything else, which the exporter
-// never writes.
-function txtUnescape(text) {
-  // Take the valid escapes out first; any backslash left over is not one.
-  if (text.replace(/\\[\\|nrs]/g, '').includes('\\')) return null;
-  return text.replace(/\\([\\|nrs])/g, (m, c) => ({ '\\': '\\', '|': '|', n: '\n', r: '\r', s: ' ' }[c]));
-}
-
-// A column's text with only the padding spaces removed (not tabs or other
-// whitespace, which belong to the value), then unescaped. null if invalid.
-function readTxtCell(text) {
-  return txtUnescape(text.replace(/^ +| +$/g, ''));
-}
-
-const txtError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter TXT format (${detail}).` });
-
-// Validates and parses a TXT export file's text content. Accepts only what
-// buildTxtExport() writes:
-//   line 1: # addons-hub-format-version: <n>
-//   then the title, the section headings and their underlines (any line with
-//   no " | " in it is skipped)
-//   then one add-on per line, exactly six columns:
-//     Name | Version | Type | Status | Link | Id
-// A line with " | " in it that is not a valid add-on line rejects the whole
-// file, with its line number. Returns { ok, addons } or { ok: false, error }.
-function parseTxtPayload(text) {
-  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-
-  const versionMatch = lines[0] && lines[0].match(/^# addons-hub-format-version: (\d+)$/);
-  if (!versionMatch) {
-    return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no format-version comment found)' };
-  }
-  const formatVersion = parseInt(versionMatch[1], 10);
-  if (formatVersion > SUPPORTED_FORMAT_VERSION) {
-    return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
-  }
-
-  const addons = [];
-  for (let n = 1; n < lines.length; n++) {
-    const line = lines[n];
-    if (!line.includes(' | ')) continue;
-    const parts = line.split(' | ');
-    const where = `line ${n + 1}`;
-    if (parts.length !== 6) return txtError(`${where} has ${parts.length} columns instead of 6`);
-    const cells = parts.map(readTxtCell);
-    if (cells.includes(null)) return txtError(`${where} has a backslash that is not an escape`);
-    const [name, version, type, status, link, id] = cells;
-    if (name === '') return txtError(`${where} has no name`);
-    if (id === '') return txtError(`${where} has no id`);
-    const parsedType = parseType(type);
-    if (!parsedType) return txtError(`${where} has an unknown type`);
-    if (status !== 'Enabled' && status !== 'Disabled') return txtError(`${where} has an unknown status`);
-    addons.push({
-      name,
-      version,
-      type: parsedType,
-      enabled: status === 'Enabled',
-      link,
-      id,
-    });
-  }
-
-  if (addons.length === 0) {
-    return { ok: false, error: 'No add-ons found in that file' };
-  }
-
-  return { ok: true, addons: migrateAddonsData(dedupeAddons(addons), formatVersion) };
-}
 
 const statusEl = document.getElementById('status');
 const fileNameEl = document.getElementById('fileName');
@@ -398,16 +27,14 @@ function setStatus(msg) {
   statusEl.textContent = msg;
 }
 
-function checkboxes() {
-  return addonListEl.querySelectorAll('input[type="checkbox"]');
-}
-
-function updateSelectionCount() {
-  const boxes = checkboxes();
-  const checked = addonListEl.querySelectorAll('input[type="checkbox"]:checked').length;
-  setSelectionCount(selectionCountEl, boxes.length ? `${checked} of ${boxes.length} selected` : '');
-  openSelectedBtn.disabled = checked === 0;
-}
+// The shared add-on list (rows, Select all, search, count, click-a-row, live
+// name shortening) - addon-list.js. Select all skips disabled (unsafe-link)
+// rows, and a search shows the list again as display: block.
+const list = createAddonList({
+  listEl: addonListEl, countEl: selectionCountEl, actionBtn: openSelectedBtn,
+  selectAllBtn, deselectAllBtn, searchInput, noMatchesEl: noSearchMatchesEl,
+  shownDisplay: 'block',
+});
 
 function clearAddonList() {
   displayItems = [];
@@ -422,53 +49,18 @@ function clearAddonList() {
   noSearchMatchesEl.style.display = 'none';
 }
 
-// Builds one <div class="addon-row"> via DOM APIs (not innerHTML) so
-// a.name/version/matchLabel never pass through HTML parsing - textContent
-// and property assignment don't need escapeHtml the way a template
-// string did.
+// The Importer's row: the shared parts, plus what only an import has - the link
+// to the add-on's page, the match label, and a warning for an unsafe link (its
+// row is disabled and skipped).
 function createAddonRow(a, i, isInstalled, shorten) {
   const safe = isSafeUrl(a.link);
-  const version = typeof a.version === 'string' ? a.version : '';
   const matchLabel = LINK_TYPE_LABELS[a.linkType] || '';
   const matchClass = UNCERTAIN_LINK_TYPES.has(a.linkType) ? ' match-uncertain' : '';
 
-  const row = document.createElement('div');
-  row.className = 'addon-row';
-  if (!safe) row.classList.add('row-disabled');
-
-  const checkbox = document.createElement('input');
-  checkbox.type = 'checkbox';
-  checkbox.id = `icb-${i}`;
-  checkbox.dataset.idx = String(i);
-  checkbox.checked = safe && !isInstalled;
-  checkbox.disabled = !safe;
-
-  const nameEl = document.createElement('span');
-  nameEl.className = 'addon-name';
-  nameEl.textContent = shorten ? shortName(a.name) : a.name;
-  nameEl.dataset.fullName = a.name; // so the name can follow the Shorten setting live
-
-  const amoLink = safe ? (() => {
-    const lnk = document.createElement('a');
-    lnk.className = 'match-label';
-    lnk.href = a.link;
-    lnk.target = '_blank';
-    lnk.rel = 'noopener';
-    lnk.textContent = 'AMO';
-    return lnk;
-  })() : null;
-
-  const versionSpan = document.createElement('span');
-  versionSpan.className = 'addon-version';
-  versionSpan.textContent = version;
-
-  const typeSpan = document.createElement('span');
-  typeSpan.className = 'match-label';
-  typeSpan.textContent = typeLabel(a.type);
-
-  const label = document.createElement('label');
-  label.htmlFor = `icb-${i}`;
-  label.append(nameEl, ' ', versionSpan, ' ', typeSpan);
+  const { row, label } = createAddonRowBase(a, i, {
+    idPrefix: 'icb', dataset: { idx: String(i) },
+    checked: safe && !isInstalled, disabled: !safe, shorten,
+  });
 
   if (matchLabel) {
     const matchSpan = document.createElement('span');
@@ -484,29 +76,16 @@ function createAddonRow(a, i, isInstalled, shorten) {
     label.append(document.createElement('br'), warningSpan);
   }
 
-  row.append(checkbox, label);
-  if (amoLink) row.append(amoLink);
+  if (safe) {
+    const lnk = document.createElement('a');
+    lnk.className = 'match-label';
+    lnk.href = a.link;
+    lnk.target = '_blank';
+    lnk.rel = 'noopener';
+    lnk.textContent = 'AMO';
+    row.append(lnk);
+  }
   return row;
-}
-
-function appendGroup(fragment, title, items, offset, isInstalled, shorten) {
-  if (items.length === 0) return;
-  const container = document.createElement('div');
-  container.className = 'group-container';
-
-  const heading = document.createElement('div');
-  heading.className = 'group-heading';
-  heading.textContent = `${title} (${items.length})`;
-
-  const box = document.createElement('div');
-  box.className = 'group-box';
-  items.forEach((a, i) => {
-    box.appendChild(createAddonRow(a, offset + i, isInstalled, shorten));
-  });
-
-  container.appendChild(heading);
-  container.appendChild(box);
-  fragment.appendChild(container);
 }
 
 function renderAddonList(addons, installed, shorten) {
@@ -526,13 +105,13 @@ function renderAddonList(addons, installed, shorten) {
   alreadyInstalled.sort(byName);
   displayItems = [...notInstalled, ...alreadyInstalled];
 
-  const outerBox = document.createElement('div');
-  outerBox.className = 'groups-outer-box';
-  appendGroup(outerBox, 'Not Installed Yet', notInstalled, 0, false, shorten);
-  appendGroup(outerBox, 'Already Installed', alreadyInstalled, notInstalled.length, true, shorten);
-  const fragment = document.createDocumentFragment();
-  fragment.appendChild(outerBox);
-  addonListEl.replaceChildren(fragment);
+  list.render(createAddonGroups(
+    [
+      { title: 'Not Installed Yet', items: notInstalled, isInstalled: false },
+      { title: 'Already Installed', items: alreadyInstalled, isInstalled: true },
+    ],
+    (a, i, group) => createAddonRow(a, i, group.isInstalled, shorten)
+  ));
   addonListEl.style.display = 'block';
   checklistBoxEl.style.display = 'block';
   listControls.style.display = 'flex';
@@ -556,10 +135,7 @@ function renderAddonList(addons, installed, shorten) {
   });
   compareNoteEl.replaceChildren(noteFragment);
 
-  checkboxes().forEach((cb) => {
-    cb.addEventListener('change', updateSelectionCount);
-  });
-  updateSelectionCount();
+  list.updateSelectionCount();
 }
 
 // Bumped each time a new file load starts, so an older load in flight
@@ -757,56 +333,12 @@ picker.addEventListener('drop', (e) => {
 document.addEventListener('dragover', (e) => { e.preventDefault(); });
 document.addEventListener('drop', (e) => { e.preventDefault(); });
 
-// Disabled checkboxes (unsafe links) are skipped by both buttons below -
-// they're not part of the selectable set, same as the row-click handler
-// already respects via its own cb.disabled check.
-selectAllBtn.addEventListener('click', () => {
-  visibleCheckboxes(checkboxes()).forEach((cb) => { if (!cb.disabled) cb.checked = true; });
-  updateSelectionCount();
-});
-
-deselectAllBtn.addEventListener('click', () => {
-  visibleCheckboxes(checkboxes()).forEach((cb) => { if (!cb.disabled) cb.checked = false; });
-  updateSelectionCount();
-});
-
-function applySearch() {
-  const anyMatch = filterAddonRows(addonListEl, searchInput.value);
-  setFilterVisible(addonListEl, anyMatch, 'block');
-  noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
-}
-searchInput.addEventListener('input', applySearch);
-
-// "Shorten add-on names" changed (Settings page, a settings import, a reset):
-// the names on this already-open page change at once. What the search box
-// matches changes with them, so a search in progress is applied again.
-onShortenNamesChanged((shorten) => {
-  if (applyNameShortening(addonListEl, shorten) > 0 && searchInput.value) applySearch();
-});
-
-// Makes the whole row clickable, not just the checkbox/label text.
-// Clicking the checkbox itself is left alone - its own native click
-// already toggles it. Anything else in the row calls cb.click(), which
-// fires the checkbox's own native toggle and change event. The
-// preventDefault stops a label click's own default forwarding to the
-// checkbox, so that path doesn't also fire and double the toggle.
-addonListEl.addEventListener('click', (e) => {
-  if (e.target.matches('input[type="checkbox"]')) return;
-  if (e.target.closest('a')) return;
-  const row = e.target.closest('.addon-row');
-  if (!row) return;
-  const cb = row.querySelector('input[type="checkbox"]');
-  if (!cb || cb.disabled) return;
-  e.preventDefault();
-  cb.click();
-});
-
 function pluralTabs(n) {
   return `${n} tab${n === 1 ? '' : 's'}`;
 }
 
 openSelectedBtn.addEventListener('click', async () => {
-  const selected = Array.from(checkboxes())
+  const selected = Array.from(list.checkboxes())
     .filter((cb) => cb.checked)
     .map((cb) => displayItems[Number(cb.dataset.idx)]);
 
@@ -854,8 +386,12 @@ openSelectedBtn.addEventListener('click', async () => {
     let opened = 1;
     if (rest.length > 0) {
       try {
-        await browser.runtime.sendMessage({ type: 'openTabs', urls: rest });
-        opened += rest.length; // queued: background.js opens them from here
+        const reply = await browser.runtime.sendMessage({ type: 'openTabs', urls: rest });
+        // background.js says how many it queued (it caps a batch); anything it
+        // did not take is counted as not opened, not as opened.
+        const queued = reply && Number.isInteger(reply.queued) ? Math.min(reply.queued, rest.length) : rest.length;
+        opened += queued;
+        failed += rest.length - queued;
       } catch {
         // Background unreachable: open them from here instead, then go on.
         for (let i = 0; i < rest.length; i++) {

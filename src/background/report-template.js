@@ -2,9 +2,9 @@
 // buildHtmlReport(). Pure string templating only - nothing here touches
 // browser.* APIs, so it can be loaded and tested on its own. Needs core.js
 // (escapeHtml, byName, LINK_TYPE_LABELS, UNCERTAIN_LINK_TYPES,
-// EXPORT_FORMAT_VERSION) and export-formats.js (groupForReading) loaded before
-// it - see manifest.json's background.scripts order. The JSON, CSV and TXT
-// builders are in export-formats.js.
+// EXPORT_FORMAT_VERSION, groupForReading) loaded before it - see
+// manifest.json's background.scripts order. The JSON, CSV and TXT builders are
+// in export-formats.js.
 
 // An add-on name (attacker-controlled) containing "</script>" would
 // close this tag early when the report is opened directly. Escaping

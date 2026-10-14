@@ -19,6 +19,7 @@ addons-hub/
 │   ├── fixtures/                # amo-release.html: a real HTML report from the version released on addons.mozilla.org (import.test.js reads it)
 │   ├── helpers.js               # Shared test()/testAsync() harness plus vm-loading and sandbox utilities
 │   ├── common.test.js           # Unit tests covering the shared helpers (core.js, page-ui.js and amo.js)
+│   ├── pure-modules.test.js     # Loads the Importer's readers and matching and the settings-file code with no page and no browser object, to keep them pure
 │   ├── script-order.test.js     # Reads manifest.json and every page's <script> tags and checks each script only uses shared names loaded before it in that context
 │   ├── theme.test.js            # Tests for the shared light/dark theme logic
 │   ├── import.test.js           # Tests covering the import page's parsing and UI logic
@@ -36,7 +37,8 @@ addons-hub/
 │   └── structure.test.js        # Cross-page checks: lang attributes, ARIA roles, version consistency
 └── src/
     ├── common/
-    │   ├── core.js     # Pure shared code, loaded everywhere: the export format registry, the settings schema and loadSettings(), text helpers, display labels
+    │   ├── core.js     # Pure shared code, loaded everywhere: the export format registry, the settings schema and loadSettings(), text helpers, display labels, groupForReading()
+    │   ├── addon-list.js  # The add-on list shared by the Exporter and Importer: rows, groups, Select all, search, selection count, click-a-row, live name shortening
     │   ├── page-ui.js  # Shared code that touches the page (fade to the confirmation page, search filtering, selection count, live name shortening); pages only
     │   ├── theme.js    # Applies the stored light/dark theme on page load
     │   ├── press.js    # Click/tap feedback: a ring bursts out of links/buttons; rows get an inward flash instead
@@ -45,7 +47,7 @@ addons-hub/
     ├── background/
     │   ├── background.js       # Handles messaging, export orchestration, and saveExport() (the file, or the zip)
     │   ├── amo.js              # AMO lookups: fetch with retry, name matching, findAmoPage()
-    │   ├── export-formats.js   # Builds the JSON, CSV and TXT exports, and puts add-ons in reading order
+    │   ├── export-formats.js   # Builds the JSON, CSV and TXT exports
     │   ├── report-template.js  # Builds the self-contained HTML report
     │   ├── report.css          # Source CSS for the report's inline <style> block; inlined by `npm run build`
     │   └── zip.js              # Tiny ZIP writer: several export formats are saved together as one .zip
@@ -57,10 +59,13 @@ addons-hub/
     │   └── export.js    # Loads the add-on list and sends the export selection
     ├── import/
     │   ├── import.html  # Page for picking an exported file and add-ons to open
-    │   └── import.js    # Parses the exported file and opens the selected tabs
+    │   ├── parsers.js   # Strict readers for the HTML, JSON, CSV and TXT exports (pure, no page code)
+    │   ├── match.js     # Which add-ons in a file are already installed (pure)
+    │   └── import.js    # The page: shows the list and opens the selected tabs
     ├── settings/
     │   ├── settings.html      # Settings page, opened from the popup or the browser's own menu
     │   ├── settings-init.js   # Parser-blocking sync script: pre-applies the saved option states before first paint
+    │   ├── settings-file.js   # Builds and strictly reads the settings file (pure, no page code)
     │   └── settings.js        # Settings page logic
     ├── confirmation/
     │   ├── confirmation.html  # Page shown after Add-ons Exporter or Add-ons Importer finishes

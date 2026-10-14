@@ -4,7 +4,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readReportBuilders } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readReportBuilders, readImport } = require('./helpers');
 
 function makeFakeElement() {
   return {
@@ -28,7 +28,7 @@ const fakeDocument = { getElementById() { return makeFakeElement(); }, addEventL
 
 const commonSrc = readCommon();
 const reportTemplateSrc = readReportBuilders();
-const importSrc = readSrc('src/import/import.js');
+const importSrc = readImport();
 const sandbox = { URL, document: fakeDocument };
 vm.createContext(sandbox);
 vm.runInContext(commonSrc, sandbox);
@@ -1490,4 +1490,23 @@ test('TXT strict: title, section headings and blank lines (no " | " in them) are
 
 test('TXT strict: a file with headings only is "No add-ons found"', () => {
   txtRejects(txtLines(['Firefox Add-ons - 0 in total (0 enabled, 0 disabled)']), /No add-ons found/);
+});
+
+testAsync('openSelectedBtn: uses the count background.js says it queued - tabs it did not take count as failed, not opened', async () => {
+  const { boxes, itemsJs } = selectItems(['https://addons.mozilla.org/a/', 'https://addons.mozilla.org/b/', 'https://addons.mozilla.org/c/', 'https://addons.mozilla.org/d/']);
+  const ctx = captureBulkSelectHandlers(boxes);
+  vm.runInContext(itemsJs, ctx.sandbox);
+  ctx.sandbox.browser.runtime.sendMessage = async () => ({ queued: 1 }); // 3 handed over, 1 taken
+  await ctx.openSelectedHandler();
+  assert.strictEqual(ctx.statusEl.textContent, 'Opened 2 tabs, 2 failed to open');
+  assert.deepStrictEqual(ctx.navigatedUrls, ['moz-extension://test-id/src/confirmation/confirmation.html?from=import&failed=2']);
+});
+
+testAsync('openSelectedBtn: a reply without a count (older background) is treated as everything queued', async () => {
+  const { boxes, itemsJs } = selectItems(['https://addons.mozilla.org/a/', 'https://addons.mozilla.org/b/', 'https://addons.mozilla.org/c/']);
+  const ctx = captureBulkSelectHandlers(boxes);
+  vm.runInContext(itemsJs, ctx.sandbox);
+  ctx.sandbox.browser.runtime.sendMessage = async () => undefined;
+  await ctx.openSelectedHandler();
+  assert.strictEqual(ctx.statusEl.textContent, 'Opened 3 tabs');
 });

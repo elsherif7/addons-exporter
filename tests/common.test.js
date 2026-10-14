@@ -3,7 +3,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext, readCommon, readReportBuilders } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, readCommon, readReportBuilders, makeFakeDom } = require('./helpers');
 
 const commonSrc = readCommon();
 const sandbox = { URL };
@@ -1140,4 +1140,50 @@ testAsync('onSettingsChanged: reports which settings changed with fresh values; 
   vm.createContext(bare);
   vm.runInContext(commonSrc, bare);
   bare.onSettingsChanged(() => {}); // must not throw
+});
+
+// --- addon-list.js: the list shared by the Exporter and the Importer ---
+
+function loadAddonListSandbox() {
+  const { document } = makeFakeDom();
+  const sb = { document, URL };
+  vm.createContext(sb);
+  vm.runInContext(readCommon(), sb);
+  return sb;
+}
+
+test('createAddonGroups: numbers rows across groups, skips empty groups, headings show the count', () => {
+  const sb = loadAddonListSandbox();
+  const seen = [];
+  const box = sb.createAddonGroups(
+    [{ title: 'First', items: [{ n: 'a' }, { n: 'b' }] }, { title: 'Empty', items: [] }, { title: 'Last', items: [{ n: 'c' }] }],
+    (item, index, group) => { seen.push([item.n, index, group.title]); return sb.document.createElement('div'); }
+  );
+  assert.deepStrictEqual(seen, [['a', 0, 'First'], ['b', 1, 'First'], ['c', 2, 'Last']]);
+  assert.strictEqual(box.className, 'groups-outer-box');
+  assert.strictEqual(box.children.length, 2, 'the empty group is left out');
+  assert.strictEqual(box.children[0].children[0].textContent, 'First (2)');
+  assert.strictEqual(box.children[1].children[0].textContent, 'Last (1)');
+});
+
+test('createAddonRowBase: id prefix, data, ticked/disabled state, short or full name, version only if text', () => {
+  const sb = loadAddonListSandbox();
+  const a = { name: 'Alpha: The Tool', version: '1.0', type: 'theme' };
+  const { row, checkbox, label } = sb.createAddonRowBase(a, 3, { idPrefix: 'x', dataset: { id: 'a@x' }, checked: false, disabled: true, shorten: true });
+  assert.strictEqual(checkbox.id, 'x-3');
+  assert.strictEqual(checkbox.dataset.id, 'a@x');
+  assert.strictEqual(checkbox.checked, false);
+  assert.strictEqual(checkbox.disabled, true);
+  assert.ok(row.classList.contains('row-disabled'));
+  assert.strictEqual(label.htmlFor, 'x-3');
+  const name = label.children[0];
+  assert.strictEqual(name.textContent, 'Alpha');
+  assert.strictEqual(name.dataset.fullName, 'Alpha: The Tool');
+  assert.strictEqual(label.children[1].textContent, '1.0');
+  assert.strictEqual(label.children[2].textContent, 'Theme');
+  const full = sb.createAddonRowBase({ name: 'Alpha: The Tool', version: 7, type: 'extension' }, 0, { idPrefix: 'y', shorten: false });
+  assert.strictEqual(full.label.children[0].textContent, 'Alpha: The Tool');
+  assert.strictEqual(full.label.children[1].textContent, '', 'a version that is not text shows nothing');
+  assert.strictEqual(full.checkbox.checked, true, 'ticked by default');
+  assert.ok(!full.row.classList.contains('row-disabled'));
 });
