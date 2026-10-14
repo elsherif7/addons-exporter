@@ -4,9 +4,9 @@
 
 const vm = require('vm');
 const assert = require('assert');
-const { test, readSrc, makeFakeDom } = require('./helpers');
+const { test, readSrc, makeFakeDom, readCommon } = require('./helpers');
 
-const commonSrc = readSrc('src/common/common.js');
+const commonSrc = readCommon();
 const confirmationSrc = readSrc('src/confirmation/confirmation.js');
 
 function loadConfirmation(search, { prefillMessage } = {}) {

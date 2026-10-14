@@ -27,7 +27,7 @@
 (function () {
   var DEFAULT_FORMAT  = EXPORT_FORMAT_DEFAULT;
   var DEFAULT_SHORTEN = SHORT_NAME_DEFAULT;
-  // The format list comes from the registry in common.js (loaded before this
+  // The format list comes from the registry in core.js (loaded before this
   // script), so a new format needs no change here.
   var VALID_FORMATS   = EXPORT_FORMATS;
   var VALID_SHORTEN   = ['on', 'off'];

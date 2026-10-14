@@ -10,7 +10,7 @@
 //   1. A file written by the previous layout may no longer be readable. Decide
 //      if the Importer must still read it (then keep a reader for it, in
 //      migrateAddonsData() and the parsers), or not.
-//   2. Bump EXPORT_FORMAT_VERSION in src/common/common.js (the settings file has
+//   2. Bump EXPORT_FORMAT_VERSION in src/common/core.js (the settings file has
 //      its own SETTINGS_FILE_FORMAT_VERSION in src/settings/settings.js).
 //   3. Update CONTRACT below, with the new version number.
 // Changing only the page's look (HTML/CSS) must never need any of this.
@@ -19,7 +19,7 @@ const assert = require('assert');
 const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
-const { test, readSrc, evalInContext } = require('./helpers');
+const { test, readSrc, evalInContext, readCommon, readReportBuilders } = require('./helpers');
 
 const CONTRACT = {
   exportFormatVersion: 1,
@@ -38,8 +38,8 @@ const CONTRACT = {
 
 const sandbox = { URL };
 vm.createContext(sandbox);
-vm.runInContext(readSrc('src/common/common.js'), sandbox);
-vm.runInContext(readSrc('src/background/report-template.js'), sandbox);
+vm.runInContext(readCommon(), sandbox);
+vm.runInContext(readReportBuilders(), sandbox);
 const VERSION = evalInContext(sandbox, 'EXPORT_FORMAT_VERSION');
 
 const AMO = 'https://addons.mozilla.org/en-US/firefox/addon/';
@@ -108,8 +108,8 @@ test('contract: TXT export starts with the version comment; every add-on line ha
 test('contract: the Importer reads exactly what each export writes (the contract and the parsers agree)', () => {
   const importSb = { URL, document: { getElementById: () => ({ style: {}, classList: { add() {}, remove() {}, contains() { return false; } }, addEventListener() {}, querySelectorAll() { return []; }, querySelector() { return null; }, dataset: {}, textContent: '', innerHTML: '', value: '' }), addEventListener() {} } };
   vm.createContext(importSb);
-  vm.runInContext(readSrc('src/common/common.js'), importSb);
-  vm.runInContext(readSrc('src/background/report-template.js'), importSb);
+  vm.runInContext(readCommon(), importSb);
+  vm.runInContext(readReportBuilders(), importSb);
   vm.runInContext(readSrc('src/import/import.js'), importSb);
   const ids = (r) => { assert.strictEqual(r.ok, true, r.error); return Array.from(r.addons, (a) => a.id).sort(); };
   assert.deepStrictEqual(ids(importSb.parseAddonsPayload(JSON.stringify(htmlData(importSb.buildHtmlReport(list, 'light', false))))), ['a@x', 'n@x']);

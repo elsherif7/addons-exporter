@@ -4,7 +4,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext, makeFakeDom } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readReportBuilders } = require('./helpers');
 
 function makeFakeElement() {
   return {
@@ -26,8 +26,8 @@ function makeFakeElement() {
 // generic fake element for every id is enough.
 const fakeDocument = { getElementById() { return makeFakeElement(); }, addEventListener() {} };
 
-const commonSrc = readSrc('src/common/common.js');
-const reportTemplateSrc = readSrc('src/background/report-template.js');
+const commonSrc = readCommon();
+const reportTemplateSrc = readReportBuilders();
 const importSrc = readSrc('src/import/import.js');
 const sandbox = { URL, document: fakeDocument };
 vm.createContext(sandbox);
@@ -47,7 +47,7 @@ const {
   validateSelectedFile,
 } = sandbox;
 
-// EXPORT_FORMAT_VERSION is declared with top-level `const` in common.js,
+// EXPORT_FORMAT_VERSION is declared with top-level `const` in core.js,
 // so (unlike the function declarations above) it isn't copied onto the
 // sandbox object - it only exists in the context's own lexical scope.
 // Evaluate it there directly instead of destructuring it from sandbox.

@@ -14,13 +14,13 @@ function migrateAddonsData(addons, formatVersion) {
   return addons;
 }
 
-// TAB_OPEN_DELAY_MS (the stagger between opened tabs) lives in common.js.
+// TAB_OPEN_DELAY_MS (the stagger between opened tabs) lives in core.js.
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function buildInstalledIndex(installed) {
   const byId = new Map();
   const byName = new Map();
-  // Short form of each installed name (see shortName() in common.js): an
+  // Short form of each installed name (see shortName() in core.js): an
   // export made with "Shorten add-on names" on has short names, so a file
   // without ids can only be matched against installed add-ons by that. A
   // short name shared by two installed add-ons is ambiguous and is

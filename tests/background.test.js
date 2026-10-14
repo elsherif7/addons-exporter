@@ -5,10 +5,10 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc } = require('./helpers');
+const { test, testAsync, readSrc, readCommon, readReportBuilders } = require('./helpers');
 
-const commonSrc = readSrc('src/common/common.js');
-const reportTemplateSrc = readSrc('src/background/report-template.js');
+const commonSrc = readCommon();
+const reportTemplateSrc = readReportBuilders();
 const backgroundSrc = readSrc('src/background/background.js');
 
 // --- background.js: excludes Mozilla's own built-in components ---

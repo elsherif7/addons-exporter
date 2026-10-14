@@ -9,10 +9,10 @@ const assert = require('assert');
 const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
-const { test, readSrc, evalInContext } = require('./helpers');
+const { test, readSrc, evalInContext, readCommon, readReportBuilders } = require('./helpers');
 
-const commonSrc = readSrc('src/common/common.js');
-const reportTemplateSrc = readSrc('src/background/report-template.js');
+const commonSrc = readCommon();
+const reportTemplateSrc = readReportBuilders();
 
 const sandbox = { URL };
 vm.createContext(sandbox);
@@ -403,12 +403,12 @@ test('A22: the report has a prefers-reduced-motion rule', () => {
 // --- A36: the report's tip no longer overstates what the Importer does ---
 
 test('A36: the report tip does not claim every link opens automatically', () => {
-  const reportTemplateSrc = readSrc('src/background/report-template.js');
+  const reportTemplateSrc = readReportBuilders();
   assert.doesNotMatch(reportTemplateSrc, /open every link below as a tab automatically/);
 });
 
 test('A36: the report tip accurately describes selecting the file and pre-selecting new add-ons', () => {
-  const reportTemplateSrc = readSrc('src/background/report-template.js');
+  const reportTemplateSrc = readReportBuilders();
   assert.match(reportTemplateSrc, /select this file[\s\S]{0,80}pre-selected to open/);
 });
 

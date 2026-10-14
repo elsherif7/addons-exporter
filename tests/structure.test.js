@@ -6,7 +6,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { test, readSrc, evalInContext } = require('./helpers');
+const { test, readSrc, evalInContext, readCommon } = require('./helpers');
 
 const HTML_PAGES = [
   'src/popup/popup.html',
@@ -717,7 +717,7 @@ test('settings.html: the Export Format tick boxes are exactly the registry forma
   const html = readSrc('src/settings/settings.html');
   const sb = {};
   vm.createContext(sb);
-  vm.runInContext(readSrc('src/common/common.js'), sb);
+  vm.runInContext(readCommon(), sb);
   const reg = Array.from(evalInContext(sb, 'EXPORT_FORMAT_REGISTRY'));
   const boxes = [...html.matchAll(/<input type="checkbox" name="exportFormat" id="(\w+)" value="(\w+)">/g)];
   assert.deepStrictEqual(boxes.map((m) => m[2]), reg.map((f) => f.id), 'same formats, same order');

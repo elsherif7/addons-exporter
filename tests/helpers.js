@@ -63,10 +63,25 @@ function testAsync(name, fn, timeoutMs = DEFAULT_ASYNC_TIMEOUT_MS) {
 }
 
 // Reads a file relative to the project root (one level up from tests/),
-// so every *.test.js file can say readSrc('src/common/common.js') instead
+// so every *.test.js file can say readSrc('src/common/core.js') instead
 // of repeating path.join(__dirname, '..', ...) at each call site.
 function readSrc(relativePath) {
   return fs.readFileSync(path.join(__dirname, '..', relativePath), 'utf8');
+}
+
+// Several source files read as one script, for tests that load "all the shared
+// code" into one sandbox. (Which file loads in which context, and in what
+// order, is checked for real in tests/script-order.test.js.)
+function readSrcs(...relativePaths) {
+  return relativePaths.map(readSrc).join('\n');
+}
+// The shared helpers: core.js + page-ui.js + the background's amo.js.
+function readCommon() {
+  return readSrcs('src/common/core.js', 'src/common/page-ui.js', 'src/background/amo.js');
+}
+// Every export builder: JSON/CSV/TXT (export-formats.js) + the HTML report.
+function readReportBuilders() {
+  return readSrcs('src/background/export-formats.js', 'src/background/report-template.js');
 }
 
 // Evaluates an identifier or expression directly in a vm context instead
@@ -95,7 +110,7 @@ async function finish() {
 // select-all/search/row-click handlers reacting to them - and then
 // inspect the result. It implements just the DOM surface this project's
 // source files actually use (seen across export.js, import.js and
-// common.js): classList, style, dataset, textContent/innerHTML,
+// page-ui.js): classList, style, dataset, textContent/innerHTML,
 // append(Child)/replaceChildren, querySelector(All) and closest/matches
 // for the small set of selectors used here (tag, .class, [attr="value"],
 // :checked - no descendant combinators), plus click()/dispatchEvent()
@@ -342,4 +357,4 @@ function makeFakeDom(ids = []) {
   return { document, elements };
 }
 
-module.exports = { test, testAsync, readSrc, evalInContext, finish, makeFakeDom };
+module.exports = { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, evalInContext, finish, makeFakeDom };

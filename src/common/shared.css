@@ -179,7 +179,7 @@ body {
 .card.staged > :not(h1) { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 0s); }
 /* A part with no --d (the Importer's list, search box and file name, revealed
    only after a file is chosen) has nothing to wait for and wipes in at once. */
-/* replayEntrance() (common.js) adds this for one frame to restart the
+/* replayEntrance() (page-ui.js) adds this for one frame to restart the
    entrance animations (the card and everything inside it), e.g. when an
    already-open Settings tab is opened again from the popup. */
 .replay-reset, .replay-reset * { animation: none !important; }
@@ -273,7 +273,7 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 /* Nothing to say yet (before the list loads): no empty badge. When it first
    gets text it fades in. */
 #selectionCount:empty { display: none; }
-/* While the number in the badge changes, setSelectionCount() (common.js)
+/* While the number in the badge changes, setSelectionCount() (page-ui.js)
    builds a little slot around it: the new number slides in while the old one
    slides out, both clipped to the slot, like a counter rolling over. The
    slot only exists for the length of the animation. */
@@ -409,7 +409,7 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 .addon-row input[type="checkbox"]:disabled {
   cursor: not-allowed;
 }
-/* Search filtering. filterAddonRows() (common.js) sets display:none AND
+/* Search filtering. filterAddonRows() (page-ui.js) sets display:none AND
    adds .is-filtered when a row or group stops matching, and removes both
    when it matches again. The opacity change plus the display transition
    above turn that into a fade out / fade in; where unsupported it is

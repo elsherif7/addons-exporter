@@ -1,11 +1,11 @@
-// Tests for src/common/common.js's pure helper functions. Loads the real
+// Tests for the shared helpers in src/common/core.js, page-ui.js and src/background/amo.js. Loads the real
 // source via vm so these run against the actual file, not a copy.
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, readCommon, readReportBuilders } = require('./helpers');
 
-const commonSrc = readSrc('src/common/common.js');
+const commonSrc = readCommon();
 const sandbox = { URL };
 vm.createContext(sandbox);
 vm.runInContext(commonSrc, sandbox);
@@ -13,11 +13,11 @@ vm.runInContext(commonSrc, sandbox);
 const { escapeHtml, isSafeUrl, byName, filterAddonRows, visibleCheckboxes, extractTranslatedField, isPlausibleNameMatch, shortName } = sandbox;
 
 // report-template.js's buildHtmlReport() inlines its own copy of
-// filterAddonRows into the exported report (it can't load common.js once
+// filterAddonRows into the exported report (it can't load page-ui.js once
 // saved elsewhere). Pull that copy's literal source straight out of
 // report-template.js - not a hand-copied snapshot - so a future edit to
 // one copy and not the other gets caught here instead of silently drifting.
-const reportTemplateSrc = readSrc('src/background/report-template.js');
+const reportTemplateSrc = readReportBuilders();
 // Extract the inline <script> block by its named marker comment rather than
 // by a bare /<script>/ tag match. The report template has two <script> tags
 // (a JSON data tag and the logic block); a tag-only regex would pick the
@@ -32,7 +32,7 @@ const reportInlineScript = reportScriptMatch[1];
 
 // Runs the report's inline script against a fake `addonList` container and
 // returns its filterAddonRows, so it can be called directly the same way
-// common.js's version is called in the test below.
+// page-ui.js's version is called in the test below.
 function loadReportFilterAddonRows(addonListContainer) {
   // The inline script now calls applyTheme() on load, which needs
   // setAttribute/textContent on the themeToggle element, and also reads
@@ -216,7 +216,7 @@ test('filterAddonRows: query matching a version number does not match the row', 
   assert.strictEqual(row1.style.display, 'none');
 });
 
-test('filterAddonRows: common.js and the report\'s inline copy agree on the same fixture', () => {
+test('filterAddonRows: page-ui.js and the report\'s inline copy agree on the same fixture', () => {
   // Both now use group-container structure — use the same fixture for both.
   const fixtureA = makeContainer();
   const fixtureB = makeContainer();
@@ -288,7 +288,7 @@ test('filterAddonRows: nested group-containers - empty query shows everything', 
   }
 });
 
-test('filterAddonRows: common.js and the report\'s inline copy agree with a nested outer wrapper too', () => {
+test('filterAddonRows: page-ui.js and the report\'s inline copy agree with a nested outer wrapper too', () => {
   const fixtureA = makeContainerWithOuterBox();
   const fixtureB = makeContainerWithOuterBox();
 
@@ -406,7 +406,7 @@ test('visibleCheckboxes: excludes checkboxes whose row is hidden', () => {
 });
 
 // --- shortName ---
-// shortName lives in common.js and is used by export.js, import.js,
+// shortName lives in core.js and is used by export.js, import.js,
 // and report-template.js to shorten long add-on names at separators.
 
 test('shortName: truncates at " - "', () => {
@@ -440,7 +440,7 @@ test('computeRetryAfterMs: converts seconds to ms', () => {
 });
 
 // These mirror AMO_RETRY_AFTER_MAX_MS / AMO_RETRY_AFTER_DEFAULT_MS in
-// common.js as literals - they're declared with const there, so (unlike
+// core.js as literals - they're declared with const there, so (unlike
 // the function declarations used everywhere else in this file) they
 // never attach to the vm context as sandbox properties to read back.
 const RETRY_AFTER_MAX_MS = 10000;
@@ -631,7 +631,7 @@ test('A34: formatLabel maps each export format to its label', () => {
   assert.strictEqual(sandbox.formatLabel('nonsense'), 'HTML report');
 });
 
-// --- common.js: fadeOutPage() / goToConfirmation() ---
+// --- page-ui.js: fadeOutPage() / goToConfirmation() ---
 // Cosmetic fade before the page is replaced by the confirmation page.
 // Must be a safe no-op wherever animation isn't available, and must
 // never block the caller.

@@ -22,12 +22,12 @@ const assert = require('assert');
 const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
-const { test, readSrc, evalInContext } = require('./helpers');
+const { test, readSrc, evalInContext, readCommon, readReportBuilders } = require('./helpers');
 
 const sandbox = { URL };
 vm.createContext(sandbox);
-vm.runInContext(readSrc('src/common/common.js'), sandbox);
-vm.runInContext(readSrc('src/background/report-template.js'), sandbox);
+vm.runInContext(readCommon(), sandbox);
+vm.runInContext(readReportBuilders(), sandbox);
 const { buildHtmlReport, buildJsonExport, buildCsvExport, buildTxtExport } = sandbox;
 
 const GOLDEN_DIR = path.join(__dirname, 'golden');

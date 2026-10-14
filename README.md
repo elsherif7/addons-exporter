@@ -18,10 +18,11 @@ addons-hub/
 │   ├── golden/                  # Expected output files used by golden.test.js
 │   ├── fixtures/                # amo-release.html: a real HTML report from the version released on addons.mozilla.org (import.test.js reads it)
 │   ├── helpers.js               # Shared test()/testAsync() harness plus vm-loading and sandbox utilities
-│   ├── common.test.js           # Unit tests covering every helper function in common.js
+│   ├── common.test.js           # Unit tests covering the shared helpers (core.js, page-ui.js and amo.js)
+│   ├── script-order.test.js     # Reads manifest.json and every page's <script> tags and checks each script only uses shared names loaded before it in that context
 │   ├── theme.test.js            # Tests for the shared light/dark theme logic
 │   ├── import.test.js           # Tests covering the import page's parsing and UI logic
-│   ├── report-template.test.js  # Tests for all export format builders (HTML, JSON, CSV, TXT) in report-template.js
+│   ├── report-template.test.js  # Tests for all export format builders (HTML, JSON, CSV, TXT) in export-formats.js and report-template.js
 │   ├── background.test.js       # Tests covering messaging, AMO lookups, and export logic
 │   ├── export.test.js           # Tests covering the export page's picker and click logic
 │   ├── golden.test.js           # Compares the exact text of every export format with the files in tests/golden/ (`UPDATE_GOLDEN=1 node tests/run.js` regenerates them)
@@ -35,14 +36,17 @@ addons-hub/
 │   └── structure.test.js        # Cross-page checks: lang attributes, ARIA roles, version consistency
 └── src/
     ├── common/
-    │   ├── common.js   # Shared helpers: the export format registry, the settings schema and loadSettings(), used by every page and script
+    │   ├── core.js     # Pure shared code, loaded everywhere: the export format registry, the settings schema and loadSettings(), text helpers, display labels
+    │   ├── page-ui.js  # Shared code that touches the page (fade to the confirmation page, search filtering, selection count, live name shortening); pages only
     │   ├── theme.js    # Applies the stored light/dark theme on page load
     │   ├── press.js    # Click/tap feedback: a ring bursts out of links/buttons; rows get an inward flash instead
     │   ├── reveal.js   # Opening of the Exporter and Importer pages, timed like the Settings page (parts top to bottom, add-ons cascading in, the Exporter's Export button last)
     │   └── shared.css  # Shared styles used by export, import, settings, and confirmation pages
     ├── background/
-    │   ├── background.js       # Handles messaging, AMO lookups, export orchestration, and saving the file (or the zip)
-    │   ├── report-template.js  # Builds the self-contained HTML report and all other export formats returned by doExport()
+    │   ├── background.js       # Handles messaging, export orchestration, and saveExport() (the file, or the zip)
+    │   ├── amo.js              # AMO lookups: fetch with retry, name matching, findAmoPage()
+    │   ├── export-formats.js   # Builds the JSON, CSV and TXT exports, and puts add-ons in reading order
+    │   ├── report-template.js  # Builds the self-contained HTML report
     │   ├── report.css          # Source CSS for the report's inline <style> block; inlined by `npm run build`
     │   └── zip.js              # Tiny ZIP writer: several export formats are saved together as one .zip
     ├── popup/

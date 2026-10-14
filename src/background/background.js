@@ -6,32 +6,36 @@ browser.runtime.onMessage.addListener((message) => {
     return Promise.resolve(queueTabOpens(message.urls));
   }
   if (message.type === 'export') {
-    return doExport(message.ids).then(async ({ files: list, formats, stats }) => {
-      // One format: that file. Several: they are bundled into ONE zip, so
-      // there is a single Save dialog instead of one per file.
-      let blob;
-      let saveName;
-      if (list.length > 1) {
-        const zipBytes = buildZip(list.map((f) => ({ name: f.filename, content: f.content })));
-        blob = new Blob([zipBytes], { type: 'application/zip' });
-        saveName = list[0].filename.replace(/\.\w+$/, '') + '.zip';
-      } else {
-        blob = new Blob([list[0].content], { type: getExportFormat(list[0].format).mime });
-        saveName = list[0].filename;
-      }
-      const url = URL.createObjectURL(blob);
-      try {
-        await browser.downloads.download({ url, filename: saveName, saveAs: true });
-      } finally {
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
-      }
-
+    return doExport(message.ids).then(async ({ files, formats, stats }) => {
+      await saveExport(files);
       // No tab is opened from here: export.js replaces its own page with
       // the confirmation page once it gets this result back.
-      return { formats, zipped: list.length > 1, stats };
+      return { formats, zipped: files.length > 1, stats };
     });
   }
 });
+
+// Saves the exported files through ONE Save dialog. One format: that file.
+// Several: they are bundled into one zip, so there is a single dialog instead
+// of one per file. The single file's MIME type comes from the format registry.
+async function saveExport(files) {
+  let blob;
+  let saveName;
+  if (files.length > 1) {
+    const zipBytes = buildZip(files.map((f) => ({ name: f.filename, content: f.content })));
+    blob = new Blob([zipBytes], { type: 'application/zip' });
+    saveName = files[0].filename.replace(/\.\w+$/, '') + '.zip';
+  } else {
+    blob = new Blob([files[0].content], { type: getExportFormat(files[0].format).mime });
+    saveName = files[0].filename;
+  }
+  const url = URL.createObjectURL(blob);
+  try {
+    await browser.downloads.download({ url, filename: saveName, saveAs: true });
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  }
+}
 
 // The Importer opens the first add-on's page itself, then hands the rest
 // here and immediately replaces its own page with the confirmation page -
@@ -59,54 +63,6 @@ function queueTabOpens(urls) {
     }
   })();
   return { queued: safe.length };
-}
-
-const AMO_API_BASE = 'https://addons.mozilla.org/api/v5';
-const AMO_FETCH_TIMEOUT_MS = 15000;
-
-// Tries an exact ID lookup first, then a name search. Returns
-// { url, matchType } or null. onFailure(), if given, is called once per
-// genuine failure (network error, timeout, or a non-2xx/404 status) -
-// not for a clean 404 or a search that simply found nothing plausible,
-// since neither of those means anything is actually wrong.
-async function findAmoPage(id, name, onFailure) {
-  // 1. Exact lookup by addon ID/GUID
-  const exact = await fetchJsonWithTimeout(
-    `${AMO_API_BASE}/addons/addon/${encodeURIComponent(id)}/`,
-    AMO_FETCH_TIMEOUT_MS
-  );
-  if (exact.ok) {
-    if (exact.status !== 404) {
-      if (exact.data && exact.data.url) return { url: exact.data.url, matchType: 'amo-exact' };
-      console.warn(`[Add-ons Hub] AMO exact lookup for "${name}" (${id}) returned no url field`, exact.data);
-    }
-    // A 404 here just means it's not on AMO - not worth a warning, and
-    // not a failure (see the doc comment above).
-  } else {
-    console.warn(`[Add-ons Hub] AMO exact lookup for "${name}" (${id}) failed:`, exact.error || `HTTP ${exact.status}`);
-    if (onFailure) onFailure();
-  }
-
-  // 2. Fuzzy search by name
-  const search = await fetchJsonWithTimeout(
-    `${AMO_API_BASE}/addons/search/?q=${encodeURIComponent(name)}&app=firefox`,
-    AMO_FETCH_TIMEOUT_MS
-  );
-  if (search.ok) {
-    const top = search.data && search.data.results && search.data.results[0];
-    if (top && top.url && isPlausibleNameMatch(name, extractTranslatedField(top.name))) {
-      return { url: top.url, matchType: 'amo-search' };
-    }
-    // Either no results, or the top result's name didn't clear the
-    // relevance bar - don't hand back an unrelated add-on just
-    // because it happened to rank first.
-    console.warn(`[Add-ons Hub] AMO name search for "${name}" (${id}) returned no plausible match`, search.data);
-  } else {
-    console.warn(`[Add-ons Hub] AMO name search for "${name}" (${id}) failed:`, search.error || `HTTP ${search.status}`);
-    if (onFailure) onFailure();
-  }
-
-  return null;
 }
 
 function formatFilenameTimestamp(d) {
@@ -284,7 +240,7 @@ async function doExport(ids, {
   // background.js has no document to apply a theme to, so it doesn't
   // load theme.js - it only needs the resolved value here, to bake into
   // the report's starting state (see report-template.js's
-  // buildHtmlReport). loadSettings() (common.js) falls back to every
+  // buildHtmlReport). loadSettings() (core.js) falls back to every
   // default if storage is ever unavailable.
   const { theme, exportFormats, shortenNames } = await loadSettings();
   const shorten = shortenNames !== 'off';

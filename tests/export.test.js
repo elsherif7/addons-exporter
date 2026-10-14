@@ -5,9 +5,9 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, makeFakeDom } = require('./helpers');
+const { test, testAsync, readSrc, makeFakeDom, readCommon } = require('./helpers');
 
-const commonSrc = readSrc('src/common/common.js');
+const commonSrc = readCommon();
 const exportSrc = readSrc('src/export/export.js');
 
 async function captureExportClick({ selectedIds, exportResponse }) {

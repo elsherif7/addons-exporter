@@ -1,10 +1,10 @@
-// Builds every export format returned by doExport() in background.js:
-// buildHtmlReport(), buildJsonExport(), buildCsvExport(), buildTxtExport().
-// Pure string templating only - nothing
-// here touches browser.* APIs, so it can be loaded and tested on its
-// own. Depends on common.js (escapeHtml, byName, LINK_TYPE_LABELS,
-// UNCERTAIN_LINK_TYPES, EXPORT_FORMAT_VERSION), which must be loaded
-// before this file - see manifest.json's background.scripts order.
+// Builds the HTML report returned by doExport() in background.js:
+// buildHtmlReport(). Pure string templating only - nothing here touches
+// browser.* APIs, so it can be loaded and tested on its own. Needs core.js
+// (escapeHtml, byName, LINK_TYPE_LABELS, UNCERTAIN_LINK_TYPES,
+// EXPORT_FORMAT_VERSION) and export-formats.js (groupForReading) loaded before
+// it - see manifest.json's background.scripts order. The JSON, CSV and TXT
+// builders are in export-formats.js.
 
 // An add-on name (attacker-controlled) containing "</script>" would
 // close this tag early when the report is opened directly. Escaping
@@ -18,146 +18,6 @@ function safeJsonForScriptTag(value) {
 // extension's icons folder sitting next to it once it's saved elsewhere.
 const REPORT_ICON_DATA_URI = 'data:image/png;base64,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';
 
-// Every export lists enabled add-ons first and disabled ones after, each
-// group A-Z - easier to read than one long mixed list. This is the ONE place
-// that grouping is done; the HTML report, TXT, CSV and JSON all use it.
-// Returns { enabled, disabled, all } (all = enabled then disabled).
-function groupForReading(list) {
-  const enabled = list.filter((a) => a.enabled).sort(byName);
-  const disabled = list.filter((a) => !a.enabled).sort(byName);
-  return { enabled, disabled, all: [...enabled, ...disabled] };
-}
-
-// Each add-on's fields in reading order (name first, the technical id last).
-// The importer finds fields by name, so the order is only for people.
-function jsonAddon(a, shorten = true) {
-  return {
-    name: shorten ? shortName(a.name) : a.name,
-    version: a.version,
-    type: a.type,
-    enabled: a.enabled,
-    link: a.link,
-    linkType: a.linkType,
-    id: a.id,
-  };
-}
-
-// Builds the JSON export: the same add-ons as the HTML report's embedded data,
-// saved as a standalone .json file the Importer reads the same way.
-// shorten (the Settings "Shorten add-on names" choice, on by default) cuts
-// each name at its first separator, exactly as the HTML report does. The
-// id is always included, and the Importer matches by id first, so a short
-// name never stops an add-on from being recognised.
-function buildJsonExport(list, shorten = true) {
-  return JSON.stringify({
-    formatVersion: EXPORT_FORMAT_VERSION,
-    addons: groupForReading(list).all.map((a) => jsonAddon(a, shorten)),
-  }, null, 2);
-}
-
-// Builds a CSV export. First line is a format-version comment so the
-// importer can validate it without guessing. Second line is the header
-// row. One data row per add-on. Fields with commas or quotes are
-// quoted and internal quotes are doubled per RFC 4180.
-function buildCsvExport(list, shorten = true) {
-  const csvField = (val) => {
-    let s = String(val == null ? '' : val);
-    // A cell starting with =, +, -, @, tab, or CR is read as a formula by
-    // Excel/Sheets/LibreOffice once this file is opened in a spreadsheet -
-    // and an add-on name is attacker-controlled. A leading apostrophe
-    // forces "read as text" in all of them, and disappears from the
-    // visible cell content once opened. parseCsvPayload()'s
-    // stripCsvFormulaGuard() strips exactly one back off on import.
-    if (/^[=+\-@\t\r]/.test(s)) {
-      s = `'${s}`;
-    }
-    // Quote the field if it contains a comma, double-quote, or newline.
-    return /[,"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const row = (fields) => fields.map(csvField).join(',');
-
-  // Columns in reading order (name first, the technical id last); the
-  // importer finds them by the header names, so the order is only for
-  // people. A byte-order mark at the very start makes Excel read the file
-  // as UTF-8, so non-English add-on names show correctly; the importer
-  // ignores it.
-  const lines = [
-    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
-    row(['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id']),
-    ...groupForReading(list).all.map((a) => row([shorten ? shortName(a.name) : a.name, a.version, a.type, a.enabled, a.link, a.linkType, a.id])),
-  ];
-  return '\uFEFF' + lines.join('\r\n');
-}
-
-// Builds a plain-text export, laid out to be read: a title, then an
-// "Enabled" and a "Disabled" section (each A-Z) with the columns lined up.
-// One add-on per line:
-//   Name | Version | Type | Status | Link | Id
-// The Importer uses the id (last column) to match add-ons even though the name
-// may be shortened (shorten, the Settings choice, on by default).
-// First line is a format-version comment so the format is identifiable.
-// The importer ignores every line without " | " in it (the title, the
-// section headings and the underlines), so none of those may contain it.
-//
-// Text written into a column is escaped so one add-on always stays on one line
-// and a name can never be mistaken for a column separator, and so the Importer
-// can restore it exactly:
-//   \\  a backslash          \|  a pipe
-//   \n  a line break         \r  a carriage return
-//   \s  a space at the very start or end of the text (the columns are padded
-//       with spaces, so edge spaces would otherwise be lost)
-// Everything else is written as it is, so ordinary names look exactly as before.
-// import.js's txtUnescape() is the reverse of this.
-function txtEscape(value) {
-  return String(value == null ? '' : value)
-    .replace(/\\/g, '\\\\')
-    .replace(/\|/g, '\\|')
-    .replace(/\r/g, '\\r')
-    .replace(/\n/g, '\\n')
-    .replace(/^ +| +$/g, (spaces) => '\\s'.repeat(spaces.length));
-}
-
-function buildTxtExport(list, shorten = true) {
-  const { enabled, disabled, all } = groupForReading(list);
-  const nameOf = (a) => txtEscape(shorten ? shortName(a.name) : a.name);
-
-  // Column widths, so every line lines up. A very long name is allowed to
-  // push its own line out rather than widening every other line.
-  const NAME_MAX = 40;
-  const nameWidth = Math.min(NAME_MAX, Math.max(0, ...all.map((a) => nameOf(a).length)));
-  const versionWidth = Math.max(0, ...all.map((a) => txtEscape(a.version).length));
-  const linkWidth = Math.max(0, ...all.map((a) => txtEscape(a.link).length));
-  const line = (a) => {
-    const type = typeLabel(a.type);
-    const status = a.enabled ? 'Enabled' : 'Disabled';
-    return [
-      nameOf(a).padEnd(nameWidth),
-      txtEscape(a.version).padEnd(versionWidth),
-      type.padEnd('Extension'.length),
-      status.padEnd('Disabled'.length),
-      txtEscape(a.link).padEnd(linkWidth),
-      txtEscape(a.id),
-    ].join(' | ');
-  };
-  const section = (title, items) => {
-    if (items.length === 0) return [];
-    const heading = `${title} (${items.length})`;
-    return [heading, '-'.repeat(heading.length), ...items.map(line), ''];
-  };
-
-  const total = all.length;
-  const lines = [
-    `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
-    '',
-    `Firefox Add-ons - ${total} in total (${enabled.length} enabled, ${disabled.length} disabled)`,
-    '',
-    ...section('Enabled', enabled),
-    ...section('Disabled', disabled),
-  ];
-  // No blank line left dangling at the end.
-  while (lines.length && lines[lines.length - 1] === '') lines.pop();
-  return lines.join('\r\n');
-}
 // THE DATA CONTRACT OF THE HTML REPORT. The page around it (layout, colours,
 // the theme button, animation) can change freely, but the data block that
 // goes into #addons-exporter-data is what the Importer reads, and it must stay

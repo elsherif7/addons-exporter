@@ -4,10 +4,10 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext, makeFakeDom } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon } = require('./helpers');
 
 const themeSrc = readSrc('src/common/theme.js');
-const commonSrc = readSrc('src/common/common.js');
+const commonSrc = readCommon();
 const settingsSrc = readSrc('src/settings/settings.js');
 
 // settings.js wires up DOM elements and event listeners at load time.
@@ -482,7 +482,7 @@ function makeSettingsInitDom(cachedFormat, cachedShorten) {
   };
   const sb = { document, localStorage };
   vm.createContext(sb);
-  // settings.html loads common.js (the format registry) before settings-init.js.
+  // settings.html loads core.js (the format registry) before settings-init.js.
   vm.runInContext(commonSrc, sb);
   vm.runInContext(settingsInitSrc, sb);
   return radios;
