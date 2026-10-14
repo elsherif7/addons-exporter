@@ -1,2 +1,3 @@
 tests/golden/** -text
 tests/fixtures/** -text
+src/background/report-assets.generated.js linguist-generated=true

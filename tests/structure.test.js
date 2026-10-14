@@ -16,6 +16,12 @@ const HTML_PAGES = [
   'src/confirmation/confirmation.html',
 ];
 
+// The Settings page is settings.html plus its stylesheet, settings.css; the
+// tests below look at both together (markup and rules).
+function readSettingsPage() {
+  return readSrc('src/settings/settings.html') + '\n' + readSrc('src/settings/settings.css');
+}
+
 // --- settings-option-row refactor ---
 // Every Settings option row (radio and tick-box rows, and action rows) must use the
 // shared settings-option-row class. These tests act as tripwires: they
@@ -23,7 +29,7 @@ const HTML_PAGES = [
 // class instead of the canonical one, or accidentally reintroduces the
 // old class names.
 
-const settingsHtml = readSrc('src/settings/settings.html');
+const settingsHtml = readSettingsPage();
 
 // Structural: all 8 option rows use settings-option-row.
 test('settings-option-row: all 8 option label rows (radios and tick boxes) use settings-option-row', () => {
@@ -101,7 +107,7 @@ for (const [labelFor, radioId] of [
 }
 
 // Shared CSS class must be defined in the <style> block (not removed).
-test('settings-option-row: .settings-option-row is defined in the settings.html <style> block', () => {
+test('settings-option-row: .settings-option-row is defined in settings.css', () => {
   assert.match(settingsHtml, /\.settings-option-row\s*\{/,
     '.settings-option-row CSS rule not found in settings.html');
 });
@@ -179,7 +185,7 @@ test('hub-btn: #chooseFileBtn no longer duplicates button base styles in import.
 
 // --- settings.html ---
 
-const settingsHtmlForBtn = readSrc('src/settings/settings.html');
+const settingsHtmlForBtn = readSettingsPage();
 
 test('hub-btn: exportSettingsBtn uses hub-btn', () => {
   assert.match(settingsHtmlForBtn, /id="exportSettingsBtn"[^>]*class="[^"]*hub-btn[^"]*"|class="[^"]*hub-btn[^"]*"[^>]*id="exportSettingsBtn"/,
@@ -299,7 +305,7 @@ test('motion: the report switches animations off when printing', () => {
 });
 
 test('motion: the report only animates theme changes after first paint', () => {
-  const src = readSrc('src/background/report-template.js');
+  const src = readSrc('src/background/report-inline.js');
   assert.match(src, /var themeReady = false;/);
   assert.match(src, /applyTheme\(loadPersistedTheme\(\)\);\s*themeReady = true;/);
 });
@@ -334,7 +340,7 @@ test('motion: reduced motion also zeroes animation delays, so staged reveals nev
 });
 
 test('settings: the page reveals in order - card, then title, then each section top to bottom', () => {
-  const html = readSrc('src/settings/settings.html');
+  const html = readSettingsPage();
   const sec = (re, label) => {
     const m = html.match(re);
     assert.ok(m, `${label} delay not found`);
@@ -406,7 +412,7 @@ test('popup: overflow is hidden only while the reveal runs, so sliding items can
 });
 
 test('settings and popup: the reveal animations never use blur, and always hold hidden until their turn (backwards fill)', () => {
-  const settingsHtml = readSrc('src/settings/settings.html');
+  const settingsHtml = readSettingsPage();
   for (const [name, src] of [['settings.html', settingsHtml], ['popup.html', popupHtml]]) {
     // The only blur allowed is the reset dialog's backdrop-filter (a blurred
     // page behind a dialog), never inside an animation's keyframes.
@@ -425,7 +431,7 @@ test('settings and popup: the reveal animations never use blur, and always hold 
 });
 
 test('settings and popup: clipped reveals end beyond the box so shadows and focus rings are never cut off', () => {
-  const settingsHtml = readSrc('src/settings/settings.html');
+  const settingsHtml = readSettingsPage();
   for (const [name, src] of [['settings.html', settingsHtml], ['popup.html', popupHtml]]) {
     const ends = src.match(/to\s*\{[^}]*clip-path:\s*inset\(([^)]*)\)/g) || [];
     assert.ok(ends.length > 0, `${name}: no clip-path reveal found`);
@@ -443,15 +449,15 @@ test('press: every extension page loads press.js', () => {
   }
 });
 
-test('press: shared.css, the popup and the report all define the --press-ring colour, in light and dark', () => {
-  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
+test('press: tokens.css and the popup define the --press-ring colour, in light and dark', () => {
+  for (const [name, src] of [['tokens.css', readSrc('src/common/tokens.css')], ['popup.html', popupHtml]]) {
     const defs = src.match(/--press-ring:/g) || [];
     assert.strictEqual(defs.length, 2, `${name} should define --press-ring for light and dark`);
   }
 });
 
 test('press: the report carries its own copy of the press feedback (it cannot load press.js)', () => {
-  const src = readSrc('src/background/report-template.js');
+  const src = readSrc('src/background/report-inline.js');
   assert.match(src, /Mirrors src\/common\/press\.js/);
   assert.match(src, /el\.animate\(/);
   assert.match(src, /addEventListener\('pointerdown'/);
@@ -467,7 +473,7 @@ test('press: buttons press in fast and spring back out (a long transform transit
 
 
 test('settings: the reset dialog backdrop is a visible blur (page stays readable behind it)', () => {
-  const html = readSrc('src/settings/settings.html');
+  const html = readSettingsPage();
   assert.match(html, /\.s-overlay \{[^}]*backdrop-filter:\s*blur\(\d+px\)/);
   // Dim only lightly - the page behind must remain visible.
   const alpha = parseFloat(html.match(/\.s-overlay \{[^}]*background:\s*rgba\(0, 0, 0, ([\d.]+)\)/)[1]);
@@ -475,7 +481,7 @@ test('settings: the reset dialog backdrop is a visible blur (page stays readable
 });
 
 test('settings: the success message slides in (no check mark), with a light and dark success colour', () => {
-  const html = readSrc('src/settings/settings.html');
+  const html = readSettingsPage();
   assert.match(html, /:root \{ --success-color: #[0-9a-f]{6}; \}/i);
   assert.match(html, /:root\[data-theme="dark"\] \{ --success-color: #[0-9a-f]{6}; \}/i);
   for (const id of ['exportSettingsStatus', 'importSettingsStatus', 'resetSettingsStatus']) {
@@ -486,7 +492,7 @@ test('settings: the success message slides in (no check mark), with a light and 
 });
 
 test('settings: descriptions and messages are inline-block, so sliding them in actually moves them', () => {
-  const html = readSrc('src/settings/settings.html');
+  const html = readSettingsPage();
   assert.match(html, /#exportSettingsDesc[\s\S]*?#resetSettingsStatus \{ display: inline-block; \}/);
 });
 
@@ -527,7 +533,7 @@ function keyframesBody(src, name) {
 }
 
 test('same as Settings: the Exporter, Importer and report use the very same animations as the Settings page', () => {
-  const settings = readSrc('src/settings/settings.html');
+  const settings = readSettingsPage();
   for (const [name, src] of [['shared.css', sharedCssForMotion], ['report.css', reportCssForMotion]]) {
     assert.strictEqual(keyframesBody(src, 'hub-unfold'), keyframesBody(settings, 'settings-card-unfold'), `${name}: card unfold`);
     assert.strictEqual(keyframesBody(src, 'hub-title-in'), keyframesBody(settings, 'settings-title-in'), `${name}: title`);
@@ -537,7 +543,7 @@ test('same as Settings: the Exporter, Importer and report use the very same anim
 });
 
 test('same as Settings: the same durations - card 0.8s, title 0.6s, parts and rows 0.55s', () => {
-  const settings = readSrc('src/settings/settings.html');
+  const settings = readSettingsPage();
   assert.match(settings, /animation-duration: 0\.8s;/);
   assert.match(settings, /animation-name: settings-title-in;\s*animation-duration: 0\.6s;/);
   assert.match(settings, /\.settings-group > \* \{[^}]*animation-duration: 0\.55s;/);
@@ -552,14 +558,14 @@ test('same as Settings: the same durations - card 0.8s, title 0.6s, parts and ro
 });
 
 test('same as Settings: the same spacing - one part every 0.16s, one row every 0.08s', () => {
-  const settings = readSrc('src/settings/settings.html');
+  const settings = readSettingsPage();
   const groups = [1, 2, 3, 4, 5, 6].map((n) => parseFloat(settings.match(new RegExp(`:nth-of-type\\(${n}\\) \\{ --gd: ([\\d.]+)s; \\}`))[1]));
   assert.strictEqual(Math.round((groups[1] - groups[0]) * 1000) / 1000, 0.16, 'Settings: sections 0.16s apart');
   assert.match(settings, /var\(--i, 0\) \* 0\.08s/, 'Settings: rows 0.08s apart');
   const reveal = readSrc('src/common/reveal.js');
   assert.match(reveal, /const PART_STEP = 0\.16;/);
   assert.match(reveal, /const ROW_STEP = 0\.08;/);
-  const tpl = readSrc('src/background/report-template.js');
+  const tpl = readSrc('src/background/report-inline.js');
   assert.match(tpl, /PART_STEP = 0\.16/);
   assert.match(tpl, /ROW_STEP = 0\.08/);
 });
@@ -585,7 +591,7 @@ test('staged reveal: the report opens in order - card, title, intro, search box,
 });
 
 test('same as Settings: the report times its parts and rows with its own script, and switches the entrance off afterwards', () => {
-  const tpl = readSrc('src/background/report-template.js');
+  const tpl = readSrc('src/background/report-template.js') + readSrc('src/background/report-inline.js');
   assert.match(tpl, /<p class="intro-text"><strong>Tip:<\/strong>/);
   assert.match(tpl, /<div id="addonList" class="revealing">/);
   assert.match(tpl, /Opening reveal - mirrors src\/common\/reveal\.js/);
@@ -619,7 +625,7 @@ test('list controls: Select all / Deselect all are pill buttons and the count is
 });
 
 test('settings: the Light and Dark rows carry the report\'s sun and moon icons, and the chosen one spins in', () => {
-  const html = readSrc('src/settings/settings.html');
+  const html = readSettingsPage();
   const light = html.match(/<label class="settings-option-row" for="themeLight">[\s\S]*?<\/label>/)[0];
   const dark = html.match(/<label class="settings-option-row" for="themeDark">[\s\S]*?<\/label>/)[0];
   assert.match(light, /<svg class="appearance-icon"[\s\S]*<circle cx="12" cy="12" r="5"\/>/, 'sun in the Light row');
@@ -716,7 +722,7 @@ test('selection badge: a slot for the rolling number exists in the stylesheet', 
 });
 
 test('settings.html: the Export Format tick boxes are exactly the registry formats, in order, with the registry text', () => {
-  const html = readSrc('src/settings/settings.html');
+  const html = readSettingsPage();
   const sb = {};
   vm.createContext(sb);
   vm.runInContext(readCommon(), sb);
@@ -728,4 +734,13 @@ test('settings.html: the Export Format tick boxes are exactly the registry forma
     assert.ok(html.includes(`>${f.title}</span>`), `${f.id} title`);
     assert.ok(html.includes(f.description), `${f.id} description`);
   });
+});
+
+test('settings: the page keeps its styling in settings.css - only "display:none" starts hidden inline', () => {
+  const html = readSrc('src/settings/settings.html');
+  assert.doesNotMatch(html, /<style[\s>]/, 'settings.html must not have a <style> block');
+  assert.match(html, /<link rel="stylesheet" href="settings\.css">/);
+  for (const m of html.matchAll(/style="([^"]*)"/g)) {
+    assert.strictEqual(m[1].replace(/[\s;]/g, ''), 'display:none', `unexpected inline style: ${m[1]}`);
+  }
 });

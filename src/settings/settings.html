@@ -7,217 +7,10 @@
   <script src="../common/core.js"></script>
   <script src="../common/page-ui.js"></script>
 <link rel="icon" href="../../icons/icon48.png">
+<link rel="stylesheet" href="../common/tokens.css">
 <link rel="stylesheet" href="../common/shared.css">
+<link rel="stylesheet" href="settings.css">
 <title>Add-ons Hub Settings</title>
-<style>
-  .settings-group {
-    text-align: left;
-    margin-bottom: 24px;
-  }
-  .settings-group h2 {
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: var(--text-muted);
-    margin: 0 0 10px;
-  }
-  /* Canonical shared row used by every Settings option:
-     option rows (Appearance and Display are radios, Export Format is
-     tick boxes) and action rows (Reset Settings).
-     The element type differs — option rows use <label> so the
-     click target covers the whole row; action rows use <div> —
-     but the border, spacing, hover, and transition are identical. */
-  .settings-option-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 8px;
-    font-size: 14px;
-    user-select: none;
-    transition: background 0.12s, border-color 0.12s, transform 0.1s;
-  }
-  .settings-option-row:last-child { margin-bottom: 0; }
-  /* Radio rows are <label> elements — cursor pointer makes the whole
-     row feel clickable. Action rows are <div> — no pointer cursor
-     since the button inside is the interactive target. */
-  label.settings-option-row { cursor: pointer; }
-  label.settings-option-row input { margin: 0; margin-top: 3px; }
-  /* Action rows use <div> — center button vertically, push it right,
-     and use slightly less padding since two-line content already makes
-     them taller than single-line radio rows. */
-  div.settings-option-row { align-items: center; justify-content: space-between; padding: 8px 12px; margin-bottom: 0; }
-  .settings-option-row:hover { background: var(--hover-bg); border-color: var(--border-hover); transform: scale(1.01); }
-  label.settings-option-row:active { transform: scale(0.985); }
-  :root[data-theme="dark"] .settings-option-row:hover { background: #2e3340; }
-  .settings-action-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  /* .settings-btn and .s-modal-btn extend hub-btn (shared.css).
-     Only layout/sizing/scale overrides live here. */
-  .settings-btn {
-    padding: 9px 14px;
-    text-align: center;
-  }
-  /* Hover: a soft grey fill, like the pink one on Reset but neutral. */
-  .settings-btn:hover { background: #e9ebee; border-color: var(--border-hover); transform: scale(1.01); }
-  :root[data-theme="dark"] .settings-btn:hover { background: #3a3f4b; }
-  .settings-btn:active { transform: scale(0.95); transition-duration: 0.08s; }
-  /* The red Reset buttons get a deeper red outline than their text. */
-  :root { --danger-border: #9b1c1c; }
-  :root[data-theme="dark"] { --danger-border: #e0463a; }
-  .settings-btn-danger { border-color: var(--danger-border); color: var(--danger-color); }
-  .settings-btn-danger:hover { background: #fef2f2; border-color: var(--danger-border); }
-  :root[data-theme="dark"] .settings-btn-danger:hover { background: #3d1515; }
-  #resetSettingsBtn { --press-ring: rgba(192, 57, 43, 0.5); }
-  :root[data-theme="dark"] #resetSettingsBtn { --press-ring: rgba(239, 106, 94, 0.5); }
-
-  /* Modal buttons shared by reset dialogs */
-  .s-modal-btn {
-    padding: 7px 0;
-    width: 96px;
-    border-radius: 7px;
-  }
-  .s-modal-btn:hover { background: #e9ebee; transform: scale(1.04); }
-  :root[data-theme="dark"] .s-modal-btn:hover { background: #3a3f4b; }
-  .s-modal-btn:active { transform: scale(0.95); transition-duration: 0.08s; }
-  .s-modal-btn-danger { color: var(--danger-color); border-color: var(--danger-border); --press-ring: rgba(192, 57, 43, 0.5); }
-  :root[data-theme="dark"] .s-modal-btn-danger { --press-ring: rgba(239, 106, 94, 0.5); }
-  .s-modal-btn-danger:hover { background: #fef2f2; border-color: var(--danger-border); }
-  :root[data-theme="dark"] .s-modal-btn-danger:hover { background: #3d1515; }
-  #settingsStatus {
-    display: block;
-    font-size: 13px;
-    margin-top: 0;
-    min-height: 0;
-    color: var(--text-muted);
-    text-align: center;
-    padding: 0 10px;
-    box-sizing: border-box;
-  }
-  #settingsStatus:not(:empty) {
-    margin-top: 10px;
-    margin-bottom: 2px;
-  }
-  #settingsStatus.error { color: var(--danger-color); }
-  /* Opening reveal, top to bottom, one step after another: first only the
-     page background, then the card UNFOLDS downward (empty), then the
-     "Settings" title settles in as its letters tighten up, then each
-     section in turn - its heading slides in from the left and its rows
-     wipe in left to right, like being written. Everything starts hidden
-     (backwards fill) until its turn. */
-  @keyframes settings-card-unfold {
-    from { opacity: 0; transform: translateY(20px); clip-path: inset(0 0 100% 0 round 12px); }
-    to   { opacity: 1; transform: none; clip-path: inset(-60px round 12px); }
-  }
-  @keyframes settings-title-in {
-    from { opacity: 0; transform: translateY(12px); letter-spacing: 0.16em; }
-    to   { opacity: 1; transform: none; letter-spacing: 0em; }
-  }
-  @keyframes settings-slide-in {
-    from { opacity: 0; transform: translateX(-18px); }
-    to   { opacity: 1; transform: none; }
-  }
-  @keyframes settings-wipe-in {
-    from { opacity: 0; transform: translateX(-14px); clip-path: inset(0 100% 0 0 round 8px); }
-    to   { opacity: 1; transform: none; clip-path: inset(-8px round 8px); }
-  }
-  .card {
-    animation-name: settings-card-unfold;
-    animation-duration: 0.8s;
-    animation-timing-function: var(--motion-ease);
-    animation-fill-mode: backwards;
-  }
-  .card { animation-delay: 0.15s; }
-  .card > h1:first-child {
-    animation-name: settings-title-in;
-    animation-duration: 0.6s;
-    animation-timing-function: var(--motion-ease);
-    animation-fill-mode: backwards;
-  }
-  .card > h1:first-child { animation-delay: 0.55s; }
-  /* The sections themselves don't animate (the shared card-children rule is
-     switched off here); they only carry their start time, --gd, which their
-     heading and rows below count from. */
-  .card > .settings-group { --gd: 0s; animation: none; }
-  .card > .settings-group:nth-of-type(1) { --gd: 0.7s; }
-  .card > .settings-group:nth-of-type(2) { --gd: 0.86s; }
-  .card > .settings-group:nth-of-type(3) { --gd: 1.02s; }
-  .card > .settings-group:nth-of-type(4) { --gd: 1.18s; }
-  .card > .settings-group:nth-of-type(5) { --gd: 1.34s; }
-  .card > .settings-group:nth-of-type(6) { --gd: 1.5s; }
-  .settings-group > * {
-    animation-name: settings-wipe-in;
-    animation-duration: 0.55s;
-    animation-timing-function: var(--motion-ease);
-    animation-fill-mode: backwards;
-    animation-delay: calc(var(--gd) + 0.12s + var(--i, 0) * 0.08s);
-  }
-  .settings-group > h2 { animation-name: settings-slide-in; }
-  .settings-group > :nth-child(2) { --i: 1; }
-  .settings-group > :nth-child(3) { --i: 2; }
-  .settings-group > :nth-child(4) { --i: 3; }
-  .settings-group > :nth-child(5) { --i: 4; }
-  .settings-group > :nth-child(6) { --i: 5; }
-  /* The short note under a section heading (Export Format). */
-  .settings-hint { font-size: 12px; color: var(--text-muted); line-height: 1.4; margin: -4px 0 10px; }
-  /* Success colour for finished export / import / reset messages. */
-  :root { --success-color: #1a7f37; }
-  :root[data-theme="dark"] { --success-color: #56d364; }
-  /* A finished export / import / reset: the message slides in (the row
-     also flashes green - see flashSuccess in settings.js). The descriptions
-     and messages are inline-block so they can slide: transforms don't apply
-     to plain inline text. */
-  #exportSettingsDesc, #importSettingsDesc, #resetSettingsDesc,
-  #exportSettingsStatus, #importSettingsStatus, #resetSettingsStatus { display: inline-block; }
-  #exportSettingsStatus.is-success, #importSettingsStatus.is-success, #resetSettingsStatus.is-success {
-    font-weight: 600;
-    animation: settings-slide-in var(--motion-slow) var(--motion-spring) backwards;
-  }
-  /* Light / Dark rows show the same sun and moon as the report's theme
-     button. The icon of the chosen theme darkens and spins and pops in each
-     time its option becomes selected (a CSS animation restarts whenever its
-     selector starts matching), just like the report's toggle. */
-  @keyframes settings-icon-spin {
-    from { opacity: 0; transform: rotate(-200deg) scale(0.3); }
-    to   { opacity: 1; transform: none; }
-  }
-  .appearance-icon {
-    flex: none;
-    margin-left: auto;
-    margin-top: 1px;
-    color: var(--text-muted);
-    transition: color var(--motion-slow) ease;
-  }
-  .settings-option-row input:checked ~ .appearance-icon {
-    color: var(--text);
-    animation: settings-icon-spin 0.7s var(--motion-spring) backwards;
-  }
-  /* Small pop when a radio becomes selected. */
-  .settings-option-row input[type="radio"]:checked,
-  .settings-option-row input[type="checkbox"]:checked { animation: hub-pop var(--motion-normal) var(--motion-spring); }
-  /* Inline row messages fade in each time they're shown (display toggles). */
-  #exportSettingsDesc, #importSettingsDesc, #resetSettingsDesc,
-  #exportSettingsStatus, #importSettingsStatus, #resetSettingsStatus,
-  #settingsStatus:not(:empty) { animation: hub-fade-in var(--motion-normal) ease backwards; }
-  /* Reset dialog: backdrop fades in, the dialog rises in. */
-  /* The page behind the reset dialog stays visible, softly blurred and
-     slightly dimmed (so it reads as "behind"). The page is frozen while it is
-     open - settings.js locks scrolling. */
-  .s-overlay {
-    background: rgba(0, 0, 0, 0.22);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    animation: hub-fade-in var(--motion-normal) ease backwards;
-  }
-  :root[data-theme="dark"] .s-overlay { background: rgba(0, 0, 0, 0.38); }
-  .s-dialog { animation: hub-card-in var(--motion-slow) var(--motion-spring) backwards; }
-  /* .about-block, .about-row, .about-label, .about-value come from shared.css */
-</style>
 </head>
 <body>
   <div class="card">
@@ -227,12 +20,12 @@
       <h2 id="appearanceHeading">Appearance</h2>
       <label class="settings-option-row" for="themeLight">
         <input type="radio" name="theme" id="themeLight" value="light" checked>
-        <span style="font-weight:600; color:var(--text); font-size:14px;">Light</span>
+        <span class="opt-title">Light</span>
         <svg class="appearance-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </label>
       <label class="settings-option-row" for="themeDark">
         <input type="radio" name="theme" id="themeDark" value="dark">
-        <span style="font-weight:600; color:var(--text); font-size:14px;">Dark</span>
+        <span class="opt-title">Dark</span>
         <svg class="appearance-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path transform="scale(-1,1) translate(-24,0)" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </label>
     </div>
@@ -243,29 +36,29 @@
       <label class="settings-option-row" for="formatHtml">
         <input type="checkbox" name="exportFormat" id="formatHtml" value="html">
         <span>
-          <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">HTML</span>
-          <span style="font-size:12px; color:var(--text-muted);">A readable report you can open in any browser. Add-ons Importer can read it back.</span>
+          <span class="opt-title opt-title-block">HTML</span>
+          <span class="opt-desc">A readable report you can open in any browser. Add-ons Importer can read it back.</span>
         </span>
       </label>
       <label class="settings-option-row" for="formatJson">
         <input type="checkbox" name="exportFormat" id="formatJson" value="json">
         <span>
-          <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">JSON</span>
-          <span style="font-size:12px; color:var(--text-muted);">Plain data for other tools. Add-ons Importer can read it back.</span>
+          <span class="opt-title opt-title-block">JSON</span>
+          <span class="opt-desc">Plain data for other tools. Add-ons Importer can read it back.</span>
         </span>
       </label>
       <label class="settings-option-row" for="formatCsv">
         <input type="checkbox" name="exportFormat" id="formatCsv" value="csv">
         <span>
-          <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">CSV</span>
-          <span style="font-size:12px; color:var(--text-muted);">A table for Excel or any spreadsheet. Add-ons Importer can read it back.</span>
+          <span class="opt-title opt-title-block">CSV</span>
+          <span class="opt-desc">A table for Excel or any spreadsheet. Add-ons Importer can read it back.</span>
         </span>
       </label>
       <label class="settings-option-row" for="formatTxt">
         <input type="checkbox" name="exportFormat" id="formatTxt" value="txt">
         <span>
-          <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">TXT</span>
-          <span style="font-size:12px; color:var(--text-muted);">A simple list, one add-on per line. Add-ons Importer can read it back.</span>
+          <span class="opt-title opt-title-block">TXT</span>
+          <span class="opt-desc">A simple list, one add-on per line. Add-ons Importer can read it back.</span>
         </span>
       </label>
     </div>
@@ -275,15 +68,15 @@
       <label class="settings-option-row" for="shortenNamesOn">
         <input type="radio" name="shortenNames" id="shortenNamesOn" value="on">
         <span>
-          <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Shorten add-on names</span>
-          <span style="font-size:12px; color:var(--text-muted);">Removes text after "–" or ":", e.g. "uBlock Origin – free ad blocker" → "uBlock Origin"</span>
+          <span class="opt-title opt-title-block">Shorten add-on names</span>
+          <span class="opt-desc">Removes text after "–" or ":", e.g. "uBlock Origin – free ad blocker" → "uBlock Origin"</span>
         </span>
       </label>
       <label class="settings-option-row" for="shortenNamesOff">
         <input type="radio" name="shortenNames" id="shortenNamesOff" value="off">
         <span>
-          <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Show full add-on names</span>
-          <span style="font-size:12px; color:var(--text-muted);">Keeps the original name exactly as installed, e.g. "uBlock Origin – free ad blocker"</span>
+          <span class="opt-title opt-title-block">Show full add-on names</span>
+          <span class="opt-desc">Keeps the original name exactly as installed, e.g. "uBlock Origin – free ad blocker"</span>
         </span>
       </label>
     </div>
@@ -292,20 +85,20 @@
       <h2>Settings Backup</h2>
       <div class="settings-action-group">
         <div class="settings-option-row">
-          <span style="flex:1;">
-            <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Export Settings</span>
-            <span id="exportSettingsDesc" style="font-size:12px; color:var(--text-muted);">Save your current settings to a file.</span>
-            <span id="exportSettingsStatus" style="font-size:12px; display:none;"></span>
+          <span class="opt-text">
+            <span class="opt-title opt-title-block">Export Settings</span>
+            <span id="exportSettingsDesc" class="opt-desc">Save your current settings to a file.</span>
+            <span id="exportSettingsStatus" class="opt-status" style="display:none;"></span>
           </span>
-          <button class="settings-btn hub-btn" id="exportSettingsBtn" style="flex-shrink:0; flex:none; width:92px; min-width:92px; padding:6px 0; margin-left:12px;">Export</button>
+          <button class="settings-btn hub-btn settings-row-btn" id="exportSettingsBtn">Export</button>
         </div>
         <div class="settings-option-row">
-          <span style="flex:1;">
-            <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Import Settings</span>
-            <span id="importSettingsDesc" style="font-size:12px; color:var(--text-muted);">Restore settings from a previously exported file.</span>
-            <span id="importSettingsStatus" style="font-size:12px; display:none;"></span>
+          <span class="opt-text">
+            <span class="opt-title opt-title-block">Import Settings</span>
+            <span id="importSettingsDesc" class="opt-desc">Restore settings from a previously exported file.</span>
+            <span id="importSettingsStatus" class="opt-status" style="display:none;"></span>
           </span>
-          <button class="settings-btn hub-btn" id="importSettingsBtn" style="flex-shrink:0; flex:none; width:92px; min-width:92px; padding:6px 0; margin-left:12px;">Import</button>
+          <button class="settings-btn hub-btn settings-row-btn" id="importSettingsBtn">Import</button>
         </div>
       </div>
     </div>
@@ -313,12 +106,12 @@
     <div class="settings-group">
       <h2>Reset</h2>
       <div class="settings-option-row">
-        <span style="flex:1;">
-          <span style="display:block; font-weight:600; color:var(--text); font-size:14px; margin-bottom:2px;">Reset Settings</span>
-          <span id="resetSettingsDesc" style="font-size:12px; color:var(--text-muted);">Clears theme, export format, and display settings back to defaults.</span>
-          <span id="resetSettingsStatus" style="font-size:12px; display:none;"></span>
+        <span class="opt-text">
+          <span class="opt-title opt-title-block">Reset Settings</span>
+          <span id="resetSettingsDesc" class="opt-desc">Clears theme, export format, and display settings back to defaults.</span>
+          <span id="resetSettingsStatus" class="opt-status" style="display:none;"></span>
         </span>
-        <button class="settings-btn settings-btn-danger hub-btn" id="resetSettingsBtn" style="flex-shrink:0; flex:none; width:92px; min-width:92px; padding:6px 0; margin-left:12px;">Reset</button>
+        <button class="settings-btn settings-btn-danger hub-btn settings-row-btn" id="resetSettingsBtn">Reset</button>
       </div>
       <span id="settingsStatus"></span>
     </div>

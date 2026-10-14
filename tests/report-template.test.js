@@ -229,7 +229,7 @@ test('buildCsvExport: an ordinary name is not guarded', () => {
   assert.ok(dataRow.startsWith('uBlock Origin,1.0,'), `should not be guarded: ${dataRow}`);
 });
 
-// --- CSS drift-detection: report-template.js vs shared.css ---
+// --- CSS drift-detection: report.css vs shared.css ---
 // The report embeds its own copy of shared layout CSS since it's a
 // standalone file. These tests catch drift between the two copies for
 // rules that must stay in sync. Intentional differences are excluded:
@@ -242,7 +242,7 @@ const sharedCssSrc = fs.readFileSync(
   path.join(__dirname, '..', 'src/common/shared.css'), 'utf8'
 );
 const reportTemplateSrcRaw = fs.readFileSync(
-  path.join(__dirname, '..', 'src/background/report-template.js'), 'utf8'
+  path.join(__dirname, '..', 'src/background/report.css'), 'utf8'
 );
 
 // Extracts the first value of a CSS property within a named selector block
@@ -301,22 +301,25 @@ const sharedRules = [
 ];
 
 for (const [selector, property] of sharedRules) {
-  test(`CSS drift: "${selector} { ${property} }" matches between shared.css and report-template.js`, () => {
+  test(`CSS drift: "${selector} { ${property} }" matches between shared.css and report.css`, () => {
     const fromShared = extractCssProp(sharedCssSrc, selector, property);
     const fromReport = extractCssProp(reportTemplateSrcRaw, selector, property);
     assert.ok(fromShared !== null,
       `"${property}" not found in shared.css for selector "${selector}" — update this test if the rule moved`);
     assert.ok(fromReport !== null,
-      `"${property}" not found in report-template.js for selector "${selector}" — the report copy may be missing this rule`);
+      `"${property}" not found in report.css for selector "${selector}" — the report copy may be missing this rule`);
     assert.strictEqual(fromReport, fromShared,
       `"${selector} { ${property} }" differs: shared.css has "${fromShared}", report has "${fromReport}"`);
   });
 }
 
-// --- CSS custom property (variable) drift ---
-// Previously excluded entirely ("CSS custom property blocks differ by
-// design" above) - in practice only a few variables are genuinely
-// report-specific; the rest should match exactly, and didn't (A29).
+// --- CSS custom properties: one source (tokens.css) ---
+// The colour and motion variables are defined once, in src/common/tokens.css.
+// The pages load it before shared.css; the report gets it built in (see
+// scripts/build-assets.js). So neither shared.css nor report.css may declare
+// its own :root block - that would be a second source that could drift.
+
+const tokensCssSrc = fs.readFileSync(path.join(__dirname, '..', 'src/common/tokens.css'), 'utf8');
 
 function extractCssVars(src, rootSelector) {
   const sel = rootSelector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -330,29 +333,19 @@ function extractCssVars(src, rootSelector) {
   return vars;
 }
 
-// Variables the report genuinely has no use for - it renders no
-// checkboxes and no <button class="primary-btn">, so it never needs a
-// disabled/hover state for either.
-const VAR_ALLOWLIST = new Set(['--btn-bg-hover', '--btn-disabled-bg']);
+test('tokens: shared.css and report.css declare no variables of their own (tokens.css is the only source)', () => {
+  assert.doesNotMatch(sharedCssSrc, /:root\s*(\[[^\]]*\])?\s*\{/, 'shared.css has a :root block - move it into tokens.css');
+  assert.doesNotMatch(reportTemplateSrcRaw, /:root\s*(\[[^\]]*\])?\s*\{/, 'report.css has a :root block - move it into tokens.css');
+});
 
-for (const [label, rootSelector] of [['light', ':root'], ['dark', ':root[data-theme="dark"]']]) {
-  test(`CSS drift: ${label} theme variables match between shared.css and report-template.js`, () => {
-    const sharedVars = extractCssVars(sharedCssSrc, rootSelector);
-    const reportVars = extractCssVars(reportTemplateSrcRaw, rootSelector);
-    assert.ok(sharedVars, `${rootSelector} not found in shared.css`);
-    assert.ok(reportVars, `${rootSelector} not found in report-template.js`);
-
-    for (const [name, value] of Object.entries(sharedVars)) {
-      if (VAR_ALLOWLIST.has(name)) continue;
-      assert.ok(name in reportVars, `${name} is in shared.css's ${rootSelector} but missing from the report's copy`);
-      assert.strictEqual(reportVars[name], value, `${name} differs in ${rootSelector}: shared.css has "${value}", report has "${reportVars[name]}"`);
-    }
-    for (const name of Object.keys(reportVars)) {
-      if (VAR_ALLOWLIST.has(name)) continue;
-      assert.ok(name in sharedVars, `${name} is in the report's ${rootSelector} but not in shared.css - typo, or shared.css is missing it?`);
-    }
-  });
-}
+test('tokens: every full page loads tokens.css before shared.css', () => {
+  for (const page of ['export/export', 'import/import', 'settings/settings', 'confirmation/confirmation']) {
+    const html = fs.readFileSync(path.join(__dirname, '..', `src/${page}.html`), 'utf8');
+    const t = html.indexOf('../common/tokens.css');
+    const s = html.indexOf('../common/shared.css');
+    assert.ok(t !== -1 && s !== -1 && t < s, `${page}.html must load tokens.css before shared.css`);
+  }
+});
 
 // --- A18: --text-faint meets WCAG AA contrast against --card-bg ---
 // A17: the search input's :focus-visible outline color meets the 3:1
@@ -376,13 +369,13 @@ function contrastRatio(a, b) {
 
 for (const [label, rootSelector] of [['light', ':root'], ['dark', ':root[data-theme="dark"]']]) {
   test(`A18: --text-faint meets 4.5:1 contrast against --card-bg (${label})`, () => {
-    const vars = extractCssVars(sharedCssSrc, rootSelector);
+    const vars = extractCssVars(tokensCssSrc, rootSelector);
     const ratio = contrastRatio(vars['--text-faint'], vars['--card-bg']);
     assert.ok(ratio >= 4.5, `--text-faint (${vars['--text-faint']}) vs --card-bg (${vars['--card-bg']}) is only ${ratio.toFixed(2)}:1, need 4.5:1`);
   });
 
   test(`A17: --link-accent (used for the search input's focus outline) meets 3:1 against --card-bg (${label})`, () => {
-    const vars = extractCssVars(sharedCssSrc, rootSelector);
+    const vars = extractCssVars(tokensCssSrc, rootSelector);
     const ratio = contrastRatio(vars['--link-accent'], vars['--card-bg']);
     assert.ok(ratio >= 3, `--link-accent (${vars['--link-accent']}) vs --card-bg (${vars['--card-bg']}) is only ${ratio.toFixed(2)}:1, need 3:1`);
   });
@@ -414,19 +407,25 @@ test('A36: the report tip accurately describes selecting the file and pre-select
 
 // --- A30: dead code cleanup ---
 
-// --- report.css is the source of truth for the report's inline CSS ---
-// src/background/report.css is the editable source; scripts/build-report-css.js
-// inlines it into the <style> block of report-template.js. This test catches
-// the case where report.css was edited but `npm run build` wasn't re-run.
+// --- the generated assets file is in sync with its sources ---
+// report.css, report-inline.js and icons/icon32.png are built into
+// report-assets.generated.js by scripts/build-assets.js. This catches the case
+// where a source was edited but `npm run build` wasn't re-run.
 
-test('report.css is in sync with the <style> block in report-template.js', () => {
-  const reportCss = fs.readFileSync(path.join(__dirname, '..', 'src', 'background', 'report.css'), 'utf8');
-  const styleMatch = reportTemplateSrcRaw.match(/<style>\n([\s\S]*?)\n<\/style>/);
-  assert.ok(styleMatch, 'could not find <style>...</style> block in report-template.js');
+test('report-assets.generated.js is in sync with report.css, report-inline.js and the icon', () => {
+  const { buildAssets, OUT_PATH } = require('../scripts/build-assets');
   assert.strictEqual(
-    styleMatch[1], reportCss,
-    'report-template.js\'s <style> block is out of sync with report.css — run `npm run build` to update it'
+    fs.readFileSync(OUT_PATH, 'utf8'), buildAssets(),
+    'report-assets.generated.js is out of sync with its sources - run `npm run build` to update it'
   );
+});
+
+test('the report embeds REPORT_CSS: tokens.css, then report.css', () => {
+  const css = tokensCssSrc + '\n' + fs.readFileSync(path.join(__dirname, '..', 'src', 'background', 'report.css'), 'utf8');
+  const sb = {};
+  vm.createContext(sb);
+  vm.runInContext(readReportBuilders(), sb);
+  assert.strictEqual(evalInContext(sb, 'REPORT_CSS'), css);
 });
 
 

@@ -12,23 +12,12 @@ vm.runInContext(commonSrc, sandbox);
 
 const { escapeHtml, isSafeUrl, byName, filterAddonRows, visibleCheckboxes, extractTranslatedField, isPlausibleNameMatch, shortName } = sandbox;
 
-// report-template.js's buildHtmlReport() inlines its own copy of
-// filterAddonRows into the exported report (it can't load page-ui.js once
-// saved elsewhere). Pull that copy's literal source straight out of
-// report-template.js - not a hand-copied snapshot - so a future edit to
-// one copy and not the other gets caught here instead of silently drifting.
-const reportTemplateSrc = readReportBuilders();
-// Extract the inline <script> block by its named marker comment rather than
-// by a bare /<script>/ tag match. The report template has two <script> tags
-// (a JSON data tag and the logic block); a tag-only regex would pick the
-// wrong one if their order ever changed, or if a third tag was added before
-// it. The marker pins extraction to exactly the right block regardless of
-// what else is in the template.
-const reportScriptMatch = reportTemplateSrc.match(/\/\/ @inline-script-start([\s\S]*?)<\/script>/);
-if (!reportScriptMatch) {
-  throw new Error("Could not find the '// @inline-script-start' marker in report-template.js - add it back to the report's inline <script> block.");
-}
-const reportInlineScript = reportScriptMatch[1];
+// The exported report carries its own copy of filterAddonRows (it can't load
+// page-ui.js once saved elsewhere). The report's script lives in
+// src/background/report-inline.js - the real file, not a hand-copied
+// snapshot - so an edit to one copy and not the other gets caught here
+// instead of silently drifting.
+const reportInlineScript = readSrc('src/background/report-inline.js');
 
 // Runs the report's inline script against a fake `addonList` container and
 // returns its filterAddonRows, so it can be called directly the same way
@@ -407,7 +396,7 @@ test('visibleCheckboxes: excludes checkboxes whose row is hidden', () => {
 
 // --- shortName ---
 // shortName lives in core.js and is used by export.js, import.js,
-// and report-template.js to shorten long add-on names at separators.
+// and report-inline.js to shorten long add-on names at separators.
 
 test('shortName: truncates at " - "', () => {
   assert.strictEqual(shortName('StayFree - Website Blocker, Web Usage Stats'), 'StayFree');

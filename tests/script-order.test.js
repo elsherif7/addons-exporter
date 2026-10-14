@@ -24,6 +24,7 @@ const LIBRARIES = [
   'src/common/press.js',
   'src/common/reveal.js',
   'src/background/export-formats.js',
+  'src/background/report-assets.generated.js',
   'src/background/report-template.js',
   'src/background/zip.js',
   'src/background/amo.js',

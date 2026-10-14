@@ -1,82 +1,9 @@
 /* Shared base styles for the extension's full-page tabs. */
 
-/* Theme variables. Light values here are :root's defaults (used when no
-   data-theme attribute is set, and by [data-theme="light"] explicitly);
-   dark values override under [data-theme="dark"]. src/common/theme.js
-   sets document.documentElement's data-theme attribute on load, based
-   on the stored setting from the Settings page - this file only holds
-   the color values themselves, not the logic that picks between them.
-   Accent colors (link/warning/danger) get their own, lighter dark-mode
-   values rather than reusing the light-mode ones as-is, since several
-   of the light values are too low-contrast against a dark background. */
-:root {
-  --bg: #f4f5f7;
-  --card-bg: #fff;
-  --card-shadow: 0 1px 4px rgba(0,0,0,0.08);
-  --card-border: transparent;
-  --text: #222;
-  --text-secondary: #444;
-  --text-muted: #666;
-  --text-faint: #707070;
-  --border: #747b87;
-  /* The outline colour every button, box and field changes to on hover or focus. */
-  --border-hover: #1f2937;
-  --border-soft: #e2e4e8;
-  /* Lines between rows: between --border-soft and --border. */
-  --divider: #c3c7ce;
-  --border-faint: #f0f1f3;
-  --hover-bg: #fafbfc;
-  --btn-bg: #1f2937;
-  --btn-bg-hover: #111827;
-  --btn-disabled-bg: #9ca3af;
-  --link-accent: #0060df;
-  --warn-color: #b45309;
-  --danger-color: #c0392b;
-  /* Click/tap feedback ring (press.js). */
-  --press-ring: rgba(0, 96, 223, 0.4);
-
-  /* Motion: clearly visible, springy entrances. Everything below uses
-     these so the whole extension moves the same way - change them here to
-     make it faster or slower everywhere. --motion-search is kept shorter
-     because it replays on every keystroke. --motion-spring overshoots and
-     settles (a real spring curve where linear() is supported, a plain
-     overshoot curve otherwise). */
-  --motion-fast: 0.2s;
-  --motion-normal: 0.4s;
-  --motion-slow: 0.6s;
-  --motion-search: 0.3s;
-  --motion-theme: 0.6s;
-  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --motion-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
-}
-@supports (animation-timing-function: linear(0, 1)) {
-  :root {
-    --motion-spring: linear(0, 0.046, 0.163, 0.321, 0.495, 0.666, 0.819, 0.946, 1.042, 1.109, 1.147, 1.162, 1.159, 1.143, 1.118, 1.09, 1.062, 1.036, 1.014, 0.997, 0.985, 0.977, 0.974, 0.974, 0.976, 0.979, 0.984, 0.989, 1);
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #15171c;
-  --card-bg: #1e2128;
-  --card-shadow: 0 1px 4px rgba(0,0,0,0.4);
-  --card-border: #2a2e37;
-  --text: #e8e9ec;
-  --text-secondary: #c3c5ca;
-  --text-muted: #9199a3;
-  --text-faint: #8890a0;
-  --border: #70767f;
-  --border-hover: #d1d5db;
-  --border-soft: #2f333c;
-  --divider: #40454f;
-  --border-faint: #262932;
-  --hover-bg: #262a33;
-  --btn-bg: #374151;
-  --btn-bg-hover: #4b5563;
-  --btn-disabled-bg: #4b5563;
-  --link-accent: #6ea8fe;
-  --warn-color: #f0a838;
-  --danger-color: #ef6a5e;
-  --press-ring: rgba(110, 168, 254, 0.5);
-}
+/* Theme variables and motion timings live in tokens.css, loaded before this
+   file. src/common/theme.js sets document.documentElement's data-theme
+   attribute on load from the stored Settings value; tokens.css holds the values
+   themselves. */
 
 /* Custom scrollbar */
 * {

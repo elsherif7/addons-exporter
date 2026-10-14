@@ -87,9 +87,9 @@ function readImport() {
 function readSettings() {
   return readSrcs('src/settings/settings-file.js', 'src/settings/settings.js');
 }
-// Every export builder: JSON/CSV/TXT (export-formats.js) + the HTML report.
+// Every export builder: JSON/CSV/TXT (export-formats.js) + the HTML report and its generated assets.
 function readReportBuilders() {
-  return readSrcs('src/background/export-formats.js', 'src/background/report-template.js');
+  return readSrcs('src/background/export-formats.js', 'src/background/report-assets.generated.js', 'src/background/report-template.js');
 }
 
 // Evaluates an identifier or expression directly in a vm context instead
