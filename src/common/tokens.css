@@ -36,6 +36,12 @@
   --link-accent: #0060df;
   --warn-color: #b45309;
   --danger-color: #c0392b;
+  --danger-border: #9b1c1c;
+  --success-color: #1a7f37;
+  /* Hover fills used by the Settings rows and buttons. */
+  --row-hover-bg: #fafbfc;
+  --hover-fill: #e9ebee;
+  --danger-hover-bg: #fef2f2;
   /* Click/tap feedback ring (press.js). */
   --press-ring: rgba(0, 96, 223, 0.4);
 
@@ -79,5 +85,10 @@
   --link-accent: #6ea8fe;
   --warn-color: #f0a838;
   --danger-color: #ef6a5e;
+  --danger-border: #e0463a;
+  --success-color: #56d364;
+  --row-hover-bg: #2e3340;
+  --hover-fill: #3a3f4b;
+  --danger-hover-bg: #3d1515;
   --press-ring: rgba(110, 168, 254, 0.5);
 }

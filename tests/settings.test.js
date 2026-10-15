@@ -681,19 +681,27 @@ testAsync('settings.js batched init writes shortenNames to the localStorage cach
 
 // --- Reset dialog: blurred backdrop, scrolling, closing animation, reset reveal ---
 
-test('Reset dialog: the overlay fills the viewport and centres the dialog (inline), with no opaque background inline', () => {
+test('Reset dialog: layout and look come from settings.css classes, not inline styles', () => {
   const { document, elements } = makeResetDialogSandbox();
-  openResetDialog(document, elements.resetSettingsBtn);
+  const dialog = openResetDialog(document, elements.resetSettingsBtn);
   const overlay = document.body.querySelector('.s-overlay');
   assert.ok(overlay, 'overlay not found');
-  const css = overlay.style.cssText;
-  assert.match(css, /position:fixed/);
-  assert.match(css, /inset:0/);
-  assert.match(css, /align-items:center/);
-  assert.match(css, /justify-content:center/);
-  // The tint and blur come from settings.html's .s-overlay rule; an inline
-  // background would override it and bring back the see-nothing backdrop.
-  assert.doesNotMatch(css, /background/);
+  for (const el of [overlay, dialog, document.body.querySelector('#resetDialogTitle'), document.body.querySelector('#resetDialogMessage')]) {
+    assert.ok(!el.style.cssText, 'the dialog parts carry no inline style');
+  }
+  const css = readSrc('src/settings/settings.css');
+  const rule = (sel) => (css.match(new RegExp(`\\n${sel.replace(/\./g, '\\.')}\\s*\\{([^}]*)\\}`)) || [])[1] || '';
+  const overlayCss = rule('.s-overlay');
+  assert.match(overlayCss, /position:\s*fixed/);
+  assert.match(overlayCss, /inset:\s*0/);
+  assert.match(overlayCss, /align-items:\s*center/);
+  assert.match(overlayCss, /justify-content:\s*center/);
+  // The tint and blur come from the same rule; an opaque background would
+  // bring back the see-nothing backdrop.
+  assert.match(overlayCss, /background:\s*rgba\(/);
+  for (const cls of ['.s-dialog', '.s-dialog-title', '.s-dialog-message', '.s-dialog-buttons']) {
+    assert.ok(rule(cls), `settings.css has a ${cls} rule`);
+  }
 });
 
 test('Reset dialog: the page behind is frozen while it is open, and unfrozen exactly as before when it closes', () => {

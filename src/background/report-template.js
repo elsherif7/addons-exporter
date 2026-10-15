@@ -66,7 +66,7 @@ function buildHtmlReport(list, theme, shorten = true) {
       <span class="addon-version">${escapeHtml(a.version)}</span>
       <span class="match-label">${escapeHtml(typeText)}</span>
       ${match}</span>
-      <a class="match-label" href="${escapeHtml(a.link)}" target="_blank" rel="noopener" style="color:var(--link-accent);text-decoration:none;flex-shrink:0;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">AMO</a>
+      <a class="match-label" href="${escapeHtml(a.link)}" target="_blank" rel="noopener">AMO</a>
     </div>`;
   };
 

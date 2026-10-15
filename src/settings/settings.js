@@ -338,10 +338,8 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
 
   const overlay = document.createElement('div');
   overlay.className = 's-overlay';
-  // Fills the whole viewport and centres the dialog in it, however far down
-  // the page is scrolled. The tint and blur live in settings.html (.s-overlay)
-  // so the page behind stays visible, just softened.
-  overlay.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:16px;z-index:1000;';
+  // Layout, tint and blur all live in settings.css (.s-overlay): the dialog
+  // fills the viewport and the page behind stays visible, just softened.
 
   const dialog = document.createElement('div');
   dialog.className = 's-dialog';
@@ -349,20 +347,19 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
   dialog.setAttribute('aria-modal', 'true');
   dialog.setAttribute('aria-labelledby', 'resetDialogTitle');
   dialog.setAttribute('aria-describedby', 'resetDialogMessage');
-  dialog.style.cssText = 'background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:24px 28px;min-width:300px;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.2);';
 
   const title = document.createElement('div');
   title.id = 'resetDialogTitle';
-  title.style.cssText = 'font-size:18px;font-weight:700;color:var(--text);text-align:center;margin-bottom:16px;';
+  title.className = 's-dialog-title';
   title.textContent = 'Settings';
 
   const message = document.createElement('p');
   message.id = 'resetDialogMessage';
-  message.style.cssText = 'font-size:14px;color:var(--text-secondary);margin:0 0 18px;';
+  message.className = 's-dialog-message';
   message.textContent = 'Reset all settings to their defaults? This will clear your theme, export format, and display choices.';
 
   const buttonRow = document.createElement('div');
-  buttonRow.style.cssText = 'display:flex;justify-content:flex-end;gap:10px;';
+  buttonRow.className = 's-dialog-buttons';
 
   const cancelBtn = document.createElement('button');
   cancelBtn.id = 'rsCancel';
