@@ -460,3 +460,16 @@ test('a11y: status messages are polite live regions', () => {
     }
   }
 });
+
+// The minimum Firefox version has to cover what the code relies on:
+// - 127: MV3 host permissions are granted at install (the AMO lookups need them)
+// - 128: the first version that accepts data_collection_permissions without an error
+// - 112: element.inert (the reset dialog) and linear() easing
+test('manifest: strict_min_version is at least 128 and the README states the same', () => {
+  const manifest = JSON.parse(readSrc('manifest.json'));
+  const min = manifest.browser_specific_settings.gecko.strict_min_version;
+  assert.ok(parseInt(min, 10) >= 128, `strict_min_version ${min} is below 128`);
+  assert.ok(manifest.browser_specific_settings.gecko.data_collection_permissions, 'data_collection_permissions is declared');
+  const readme = readSrc('README.md');
+  assert.match(readme, new RegExp(`Requires Firefox ${parseInt(min, 10)} or newer`), 'README states the same minimum version');
+});

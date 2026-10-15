@@ -91,7 +91,7 @@ addons-hub/
 
 ## Installation
 
-> Requires Firefox 109 or newer (the first release with MV3 support).
+> Requires Firefox 128 or newer.
 
 **1. Install from Firefox Add-ons (recommended)**
 

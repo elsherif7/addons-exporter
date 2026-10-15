@@ -323,8 +323,8 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 }
 /* Rows with an unsafe link are non-interactive — disable and grey them out.
    A class set directly by the JS that disables the checkbox (rather than
-   the :has selector (with input:disabled), which needs Firefox 121 - past this extension's
-   stated 109/113 minimum, and silently does nothing on older versions). */
+   the :has selector (with input:disabled), which needs Firefox 121 - newer
+   than some of the browsers this was first written for). */
 .addon-row.row-disabled {
   opacity: 0.5;
   cursor: default;
