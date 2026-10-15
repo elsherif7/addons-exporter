@@ -143,7 +143,13 @@ function renderAddonList(addons, installed, shorten) {
 let loadGeneration = 0;
 
 const MAX_IMPORT_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
-const ACCEPTED_IMPORT_EXTENSIONS = new Set(['html', 'htm', 'json', 'csv', 'txt']);
+// The formats the Exporter writes; a .zip of them (the Exporter's own when
+// several formats are ticked) is accepted too and its files read the same way.
+const IMPORT_TEXT_EXTENSIONS = new Set(['html', 'htm', 'json', 'csv', 'txt']);
+const ACCEPTED_IMPORT_EXTENSIONS = new Set([...IMPORT_TEXT_EXTENSIONS, 'zip']);
+// When a .zip holds several formats, the first one that reads wins. They all
+// carry the same add-ons; JSON goes first as the most exact.
+const ZIP_READ_ORDER = ['json', 'html', 'htm', 'csv', 'txt'];
 
 // Checked before a file is ever read - lets a wrong-typed or oversized
 // file get a clear, immediate reason instead of failing deep inside
@@ -153,7 +159,7 @@ const ACCEPTED_IMPORT_EXTENSIONS = new Set(['html', 'htm', 'json', 'csv', 'txt']
 function validateSelectedFile(file) {
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   if (!ACCEPTED_IMPORT_EXTENSIONS.has(ext)) {
-    return { ok: false, error: `"${file.name}" isn't a supported file type. Choose an .html, .json, .csv, or .txt export.` };
+    return { ok: false, error: `"${file.name}" isn't a supported file type. Choose an .html, .json, .csv, .txt, or .zip export.` };
   }
   if (typeof file.size === 'number' && file.size > MAX_IMPORT_FILE_SIZE_BYTES) {
     return { ok: false, error: `That file is too large (over ${Math.round(MAX_IMPORT_FILE_SIZE_BYTES / (1024 * 1024))} MB) to be a real export.` };
@@ -161,30 +167,63 @@ function validateSelectedFile(file) {
   return { ok: true };
 }
 
+// Reads one export's text by its file extension. Throws on text a reader
+// cannot make sense of at all (e.g. malformed JSON) - callers catch that.
+function parseImportText(ext, text) {
+  if (ext === 'json') return parseJsonPayload(text);
+  if (ext === 'csv') return parseCsvPayload(text);
+  if (ext === 'txt') return parseTxtPayload(text);
+  // Default to HTML (also handles .html and any unrecognised extension).
+  // DOMParser never executes scripts in the parsed document, so this is
+  // safe even for an untrusted file.
+  const doc = new DOMParser().parseFromString(text, 'text/html');
+  const dataEl = doc.getElementById('addons-exporter-data');
+  return parseAddonsPayload(dataEl ? dataEl.textContent : null);
+}
+
+// Reads the add-ons out of a .zip: tries its export files in ZIP_READ_ORDER and
+// uses the first that reads. If none does, the answer names the first problem.
+async function parseZipExport(buffer) {
+  const zip = await readZipEntries(new Uint8Array(buffer), { extensions: IMPORT_TEXT_EXTENSIONS, maxEntryBytes: MAX_IMPORT_FILE_SIZE_BYTES });
+  if (!zip.ok) return zip;
+  const extOf = (name) => name.split('.').pop().toLowerCase();
+  const entries = zip.entries
+    .map((e, i) => ({ ...e, ext: extOf(e.name), i }))
+    .sort((a, b) => ZIP_READ_ORDER.indexOf(a.ext) - ZIP_READ_ORDER.indexOf(b.ext) || a.i - b.i);
+  if (entries.length === 0) {
+    return { ok: false, error: "That .zip doesn't contain an Add-ons Exporter file (.html, .json, .csv, or .txt)." };
+  }
+  let firstProblem = null;
+  for (const entry of entries) {
+    let result;
+    try {
+      result = parseImportText(entry.ext, entry.text);
+    } catch (err) {
+      result = { ok: false, error: err.message };
+    }
+    if (result.ok) return result;
+    if (!firstProblem) firstProblem = `Couldn't read "${entry.name}" inside the .zip. ${result.error}`;
+  }
+  return { ok: false, error: firstProblem };
+}
+
 async function loadFile(file) {
   const myGeneration = ++loadGeneration;
   clearAddonList();
   setStatus('Reading file...');
   try {
-    const text = await file.text();
-    if (myGeneration !== loadGeneration) return;
-
     const ext = file.name.split('.').pop().toLowerCase();
     let result;
-    if (ext === 'json') {
-      result = parseJsonPayload(text);
-    } else if (ext === 'csv') {
-      result = parseCsvPayload(text);
-    } else if (ext === 'txt') {
-      result = parseTxtPayload(text);
+    if (ext === 'zip') {
+      const buffer = await file.arrayBuffer();
+      if (myGeneration !== loadGeneration) return;
+      result = await parseZipExport(buffer);
     } else {
-      // Default to HTML (also handles .html and any unrecognised extension).
-      // DOMParser never executes scripts in the parsed document, so this is
-      // safe even for an untrusted file.
-      const doc = new DOMParser().parseFromString(text, 'text/html');
-      const dataEl = doc.getElementById('addons-exporter-data');
-      result = parseAddonsPayload(dataEl ? dataEl.textContent : null);
+      const text = await file.text();
+      if (myGeneration !== loadGeneration) return;
+      result = parseImportText(ext, text);
     }
+    if (myGeneration !== loadGeneration) return;
 
     if (!result.ok) {
       setStatus(result.error);

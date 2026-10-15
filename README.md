@@ -36,6 +36,8 @@ addons-hub/
 │   ├── settings.test.js         # Tests for the settings page: backup/restore, reset, live updates
 │   ├── confirmation.test.js     # Tests for the confirmation page's heading/message logic
 │   ├── popup.test.js            # Tests for the popup's three buttons (Export, Import, Settings)
+│   ├── zip-reader.test.js       # Tests for reading a .zip in the Importer (hand-built, Python-made and the Exporter's own zips, damaged and oversized ones)
+│   ├── coverage-preload.js      # Used only by `npm run test:coverage`: lets the coverage tool see the scripts the tests run in sandboxes
 │   └── structure.test.js        # Invariants users can see: every page loads press.js and has a real favicon, reduced motion is honoured, every button uses the shared class
 └── src/
     ├── common/
@@ -66,6 +68,7 @@ addons-hub/
     │   ├── import.html  # Page for picking an exported file and add-ons to open
     │   ├── parsers.js   # Strict readers for the HTML, JSON, CSV and TXT exports (pure, no page code)
     │   ├── match.js     # Which add-ons in a file are already installed (pure)
+    │   ├── zip-reader.js  # Reads the export files out of a .zip (stored or deflated, CRC and size checked; pure)
     │   └── import.js    # The page: shows the list and opens the selected tabs
     ├── settings/
     │   ├── settings.html      # Settings page, opened from the popup or the browser's own menu
@@ -123,7 +126,7 @@ All export formats list enabled add-ons first and disabled ones after, each grou
 
 ### Add-ons Importer
 
-Reads a previously exported file (`.html`/`.htm`, `.json`, `.csv`, or `.txt`, up to 10 MB), chosen or dragged in. The file is validated before anything is read from it: an unrecognised extension or an oversized file is rejected immediately with a plain explanation, and a file with a missing, non-numeric, or unsupported format version is rejected the same way — including an export from the original v1.0.0 release, whose file shape predates this version check entirely. Every reader is strict: it accepts only a file laid out exactly as this extension writes it — the HTML report (including the one from the version released on addons.mozilla.org) must hold, for every add-on, exactly the fields `id`, `name`, `version`, `enabled`, `type`, `link` and `linkType`, in that order, and the JSON file exactly `name`, `version`, `type`, `enabled`, `link`, `linkType` and `id`, in that order; the CSV must have the exact header, and the TXT exactly six columns per line, with the id always present; `true`/`false`, `Extension`/`Theme` and `Enabled`/`Disabled` are spelled as written. Anything else is rejected with the first problem named, rather than guessed at.  A duplicate entry in the file (the same add-on listed twice) is merged into one row. It compares the file against what's currently installed, matching by add-on ID when the file has one, and falling back to matching by name otherwise (or when the id in the file doesn't match anything installed). The name match tries the exact name first, then the shortened form, so a file made with **Shorten add-on names** on still finds its add-on even when it has no id; a short name shared by two installed add-ons is never guessed at. The checklist is split into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference), so you never need to reopen things you already have. A `.zip` made when several formats were exported is not read directly — unzip it and choose one of the files inside. It opens each pick as a tab rather than installing it directly, which is the workaround for a real limitation: Firefox doesn't allow any extension to install other extensions automatically — a deliberate security restriction, not a limitation of these tools.
+Reads a previously exported file (`.html`/`.htm`, `.json`, `.csv`, `.txt`, or the `.zip` the Exporter makes when several formats are ticked, up to 10 MB), chosen or dragged in. From a `.zip` it reads the first export file that reads cleanly (JSON first, then HTML, CSV, TXT); the zip itself is checked too, so an encrypted, damaged or oversized one is refused with a plain message. The file is validated before anything is read from it: an unrecognised extension or an oversized file is rejected immediately with a plain explanation, and a file with a missing, non-numeric, or unsupported format version is rejected the same way — including an export from the original v1.0.0 release, whose file shape predates this version check entirely. Every reader is strict: it accepts only a file laid out exactly as this extension writes it — the HTML report (including the one from the version released on addons.mozilla.org) must hold, for every add-on, exactly the fields `id`, `name`, `version`, `enabled`, `type`, `link` and `linkType`, in that order, and the JSON file exactly `name`, `version`, `type`, `enabled`, `link`, `linkType` and `id`, in that order; the CSV must have the exact header, and the TXT exactly six columns per line, with the id always present; `true`/`false`, `Extension`/`Theme` and `Enabled`/`Disabled` are spelled as written. Anything else is rejected with the first problem named, rather than guessed at.  A duplicate entry in the file (the same add-on listed twice) is merged into one row. It compares the file against what's currently installed, matching by add-on ID when the file has one, and falling back to matching by name otherwise (or when the id in the file doesn't match anything installed). The name match tries the exact name first, then the shortened form, so a file made with **Shorten add-on names** on still finds its add-on even when it has no id; a short name shared by two installed add-ons is never guessed at. The checklist is split into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference), so you never need to reopen things you already have. A `.zip` made when several formats were exported is not read directly — unzip it and choose one of the files inside. It opens each pick as a tab rather than installing it directly, which is the workaround for a real limitation: Firefox doesn't allow any extension to install other extensions automatically — a deliberate security restriction, not a limitation of these tools.
 
 ### Settings
 
@@ -184,7 +187,7 @@ Bug reports and feature requests are welcome via [GitHub Issues](https://github.
 npm test                                   # everything (needs Node 20 or newer)
 node --test tests/import.test.js           # one file
 node --test --test-name-pattern="zip"      # tests whose name contains "zip"
-npm run test:coverage                      # with a coverage table
+npm run test:coverage                      # coverage of src/ (needs `npm install` once; also writes coverage/index.html)
 npm run lint:ext                           # Mozilla's web-ext lint
 ```
 

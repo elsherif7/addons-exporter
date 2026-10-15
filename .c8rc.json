@@ -1,0 +1,8 @@
+{
+  "all": true,
+  "src": ["src"],
+  "include": ["src/**/*.js"],
+  "exclude": ["src/background/report-assets.generated.js"],
+  "reporter": ["text", "html"],
+  "reportsDirectory": "coverage"
+}

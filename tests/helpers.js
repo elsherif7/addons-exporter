@@ -5,7 +5,7 @@
 // Run everything:        npm test            (node --test)
 // Run one file:          node --test tests/import.test.js
 // Filter by test name:   node --test --test-name-pattern="zip" 
-// Coverage:              npm run test:coverage
+// Coverage of src/:      npm run test:coverage   (c8; see tests/coverage-preload.js)
 
 const nodeTest = require('node:test');
 const fs = require('fs');
@@ -44,7 +44,7 @@ function readCommon() {
 }
 // The Importer: its readers, its matching and the page script.
 function readImport() {
-  return readSrcs('src/import/parsers.js', 'src/import/match.js', 'src/import/import.js');
+  return readSrcs('src/import/parsers.js', 'src/import/match.js', 'src/import/zip-reader.js', 'src/import/import.js');
 }
 // The Settings page: the settings-file code and the page script.
 function readSettings() {
