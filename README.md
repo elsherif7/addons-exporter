@@ -60,7 +60,7 @@ addons-hub/
     │   └── zip.js              # Tiny ZIP writer: several export formats are saved together as one .zip
     ├── popup/
     │   ├── popup.html  # Markup for the small toolbar popup interface
-    │   └── popup.js    # Handles clicks on the popup's export, import, and settings buttons
+    │   └── popup.js    # Handles clicks on the popup's export, import, and settings buttons (reusing an already-open Exporter or Importer tab)
     ├── export/
     │   ├── export.html  # Page for choosing which installed add-ons to export
     │   └── export.js    # Loads the add-on list and sends the export selection
@@ -116,7 +116,7 @@ addons-hub/
 
 ## Tools
 
-Both are opened from the toolbar icon's popup.
+Both are opened from the toolbar icon's popup. If one is already open, the popup brings that tab to the front instead of opening a second copy.
 
 ### Add-ons Exporter
 

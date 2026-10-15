@@ -247,3 +247,20 @@ function setSelectionCount(el, text) {
     if (countText.get(el) === text) el.textContent = text;
   }, () => {});
 }
+
+// The popup asks "is the Exporter (or Importer) already open?" before opening
+// another one: it broadcasts { type: 'whereIsPage', page } and the page with
+// that name answers with its own tab, so the popup can bring that tab to the
+// front instead of opening a second copy. (The extension's own pages can read
+// their own tab without any extra permission.) Safe to call anywhere: a page
+// without runtime messaging just never answers.
+function answerWhereIsPage(page) {
+  if (typeof browser === 'undefined' || !browser.runtime || !browser.runtime.onMessage || !browser.tabs || !browser.tabs.getCurrent) return;
+  browser.runtime.onMessage.addListener((message) => {
+    if (!message || message.type !== 'whereIsPage' || message.page !== page) return undefined;
+    return browser.tabs.getCurrent().then(
+      (tab) => (tab ? { tabId: tab.id, windowId: tab.windowId } : undefined),
+      () => undefined
+    );
+  });
+}

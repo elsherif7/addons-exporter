@@ -453,3 +453,6 @@ openSelectedBtn.addEventListener('click', async () => {
     openSelectedBtn.disabled = false;
   }
 });
+
+// The popup brings this tab to the front instead of opening a second Importer.
+answerWhereIsPage('import');

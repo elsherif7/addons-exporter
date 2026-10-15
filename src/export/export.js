@@ -166,6 +166,9 @@ exportBtn.addEventListener('click', async () => {
   }
 });
 
+// The popup brings this tab to the front instead of opening a second Exporter.
+answerWhereIsPage('export');
+
 // background.js broadcasts progress as each link is resolved.
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'exportProgress') {
