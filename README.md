@@ -169,7 +169,7 @@ The Settings page controls **Appearance** (light/dark theme), **Export Format** 
 
 ## Privacy
 
-This extension does not collect, store, or transmit any personal data. Your theme, export format, and display preferences are saved locally in your browser profile (never sent anywhere) so they persist between sessions. The only network requests it makes are to `addons.mozilla.org`'s public API: to look up each installed add-on's official listing page during an export, and, if you use **Check now** in Settings, to check the extension's own latest version.
+This extension does not collect, store, or transmit any personal data. Your theme, export format, and display preferences are saved locally in your browser profile (never sent anywhere) so they persist between sessions. The only network requests it makes are to `addons.mozilla.org`'s public API: to look up each installed add-on's official listing page during an export. Nothing else is sent anywhere: files you import are read on your computer only.
 
 ---
 

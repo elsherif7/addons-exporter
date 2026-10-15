@@ -8,7 +8,7 @@
     "pretest": "node scripts/build-assets.js --check && node scripts/check-syntax.js",
     "test": "node --test --test-reporter=spec",
     "test:coverage": "node --test --test-reporter=spec --experimental-test-coverage",
-    "lint:ext": "npx --yes web-ext@8 lint --source-dir . --ignore-files \"tests/**\" \"scripts/**\" \".github/**\" \"src/background/report-inline.js\" package.json README.md LICENSE .editorconfig .gitattributes",
+    "lint:ext": "npx --yes web-ext@8 lint --source-dir . --ignore-files \"tests/**\" \"scripts/**\" \"src/background/report-inline.js\" package.json README.md LICENSE .editorconfig .gitattributes",
     "set-version": "node scripts/set-version.js",
     "build:check": "node scripts/build-assets.js --check"
   },

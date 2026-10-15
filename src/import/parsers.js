@@ -137,11 +137,13 @@ function parseJsonPayload(text) {
 // Undoes the leading-apostrophe formula-injection guard buildCsvExport()
 // (report-template.js) adds to a field that would otherwise be read as a
 // formula by a spreadsheet app (one starting with =, +, -, @, tab, or
-// CR). Only strips it when the character right after it is one of those -
-// a value that genuinely starts with a literal apostrophe followed by
-// something else is left alone.
+// CR). Only strips it when what follows the leading apostrophe(s) is one of
+// those - a value that genuinely starts with an apostrophe followed by
+// something else is left alone. The exporter guards every value that starts
+// with any number of apostrophes then one of those characters, so exactly
+// one apostrophe is removed here and the original value comes back.
 function stripCsvFormulaGuard(s) {
-  return /^'[=+\-@\t\r]/.test(s) ? s.slice(1) : s;
+  return /^'+[=+\-@\t\r]/.test(s) ? s.slice(1) : s;
 }
 
 // The one header row buildCsvExport() (report-template.js) writes.

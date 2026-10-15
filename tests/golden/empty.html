@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add-ons Exporter</title>
+<link rel="icon" href="data:image/png;base64,ICON">
+<style>/* report.css (checked by its own sync test) */</style>
+</head>
+<body>
+  <div class="card">
+  <button type="button" id="themeToggle" class="theme-toggle">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path transform="scale(-1,1) translate(-24,0)" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  </button>
+  <h1>Add-ons Exporter</h1>
+  <p class="intro-text"><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener">Add-ons Hub</a> installed, click its toolbar icon, choose <strong>Add-ons Importer</strong>, and select this file - any add-ons you don't already have will be pre-selected to open.</p>
+
+  <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
+
+  <div class="checklist-box">
+    <div id="addonList" class="revealing">
+      <div class="groups-outer-box">
+        
+        
+      </div>
+    </div>
+    <p id="noSearchMatches" class="placeholder-text" style="display:none;">No add-ons match your search.</p>
+  </div>
+  </div>
+
+  <script type="application/json" id="addons-exporter-data">{"formatVersion":1,"addons":[]}</script>
+  <script>
+    // @inline-script-start
+    // Self-contained - this file has no access to the extension's own
+    // scripts or APIs once it's saved and opened on its own.
+    var addonListEl = document.getElementById('addonList');
+    var noSearchMatchesEl = document.getElementById('noSearchMatches');
+
+    var THEME_KEY = 'addons-hub-report-theme';
+    var BAKED_THEME = 'light';
+
+    // Reads the persisted theme from localStorage, falling back to the
+    // baked-in value if localStorage is unavailable or has nothing stored.
+    function loadPersistedTheme() {
+      try {
+        var stored = localStorage.getItem(THEME_KEY);
+        return stored === 'dark' || stored === 'light' ? stored : BAKED_THEME;
+      } catch (e) {
+        return BAKED_THEME;
+      }
+    }
+
+    var SUN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+    var MOON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path transform="scale(-1,1) translate(-24,0)" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+
+    // Colors glide between themes (see .theme-switching in the CSS), but
+    // only for changes after the page has loaded, never the first paint.
+    var themeSwitchTimer = null;
+    var themeReady = false;
+
+    // Mirrors applyTheme() in theme.js: view transitions (new theme fades
+    // in over the old one) where supported, a color glide otherwise,
+    // nothing on first load or for reduced motion.
+    function applyTheme(theme) {
+      var root = document.documentElement;
+      var changing = themeReady && root.getAttribute('data-theme') !== theme;
+      var reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      function update() {
+        root.setAttribute('data-theme', theme);
+        themeToggleEl.innerHTML = theme === 'dark' ? SUN_SVG : MOON_SVG;
+      }
+      if (changing && !reduced && document.startViewTransition) {
+        document.startViewTransition(update);
+      } else {
+        if (changing && !reduced) {
+          root.classList.add('theme-switching');
+          clearTimeout(themeSwitchTimer);
+          themeSwitchTimer = setTimeout(function () { root.classList.remove('theme-switching'); }, 800);
+        }
+        update();
+      }
+    }
+
+    var themeToggleEl = document.getElementById('themeToggle');
+
+    // Apply persisted theme on load (may differ from the baked-in default).
+    applyTheme(loadPersistedTheme());
+    themeReady = true;
+
+    themeToggleEl.addEventListener('click', function () {
+      var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      var next = isDark ? 'light' : 'dark';
+      applyTheme(next);
+      try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+    });
+
+    // NOTE: mirrors setFilterVisible() and filterAddonRows() in common.js. Duplicated here
+    // because this report is self-contained and can't load common.js
+    // once saved elsewhere. Keep both copies in sync if you change this.
+    function setFilterVisible(el, visible) {
+      el.style.display = visible ? '' : 'none';
+      if (el.classList) el.classList.toggle('is-filtered', !visible);
+    }
+
+    function filterAddonRows(query) {
+      var q = query.trim().toLowerCase();
+      var anyMatch = false;
+      // querySelectorAll (not addonListEl.children) so this keeps working
+      // regardless of nesting depth - see the same change in common.js's
+      // filterAddonRows().
+      var groupContainers = addonListEl.querySelectorAll('.group-container');
+      for (var i = 0; i < groupContainers.length; i++) {
+        var el = groupContainers[i];
+        var box = el.querySelector('.group-box');
+        var groupHasMatch = false;
+        if (box) {
+          var rows = box.children;
+          for (var j = 0; j < rows.length; j++) {
+            if (rows[j].classList.contains('addon-row')) {
+              var nameEl = rows[j].querySelector('.addon-name');
+              var match = q === '' || (nameEl && nameEl.textContent.toLowerCase().indexOf(q) !== -1);
+              setFilterVisible(rows[j], !!match);
+              if (match) { groupHasMatch = true; anyMatch = true; }
+            }
+          }
+        }
+        setFilterVisible(el, groupHasMatch);
+      }
+      return anyMatch;
+    }
+
+    document.getElementById('searchInput').addEventListener('input', function (e) {
+      var anyMatch = filterAddonRows(e.target.value);
+      setFilterVisible(addonListEl, anyMatch);
+      noSearchMatchesEl.style.display = anyMatch ? 'none' : 'block';
+    });
+
+    // Opening reveal - mirrors src/common/reveal.js, which a saved report
+    // can't load; it is the same reveal the extension's Settings page has.
+    // Gives the intro, the search box and the list box their start times
+    // (--d, one every 0.16s) and the list rows theirs (--rd, one every
+    // 0.08s), and takes the "revealing" flag off the list afterwards so
+    // searching never replays the entrance. Skipped for reduced motion.
+    (function () {
+      if (typeof document.querySelector !== 'function' || typeof getComputedStyle !== 'function') return;
+      if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var card = document.querySelector('.card');
+      if (!card || !card.children) return;
+      var START = 0.82, PART_STEP = 0.16, ROW_LEAD = 0.08, ROW_STEP = 0.08, ROW_ANIMATED_MAX = 14, ROW_DURATION = 0.55;
+      function round(n) { return Math.round(n * 1000) / 1000; }
+      var t = START;
+      var listBase = 1.22;
+      Array.prototype.forEach.call(card.children, function (child) {
+        if (child.id === 'themeToggle' || child.tagName === 'H1') return;
+        if (getComputedStyle(child).display === 'none') return;
+        child.style.setProperty('--d', round(t) + 's');
+        if (child.classList.contains('checklist-box')) listBase = t + ROW_LEAD;
+        t += PART_STEP;
+      });
+      var list = document.getElementById('addonList');
+      if (list) {
+        var items = list.querySelectorAll('.group-heading, .addon-row');
+        Array.prototype.forEach.call(items, function (item, k) {
+          item.style.setProperty('--rd', round(listBase + Math.min(k, ROW_ANIMATED_MAX) * ROW_STEP) + 's');
+        });
+        var done = listBase + Math.min(items.length, ROW_ANIMATED_MAX) * ROW_STEP + ROW_DURATION + 0.3;
+        setTimeout(function () { list.classList.remove('revealing'); }, Math.ceil(done * 1000));
+      }
+    })();
+
+    // Click/tap feedback: a ring (or, for rows, a tinted flash) bursts out
+    // of whatever is pressed. Mirrors src/common/press.js, which a saved
+    // report can't load. Uses element.animate() so the page's own CSS
+    // animations are never restarted by a press.
+    (function () {
+      var ROW = '.addon-row';
+      var TARGET = '.theme-toggle, a[href]';
+      function ringColor() {
+        try {
+          var v = getComputedStyle(document.documentElement).getPropertyValue('--press-ring').trim();
+          return v || 'rgba(0, 96, 223, 0.4)';
+        } catch (e) { return 'rgba(0, 96, 223, 0.4)'; }
+      }
+      function pulse(el) {
+        if (!el || typeof el.animate !== 'function') return;
+        if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        var c = ringColor();
+        el.animate(
+          el.matches(ROW)
+            ? [{ boxShadow: 'inset 0 0 0 999px ' + c }, { boxShadow: 'inset 0 0 0 999px transparent' }]
+            : [{ boxShadow: '0 0 0 2px ' + c }, { boxShadow: '0 0 0 10px transparent' }],
+          { duration: 520, easing: 'ease-out' }
+        );
+      }
+      function findTarget(node) {
+        if (!node || typeof node.closest !== 'function') return null;
+        // If the click is on (or inside) a link, pulse only the link — never
+        // the whole row — so the AMO link gets its own ring, not a row flash.
+        var link = node.closest('a[href]');
+        if (link) return link;
+        return node.closest(ROW) || node.closest(TARGET);
+      }
+      if (document.addEventListener) {
+        document.addEventListener('pointerdown', function (e) {
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
+          pulse(findTarget(e.target));
+        }, true);
+        document.addEventListener('click', function (e) {
+          if (e.detail === 0) pulse(findTarget(e.target));
+        }, true);
+      }
+    })();
+  </script>
+</body>
+</html>

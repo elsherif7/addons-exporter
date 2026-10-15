@@ -1,0 +1,13 @@
+# addons-hub-format-version: 1
+
+Firefox Add-ons - 4 in total (2 enabled, 2 disabled)
+
+Enabled (2)
+-----------
+Line\nBreak\r\nName    | 1.0 | Extension | Enabled  | https://example.com/b   | b@example.com
+Pipe \| Name           | 1.0 | Extension | Enabled  | https://example.com/a   | a@example.com
+
+Disabled (2)
+------------
+\s\sPadded\s\s         | 1.0 | Extension | Disabled | https://example.com/d   | d@example.com
+C:\\Tools\\ \\\| end\\ | 1.0 | Theme     | Disabled | https://example.com/c d | c@example.com

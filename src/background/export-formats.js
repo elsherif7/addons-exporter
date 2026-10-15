@@ -40,8 +40,11 @@ function buildCsvExport(list, shorten = true) {
     // and an add-on name is attacker-controlled. A leading apostrophe
     // forces "read as text" in all of them, and disappears from the
     // visible cell content once opened. parseCsvPayload()'s
-    // stripCsvFormulaGuard() strips exactly one back off on import.
-    if (/^[=+\-@\t\r]/.test(s)) {
+    // stripCsvFormulaGuard() strips exactly one back off on import. A name
+    // that itself starts with apostrophes followed by one of those
+    // characters gets the guard too, so the importer strips only the one
+    // we add and the original name comes back unchanged.
+    if (/^'*[=+\-@\t\r]/.test(s)) {
       s = `'${s}`;
     }
     // Quote the field if it contains a comma, double-quote, or newline.

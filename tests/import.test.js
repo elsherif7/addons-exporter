@@ -706,6 +706,15 @@ test('parseCsvPayload: a name that genuinely starts with an apostrophe (not our 
   assert.strictEqual(result.addons[0].name, "'Twas Great");
 });
 
+test('buildCsvExport + parseCsvPayload: names starting with an apostrophe then a formula character round-trip exactly', () => {
+  const names = ["'=x", "''=z", "'''-q", "'+1", "'-2", "'@y", "'\ttab", "'Twas", "=x", "plain"];
+  const list = names.map((name, i) => ({ id: `n${i}@e.com`, name, version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }));
+  const result = parseCsvPayload(buildCsvExport(list, false));
+  assert.strictEqual(result.ok, true);
+  // The export lists add-ons in reading order, so compare as sorted sets.
+  assert.deepStrictEqual(Array.from(result.addons, (a) => a.name).sort(), [...names].sort());
+});
+
 // --- de-duplication ---
 
 test('parseCsvPayload: an exact duplicate row is de-duplicated', () => {
