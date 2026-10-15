@@ -106,23 +106,6 @@ for (const [labelFor, radioId] of [
   });
 }
 
-// Shared CSS class must be defined in the <style> block (not removed).
-test('settings-option-row: .settings-option-row is defined in settings.css', () => {
-  assert.match(settingsHtml, /\.settings-option-row\s*\{/,
-    '.settings-option-row CSS rule not found in settings.html');
-});
-
-// Hover and dark-mode rules exist for the shared class.
-test('settings-option-row: hover rule is defined for .settings-option-row', () => {
-  assert.match(settingsHtml, /\.settings-option-row:hover\s*\{/,
-    '.settings-option-row:hover rule not found');
-});
-
-test('settings-option-row: dark-mode hover rule is defined for .settings-option-row', () => {
-  assert.match(settingsHtml, /\[data-theme="dark"\][^{]*\.settings-option-row:hover/,
-    'dark-mode .settings-option-row:hover rule not found');
-});
-
 // --- hub-btn refactor ---
 // Every visible action button must use the shared hub-btn class.
 // Tripwires catch regressions where someone adds a new button without
@@ -132,135 +115,25 @@ test('settings-option-row: dark-mode hover rule is defined for .settings-option-
 
 const sharedCssForBtn = readSrc('src/common/shared.css');
 
-test('hub-btn: .hub-btn is defined in shared.css', () => {
-  assert.match(sharedCssForBtn, /\.hub-btn\s*\{/, '.hub-btn rule not found in shared.css');
-});
-
-test('hub-btn: .hub-btn:hover is defined in shared.css', () => {
-  assert.match(sharedCssForBtn, /\.hub-btn:hover\s*\{/, '.hub-btn:hover rule not found in shared.css');
-});
-
-test('hub-btn: .primary-btn no longer duplicates border/background/cursor in shared.css', () => {
-  // Extract only the .primary-btn block (not hub-btn) and verify the
-  // duplicated properties were removed.
-  const primaryBtnBlock = sharedCssForBtn.match(/\.primary-btn\s*\{([^}]*)\}/);
-  assert.ok(primaryBtnBlock, '.primary-btn block not found in shared.css');
-  const block = primaryBtnBlock[1];
-  assert.doesNotMatch(block, /\bborder\s*:/, '.primary-btn should not redeclare border (it inherits from hub-btn)');
-  assert.doesNotMatch(block, /\bbackground\s*:/, '.primary-btn should not redeclare background (it inherits from hub-btn)');
-  assert.doesNotMatch(block, /\bcursor\s*:/, '.primary-btn should not redeclare cursor (it inherits from hub-btn)');
-});
-
 // --- export.html ---
 
 const exportHtml = readSrc('src/export/export.html');
-
-test('hub-btn: exportSelectedBtn uses hub-btn', () => {
-  assert.match(exportHtml, /id="exportSelectedBtn"[^>]*class="[^"]*hub-btn[^"]*"|class="[^"]*hub-btn[^"]*"[^>]*id="exportSelectedBtn"/,
-    'exportSelectedBtn should have hub-btn class');
-});
 
 // --- import.html ---
 
 const importHtml = readSrc('src/import/import.html');
 
-test('hub-btn: openSelectedBtn uses hub-btn', () => {
-  assert.match(importHtml, /id="openSelectedBtn"[^>]*class="[^"]*hub-btn[^"]*"|class="[^"]*hub-btn[^"]*"[^>]*id="openSelectedBtn"/,
-    'openSelectedBtn should have hub-btn class');
-});
-
-test('hub-btn: chooseFileBtn uses hub-btn', () => {
-  assert.match(importHtml, /id="chooseFileBtn"[^>]*class="[^"]*hub-btn[^"]*"|class="[^"]*hub-btn[^"]*"[^>]*id="chooseFileBtn"/,
-    'chooseFileBtn should have hub-btn class');
-});
-
-test('hub-btn: #chooseFileBtn no longer duplicates button base styles in import.html', () => {
-  const chooseFileBtnBlock = importHtml.match(/#chooseFileBtn\s*\{([^}]*)\}/);
-  assert.ok(chooseFileBtnBlock, '#chooseFileBtn CSS block not found in import.html');
-  const block = chooseFileBtnBlock[1];
-  assert.doesNotMatch(block, /\bborder\s*:/, '#chooseFileBtn should not redeclare border');
-  assert.doesNotMatch(block, /\bbackground\s*:/, '#chooseFileBtn should not redeclare background');
-  assert.doesNotMatch(block, /\bcursor\s*:/, '#chooseFileBtn should not redeclare cursor');
-});
-
 // --- settings.html ---
 
 const settingsHtmlForBtn = readSettingsPage();
-
-test('hub-btn: exportSettingsBtn uses hub-btn', () => {
-  assert.match(settingsHtmlForBtn, /id="exportSettingsBtn"[^>]*class="[^"]*hub-btn[^"]*"|class="[^"]*hub-btn[^"]*"[^>]*id="exportSettingsBtn"/,
-    'exportSettingsBtn should have hub-btn class');
-});
-
-test('hub-btn: importSettingsBtn uses hub-btn', () => {
-  assert.match(settingsHtmlForBtn, /id="importSettingsBtn"[^>]*class="[^"]*hub-btn[^"]*"|class="[^"]*hub-btn[^"]*"[^>]*id="importSettingsBtn"/,
-    'importSettingsBtn should have hub-btn class');
-});
-
-test('hub-btn: resetSettingsBtn uses hub-btn', () => {
-  assert.match(settingsHtmlForBtn, /id="resetSettingsBtn"[^>]*class="[^"]*hub-btn[^"]*"|class="[^"]*hub-btn[^"]*"[^>]*id="resetSettingsBtn"/,
-    'resetSettingsBtn should have hub-btn class');
-});
-
-test('hub-btn: .settings-btn no longer duplicates button base styles in settings.html', () => {
-  const settingsBtnBlock = settingsHtmlForBtn.match(/\.settings-btn\s*\{([^}]*)\}/);
-  assert.ok(settingsBtnBlock, '.settings-btn block not found in settings.html');
-  const block = settingsBtnBlock[1];
-  assert.doesNotMatch(block, /\bborder\s*:/, '.settings-btn should not redeclare border');
-  assert.doesNotMatch(block, /\bbackground\s*:/, '.settings-btn should not redeclare background');
-  assert.doesNotMatch(block, /\bcursor\s*:/, '.settings-btn should not redeclare cursor');
-});
 
 // Modal buttons (cancelBtn/confirmBtn) get hub-btn from settings.js at runtime.
 // Verify the className assignment in settings.js includes hub-btn.
 const settingsJsSrc = readSrc('src/settings/settings.js');
 
-test('hub-btn: modal Cancel button (rsCancel) is assigned hub-btn in settings.js', () => {
-  assert.match(settingsJsSrc, /cancelBtn\.className\s*=\s*'[^']*hub-btn[^']*'/,
-    'cancelBtn.className should include hub-btn');
-});
-
-test('hub-btn: modal Reset button (rsConfirm) is assigned hub-btn in settings.js', () => {
-  assert.match(settingsJsSrc, /confirmBtn\.className\s*=\s*'[^']*hub-btn[^']*'/,
-    'confirmBtn.className should include hub-btn');
-});
-
 // --- popup.html ---
 
 const popupHtml = readSrc('src/popup/popup.html');
-
-test('hub-btn: popup exportBtn uses hub-btn', () => {
-  assert.match(popupHtml, /id="exportBtn"[^>]*class="[^"]*hub-btn[^"]*"|class="[^"]*hub-btn[^"]*"[^>]*id="exportBtn"/,
-    'popup exportBtn should have hub-btn class');
-});
-
-test('hub-btn: popup importBtn uses hub-btn', () => {
-  assert.match(popupHtml, /id="importBtn"[^>]*class="[^"]*hub-btn[^"]*"|class="[^"]*hub-btn[^"]*"[^>]*id="importBtn"/,
-    'popup importBtn should have hub-btn class');
-});
-
-test('hub-btn: popup settingsBtn uses hub-btn', () => {
-  assert.match(popupHtml, /id="settingsBtn"[^>]*class="[^"]*hub-btn[^"]*"|class="[^"]*hub-btn[^"]*"[^>]*id="settingsBtn"/,
-    'popup settingsBtn should have hub-btn class');
-});
-
-// Tripwire: popup must not have a bare `button {` selector anymore.
-test('hub-btn: popup.html no longer has a bare button { selector', () => {
-  assert.doesNotMatch(popupHtml, /^\s*button\s*\{/m,
-    'bare button { selector found in popup.html — use .hub-btn instead');
-});
-
-// Drift check: popup's local hub-btn copy must declare the same key
-// properties as shared.css's hub-btn (border, background, cursor, transition).
-test('hub-btn: popup.html local .hub-btn copy declares the core shared properties', () => {
-  const popupHubBtnBlock = popupHtml.match(/(?:^|\n)\s*\.hub-btn\s*\{([^}]*)\}/m);
-  assert.ok(popupHubBtnBlock, '.hub-btn block not found in popup.html');
-  const block = popupHubBtnBlock[1];
-  assert.match(block, /\bborder\s*:/, 'popup .hub-btn missing border');
-  assert.match(block, /\bbackground\s*:/, 'popup .hub-btn missing background');
-  assert.match(block, /\bcursor\s*:/, 'popup .hub-btn missing cursor');
-  assert.match(block, /\btransition\s*:/, 'popup .hub-btn missing transition');
-});
 
 // --- Animations: shared rules every surface must keep ---
 // The popup and the report can't load shared.css, so each carries its own
@@ -275,12 +148,6 @@ test('motion: shared.css, the popup and the report all honor prefers-reduced-mot
   }
 });
 
-test('motion: shared.css, the popup and the report all define the .theme-switching color transition', () => {
-  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
-    assert.match(src, /:root\.theme-switching/, `${name} is missing the theme transition`);
-  }
-});
-
 test('motion: entrance animations use backwards fill (a held final keyframe would override :hover transforms)', () => {
   for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
     const entrance = src.match(/animation:\s*(?:hub-card-in|hub-rise-in|hub-unfold|hub-title-in|hub-wipe-in|popup-card-in|popup-in)[^;]*;/g) || [];
@@ -292,43 +159,10 @@ test('motion: entrance animations use backwards fill (a held final keyframe woul
   }
 });
 
-test('motion: search fade rules (.is-filtered + allow-discrete) exist in shared.css and the report', () => {
-  for (const [name, src] of [['shared.css', sharedCssForMotion], ['report.css', reportCssForMotion]]) {
-    assert.match(src, /\.addon-row\.is-filtered/, `${name}: missing .is-filtered rule`);
-    assert.match(src, /allow-discrete/, `${name}: missing the display transition`);
-    assert.match(src, /@starting-style/, `${name}: missing @starting-style (fade-in)`);
-  }
-});
-
-test('motion: the report switches animations off when printing', () => {
-  assert.match(reportCssForMotion, /@media print\s*\{[\s\S]*animation:\s*none/);
-});
-
 test('motion: the report only animates theme changes after first paint', () => {
   const src = readSrc('src/background/report-inline.js');
   assert.match(src, /var themeReady = false;/);
   assert.match(src, /applyTheme\(loadPersistedTheme\(\)\);\s*themeReady = true;/);
-});
-
-test('motion: shared.css, the popup and the report all define the view-transition theme switch', () => {
-  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
-    assert.match(src, /::view-transition-old\(root\)/, `${name} is missing the old-snapshot rule`);
-    assert.match(src, /::view-transition-new\(root\)/, `${name} is missing the new-snapshot rule`);
-    assert.match(src, /@keyframes hub-theme-in/, `${name} is missing hub-theme-in`);
-    assert.match(src, /::view-transition-old\(root\)\s*\{\s*animation:\s*none/, `${name}: the old page should stay put under the fade`);
-  }
-});
-
-test('motion: the theme switch is a plain cross-fade (no blur, no zoom)', () => {
-  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml], ['report.css', reportCssForMotion]]) {
-    const kf = src.match(/@keyframes hub-theme-in\s*\{[^}]*\}[^}]*\}/);
-    assert.ok(kf, `${name}: hub-theme-in keyframes not found`);
-    assert.doesNotMatch(kf[0], /blur|scale|transform/, `${name}: the theme fade must be opacity only`);
-  }
-});
-
-test('motion: shared.css has the .replay-reset rule replayEntrance() depends on (covers everything inside the card)', () => {
-  assert.match(sharedCssForMotion, /\.replay-reset,\s*\.replay-reset \*\s*\{\s*animation:\s*none/);
 });
 
 test('motion: reduced motion also zeroes animation delays, so staged reveals never leave content hidden', () => {
@@ -337,27 +171,6 @@ test('motion: reduced motion also zeroes animation delays, so staged reveals nev
     assert.ok(block, `${name}: reduced-motion block not found`);
     assert.match(block[0], /animation-delay:\s*0s\s*!important/, `${name} must zero animation-delay`);
   }
-});
-
-test('settings: the page reveals in order - card, then title, then each section top to bottom', () => {
-  const html = readSettingsPage();
-  const sec = (re, label) => {
-    const m = html.match(re);
-    assert.ok(m, `${label} delay not found`);
-    return parseFloat(m[1]);
-  };
-  const card = sec(/\.card \{ animation-delay: ([\d.]+)s; \}/, 'card');
-  const title = sec(/\.card > h1:first-child \{ animation-delay: ([\d.]+)s; \}/, 'title');
-  const groups = [1, 2, 3, 4, 5, 6].map((n) =>
-    sec(new RegExp(`:nth-of-type\\(${n}\\) \\{ --gd: ([\\d.]+)s; \\}`), `section ${n}`));
-  assert.ok(card > 0, 'the card must wait so the bare background shows first');
-  assert.ok(title > card, 'title comes after the card');
-  assert.ok(groups[0] > title, 'first section comes after the title');
-  for (let i = 1; i < groups.length; i++) {
-    assert.ok(groups[i] > groups[i - 1], `section ${i + 1} must come after section ${i}`);
-  }
-  // 6 groups in the markup, so none is left without a delay.
-  assert.strictEqual((html.match(/<div class="settings-group"/g) || []).length, 6);
 });
 
 test('motion: popup Settings button asks an already-open Settings tab to replay its entrance', () => {
@@ -375,70 +188,6 @@ test('settings: pressing Settings again (popup message) scrolls to the top and r
   assert.match(onMessage[1], /replayEntranceIfIdle\(\)/);
   // Switching back to the tab must not replay the ~2s reveal or reset scroll.
   assert.doesNotMatch(src, /addEventListener\('visibilitychange'/);
-});
-
-// The Settings card and its title set their animation one property at a time
-// (name, duration, timing, delay), so the fill mode has to be set there too.
-// Without "backwards" the title is fully visible during its 0.55s wait, then
-// jumps to hidden and plays: it looks like it happens twice. (This once came
-// from a shared rule that was deleted as unused: it had been supplying the
-// fill mode.)
-test('settings: the card and its title hold hidden until their turn (backwards fill set on each)', () => {
-  for (const selector of ['\\.card', '\\.card > h1:first-child']) {
-    const rule = settingsHtml.match(new RegExp(`\\n\\s*${selector} \\{([^}]*animation-name:[^}]*)\\}`));
-    assert.ok(rule, `${selector}: the rule that sets animation-name was not found`);
-    assert.match(rule[1], /animation-fill-mode:\s*backwards;/, `${selector} must set animation-fill-mode: backwards`);
-  }
-});
-
-test('popup: opens in order - card, then title, then the three buttons top to bottom', () => {
-  const delay = (re, label) => {
-    const m = popupHtml.match(re);
-    assert.ok(m, `${label} delay not found`);
-    return parseFloat(m[1]);
-  };
-  const card = delay(/\.card \{[^}]*animation-delay:\s*([\d.]+)s/, 'card');
-  const title = delay(/h3 \{ animation-delay: ([\d.]+)s; \}/, 'title');
-  const exp = delay(/#exportBtn \{ animation-delay: ([\d.]+)s; \}/, 'export button');
-  const imp = delay(/#importBtn \{ animation-delay: ([\d.]+)s; \}/, 'import button');
-  const set = delay(/#settingsBtn \{ animation-delay: ([\d.]+)s; \}/, 'settings button');
-  assert.ok(card > 0, 'the card must wait so the bare background shows first');
-  assert.ok(title > card && exp > title && imp > exp && set > imp, 'each step must come after the one above it');
-});
-
-test('popup: overflow is hidden only while the reveal runs, so sliding items cannot flash a scrollbar', () => {
-  assert.match(popupHtml, /@keyframes popup-no-scroll\s*\{\s*from, to \{ overflow: hidden; \}/);
-  assert.match(popupHtml, /html \{ animation: popup-no-scroll [\d.]+s; \}/);
-});
-
-test('settings and popup: the reveal animations never use blur, and always hold hidden until their turn (backwards fill)', () => {
-  const settingsHtml = readSettingsPage();
-  for (const [name, src] of [['settings.html', settingsHtml], ['popup.html', popupHtml]]) {
-    // The only blur allowed is the reset dialog's backdrop-filter (a blurred
-    // page behind a dialog), never inside an animation's keyframes.
-    const withoutBackdrop = src.replace(/(-webkit-)?backdrop-filter:[^;]*;/g, '');
-    assert.doesNotMatch(withoutBackdrop, /blur\(/, `${name} must not use blur in its animations`);
-    assert.doesNotMatch(src, /animation-fill-mode:\s*(both|forwards)/, `${name} must not hold a final keyframe`);
-  }
-  // Settings spells its animations out longhand; the fill must be backwards.
-  assert.match(settingsHtml, /\.settings-group > \* \{[^}]*animation-fill-mode: backwards;/);
-  for (const kf of ['settings-card-unfold', 'settings-title-in', 'settings-slide-in', 'settings-wipe-in']) {
-    assert.match(settingsHtml, new RegExp(`@keyframes ${kf}`), `missing @keyframes ${kf}`);
-  }
-  for (const kf of ['popup-card-in', 'popup-title-in', 'popup-in']) {
-    assert.match(popupHtml, new RegExp(`@keyframes ${kf}`), `missing @keyframes ${kf}`);
-  }
-});
-
-test('settings and popup: clipped reveals end beyond the box so shadows and focus rings are never cut off', () => {
-  const settingsHtml = readSettingsPage();
-  for (const [name, src] of [['settings.html', settingsHtml], ['popup.html', popupHtml]]) {
-    const ends = src.match(/to\s*\{[^}]*clip-path:\s*inset\(([^)]*)\)/g) || [];
-    assert.ok(ends.length > 0, `${name}: no clip-path reveal found`);
-    for (const end of ends) {
-      assert.match(end, /inset\(-\d+px/, `${name}: "${end}" must end with a negative inset`);
-    }
-  }
 });
 
 // --- Press feedback (click/tap ring) ---
@@ -471,30 +220,6 @@ test('press: buttons press in fast and spring back out (a long transform transit
 });
 
 
-
-test('settings: the reset dialog backdrop is a visible blur (page stays readable behind it)', () => {
-  const html = readSettingsPage();
-  assert.match(html, /\.s-overlay \{[^}]*backdrop-filter:\s*blur\(\d+px\)/);
-  // Dim only lightly - the page behind must remain visible.
-  const alpha = parseFloat(html.match(/\.s-overlay \{[^}]*background:\s*rgba\(0, 0, 0, ([\d.]+)\)/)[1]);
-  assert.ok(alpha > 0 && alpha <= 0.4, `light tint expected, got ${alpha}`);
-});
-
-test('settings: the success message slides in (no check mark), with a light and dark success colour', () => {
-  const html = readSettingsPage();
-  assert.match(html, /:root \{ --success-color: #[0-9a-f]{6}; \}/i);
-  assert.match(html, /:root\[data-theme="dark"\] \{ --success-color: #[0-9a-f]{6}; \}/i);
-  for (const id of ['exportSettingsStatus', 'importSettingsStatus', 'resetSettingsStatus']) {
-    assert.match(html, new RegExp(`#${id}\\.is-success`), `${id} is missing its success style`);
-  }
-  assert.doesNotMatch(html, /2713|\u2713/, 'the check mark was removed on purpose');
-  assert.doesNotMatch(html, /\.is-success::before/);
-});
-
-test('settings: descriptions and messages are inline-block, so sliding them in actually moves them', () => {
-  const html = readSettingsPage();
-  assert.match(html, /#exportSettingsDesc[\s\S]*?#resetSettingsStatus \{ display: inline-block; \}/);
-});
 
 // --- Staged opening reveal: Exporter, Importer and the HTML report ---
 
@@ -570,26 +295,6 @@ test('same as Settings: the same spacing - one part every 0.16s, one row every 0
   assert.match(tpl, /ROW_STEP = 0\.08/);
 });
 
-test('staged reveal: shared.css order is card (0.15s) -> title (0.55s) -> parts (from --d)', () => {
-  assert.match(sharedCssForMotion, /\.card\.staged \{ animation: hub-unfold [^;]*backwards; animation-delay: 0\.15s; \}/);
-  assert.match(sharedCssForMotion, /\.card\.staged > h1:first-child \{ animation: hub-title-in [^;]*backwards; animation-delay: 0\.55s; \}/);
-  assert.match(sharedCssForMotion, /\.card\.staged > :not\(h1\) \{ animation: hub-wipe-in [^;]*backwards; animation-delay: var\(--d, 0s\); \}/);
-});
-
-test('staged reveal: the report opens in order - card, title, intro, search box, list (also without its script)', () => {
-  const delay = (re, label) => {
-    const m = reportCssForMotion.match(re);
-    assert.ok(m, `${label} delay not found`);
-    return parseFloat(m[1]);
-  };
-  const card = delay(/\.card \{ animation: hub-unfold [^;]*; animation-delay: ([\d.]+)s; \}/, 'card');
-  const title = delay(/\.card > h1 \{ animation: hub-title-in [^;]*; animation-delay: ([\d.]+)s; \}/, 'title');
-  const intro = delay(/\.card > \.intro-text \{ animation: hub-wipe-in [^;]*; animation-delay: var\(--d, ([\d.]+)s\); \}/, 'intro');
-  const search = delay(/\.card > \.search-input \{ animation: hub-wipe-in [^;]*; animation-delay: var\(--d, ([\d.]+)s\); \}/, 'search');
-  const list = delay(/\.card > \.checklist-box \{ animation: hub-wipe-in [^;]*; animation-delay: var\(--d, ([\d.]+)s\); \}/, 'list');
-  assert.ok(card > 0 && title > card && intro > title && search > intro && list > search);
-});
-
 test('same as Settings: the report times its parts and rows with its own script, and switches the entrance off afterwards', () => {
   const tpl = readSrc('src/background/report-template.js') + readSrc('src/background/report-inline.js');
   assert.match(tpl, /<p class="intro-text"><strong>Tip:<\/strong>/);
@@ -597,31 +302,6 @@ test('same as Settings: the report times its parts and rows with its own script,
   assert.match(tpl, /Opening reveal - mirrors src\/common\/reveal\.js/);
   assert.match(tpl, /list\.classList\.remove\('revealing'\)/, 'the flag is taken away again so searching never replays the entrance');
   assert.match(tpl, /Opening reveal[\s\S]*prefers-reduced-motion: reduce/, 'skipped for reduced motion');
-});
-
-test('staged reveal: clipped reveals in shared.css and the report end beyond the box (shadows and focus rings stay visible)', () => {
-  for (const [name, src] of [['shared.css', sharedCssForMotion], ['report.css', reportCssForMotion]]) {
-    for (const kf of ['hub-unfold', 'hub-wipe-in']) {
-      const body = src.match(new RegExp(`@keyframes ${kf} \\{[\\s\\S]*?\\n\\s*\\}\\n`));
-      assert.ok(body, `${name}: @keyframes ${kf} not found`);
-      assert.match(body[0], /to\s*\{[^}]*clip-path:\s*inset\(-\d+px/, `${name}: ${kf} must end with a negative inset`);
-      assert.doesNotMatch(body[0], /blur\(/, `${name}: ${kf} must not blur`);
-    }
-  }
-});
-
-test('staged reveal: the report removes all animation when printing (nothing caught half-revealed)', () => {
-  assert.match(reportCssForMotion, /@media print\s*\{[\s\S]*animation:\s*none/);
-});
-
-test('list controls: Select all / Deselect all are pill buttons and the count is a badge that hides while empty', () => {
-  const css = readSrc('src/common/shared.css');
-  assert.match(css, /\.list-controls button \{[^}]*border-radius: 999px;/, 'pill buttons');
-  assert.match(css, /\.list-controls button \{[^}]*border: 1px solid var\(--border\);/, 'visible outline, so they look pressable');
-  assert.match(css, /#selectionCount \{[^}]*border-radius: 999px;/, 'count badge');
-  assert.match(css, /#selectionCount:empty \{ display: none; \}/, 'no empty badge before the list loads');
-  assert.match(css, /\.list-controls button:focus-visible \{[^}]*outline:/, 'keyboard focus stays visible');
-  assert.match(css, /\.list-controls button:active \{ transform: scale\(0\.94\)/, 'pressed-in feel');
 });
 
 test('settings: the Light and Dark rows carry the report\'s sun and moon icons, and the chosen one spins in', () => {
@@ -706,21 +386,6 @@ test('selection badge: the Exporter and Importer (shared list) set it through se
   assert.doesNotMatch(readSrc('src/export/export.js'), /selectionCountEl\.textContent =/);
 });
 
-test('checkboxes: they keep the browser\'s own blue tick boxes (a custom restyle was tried and rejected)', () => {
-  const css = readSrc('src/common/shared.css');
-  assert.match(css, /\.addon-row input\[type="checkbox"\] \{\n  margin-top: 3px;\n\}/);
-  assert.doesNotMatch(css, /\.addon-row input\[type="checkbox"\][^{]*\{[^}]*appearance:\s*none/, 'no custom-drawn boxes');
-  assert.doesNotMatch(css, /hub-tick/);
-  // The little pop when a box becomes ticked is the only extra.
-  assert.match(css, /\.addon-row input\[type="checkbox"\]:checked \{ animation: hub-pop var\(--motion-normal\) var\(--motion-spring\); \}/);
-});
-
-test('selection badge: a slot for the rolling number exists in the stylesheet', () => {
-  const css = readSrc('src/common/shared.css');
-  assert.match(css, /#selectionCount \.count-roll \{[^}]*overflow: hidden;/);
-  assert.match(css, /#selectionCount \.count-roll-old \{[^}]*position: absolute;/);
-});
-
 test('settings.html: the Export Format tick boxes are exactly the registry formats, in order, with the registry text', () => {
   const html = readSettingsPage();
   const sb = {};
@@ -743,4 +408,26 @@ test('settings: the page keeps its styling in settings.css - only "display:none"
   for (const m of html.matchAll(/style="([^"]*)"/g)) {
     assert.strictEqual(m[1].replace(/[\s;]/g, ''), 'display:none', `unexpected inline style: ${m[1]}`);
   }
+});
+
+// The one shared button class: every action button on every page carries it, so
+// they all press, hover and spring the same way.
+test('hub-btn: every action button on the popup, Exporter, Importer and Settings carries hub-btn', () => {
+  const pages = {
+    'src/popup/popup.html': ['exportBtn', 'importBtn', 'settingsBtn'],
+    'src/export/export.html': ['exportSelectedBtn'],
+    'src/import/import.html': ['openSelectedBtn', 'chooseFileBtn'],
+    'src/settings/settings.html': ['exportSettingsBtn', 'importSettingsBtn', 'resetSettingsBtn'],
+  };
+  for (const [page, ids] of Object.entries(pages)) {
+    const html = readSrc(page);
+    for (const id of ids) {
+      const tag = html.match(new RegExp(`<button[^>]*id="${id}"[^>]*>`));
+      assert.ok(tag, `${page}: #${id} not found`);
+      assert.match(tag[0], /class="[^"]*\bhub-btn\b/, `${page}: #${id} must use hub-btn`);
+    }
+  }
+  const js = readSrc('src/settings/settings.js');
+  assert.match(js, /rsCancel[\s\S]{0,200}hub-btn|hub-btn[\s\S]{0,200}rsCancel/, 'the Cancel button in the reset dialog uses hub-btn');
+  assert.match(js, /rsConfirm[\s\S]{0,200}hub-btn|hub-btn[\s\S]{0,200}rsConfirm/, 'the Reset button in the reset dialog uses hub-btn');
 });

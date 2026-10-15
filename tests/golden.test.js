@@ -8,7 +8,7 @@
 // output, byte for byte, against files in tests/golden/.
 //
 // If an output is MEANT to change, regenerate the files and review the diff:
-//     UPDATE_GOLDEN=1 node tests/run.js
+//     UPDATE_GOLDEN=1 node --test tests/golden.test.js
 //
 // Line endings are compared after normalising \r\n to \n, so a checkout that
 // converts line endings (git on Windows) does not fail these; a separate test
@@ -67,10 +67,10 @@ function check(name, actual) {
     fs.writeFileSync(file, actual, 'utf8');
     return;
   }
-  assert.ok(fs.existsSync(file), `missing golden file tests/golden/${name} - run: UPDATE_GOLDEN=1 node tests/run.js`);
+  assert.ok(fs.existsSync(file), `missing golden file tests/golden/${name} - run: UPDATE_GOLDEN=1 node --test tests/golden.test.js`);
   const expected = fs.readFileSync(file, 'utf8');
   assert.strictEqual(norm(actual), norm(expected),
-    `output differs from tests/golden/${name}. If the change is intended, run: UPDATE_GOLDEN=1 node tests/run.js, then review the diff.`);
+    `output differs from tests/golden/${name}. If the change is intended, run: UPDATE_GOLDEN=1 node --test tests/golden.test.js, then review the diff.`);
 }
 
 const variants = [

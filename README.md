@@ -13,11 +13,10 @@ addons-hub/
 ├── manifest.json         # Extension manifest: config, permissions, and background script list
 ├── icons/                 # Toolbar and extension icons in several standard sizes
 ├── scripts/               # Build helpers: generate the report's embedded assets, syntax-check every source file, set the version
-├── tests/                 # Plain Node.js test suite, run via `npm test`
-│   ├── run.js                   # Requires every test file, then prints the combined summary
+├── tests/                 # Test suite on Node's built-in runner (node:test), run via `npm test`
 │   ├── golden/                  # Expected output files used by golden.test.js
 │   ├── fixtures/                # amo-release.html: a real HTML report from the version released on addons.mozilla.org (import.test.js reads it)
-│   ├── helpers.js               # Shared test()/testAsync() harness plus vm-loading and sandbox utilities
+│   ├── helpers.js               # test()/testAsync() (thin wrappers over node:test) plus vm-loading helpers and a small fake DOM
 │   ├── common.test.js           # Unit tests covering the shared helpers (core.js, page-ui.js and amo.js)
 │   ├── pure-modules.test.js     # Loads the Importer's readers and matching and the settings-file code with no page and no browser object, to keep them pure
 │   ├── script-order.test.js     # Reads manifest.json and every page's <script> tags and checks each script only uses shared names loaded before it in that context
@@ -26,15 +25,17 @@ addons-hub/
 │   ├── report-template.test.js  # Tests for all export format builders (HTML, JSON, CSV, TXT) in export-formats.js and report-template.js
 │   ├── background.test.js       # Tests covering messaging, AMO lookups, and export logic
 │   ├── export.test.js           # Tests covering the export page's picker and click logic
-│   ├── golden.test.js           # Compares the exact text of every export format with the files in tests/golden/ (`UPDATE_GOLDEN=1 node tests/run.js` regenerates them)
+│   ├── golden.test.js           # Compares the exact text of every export format with the files in tests/golden/ (`UPDATE_GOLDEN=1 node --test tests/golden.test.js` regenerates them)
 │   ├── format-contract.test.js  # Pins the data layout of every export next to the format version, so a data change cannot happen without bumping it (a change to only the page's look never needs that)
 │   ├── set-version.test.js      # Tests for scripts/set-version.js (the version is changed in package.json and manifest.json together)
+│   ├── round-trip.test.js       # Generated lists with awkward names (commas, quotes, newlines, non-Latin text, leading =) written in all four formats and read back by the Importer
+│   ├── report-script.test.js    # Runs the report's own script in a fake page: theme button, saved theme, search box
 │   ├── zip-external.test.js     # Checks the .zip with unzip, Python and bsdtar (whichever are installed), not just with this project's own reader
 │   ├── press.test.js            # Tests for the click/tap press-ring feedback in press.js
 │   ├── reveal.test.js           # Tests for the opening-reveal timing in reveal.js (including the Export button waiting for the last add-on)
 │   ├── settings.test.js         # Tests for the settings page: backup/restore, reset, update check
 │   ├── confirmation.test.js     # Tests for the confirmation page's heading/message logic
-│   └── structure.test.js        # Cross-page checks: lang attributes, ARIA roles, version consistency
+│   └── structure.test.js        # Invariants users can see: every page loads press.js and has a real favicon, reduced motion is honoured, every button uses the shared class
 └── src/
     ├── common/
     │   ├── core.js     # Pure shared code, loaded everywhere: the export format registry, the settings schema and loadSettings(), text helpers, display labels, groupForReading()
@@ -179,7 +180,11 @@ Bug reports and feature requests are welcome via [GitHub Issues](https://github.
 **Running the tests**
 
 ```
-npm test
+npm test                                   # everything (needs Node 20 or newer)
+node --test tests/import.test.js           # one file
+node --test --test-name-pattern="zip"      # tests whose name contains "zip"
+npm run test:coverage                      # with a coverage table
+npm run lint:ext                           # Mozilla's web-ext lint
 ```
 
 **Changing the version**

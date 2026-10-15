@@ -1,65 +1,28 @@
-// Shared test-running infrastructure for every *.test.js file in this
-// folder - no framework, just enough to run assertions and print a
-// summary, matching this project's existing "plain Node.js" style.
+// Shared test infrastructure for every *.test.js file in this folder: thin
+// wrappers over Node's built-in test runner (node:test), plus the loading
+// helpers and the minimal fake DOM below. No dependencies.
 //
-// Each *.test.js file requires this and calls test()/testAsync()
-// directly as it loads. tests/run.js requires every *.test.js file (which
-// registers their tests as a side effect of being required, same as
-// before the split) and then calls finish() once, after everything -
-// including async tests from every file - has settled.
+// Run everything:        npm test            (node --test)
+// Run one file:          node --test tests/import.test.js
+// Filter by test name:   node --test --test-name-pattern="zip" 
+// Coverage:              npm run test:coverage
 
+const nodeTest = require('node:test');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-let passed = 0;
-let failed = 0;
-const pendingAsyncTests = [];
-
+// A synchronous test. Same signature as before the move to node:test.
 function test(name, fn) {
-  try {
-    fn();
-    passed++;
-    console.log(`  ok - ${name}`);
-  } catch (err) {
-    failed++;
-    console.log(`  FAIL - ${name}`);
-    console.log(`    ${err.message}`);
-  }
+  nodeTest.test(name, fn);
 }
 
-// test() is synchronous - fine for plain assertions, but some tests need
-// to load and exercise real async code (message listeners, click
-// handlers). testAsync() runs the same pass/fail bookkeeping against a
-// promise instead; the calls are collected here (across every test file,
-// since this module is cached and shared by all of them) so finish() can
-// wait for all of them before printing the final summary.
-//
-// Races fn() against a timeout so a test whose promise never settles
-// (a bug in the test, or in the code it's exercising) fails loudly
-// instead of hanging silently. Without this, a never-settling promise
-// doesn't even hang the process: a bare pending Promise keeps nothing
-// in the event loop alive, so once every other callback has run, Node
-// exits on its own - quietly, with no summary line and exit code 0 -
-// while finish()'s `await Promise.all(...)` is still parked forever.
-// The timeout's setTimeout() is what keeps the loop (and this test)
-// alive long enough to actually fail and report.
+// An async test (the function returns a promise). A promise that never
+// settles fails after timeoutMs instead of hanging the run.
 const DEFAULT_ASYNC_TIMEOUT_MS = 5000;
 
 function testAsync(name, fn, timeoutMs = DEFAULT_ASYNC_TIMEOUT_MS) {
-  const timeout = new Promise((_resolve, reject) => {
-    setTimeout(() => reject(new Error(`timed out after ${timeoutMs}ms - the returned promise never settled`)), timeoutMs);
-  });
-  pendingAsyncTests.push(
-    Promise.race([fn(), timeout]).then(() => {
-      passed++;
-      console.log(`  ok - ${name}`);
-    }).catch((err) => {
-      failed++;
-      console.log(`  FAIL - ${name}`);
-      console.log(`    ${err.message}`);
-    })
-  );
+  nodeTest.test(name, { timeout: timeoutMs }, fn);
 }
 
 // Reads a file relative to the project root (one level up from tests/),
@@ -99,16 +62,6 @@ function readReportBuilders() {
 // but const/let don't, so those have to be read this way instead.
 function evalInContext(sandbox, expr) {
   return vm.runInContext(expr, sandbox);
-}
-
-// Waits for every async test (from every test file that's been required)
-// to settle, then prints the combined summary and exits non-zero if
-// anything failed. Called once, by tests/run.js, after requiring every
-// *.test.js file.
-async function finish() {
-  await Promise.all(pendingAsyncTests);
-  console.log(`\n${passed} passed, ${failed} failed`);
-  if (failed > 0) process.exit(1);
 }
 
 // --- Minimal fake DOM -------------------------------------------------
@@ -365,4 +318,4 @@ function makeFakeDom(ids = []) {
   return { document, elements };
 }
 
-module.exports = { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, readImport, readSettings, evalInContext, finish, makeFakeDom };
+module.exports = { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, readImport, readSettings, evalInContext, makeFakeDom };
