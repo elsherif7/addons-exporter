@@ -88,7 +88,7 @@
           <span class="opt-text">
             <span class="opt-title opt-title-block">Export Settings</span>
             <span id="exportSettingsDesc" class="opt-desc">Save your current settings to a file.</span>
-            <span id="exportSettingsStatus" class="opt-status" style="display:none;"></span>
+            <span id="exportSettingsStatus" class="opt-status" role="status" aria-live="polite" style="display:none;"></span>
           </span>
           <button class="settings-btn hub-btn settings-row-btn" id="exportSettingsBtn">Export</button>
         </div>
@@ -96,7 +96,7 @@
           <span class="opt-text">
             <span class="opt-title opt-title-block">Import Settings</span>
             <span id="importSettingsDesc" class="opt-desc">Restore settings from a previously exported file.</span>
-            <span id="importSettingsStatus" class="opt-status" style="display:none;"></span>
+            <span id="importSettingsStatus" class="opt-status" role="status" aria-live="polite" style="display:none;"></span>
           </span>
           <button class="settings-btn hub-btn settings-row-btn" id="importSettingsBtn">Import</button>
         </div>
@@ -109,11 +109,11 @@
         <span class="opt-text">
           <span class="opt-title opt-title-block">Reset Settings</span>
           <span id="resetSettingsDesc" class="opt-desc">Clears theme, export format, and display settings back to defaults.</span>
-          <span id="resetSettingsStatus" class="opt-status" style="display:none;"></span>
+          <span id="resetSettingsStatus" class="opt-status" role="status" aria-live="polite" style="display:none;"></span>
         </span>
         <button class="settings-btn settings-btn-danger hub-btn settings-row-btn" id="resetSettingsBtn">Reset</button>
       </div>
-      <span id="settingsStatus"></span>
+      <span id="settingsStatus" role="status" aria-live="polite"></span>
     </div>
 
     <div class="settings-group">

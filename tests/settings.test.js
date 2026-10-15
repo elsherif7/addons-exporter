@@ -361,6 +361,16 @@ test('Reset dialog: opens when button is clicked and can be closed with Cancel',
   assert.strictEqual(elements.resetSettingsBtn._focused, true, 'focus should return to the button that opened it');
 });
 
+test('Reset dialog: is marked modal and named by its title and message', () => {
+  const { document, elements } = makeResetDialogSandbox();
+  const dialog = openResetDialog(document, elements.resetSettingsBtn);
+  assert.strictEqual(dialog.getAttribute('aria-modal'), 'true');
+  assert.strictEqual(dialog.getAttribute('aria-labelledby'), 'resetDialogTitle');
+  assert.strictEqual(dialog.getAttribute('aria-describedby'), 'resetDialogMessage');
+  assert.ok(document.body.querySelector('#resetDialogTitle'), 'the title the dialog points to exists');
+  assert.ok(document.body.querySelector('#resetDialogMessage'), 'the message the dialog points to exists');
+});
+
 test('Reset dialog: focus moves to Cancel when it opens', () => {
   const { document, elements } = makeResetDialogSandbox();
   openResetDialog(document, elements.resetSettingsBtn);

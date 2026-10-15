@@ -346,6 +346,9 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
   const dialog = document.createElement('div');
   dialog.className = 's-dialog';
   dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-labelledby', 'resetDialogTitle');
+  dialog.setAttribute('aria-describedby', 'resetDialogMessage');
   dialog.style.cssText = 'background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:24px 28px;min-width:300px;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.2);';
 
   const title = document.createElement('div');
@@ -354,6 +357,7 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
   title.textContent = 'Settings';
 
   const message = document.createElement('p');
+  message.id = 'resetDialogMessage';
   message.style.cssText = 'font-size:14px;color:var(--text-secondary);margin:0 0 18px;';
   message.textContent = 'Reset all settings to their defaults? This will clear your theme, export format, and display choices.';
 

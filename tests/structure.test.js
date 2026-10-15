@@ -431,3 +431,32 @@ test('hub-btn: every action button on the popup, Exporter, Importer and Settings
   assert.match(js, /rsCancel[\s\S]{0,200}hub-btn|hub-btn[\s\S]{0,200}rsCancel/, 'the Cancel button in the reset dialog uses hub-btn');
   assert.match(js, /rsConfirm[\s\S]{0,200}hub-btn|hub-btn[\s\S]{0,200}rsConfirm/, 'the Reset button in the reset dialog uses hub-btn');
 });
+
+// Screen readers: icon-only buttons need a name, search boxes need a label,
+// and the status messages must be announced when they change.
+test('a11y: the remove-file button has a name and the search boxes are labelled', () => {
+  const imp = readSrc('src/import/import.html');
+  assert.match(imp.match(/<button[^>]*id="removeFileBtn"[^>]*>/)[0], /aria-label="[^"]+"/, 'removeFileBtn needs an aria-label');
+  for (const page of ['src/import/import.html', 'src/export/export.html']) {
+    const tag = readSrc(page).match(/<input[^>]*id="searchInput"[^>]*>/);
+    assert.ok(tag, `${page}: #searchInput not found`);
+    assert.match(tag[0], /aria-label="[^"]+"/, `${page}: #searchInput needs an aria-label`);
+  }
+});
+
+test('a11y: status messages are polite live regions', () => {
+  const pages = {
+    'src/import/import.html': ['status'],
+    'src/export/export.html': ['status'],
+    'src/settings/settings.html': ['settingsStatus', 'exportSettingsStatus', 'importSettingsStatus', 'resetSettingsStatus'],
+  };
+  for (const [page, ids] of Object.entries(pages)) {
+    const html = readSrc(page);
+    for (const id of ids) {
+      const tag = html.match(new RegExp(`<span[^>]*id="${id}"[^>]*>`));
+      assert.ok(tag, `${page}: #${id} not found`);
+      assert.match(tag[0], /role="status"/, `${page}: #${id} needs role="status"`);
+      assert.match(tag[0], /aria-live="polite"/, `${page}: #${id} needs aria-live="polite"`);
+    }
+  }
+});
