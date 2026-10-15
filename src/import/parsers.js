@@ -135,7 +135,7 @@ function parseJsonPayload(text) {
 }
 
 // Undoes the leading-apostrophe formula-injection guard buildCsvExport()
-// (report-template.js) adds to a field that would otherwise be read as a
+// (export-formats.js) adds to a field that would otherwise be read as a
 // formula by a spreadsheet app (one starting with =, +, -, @, tab, or
 // CR). Only strips it when what follows the leading apostrophe(s) is one of
 // those - a value that genuinely starts with an apostrophe followed by
@@ -146,7 +146,7 @@ function stripCsvFormulaGuard(s) {
   return /^'+[=+\-@\t\r]/.test(s) ? s.slice(1) : s;
 }
 
-// The one header row buildCsvExport() (report-template.js) writes.
+// The one header row buildCsvExport() (export-formats.js) writes.
 const CSV_HEADER = ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id'];
 
 const csvError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter CSV format (${detail}).` });
@@ -272,7 +272,7 @@ function parseCsvRecords(text) {
 }
 
 
-// Reverses the escaping buildTxtExport() (report-template.js) applies to every
+// Reverses the escaping buildTxtExport() (export-formats.js) applies to every
 // column: \\ is a backslash, \| a pipe, \n a line break, \r a carriage
 // return, \s a space (used for a space at the very start or end of a value).
 // Returns null for a backslash followed by anything else, which the exporter

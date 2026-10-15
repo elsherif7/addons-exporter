@@ -62,8 +62,8 @@ themeToggleEl.addEventListener('click', function () {
   try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
 });
 
-// NOTE: mirrors setFilterVisible() and filterAddonRows() in common.js. Duplicated here
-// because this report is self-contained and can't load common.js
+// NOTE: mirrors setFilterVisible() and filterAddonRows() in page-ui.js. Duplicated here
+// because this report is self-contained and can't load page-ui.js
 // once saved elsewhere. Keep both copies in sync if you change this.
 function setFilterVisible(el, visible) {
   el.style.display = visible ? '' : 'none';
@@ -74,7 +74,7 @@ function filterAddonRows(query) {
   var q = query.trim().toLowerCase();
   var anyMatch = false;
   // querySelectorAll (not addonListEl.children) so this keeps working
-  // regardless of nesting depth - see the same change in common.js's
+  // regardless of nesting depth - see the same change in page-ui.js's
   // filterAddonRows().
   var groupContainers = addonListEl.querySelectorAll('.group-container');
   for (var i = 0; i < groupContainers.length; i++) {

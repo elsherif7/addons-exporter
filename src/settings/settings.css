@@ -221,8 +221,7 @@ label.settings-option-row:active { transform: scale(0.985); }
 .s-dialog-buttons { display: flex; justify-content: flex-end; gap: 10px; }
 /* .about-block, .about-row, .about-label, .about-value come from shared.css */
 
-/* Settings rows: titles, descriptions and the buttons on the right of a row
-   (these were inline style="" attributes). */
+/* Settings rows: titles, descriptions and the buttons on the right of a row. */
 .opt-title { font-weight: 600; color: var(--text); font-size: 14px; }
 .opt-title-block { display: block; margin-bottom: 2px; }
 .opt-desc { font-size: 12px; color: var(--text-muted); }

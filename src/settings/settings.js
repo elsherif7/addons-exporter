@@ -22,7 +22,7 @@ const settingsStatusEl = document.getElementById('settingsStatus');
 // Row feedback, all done with element.animate() so the row's own CSS
 // animations are left alone, and all skipped for reduced motion:
 //  - a finished export / import / reset flashes its row green and slides the
-//    message in (see .is-success in settings.html);
+//    message in (see .is-success in settings.css);
 //  - a cancelled one (dismissed file dialog, cancelled save dialog, Cancel in
 //    the reset dialog) flashes the row soft grey and slides its description
 //    back in from the left.

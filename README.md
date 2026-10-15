@@ -33,8 +33,9 @@ addons-hub/
 │   ├── zip-external.test.js     # Checks the .zip with unzip, Python and bsdtar (whichever are installed), not just with this project's own reader
 │   ├── press.test.js            # Tests for the click/tap press-ring feedback in press.js
 │   ├── reveal.test.js           # Tests for the opening-reveal timing in reveal.js (including the Export button waiting for the last add-on)
-│   ├── settings.test.js         # Tests for the settings page: backup/restore, reset, update check
+│   ├── settings.test.js         # Tests for the settings page: backup/restore, reset, live updates
 │   ├── confirmation.test.js     # Tests for the confirmation page's heading/message logic
+│   ├── popup.test.js            # Tests for the popup's three buttons (Export, Import, Settings)
 │   └── structure.test.js        # Invariants users can see: every page loads press.js and has a real favicon, reduced motion is honoured, every button uses the shared class
 └── src/
     ├── common/

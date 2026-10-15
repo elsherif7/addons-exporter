@@ -74,7 +74,8 @@ function formatFilenameTimestamp(d) {
 
 // buildHtmlReport(), buildJsonExport(), buildCsvExport(), buildTxtExport() -
 // all export format builders - live in
-// report-template.js, loaded before this file (see manifest.json). They're
+// export-formats.js (buildHtmlReport() in report-template.js), loaded before
+// this file (see manifest.json). They're
 // pure string templating with no browser.* dependency, split out so they
 // can be read/tested on their own, separate from this file's messaging
 // and AMO-lookup concerns.

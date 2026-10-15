@@ -6,7 +6,7 @@
 // Uses the Web Animations API on purpose instead of toggling a CSS class:
 // an element's own CSS animations (e.g. the page's opening reveal) must not
 // be restarted just because it was pressed, and element.animate() leaves
-// them alone. The report (report-template.js) carries its own small copy of
+// them alone. The report (report-inline.js) carries its own small copy of
 // this, since a saved report can't load this file.
 (function () {
   // List rows (export/import add-on rows, settings option rows) are matched
