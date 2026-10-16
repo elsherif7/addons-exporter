@@ -79,8 +79,6 @@ function evalInContext(sandbox, expr) {
 // implementation - extend it only when a new test genuinely needs more
 // of the real API surface.
 
-const SELECTOR_RE = /^([a-zA-Z]*)|(\.[\w-]+)|(\[[a-zA-Z-]+=(?:"[^"]*"|'[^']*')\])|(:[a-zA-Z-]+)/g;
-
 // Parses a single compound selector (no descendant combinators) into
 // {tag, classes[], attrs{}, pseudos[]} once, so matching against many
 // elements doesn't re-parse the same selector string repeatedly.

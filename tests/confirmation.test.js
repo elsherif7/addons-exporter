@@ -46,6 +46,24 @@ test('export, no format param: defaults to HTML report wording', () => {
   assert.match(elements.message.textContent, /exported as an HTML report/);
 });
 
+test('export, several formats saved as one .zip: names them all and says they are zipped', () => {
+  const { elements } = loadConfirmation('?from=export&format=html,json&zip=1');
+  const text = elements.message.textContent;
+  assert.match(text, /exported as an HTML report and JSON file/);
+  assert.match(text, /saved together in one \.zip file/);
+});
+
+test('export, several formats without zip=1: lists them but does not claim a .zip', () => {
+  const { elements } = loadConfirmation('?from=export&format=html,json');
+  assert.match(elements.message.textContent, /HTML report and JSON file/);
+  assert.doesNotMatch(elements.message.textContent, /\.zip/);
+});
+
+test('export, one format with zip=1: not zipped (a single file is never a .zip)', () => {
+  const { elements } = loadConfirmation('?from=export&format=html&zip=1');
+  assert.doesNotMatch(elements.message.textContent, /\.zip/);
+});
+
 test('import: heading and message reflect the Importer, not the Exporter', () => {
   const { elements } = loadConfirmation('?from=import');
   assert.strictEqual(elements.heading.textContent, 'Add-ons Importer');

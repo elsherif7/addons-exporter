@@ -460,17 +460,20 @@ testAsync('listInstalledAddons: includes optionsUrl when present, null when abse
   assert.strictEqual(result[1].optionsUrl, null);
 });
 
-// --- management.uninstall is available via the management permission ---
+// --- background.js: loads and registers its message listener ---
+// Firefox does not expose browser.management.uninstall() to regular
+// extensions - the Remove button opens about:addons instead - so there is no
+// uninstall path to test. What matters is that background.js loads in a
+// sandbox that has only the management API, and registers the
+// runtime.onMessage listener every page's message goes through.
 
-testAsync('browser.management.uninstall: can be called and resolves', async () => {
-  // Firefox does not expose browser.management.uninstall() for regular
-  // extensions — the Remove button opens about:addons instead. This test
-  // just verifies the management API sandbox loads without error.
+testAsync('background.js: loads with only the management API and registers its message listener', async () => {
+  let listener = null;
   const bgSandbox = {
     URL,
     console: { warn() {}, debug() {}, log() {}, error() {} },
     browser: {
-      runtime: { onMessage: { addListener() {} } },
+      runtime: { onMessage: { addListener(fn) { listener = fn; } } },
       management: {
         getAll: async () => [],
       },
@@ -480,7 +483,7 @@ testAsync('browser.management.uninstall: can be called and resolves', async () =
   vm.runInContext(commonSrc, bgSandbox);
   vm.runInContext(reportTemplateSrc, bgSandbox);
   vm.runInContext(backgroundSrc, bgSandbox);
-  assert.ok(typeof bgSandbox.browser.management.getAll === 'function');
+  assert.strictEqual(typeof listener, 'function', 'background.js must register a runtime.onMessage listener');
 });
 
 // --- background.js: openTabs (the Importer hands every tab after the first to us) ---

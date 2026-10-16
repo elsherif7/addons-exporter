@@ -107,6 +107,11 @@
   .export-pick-option:active { transform: scale(0.985); }
   /* The same darker hover the add-on rows use in the dark theme. */
   :root[data-theme="dark"] .export-pick-option:hover { background: #2e3340; }
+  /* The add-on rows' grow-on-hover is switched off under reduced motion in
+     shared.css; the picker's rows must match, so switch theirs off here. */
+  @media (prefers-reduced-motion: reduce) {
+    .export-pick-option:hover { transform: none; }
+  }
   /* compareNote's notes each get their own line instead of running
      together in one sentence. */
   .compare-note-line {

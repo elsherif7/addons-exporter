@@ -9,9 +9,12 @@
 // them alone. The report (report-inline.js) carries its own small copy of
 // this, since a saved report can't load this file.
 (function () {
-  // List rows (export/import add-on rows, settings option rows) are matched
-  // first, so pressing the radio/checkbox inside one pulses the whole row.
-  const ROW_SELECTOR = '.addon-row, label.settings-option-row';
+  // List rows (export/import add-on rows, settings option rows, the Importer's
+  // export-picker rows) are matched first, so pressing the radio/checkbox
+  // inside one pulses the whole row - and so a row inside a box that clips
+  // overflow (the picker's list) flashes from the inside instead of sending a
+  // ring that gets clipped away.
+  const ROW_SELECTOR = '.addon-row, label.settings-option-row, .export-pick-option';
   const TARGET_SELECTOR =
     'button, .hub-btn, label, .picker, .theme-toggle, a[href], input[type="checkbox"], input[type="radio"]';
   const DURATION_MS = 520;

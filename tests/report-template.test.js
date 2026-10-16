@@ -92,6 +92,12 @@ test('buildHtmlReport: includes a theme toggle button', () => {
   assert.match(darkHtml, /id="themeToggle"/);
 });
 
+test('buildHtmlReport: the icon-only theme toggle and the search box have accessible names', () => {
+  const html = buildHtmlReport(sampleList, 'light');
+  assert.match(html, /<button[^>]*id="themeToggle"[^>]*aria-label="[^"]+"/, 'the icon-only toggle needs an aria-label');
+  assert.match(html, /<input[^>]*id="searchInput"[^>]*aria-label="[^"]+"/, 'the search box needs an aria-label');
+});
+
 test('safeJsonForScriptTag: escapes "</" so an add-on name can\'t close the script tag early', () => {
   const json = safeJsonForScriptTag({ addons: [{ name: 'x</script><script>alert(1)</script>' }] });
   assert.ok(!json.includes('</script>'), 'a literal </script> would close the tag early if left unescaped');

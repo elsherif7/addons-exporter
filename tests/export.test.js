@@ -92,6 +92,21 @@ testAsync('export.js click handler: on desktop, the confirmation URL carries the
   }
 });
 
+testAsync('export.js click handler: several formats are saved as one .zip, and the URL says so', async () => {
+  const { navigatedUrls, statusEl } = await captureExportClick({
+    selectedIds: ['ext1@example.com'],
+    exportResponse: {
+      formats: ['html', 'json'],
+      zipped: true,
+      stats: { total: 1, amoExact: 1, amoSearch: 0, homepage: 0, searchFallback: 0, lookupFailures: 0, lookupsSkipped: 0 },
+    },
+  });
+  assert.deepStrictEqual(navigatedUrls, [
+    'moz-extension://test-id/src/confirmation/confirmation.html?from=export&format=html,json&zip=1',
+  ]);
+  assert.match(statusEl.textContent, /saved together in one \.zip file/);
+});
+
 // --- A14: desktop success re-enables the button and names the format ---
 
 testAsync('export.js click handler: re-enables Export Selected after a successful desktop export', async () => {

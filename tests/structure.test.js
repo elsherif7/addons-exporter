@@ -111,26 +111,6 @@ for (const [labelFor, radioId] of [
 // Tripwires catch regressions where someone adds a new button without
 // the shared base, or reintroduces a duplicated button implementation.
 
-// --- shared.css: hub-btn is defined and owns the common rules ---
-
-const sharedCssForBtn = readSrc('src/common/shared.css');
-
-// --- export.html ---
-
-const exportHtml = readSrc('src/export/export.html');
-
-// --- import.html ---
-
-const importHtml = readSrc('src/import/import.html');
-
-// --- settings.html ---
-
-const settingsHtmlForBtn = readSettingsPage();
-
-// Modal buttons (cancelBtn/confirmBtn) get hub-btn from settings.js at runtime.
-// Verify the className assignment in settings.js includes hub-btn.
-const settingsJsSrc = readSrc('src/settings/settings.js');
-
 // --- popup.html ---
 
 const popupHtml = readSrc('src/popup/popup.html');

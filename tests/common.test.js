@@ -298,12 +298,19 @@ test('filterAddonRows: page-ui.js and the report\'s inline copy agree with a nes
 
 // --- byName (tie-breaking) ---
 
-test('byName with identical names: both items survive the sort', () => {
-  const items = [{ name: 'uBlock Origin' }, { name: 'uBlock Origin' }];
-  items.sort(byName);
-  assert.strictEqual(items.length, 2);
-  assert.strictEqual(items[0].name, 'uBlock Origin');
-  assert.strictEqual(items[1].name, 'uBlock Origin');
+test('byName: locale-aware and case-insensitive, and a stable sort keeps identical names in order', () => {
+  // Identical names compare equal...
+  assert.strictEqual(byName({ name: 'uBlock Origin' }, { name: 'uBlock Origin' }), 0);
+  // ...and sensitivity: 'base' makes the comparison case- and accent-insensitive.
+  assert.strictEqual(byName({ name: 'UBlock' }, { name: 'ublock' }), 0);
+  assert.ok(byName({ name: 'alpha' }, { name: 'beta' }) < 0);
+  assert.ok(byName({ name: 'beta' }, { name: 'alpha' }) > 0);
+  // Two add-ons with the same name keep their original order (a stable sort),
+  // so an export never reshuffles them.
+  const first = { name: 'Same', id: 'first' };
+  const second = { name: 'Same', id: 'second' };
+  const sorted = [second, first].sort(byName);
+  assert.deepStrictEqual(sorted.map((a) => a.id), ['second', 'first']);
 });
 
 // --- extractTranslatedField ---
