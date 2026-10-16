@@ -50,6 +50,63 @@
     --press-ring: rgba(239, 106, 94, 0.5);
   }
   #removeFileBtn:hover { color: var(--danger-color); }
+  /* The export picker, shown only when a .zip holds more than one distinct
+     export. The closed box borrows the add-on list's own "search-input"
+     styling; opening it drops a list of rows - styled exactly like the add-on
+     list rows, same padding, borders and little grow on hover - into the page,
+     pushing the search box and the list below it down (and back up when it
+     closes). */
+  #exportPickRow { margin-bottom: 10px; }
+  .export-pick-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 0;
+    cursor: pointer;
+    text-align: left;
+  }
+  /* The caret, like the one a native dropdown shows - it flips while open. */
+  .export-pick-trigger::after {
+    content: "";
+    flex: none;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--text-muted);
+    transition: transform 0.12s;
+  }
+  .export-pick-trigger[aria-expanded="true"]::after { transform: rotate(180deg); }
+  .export-pick-list {
+    margin-top: 6px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card-bg);
+    overflow: hidden;
+    text-align: left;
+  }
+  .export-pick-option {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    border: none;
+    border-bottom: 1px solid var(--divider);
+    background: var(--card-bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
+  }
+  .export-pick-option:last-child { border-bottom: none; }
+  .export-pick-option:hover { background: var(--hover-bg); transform: scale(1.01); }
+  .export-pick-option:active { transform: scale(0.985); }
+  /* The same darker hover the add-on rows use in the dark theme. */
+  :root[data-theme="dark"] .export-pick-option:hover { background: #2e3340; }
   /* compareNote's notes each get their own line instead of running
      together in one sentence. */
   .compare-note-line {
@@ -61,7 +118,7 @@
 <body>
   <div class="card staged">
     <h1>Add-ons Importer</h1>
-    <p class="intro-text">Pick an <strong>exported file</strong> from <strong>Add-ons Exporter</strong>. HTML, JSON, CSV, and TXT formats are all supported, and so is the .zip the Exporter makes when you tick several. The Add-ons you don't have yet are pre-selected, while your installed ones are shown too if you want to check them.</p>
+    <p class="intro-text">Pick an <strong>exported file</strong> from <strong>Add-ons Exporter</strong>. HTML, JSON, CSV, and TXT formats are all supported, and so is the .zip the Exporter makes when you tick several. If a .zip holds files with different add-ons, a picker lets you choose which set to import (or all of them). The Add-ons you don't have yet are pre-selected, while your installed ones are shown too if you want to check them.</p>
     <p class="intro-text"><strong>Note:</strong> Firefox doesn't allow any extension, including this one, to&nbsp;automatically install other add-ons. It can only open each add-on's page as&nbsp;a tab for you. You'll still need to click <strong>Add&nbsp;to&nbsp;Firefox</strong> yourself on each one.</p>
 
     <div class="picker" id="picker">
@@ -71,6 +128,12 @@
         <button id="removeFileBtn" type="button" aria-label="Remove file">&times;</button>
       </div>
       <span id="compareNote"></span>
+    </div>
+
+    <div id="exportPickRow" style="display:none;">
+      <div id="exportPickLabel" class="group-heading">Import from</div>
+      <button type="button" id="exportPick" class="search-input export-pick-trigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="exportPickLabel"></button>
+      <div id="exportPickList" class="export-pick-list" role="listbox" aria-labelledby="exportPickLabel" style="display:none;"></div>
     </div>
 
     <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons..." aria-label="Search add-ons" style="display:none;">

@@ -18,10 +18,26 @@ const openSelectedBtn = document.getElementById('openSelectedBtn');
 const compareNoteEl = document.getElementById('compareNote');
 const searchInput = document.getElementById('searchInput');
 const noSearchMatchesEl = document.getElementById('noSearchMatches');
+const exportPickRowEl = document.getElementById('exportPickRow');
+const exportPickEl = document.getElementById('exportPick');
+const exportPickListEl = document.getElementById('exportPickList');
 
 // Rendered order (Not Installed Yet, then Already Installed) - each
 // checkbox's data-idx indexes into this array to find the right item.
 let displayItems = [];
+
+// What the chosen file held: one entry per distinct export (a plain file is
+// one; a .zip can hold several), plus what the list needs to redraw when the
+// picker's choice changes.
+let loadedExports = [];
+let loadedInstalled = [];
+let loadedShorten = true;
+
+// Which picker entry the list is showing: 'all', or an export's index. The
+// rendered labels live here so the closed box can echo the choice without
+// re-reading the DOM.
+let exportSelection = 0;
+let exportPickLabels = new Map();
 
 function setStatus(msg) {
   statusEl.textContent = msg;
@@ -38,9 +54,16 @@ const list = createAddonList({
 
 function clearAddonList() {
   displayItems = [];
+  loadedExports = [];
   addonListEl.innerHTML = '';
   checklistBoxEl.style.display = 'none';
   listControls.style.display = 'none';
+  exportPickRowEl.style.display = 'none';
+  exportPickListEl.replaceChildren();
+  exportPickLabels = new Map();
+  exportSelection = 0;
+  closeExportPicker();
+  exportPickEl.textContent = '';
   openSelectedBtn.disabled = true;
   selectionCountEl.textContent = '';
   compareNoteEl.textContent = '';
@@ -147,8 +170,8 @@ const MAX_IMPORT_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 // several formats are ticked) is accepted too and its files read the same way.
 const IMPORT_TEXT_EXTENSIONS = new Set(['html', 'htm', 'json', 'csv', 'txt']);
 const ACCEPTED_IMPORT_EXTENSIONS = new Set([...IMPORT_TEXT_EXTENSIONS, 'zip']);
-// When a .zip holds several formats, the first one that reads wins. They all
-// carry the same add-ons; JSON goes first as the most exact.
+// When a .zip holds several formats, the most exact one supplies an export's
+// data (the rest are grouped with it; see groupZipExports).
 const ZIP_READ_ORDER = ['json', 'html', 'htm', 'csv', 'txt'];
 
 // Checked before a file is ever read - lets a wrong-typed or oversized
@@ -181,8 +204,112 @@ function parseImportText(ext, text) {
   return parseAddonsPayload(dataEl ? dataEl.textContent : null);
 }
 
-// Reads the add-ons out of a .zip: tries its export files in ZIP_READ_ORDER and
-// uses the first that reads. If none does, the answer names the first problem.
+// The distinct exports a chosen .zip holds, in the order to offer them. Files
+// that list the same set of add-on ids describe the same export, so they become
+// one entry - labelled with every file name it came from, and holding the data
+// of the first of them in ZIP_READ_ORDER.
+function groupZipExports(parsed) {
+  const groups = new Map();
+  for (const p of parsed) {
+    const key = [...new Set(p.addons.map((a) => a.id))].sort().join('\u0000');
+    const group = groups.get(key);
+    if (group) group.names.push(p.name);
+    else groups.set(key, { names: [p.name], addons: p.addons });
+  }
+  return [...groups.values()];
+}
+
+// Every add-on from every export, once per id - what the picker's "All" entry
+// shows. The first export to name an id decides its row.
+function mergeExports(exports) {
+  const seen = new Set();
+  const merged = [];
+  for (const e of exports) {
+    for (const a of e.addons) {
+      if (seen.has(a.id)) continue;
+      seen.add(a.id);
+      merged.push(a);
+    }
+  }
+  return merged;
+}
+
+// The closed box echoes the choice; the open panel is a real list of rows (no
+// native <select>, whose popup can't take the add-on list's hover), one row per
+// entry. "All add-ons" comes first and is the default, then each distinct
+// export, the one holding the most add-ons first.
+function setUpExportPicker(exports) {
+  if (exports.length < 2) {
+    exportPickRowEl.style.display = 'none';
+    exportPickListEl.replaceChildren();
+    exportPickLabels = new Map();
+    exportSelection = 0;
+    closeExportPicker();
+    return;
+  }
+  const ordered = exports
+    .map((e, i) => ({ e, i }))
+    .sort((a, b) => b.e.addons.length - a.e.addons.length);
+  const entries = [
+    { value: 'all', text: `All add-ons (${mergeExports(exports).length})` },
+    ...ordered.map(({ e, i }) => ({ value: String(i), text: `${e.names.join(', ')} (${e.addons.length})` })),
+  ];
+  exportPickLabels = new Map(entries.map((entry) => [entry.value, entry.text]));
+  exportPickListEl.replaceChildren(...entries.map((entry) => {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'export-pick-option';
+    option.dataset.value = entry.value;
+    option.setAttribute('role', 'option');
+    option.textContent = entry.text;
+    option.addEventListener('click', () => chooseExport(entry.value));
+    return option;
+  }));
+  setExportSelection('all');
+  closeExportPicker();
+  exportPickRowEl.style.display = 'block';
+}
+
+// Paints the closed box and marks the chosen row, without touching the list.
+function setExportSelection(selection) {
+  exportSelection = selection;
+  exportPickEl.textContent = exportPickLabels.get(String(selection)) || '';
+  for (const option of exportPickListEl.querySelectorAll('.export-pick-option')) {
+    option.setAttribute('aria-selected', String(option.dataset.value === String(selection)));
+  }
+}
+
+// A picked row: remember the choice, close the panel, redraw the list.
+function chooseExport(value) {
+  setExportSelection(value === 'all' ? 'all' : Number(value));
+  closeExportPicker();
+  if (loadedExports.length > 0) renderExports(exportSelection);
+  exportPickEl.focus();
+}
+
+function openExportPicker() {
+  exportPickListEl.style.display = 'block';
+  exportPickEl.setAttribute('aria-expanded', 'true');
+}
+
+function closeExportPicker() {
+  exportPickListEl.style.display = 'none';
+  exportPickEl.setAttribute('aria-expanded', 'false');
+}
+
+// Draws the list for one picker entry: an export's index, or 'all'. With the
+// picker hidden (a single export) the selection is 0.
+function renderExports(selection) {
+  const addons = selection === 'all' ? mergeExports(loadedExports) : loadedExports[selection].addons;
+  renderAddonList(addons, loadedInstalled, loadedShorten);
+}
+
+// That .zip held nothing the Importer can read.
+const noExportInZip = () => ({ ok: false, error: "That .zip doesn't contain an Add-ons Exporter file (.html, .json, .csv, or .txt)." });
+
+// Reads the add-ons out of a .zip. Files that are not Add-ons Exporter exports
+// are ignored silently; the rest are grouped into distinct exports (see
+// groupZipExports), which the picker then offers.
 async function parseZipExport(buffer) {
   const zip = await readZipEntries(new Uint8Array(buffer), { extensions: IMPORT_TEXT_EXTENSIONS, maxEntryBytes: MAX_IMPORT_FILE_SIZE_BYTES });
   if (!zip.ok) return zip;
@@ -190,10 +317,8 @@ async function parseZipExport(buffer) {
   const entries = zip.entries
     .map((e, i) => ({ ...e, ext: extOf(e.name), i }))
     .sort((a, b) => ZIP_READ_ORDER.indexOf(a.ext) - ZIP_READ_ORDER.indexOf(b.ext) || a.i - b.i);
-  if (entries.length === 0) {
-    return { ok: false, error: "That .zip doesn't contain an Add-ons Exporter file (.html, .json, .csv, or .txt)." };
-  }
-  let firstProblem = null;
+  if (entries.length === 0) return noExportInZip();
+  const parsed = [];
   for (const entry of entries) {
     let result;
     try {
@@ -201,10 +326,10 @@ async function parseZipExport(buffer) {
     } catch (err) {
       result = { ok: false, error: err.message };
     }
-    if (result.ok) return result;
-    if (!firstProblem) firstProblem = `Couldn't read "${entry.name}" inside the .zip. ${result.error}`;
+    if (result.ok) parsed.push({ name: entry.name, addons: result.addons });
   }
-  return { ok: false, error: firstProblem };
+  if (parsed.length === 0) return noExportInZip();
+  return { ok: true, exports: groupZipExports(parsed) };
 }
 
 async function loadFile(file) {
@@ -213,21 +338,26 @@ async function loadFile(file) {
   setStatus('Reading file...');
   try {
     const ext = file.name.split('.').pop().toLowerCase();
-    let result;
+    let exports;
     if (ext === 'zip') {
       const buffer = await file.arrayBuffer();
       if (myGeneration !== loadGeneration) return;
-      result = await parseZipExport(buffer);
+      const result = await parseZipExport(buffer);
+      if (myGeneration !== loadGeneration) return;
+      if (!result.ok) {
+        setStatus(result.error);
+        return;
+      }
+      exports = result.exports;
     } else {
       const text = await file.text();
       if (myGeneration !== loadGeneration) return;
-      result = parseImportText(ext, text);
-    }
-    if (myGeneration !== loadGeneration) return;
-
-    if (!result.ok) {
-      setStatus(result.error);
-      return;
+      const result = parseImportText(ext, text);
+      if (!result.ok) {
+        setStatus(result.error);
+        return;
+      }
+      exports = [{ names: [file.name], addons: result.addons }];
     }
 
     // If this fails, degrade gracefully instead of blocking the import -
@@ -245,8 +375,12 @@ async function loadFile(file) {
     setStatus('');
     const settings = await loadSettings();
     if (myGeneration !== loadGeneration) return;
-    const shorten = settings.shortenNames !== 'off';
-    renderAddonList(result.addons, installed, shorten);
+
+    loadedExports = exports;
+    loadedInstalled = installed;
+    loadedShorten = settings.shortenNames !== 'off';
+    setUpExportPicker(loadedExports);
+    renderExports(exportSelection);
   } catch (err) {
     if (myGeneration !== loadGeneration) return;
     setStatus('Error reading file: ' + err.message);
@@ -282,16 +416,16 @@ function setSelectedFile(file) {
 }
 
 // Removing the file plays out the page's opening in reverse: what is lowest
-// goes first (the list, the Select all row, the search box, the note, the file
-// name), each sliding left and fading, one after another - then the file is
-// really removed and "Choose file" pops back in. Until it has finished the
-// page keeps its state, but a load still in flight is cancelled at once so it
-// cannot draw anything in the middle of the exit. Without animation support,
-// or for reduced motion, the file is simply removed at once.
+// goes first (the list, the Select all row, the search box, the export picker,
+// the note, the file name), each sliding left and fading, one after another -
+// then the file is really removed and "Choose file" pops back in. Until it has
+// finished the page keeps its state, but a load still in flight is cancelled at
+// once so it cannot draw anything in the middle of the exit. Without animation
+// support, or for reduced motion, the file is simply removed at once.
 let removingFile = false;
 
 function removalTargets() {
-  return [checklistBoxEl, listControls, searchInput, compareNoteEl, fileNameRow].filter((el) => {
+  return [checklistBoxEl, listControls, searchInput, exportPickRowEl, compareNoteEl, fileNameRow].filter((el) => {
     if (!el || el.style.display === 'none') return false;
     return el !== compareNoteEl || el.textContent !== '';
   });
@@ -344,6 +478,28 @@ chooseFileBtn.addEventListener('click', () => {
 
 fileInput.addEventListener('change', () => {
   setSelectedFile(fileInput.files[0] || null);
+});
+
+// A .zip can hold more than one distinct export; this picker chooses which one
+// (or all of them) the list shows. The closed box opens the row panel; picking
+// a row is what redraws the list (see chooseExport).
+exportPickEl.addEventListener('click', () => {
+  if (exportPickListEl.style.display === 'block') closeExportPicker();
+  else openExportPicker();
+});
+
+exportPickRowEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeExportPicker();
+    exportPickEl.focus();
+  }
+});
+
+// A click anywhere outside the picker closes the panel.
+document.addEventListener('click', (e) => {
+  const target = e.target;
+  if (target && typeof target.closest === 'function' && target.closest('#exportPickRow')) return;
+  closeExportPicker();
 });
 
 // Dropping a file onto the picker works the same as "Choose file".

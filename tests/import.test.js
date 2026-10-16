@@ -343,6 +343,9 @@ function captureBulkSelectHandlers(checkboxList, { failNavigation = false, failS
     compareNote: { textContent: '' },
     searchInput: { addEventListener() {}, style: {} },
     noSearchMatches: { style: {} },
+    exportPickRow: { style: {}, addEventListener() {} },
+    exportPick: { addEventListener() {}, setAttribute() {}, focus() {}, style: {}, textContent: '' },
+    exportPickList: { style: {}, replaceChildren() {}, querySelectorAll: () => [] },
   };
   const sandbox = {
     URL,

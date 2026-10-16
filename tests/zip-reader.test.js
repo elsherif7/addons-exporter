@@ -186,7 +186,7 @@ function bootImporter(installed = []) {
     'status', 'fileName', 'fileNameRow', 'fileInput', 'picker', 'removeFileBtn',
     'chooseFileBtn', 'listControls', 'addonList', 'checklistBox', 'selectAllBtn',
     'deselectAllBtn', 'selectionCount', 'openSelectedBtn', 'compareNote',
-    'searchInput', 'noSearchMatches',
+    'searchInput', 'noSearchMatches', 'exportPickRow', 'exportPick', 'exportPickList',
   ]);
   const sandbox = {
     document, URL, Blob, DecompressionStream, TextDecoder,
@@ -257,7 +257,7 @@ testAsync('Importer: a .zip with no export file in it says so', async () => {
   assert.deepStrictEqual(shownNames(elements), []);
 });
 
-testAsync('Importer: a damaged .zip shows the reader\'s sentence, and a bad file inside names that file', async () => {
+testAsync('Importer: a damaged .zip shows the reader\'s sentence, and a file that is not an export is ignored', async () => {
   const { sandbox, elements } = bootImporter();
   sandbox.setSelectedFile(zipFile('broken.zip', new Uint8Array(Buffer.from('definitely not a zip file, just some text'))));
   await settle();
@@ -266,7 +266,54 @@ testAsync('Importer: a damaged .zip shows the reader\'s sentence, and a bad file
   const again = bootImporter();
   again.sandbox.setSelectedFile(zipFile('bad-json.zip', makeZip([{ name: 'list.json', data: '{"formatVersion":1}' }])));
   await settle();
-  assert.match(again.elements.status.textContent, /Couldn't read "list\.json" inside the \.zip/);
+  assert.match(again.elements.status.textContent, /doesn't contain an Add-ons Exporter file/);
+  assert.deepStrictEqual(shownNames(again.elements), []);
+});
+
+testAsync('Importer: files in a .zip that hold the same add-ons are one export, with no picker', async () => {
+  const { sandbox, elements } = bootImporter();
+  sandbox.setSelectedFile(zipFile('same.zip', makeZip([
+    { name: 'one.json', data: jsonText(['Alpha', 'Beta']) },
+    { name: 'two.json', data: jsonText(['Beta', 'Alpha']), method: 'deflate' },
+    { name: 'notes.txt', data: 'just some notes, not an export' },
+  ])));
+  await settle();
+  assert.strictEqual(elements.status.textContent, '');
+  assert.deepStrictEqual(shownNames(elements), ['Alpha', 'Beta']);
+  assert.strictEqual(elements.exportPickRow.style.display, 'none', 'no picker when the files agree');
+});
+
+testAsync('Importer: a .zip with different exports shows a picker ("All add-ons" first and default, then the biggest export), and the choice redraws the list', async () => {
+  const { sandbox, elements } = bootImporter();
+  sandbox.setSelectedFile(zipFile('mixed.zip', makeZip([
+    { name: 'first.json', data: jsonText(['Alpha']) },
+    { name: 'second.json', data: jsonText(['Beta', 'Gamma']), method: 'deflate' },
+  ])));
+  await settle();
+
+  const options = () => elements.exportPickList.querySelectorAll('.export-pick-option');
+  assert.deepStrictEqual(options().map((o) => o.textContent), ['All add-ons (2)', 'second.json (2)', 'first.json (1)']);
+  assert.strictEqual(elements.exportPickRow.style.display, 'block');
+  assert.strictEqual(elements.exportPick.textContent, 'All add-ons (2)', '"All add-ons" is the default');
+  assert.strictEqual(elements.exportPickList.style.display, 'none', 'the row panel starts closed');
+  assert.deepStrictEqual(shownNames(elements), ['Alpha', 'Gamma'], 'All merges, keeping id 0@x once - from the first export');
+
+  elements.exportPick.click(); // the closed box opens the row panel
+  assert.strictEqual(elements.exportPickList.style.display, 'block');
+  assert.strictEqual(elements.exportPick.getAttribute('aria-expanded'), 'true');
+
+  options()[1].click(); // second.json
+  assert.strictEqual(elements.exportPickList.style.display, 'none', 'picking a row closes the panel');
+  assert.strictEqual(elements.exportPick.textContent, 'second.json (2)', 'the closed box echoes the choice');
+  assert.deepStrictEqual(shownNames(elements), ['Beta', 'Gamma']);
+
+  options()[2].click(); // first.json
+  assert.strictEqual(elements.exportPick.textContent, 'first.json (1)');
+  assert.deepStrictEqual(shownNames(elements), ['Alpha']);
+
+  options()[0].click(); // back to All add-ons
+  assert.strictEqual(elements.exportPick.textContent, 'All add-ons (2)');
+  assert.deepStrictEqual(shownNames(elements), ['Alpha', 'Gamma']);
 });
 
 test('Importer: .zip is an accepted file type, and the page lists the zip reader before import.js', () => {
