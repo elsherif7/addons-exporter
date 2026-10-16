@@ -90,11 +90,9 @@ function parseSettingsFile(text) {
 // Export handler below - buildSettingsExport() itself is unchanged, and
 // still only writes whatever it's actually given.
 function withSettingsDefaults(stored) {
-  const fmt = stored && stored[EXPORT_FORMAT_STORAGE_KEY];
-  const shorten = stored && stored[SHORT_NAME_STORAGE_KEY];
   return {
     [SETTINGS_SCHEMA.theme.key]: SETTINGS_SCHEMA.theme.resolve(stored && stored[SETTINGS_SCHEMA.theme.key]),
-    [EXPORT_FORMAT_STORAGE_KEY]: serializeExportFormats(fmt),
-    [SHORT_NAME_STORAGE_KEY]: (shorten === 'on' || shorten === 'off') ? shorten : SHORT_NAME_DEFAULT,
+    [EXPORT_FORMAT_STORAGE_KEY]: serializeExportFormats(stored && stored[EXPORT_FORMAT_STORAGE_KEY]),
+    [SHORT_NAME_STORAGE_KEY]: resolveShortenNames(stored && stored[SHORT_NAME_STORAGE_KEY]),
   };
 }

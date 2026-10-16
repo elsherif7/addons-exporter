@@ -4,7 +4,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readReportBuilders, readImport } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readReportBuilders, readImport, plain } = require('./helpers');
 
 function makeFakeElement() {
   return {
@@ -178,7 +178,7 @@ test('parseAddonsPayload: valid file succeeds and returns the parsed addons', ()
   const result = parseAddonsPayload(payload([entry()]));
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons.length, 1);
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(result.addons[0])), entry());
+  assert.deepStrictEqual(plain(result.addons[0]), entry());
 });
 
 // The HTML report from the version released on addons.mozilla.org, saved
@@ -436,10 +436,6 @@ test('deselectAllBtn: unchecks visible enabled rows, leaves disabled rows alone'
 // so it's set here via vm.runInContext() directly against the returned
 // sandbox, in the same lexical scope where it was declared.
 
-// Objects built inside the vm sandbox have a different Object prototype, so
-// deepStrictEqual needs them copied into this realm first.
-const plain = (v) => JSON.parse(JSON.stringify(v));
-
 function selectItems(links) {
   const boxes = links.map((_, i) => {
     const cb = makeCheckbox();
@@ -632,7 +628,7 @@ test('parseCsvPayload: a file the exporter wrote is read back, every field', () 
   const result = parseCsvPayload(csvLines([csvRow(), csvRow({ name: 'Midnight', type: 'theme', enabled: 'false', id: 'b@e.com' })]));
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons.length, 2);
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(result.addons[0])),
+  assert.deepStrictEqual(plain(result.addons[0]),
     { name: 'uBlock Origin', version: '1.0', type: 'extension', enabled: true, link: 'https://x.com/', linkType: 'amo-exact', id: 'a@e.com' });
   assert.strictEqual(result.addons[1].type, 'theme');
   assert.strictEqual(result.addons[1].enabled, false);

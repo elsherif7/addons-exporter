@@ -19,6 +19,7 @@ const ROOT = path.join(__dirname, '..');
 const LIBRARIES = [
   'src/common/theme.js',
   'src/common/core.js',
+  'src/common/crc32.js',
   'src/common/page-ui.js',
   'src/common/addon-list.js',
   'src/common/press.js',

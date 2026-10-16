@@ -1,7 +1,8 @@
 // Reads the export files out of a .zip, so the Importer can open the .zip the
 // Exporter writes when several formats are ticked (and a .zip made by any
 // other tool). Pure: no page, no extension APIs - only the standard Blob,
-// DecompressionStream and TextDecoder, so it can be tested on its own.
+// DecompressionStream and TextDecoder plus the shared CRC-32
+// (src/common/crc32.js), so it can be tested on its own.
 //
 // What it supports: files that are stored or deflated (the two methods every
 // zip tool uses), UTF-8 text, any number of entries. What it refuses, with a
@@ -22,21 +23,8 @@ const ZIP_LOCAL_SIGNATURE = 0x04034b50;
 const ZIP_MAX_COMMENT = 0xFFFF;
 const ZIP_MAX_ENTRIES_READ = 50; // an export holds at most one file per format
 
-const UNZIP_CRC_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-    table[n] = c >>> 0;
-  }
-  return table;
-})();
-
-function unzipCrc32(bytes) {
-  let crc = 0xFFFFFFFF;
-  for (let i = 0; i < bytes.length; i++) crc = UNZIP_CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
-  return (crc ^ 0xFFFFFFFF) >>> 0;
-}
+// An entry's checksum is checked with zipCrc32() from src/common/crc32.js - the
+// very same function the writer stamps entries with.
 
 const unzipError = (detail) => ({ ok: false, error: `This isn't a .zip file the Importer can read (${detail}).` });
 
@@ -138,7 +126,7 @@ async function readZipEntries(bytes, { extensions, maxEntryBytes }) {
           return unzipError(`"${e.name}" is damaged`);
         }
       }
-      if (data.length !== e.size || unzipCrc32(data) !== e.crc) return unzipError(`"${e.name}" is damaged`);
+      if (data.length !== e.size || zipCrc32(data) !== e.crc) return unzipError(`"${e.name}" is damaged`);
       entries.push({ name: e.name, text: decoder.decode(data) });
     }
     return { ok: true, entries };

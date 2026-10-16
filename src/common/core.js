@@ -62,12 +62,19 @@ function makeSource(fileType, formatVersion, browserSource) {
   };
 }
 
+// Exactly these keys, in exactly this order (JSON.parse keeps a file's order).
+// The one place "the fields are exactly these, in this order" is written: the
+// source check below and the Importer's payload check (parsers.js) both use it.
+function hasExactKeys(obj, keys) {
+  const have = Object.keys(obj);
+  return have.length === keys.length && keys.every((k, i) => have[i] === k);
+}
+
 // null when `source` is exactly what an exporter writes, otherwise a short
 // reason. When `fileType` is given, the source must name exactly that file type.
 function sourceProblem(source, fileType) {
   if (!source || typeof source !== 'object' || Array.isArray(source)) return 'it is not an object';
-  const have = Object.keys(source);
-  if (have.length !== SOURCE_KEYS.length || !SOURCE_KEYS.every((k, i) => have[i] === k)) {
+  if (!hasExactKeys(source, SOURCE_KEYS)) {
     return 'its fields are not exactly ' + SOURCE_KEYS.join(', ') + ', in that order';
   }
   if (!Number.isInteger(source.formatVersion) || source.formatVersion < 1) return 'its format version is not a positive whole number';
@@ -237,6 +244,15 @@ const SETTINGS_SCHEMA = {
 };
 const SETTINGS_STORAGE_KEYS = Object.values(SETTINGS_SCHEMA).map((d) => d.key);
 
+// The localStorage cache keys the Settings page uses to pre-apply its controls
+// before the first paint: settings.js writes the current choice here after each
+// change, and settings-init.js reads it back synchronously on the next open.
+// Kept in one place so the two files can never drift apart.
+const SETTINGS_CACHE_KEYS = {
+  exportFormat: 'addons-hub-settings-exportFormat',
+  shortenNames: 'addons-hub-settings-shortenNames',
+};
+
 function defaultSettings() {
   const out = {};
   for (const [name, def] of Object.entries(SETTINGS_SCHEMA)) {
@@ -325,6 +341,17 @@ const LINK_TYPE_LABELS = {
   'amo-search-fallback': 'Search results',
 };
 const UNCERTAIN_LINK_TYPES = new Set(['amo-search', 'amo-search-fallback']);
+
+// The timestamp every downloaded file's name carries - "2026-10-17_14-05-09"
+// in local time - so two exports into the same folder never overwrite each
+// other. Used by background.js (the add-on exports) and settings.js (the
+// settings file).
+function formatFilenameTimestamp(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const time = `${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+  return `${date}_${time}`;
+}
 
 // Stagger between opening add-on tabs, so dozens of add-ons don't all burst
 // open at once. Used by import.js (fallback) and background.js.

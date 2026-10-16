@@ -435,12 +435,12 @@ test('computeRetryAfterMs: converts seconds to ms', () => {
   assert.strictEqual(sandbox.computeRetryAfterMs('2'), 2000);
 });
 
-// These mirror AMO_RETRY_AFTER_MAX_MS / AMO_RETRY_AFTER_DEFAULT_MS in
-// core.js as literals - they're declared with const there, so (unlike
-// the function declarations used everywhere else in this file) they
-// never attach to the vm context as sandbox properties to read back.
-const RETRY_AFTER_MAX_MS = 10000;
-const RETRY_AFTER_DEFAULT_MS = 1000;
+// Read straight out of the sandbox so they can never drift from amo.js.
+// They're declared with const, so (unlike the function declarations used
+// everywhere else in this file) they never attach to the vm context as
+// sandbox properties - evalInContext is what reads them back.
+const RETRY_AFTER_MAX_MS = evalInContext(sandbox, 'AMO_RETRY_AFTER_MAX_MS');
+const RETRY_AFTER_DEFAULT_MS = evalInContext(sandbox, 'AMO_RETRY_AFTER_DEFAULT_MS');
 
 test('computeRetryAfterMs: caps an absurdly large value', () => {
   assert.strictEqual(sandbox.computeRetryAfterMs('99999'), RETRY_AFTER_MAX_MS);

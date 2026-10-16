@@ -5,7 +5,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, readCommon, readReportBuilders } = require('./helpers');
+const { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, plain } = require('./helpers');
 
 const commonSrc = readCommon();
 const reportTemplateSrc = readReportBuilders() + '\n' + readSrc('src/background/browser-info.js');
@@ -488,10 +488,6 @@ testAsync('background.js: loads with only the management API and registers its m
 
 // --- background.js: openTabs (the Importer hands every tab after the first to us) ---
 
-// Objects built inside the vm sandbox have a different Object prototype, so
-// deepStrictEqual needs them copied into this realm first.
-const plain = (v) => JSON.parse(JSON.stringify(v));
-
 function loadBackgroundForOpenTabs({ failUrls = [] } = {}) {
   let messageListener = null;
   const created = [];
@@ -623,7 +619,7 @@ function readZip(bytes) {
 }
 
 test('zip.js: buildZip stores every file intact, with correct names and CRCs (incl. non-ASCII)', () => {
-  const zipSrc = readSrc('src/background/zip.js');
+  const zipSrc = readSrcs('src/common/crc32.js', 'src/background/zip.js');
   const sb = { TextEncoder, Uint8Array, Uint32Array, DataView };
   vm.createContext(sb);
   vm.runInContext(zipSrc, sb);
@@ -661,7 +657,7 @@ testAsync('export message: several formats are downloaded as one .zip with a sin
   vm.createContext(bgSandbox);
   vm.runInContext(commonSrc, bgSandbox);
   vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(readSrc('src/background/zip.js'), bgSandbox);
+  vm.runInContext(readSrcs('src/common/crc32.js', 'src/background/zip.js'), bgSandbox);
   vm.runInContext(backgroundSrc, bgSandbox);
   const result = await listener({ type: 'export', ids: [addon.id] });
   assert.strictEqual(downloads.length, 1, 'one download, so one Save dialog');

@@ -12,7 +12,7 @@ const { test, testAsync, readSrc, readSrcs, readImport, readCommon, makeFakeDom 
 function load() {
   const sb = { Blob, DecompressionStream, TextDecoder, TextEncoder };
   vm.createContext(sb);
-  vm.runInContext(readSrcs('src/background/zip.js', 'src/import/zip-reader.js'), sb);
+  vm.runInContext(readSrcs('src/common/crc32.js', 'src/background/zip.js', 'src/import/zip-reader.js'), sb);
   return sb;
 }
 const sb = load();

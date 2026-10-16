@@ -6,7 +6,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrcs, readReportBuilders } = require('./helpers');
+const { test, testAsync, readSrcs, readReportBuilders, plain, htmlData } = require('./helpers');
 
 function load(globals = {}) {
   const sb = { URL, ...globals };
@@ -18,14 +18,12 @@ function load(globals = {}) {
 }
 const sb = load();
 const UNKNOWN = { browser: 'Unknown', basedOn: 'Unknown', browserVersion: 'unknown', extensionVersion: 'unknown' };
-const plain = (v) => JSON.parse(JSON.stringify(v)); // out of the sandbox's realm, for deepStrictEqual
 // The browser part of the source (what getExportSource returns), and a full
 // source as a given file type writes it (makeSource adds the version and type).
 const BROWSER = { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' };
 const source = (fileType, formatVersion = 2, browser = BROWSER) => ({ formatVersion, fileType, ...browser });
 const addon = (o = {}) => ({ id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/a', linkType: 'amo-exact', ...o });
 const list = [addon(), addon({ id: 'b@x', name: 'Beta', enabled: false, type: 'theme', link: 'https://example.com/b', linkType: 'homepage' })];
-const htmlData = (html) => JSON.parse(html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/)[1].replace(/<\\\//g, '</'));
 
 // --- the shared helpers ---
 

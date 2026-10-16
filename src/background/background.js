@@ -70,13 +70,6 @@ function queueTabOpens(urls) {
   return { queued: safe.length };
 }
 
-function formatFilenameTimestamp(d) {
-  const pad = (n) => String(n).padStart(2, '0');
-  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const time = `${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
-  return `${date}_${time}`;
-}
-
 // buildHtmlReport(), buildJsonExport(), buildCsvExport(), buildTxtExport() -
 // all export format builders - live in
 // export-formats.js (buildHtmlReport() in report-template.js), loaded before

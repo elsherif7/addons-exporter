@@ -8,7 +8,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, readCommon, readReportBuilders, readImport } = require('./helpers');
+const { test, readCommon, readReportBuilders, readImport, htmlData } = require('./helpers');
 
 const sb = {
   URL,
@@ -60,8 +60,6 @@ function makeList(seed, size) {
   }
   return list;
 }
-
-const htmlData = (html) => JSON.parse(html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/)[1]);
 
 // The fields every format carries, in a comparable form.
 // (The TXT file has no link-type column, so that field is left out for it.)

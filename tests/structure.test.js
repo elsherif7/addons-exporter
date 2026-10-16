@@ -237,20 +237,24 @@ function keyframesBody(src, name) {
   return m[1].replace(/\s+/g, ' ').trim();
 }
 
-test('same as Settings: the Exporter, Importer and report use the very same animations as the Settings page', () => {
-  const settings = readSettingsPage();
-  for (const [name, src] of [['shared.css', sharedCssForMotion], ['report.css', reportCssForMotion]]) {
-    assert.strictEqual(keyframesBody(src, 'hub-unfold'), keyframesBody(settings, 'settings-card-unfold'), `${name}: card unfold`);
-    assert.strictEqual(keyframesBody(src, 'hub-title-in'), keyframesBody(settings, 'settings-title-in'), `${name}: title`);
-    assert.strictEqual(keyframesBody(src, 'hub-wipe-in'), keyframesBody(settings, 'settings-wipe-in'), `${name}: wipe (parts and rows)`);
-    assert.strictEqual(keyframesBody(src, 'hub-slide-in'), keyframesBody(settings, 'settings-slide-in'), `${name}: slide (headings)`);
+test('same as Settings: the report copies shared.css\'s hub-* animations exactly (it cannot load shared.css)', () => {
+  for (const name of ['hub-unfold', 'hub-title-in', 'hub-wipe-in', 'hub-slide-in']) {
+    assert.strictEqual(keyframesBody(reportCssForMotion, name), keyframesBody(sharedCssForMotion, name), `${name} must match shared.css`);
   }
+});
+
+test('same as Settings: the Settings page reuses the shared hub-* animations instead of duplicating them', () => {
+  const settings = readSettingsPage();
+  for (const name of ['hub-unfold', 'hub-title-in', 'hub-wipe-in', 'hub-slide-in']) {
+    assert.match(settings, new RegExp(`animation(?:-name)?: ${name}\\b`), `settings.css must use ${name}`);
+  }
+  assert.doesNotMatch(settings, /@keyframes settings-(card-unfold|title-in|wipe-in|slide-in)/, 'settings.css must not carry its own copies');
 });
 
 test('same as Settings: the same durations - card 0.8s, title 0.6s, parts and rows 0.55s', () => {
   const settings = readSettingsPage();
   assert.match(settings, /animation-duration: 0\.8s;/);
-  assert.match(settings, /animation-name: settings-title-in;\s*animation-duration: 0\.6s;/);
+  assert.match(settings, /animation-name: hub-title-in;\s*animation-duration: 0\.6s;/);
   assert.match(settings, /\.settings-group > \* \{[^}]*animation-duration: 0\.55s;/);
   assert.match(sharedCssForMotion, /\.card\.staged \{ animation: hub-unfold 0\.8s /);
   assert.match(sharedCssForMotion, /\.card\.staged > h1:first-child \{ animation: hub-title-in 0\.6s /);

@@ -44,7 +44,7 @@ function readCommon() {
 }
 // The Importer: its readers, its matching and the page script.
 function readImport() {
-  return readSrcs('src/import/parsers.js', 'src/import/match.js', 'src/import/zip-reader.js', 'src/import/import.js');
+  return readSrcs('src/common/crc32.js', 'src/import/parsers.js', 'src/import/match.js', 'src/import/zip-reader.js', 'src/import/import.js');
 }
 // The Settings page: the settings-file code and the page script.
 function readSettings() {
@@ -62,6 +62,20 @@ function readReportBuilders() {
 // but const/let don't, so those have to be read this way instead.
 function evalInContext(sandbox, expr) {
   return vm.runInContext(expr, sandbox);
+}
+
+// A deep copy that leaves the vm sandbox's realm: a value built inside a
+// context has that context's Object prototype, which deepStrictEqual rejects,
+// so tests copy values out with this before comparing them.
+function plain(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+// The data an HTML report embeds (its <script id="addons-exporter-data">
+// block), parsed back into a plain object. The report escapes "/" as "\/"
+// inside that JSON, so undo that before parsing.
+function htmlData(html) {
+  return JSON.parse(html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/)[1].replace(/<\\\//g, '</'));
 }
 
 // --- Minimal fake DOM -------------------------------------------------
@@ -316,4 +330,4 @@ function makeFakeDom(ids = []) {
   return { document, elements };
 }
 
-module.exports = { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, readImport, readSettings, evalInContext, makeFakeDom };
+module.exports = { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, readImport, readSettings, evalInContext, plain, htmlData, makeFakeDom };

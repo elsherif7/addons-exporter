@@ -168,7 +168,7 @@ async function loadCurrentExportFormat() {
   for (const box of formatBoxes) {
     box.checked = exportFormats.includes(box.value);
   }
-  try { localStorage.setItem('addons-hub-settings-exportFormat', exportFormats.join(',')); } catch (e) {}
+  try { localStorage.setItem(SETTINGS_CACHE_KEYS.exportFormat, exportFormats.join(',')); } catch (e) {}
 }
 for (const radio of themeRadios) {
   radio.addEventListener('change', async () => {
@@ -197,7 +197,7 @@ for (const box of formatBoxes) {
     }
     try {
       await browser.storage.local.set({ [EXPORT_FORMAT_STORAGE_KEY]: serializeExportFormats(ticked) });
-      try { localStorage.setItem('addons-hub-settings-exportFormat', resolveExportFormats(ticked).join(',')); } catch (e) {}
+      try { localStorage.setItem(SETTINGS_CACHE_KEYS.exportFormat, resolveExportFormats(ticked).join(',')); } catch (e) {}
     } catch (err) {
       setSettingsStatus('Could not save export format: ' + err.message, true);
       await loadCurrentExportFormat();
@@ -210,7 +210,7 @@ async function loadCurrentShortenNames() {
   for (const radio of shortenRadios) {
     radio.checked = radio.value === shortenNames;
   }
-  try { localStorage.setItem('addons-hub-settings-shortenNames', shortenNames); } catch (e) {}
+  try { localStorage.setItem(SETTINGS_CACHE_KEYS.shortenNames, shortenNames); } catch (e) {}
 }
 
 for (const radio of shortenRadios) {
@@ -245,9 +245,7 @@ exportSettingsBtn.addEventListener('click', async () => {
     const json = buildSettingsExport(withSettingsDefaults(stored), await getSettingsSource());
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const pad = (n) => String(n).padStart(2, '0');
-    const d = new Date();
-    const timestamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+    const timestamp = formatFilenameTimestamp(new Date());
     const filename = `Add-ons Hub Settings (${timestamp}).json`;
 
     try {
@@ -326,8 +324,8 @@ settingsFileInput.addEventListener('change', async () => {
   }
   // Write the confirmed values to the localStorage cache so settings-init.js
   // can pre-apply them synchronously before the first paint on the next open.
-  try { localStorage.setItem('addons-hub-settings-exportFormat', exportFormats.join(',')); } catch (e) {}
-  try { localStorage.setItem('addons-hub-settings-shortenNames', shortenNames); } catch (e) {}
+  try { localStorage.setItem(SETTINGS_CACHE_KEYS.exportFormat, exportFormats.join(',')); } catch (e) {}
+  try { localStorage.setItem(SETTINGS_CACHE_KEYS.shortenNames, shortenNames); } catch (e) {}
 })();
 
 // --- Check for updates ---

@@ -19,7 +19,7 @@ const assert = require('assert');
 const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
-const { test, readSrc, evalInContext, readCommon, readReportBuilders, readImport } = require('./helpers');
+const { test, readSrc, evalInContext, readCommon, readReportBuilders, readImport, htmlData } = require('./helpers');
 
 const CONTRACT = {
   exportFormatVersion: 2,
@@ -66,7 +66,6 @@ const list = [
 ];
 const SOURCE = { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' };
 const keys = (o) => Array.from(Object.keys(o));
-const htmlData = (html) => JSON.parse(html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/)[1]);
 
 const HINT = ' - the data layout changed. Read the note at the top of tests/format-contract.test.js: bump the format version and update CONTRACT on purpose.';
 

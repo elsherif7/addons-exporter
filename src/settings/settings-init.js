@@ -18,8 +18,8 @@
 // Theme is excluded because theme.js already handles it with its own
 // localStorage cache key (addons-hub-theme-cache).
 //
-// Cache keys must match what settings.js writes after its authoritative
-// browser.storage.local read (see the batched init IIFE in settings.js).
+// The cache keys themselves live in core.js (SETTINGS_CACHE_KEYS), shared
+// with settings.js, so the two can never drift apart.
 //
 // Wrapped in try/catch so any localStorage error degrades silently — the
 // defaults are still applied from the explicit fallback paths below.
@@ -36,8 +36,8 @@
   var shorten = null;
 
   try {
-    fmt     = localStorage.getItem('addons-hub-settings-exportFormat');
-    shorten = localStorage.getItem('addons-hub-settings-shortenNames');
+    fmt     = localStorage.getItem(SETTINGS_CACHE_KEYS.exportFormat);
+    shorten = localStorage.getItem(SETTINGS_CACHE_KEYS.shortenNames);
   } catch (e) {
     // localStorage unavailable — fall through to apply defaults below.
   }

@@ -17,11 +17,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { test, readSrc } = require('./helpers');
+const { test, readSrc, readSrcs } = require('./helpers');
 
 const sandbox = { TextEncoder, Uint8Array, Uint32Array, DataView };
 vm.createContext(sandbox);
-vm.runInContext(readSrc('src/background/zip.js'), sandbox);
+vm.runInContext(readSrcs('src/common/crc32.js', 'src/background/zip.js'), sandbox);
 
 // Names and contents like a real multi-format export, including non-ASCII.
 const files = [

@@ -1,6 +1,13 @@
 // TAB_OPEN_DELAY_MS (the stagger between opened tabs) lives in core.js.
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// A file name's extension, lower-case and without the dot ("a.JSON" -> "json").
+// Used wherever a name has to be turned into a reader (validateSelectedFile,
+// the .zip entries and loadFile).
+function extensionOf(name) {
+  return (name.split('.').pop() || '').toLowerCase();
+}
+
 const statusEl = document.getElementById('status');
 const fileNameEl = document.getElementById('fileName');
 const fileNameRow = document.getElementById('fileNameRow');
@@ -55,7 +62,7 @@ const list = createAddonList({
 function clearAddonList() {
   displayItems = [];
   loadedExports = [];
-  addonListEl.innerHTML = '';
+  addonListEl.replaceChildren();
   checklistBoxEl.style.display = 'none';
   listControls.style.display = 'none';
   exportPickRowEl.style.display = 'none';
@@ -180,7 +187,7 @@ const ZIP_READ_ORDER = ['json', 'html', 'htm', 'csv', 'txt'];
 // HTML), or, for a very large file, reading the whole thing into memory
 // for no reason.
 function validateSelectedFile(file) {
-  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const ext = extensionOf(file.name);
   if (!ACCEPTED_IMPORT_EXTENSIONS.has(ext)) {
     return { ok: false, error: `"${file.name}" isn't a supported file type. Choose an .html, .json, .csv, .txt, or .zip export.` };
   }
@@ -313,9 +320,8 @@ const noExportInZip = () => ({ ok: false, error: "That .zip doesn't contain an A
 async function parseZipExport(buffer) {
   const zip = await readZipEntries(new Uint8Array(buffer), { extensions: IMPORT_TEXT_EXTENSIONS, maxEntryBytes: MAX_IMPORT_FILE_SIZE_BYTES });
   if (!zip.ok) return zip;
-  const extOf = (name) => name.split('.').pop().toLowerCase();
   const entries = zip.entries
-    .map((e, i) => ({ ...e, ext: extOf(e.name), i }))
+    .map((e, i) => ({ ...e, ext: extensionOf(e.name), i }))
     .sort((a, b) => ZIP_READ_ORDER.indexOf(a.ext) - ZIP_READ_ORDER.indexOf(b.ext) || a.i - b.i);
   if (entries.length === 0) return noExportInZip();
   const parsed = [];
@@ -337,7 +343,7 @@ async function loadFile(file) {
   clearAddonList();
   setStatus('Reading file...');
   try {
-    const ext = file.name.split('.').pop().toLowerCase();
+    const ext = extensionOf(file.name);
     let exports;
     if (ext === 'zip') {
       const buffer = await file.arrayBuffer();

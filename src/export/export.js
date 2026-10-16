@@ -115,7 +115,12 @@ function createAddonRow(a, index, shorten) {
 
 function renderList(addons, shorten) {
   if (addons.length === 0) {
-    listEl.innerHTML = '<p class="placeholder-text">No add-ons found to export.</p>';
+    // Built with DOM APIs, never innerHTML (see addon-list.js), so the
+    // placeholder is a real element in every context, tests included.
+    const placeholder = document.createElement('p');
+    placeholder.className = 'placeholder-text';
+    placeholder.textContent = 'No add-ons found to export.';
+    listEl.replaceChildren(placeholder);
     list.updateSelectionCount();
     return;
   }

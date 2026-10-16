@@ -53,7 +53,7 @@ body {
 }
 
 /* Entrance animation keyframes (the pages' own opening is the staged reveal
-   below; Settings spells its own out in settings.css).
+   below; the Settings page uses these same hub-* names).
    IMPORTANT: these use backwards fill, never both/forwards. A held final
    keyframe would override the :hover transform on buttons and inputs that
    are direct children of the card. */

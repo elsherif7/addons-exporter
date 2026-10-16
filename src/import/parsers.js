@@ -66,17 +66,14 @@ function dedupeAddons(list) {
 const HTML_ENTRY_KEYS = ['id', 'name', 'version', 'enabled', 'type', 'link', 'linkType'];
 const JSON_ENTRY_KEYS = ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id'];
 const payloadError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter format (${detail}).` });
-// Exactly these keys, in exactly this order (JSON.parse keeps the file's order).
-const sameKeys = (obj, keys) => {
-  const have = Object.keys(obj);
-  return have.length === keys.length && keys.every((k, i) => have[i] === k);
-};
+// "Exactly these keys, in exactly this order" is hasExactKeys() in core.js -
+// the same check sourceProblem() uses on a source block.
 
 // Returns null when the entry is exactly what the exporter writes, otherwise a
 // short reason.
 function addonEntryProblem(a, keys) {
   if (!a || typeof a !== 'object' || Array.isArray(a)) return 'it is not an object';
-  if (!sameKeys(a, keys)) return 'its fields are not exactly ' + keys.join(', ') + ', in that order';
+  if (!hasExactKeys(a, keys)) return 'its fields are not exactly ' + keys.join(', ') + ', in that order';
   if (typeof a.id !== 'string' || a.id === '') return 'it has no id';
   if (typeof a.name !== 'string' || a.name.trim() === '') return 'it has no name';
   if (typeof a.version !== 'string') return 'its version is not text';
@@ -131,7 +128,7 @@ function parseAddonsPayload(jsonText, entryKeys = HTML_ENTRY_KEYS, fileType = 'h
     return { ok: false, error: 'No add-ons found in that file' };
   }
   const topKeys = formatVersion >= 2 ? ['source', 'addons'] : ['formatVersion', 'addons'];
-  if (!sameKeys(parsed, topKeys)) {
+  if (!hasExactKeys(parsed, topKeys)) {
     return payloadError('the data is not exactly ' + topKeys.join(', then '));
   }
 
@@ -168,6 +165,31 @@ function stripCsvFormulaGuard(s) {
 // The one header row buildCsvExport() (export-formats.js) writes.
 const CSV_HEADER = ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id'];
 
+// One message for every "this file is from the future" case below.
+const NEWER_VERSION_ERROR = 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.';
+
+// Reads the header a CSV or TXT export starts with: the format-2 source
+// comments (whose first line carries the format version) or the format-1 plain
+// format-version comment. `formatError` is the format's own error builder
+// (csvError/txtError). Returns { ok: true, formatVersion, source, start } -
+// `start` is the index of the first body line - or { ok: false, error }.
+function readFormatHeader(lines, fileType, formatError) {
+  const first = (lines && lines[0]) || '';
+  const sourceVersion = first.match(/^# addons-hub-source-formatVersion: (\d+)$/);
+  if (sourceVersion) {
+    const formatVersion = parseInt(sourceVersion[1], 10);
+    if (formatVersion > SUPPORTED_FORMAT_VERSION) return { ok: false, error: NEWER_VERSION_ERROR };
+    const source = parseSourceCommentLines(lines.slice(0, SOURCE_KEYS.length), fileType);
+    if (!source) return formatError('the file must start with the source comments, "# addons-hub-source-formatVersion: ..." and the five more');
+    return { ok: true, formatVersion, source, start: SOURCE_KEYS.length };
+  }
+  const versionMatch = first.match(/^# addons-hub-format-version: (\d+)$/);
+  if (!versionMatch) return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no format-version comment found)' };
+  const formatVersion = parseInt(versionMatch[1], 10);
+  if (formatVersion > SUPPORTED_FORMAT_VERSION) return { ok: false, error: NEWER_VERSION_ERROR };
+  return { ok: true, formatVersion, source: null, start: 1 };
+}
+
 const csvError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter CSV format (${detail}).` });
 
 // Validates and parses a CSV export file's text content. Accepts only what
@@ -187,30 +209,10 @@ function parseCsvPayload(text) {
   // Format 2 starts with the source comments, whose first line carries the
   // format version. Format 1 (what the releases wrote) has no source: it starts
   // with a plain format-version comment and its version is only there.
-  let formatVersion;
-  let source = null;
-  let bodyLines;
-  const sourceVersion = lines[0].match(/^# addons-hub-source-formatVersion: (\d+)$/);
-  if (sourceVersion) {
-    formatVersion = parseInt(sourceVersion[1], 10);
-    if (formatVersion > SUPPORTED_FORMAT_VERSION) {
-      return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
-    }
-    source = parseSourceCommentLines(lines.slice(0, SOURCE_KEYS.length), 'csv');
-    if (!source) return csvError('the file must start with the source comments, "# addons-hub-source-formatVersion: ..." and the five more');
-    bodyLines = lines.slice(SOURCE_KEYS.length);
-  } else {
-    const versionMatch = lines[0].match(/^# addons-hub-format-version: (\d+)$/);
-    if (!versionMatch) {
-      return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no format-version comment found)' };
-    }
-    formatVersion = parseInt(versionMatch[1], 10);
-    if (formatVersion > SUPPORTED_FORMAT_VERSION) {
-      return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
-    }
-    bodyLines = lines.slice(1);
-  }
-  const body = bodyLines.join('\n');
+  const header = readFormatHeader(lines, 'csv', csvError);
+  if (!header.ok) return header;
+  const { formatVersion, source } = header;
+  const body = lines.slice(header.start).join('\n');
 
   // The rest is parsed as a whole, not line by line, so a quoted name that
   // contains a line break stays one field.
@@ -347,29 +349,10 @@ function parseTxtPayload(text) {
   // Format 2 starts with the source comments, whose first line carries the
   // format version. Format 1 (what the releases wrote) has no source: it starts
   // with a plain format-version comment and its version is only there.
-  let formatVersion;
-  let source = null;
-  let start;
-  const sourceVersion = lines[0] && lines[0].match(/^# addons-hub-source-formatVersion: (\d+)$/);
-  if (sourceVersion) {
-    formatVersion = parseInt(sourceVersion[1], 10);
-    if (formatVersion > SUPPORTED_FORMAT_VERSION) {
-      return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
-    }
-    source = parseSourceCommentLines(lines.slice(0, SOURCE_KEYS.length), 'txt');
-    if (!source) return txtError('the file must start with the source comments, "# addons-hub-source-formatVersion: ..." and the five more');
-    start = SOURCE_KEYS.length;
-  } else {
-    const versionMatch = lines[0] && lines[0].match(/^# addons-hub-format-version: (\d+)$/);
-    if (!versionMatch) {
-      return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no format-version comment found)' };
-    }
-    formatVersion = parseInt(versionMatch[1], 10);
-    if (formatVersion > SUPPORTED_FORMAT_VERSION) {
-      return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
-    }
-    start = 1;
-  }
+  const header = readFormatHeader(lines, 'txt', txtError);
+  if (!header.ok) return header;
+  const { formatVersion, source } = header;
+  const start = header.start;
 
   // Format 2 added the link-type column (before the id); format 1 files, which
   // predate it, have one column fewer. Both are read, each against its own
