@@ -1,2 +1,3 @@
-﻿# addons-hub-format-version: 1
+﻿# addons-hub-format-version: 2
+# addons-hub-source: browser=Firefox; basedOn=Firefox; browserVersion=128.0; extensionVersion=1.2.0
 name,version,type,enabled,link,linkType,id

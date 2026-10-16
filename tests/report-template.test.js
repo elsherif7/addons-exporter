@@ -155,22 +155,23 @@ test('buildCsvExport: first line is the format-version comment', () => {
   assert.match(firstLine, /^\uFEFF# addons-hub-format-version: \d+$/);
 });
 
-test('buildCsvExport: second line is the header row with all expected columns', () => {
-  const csv = buildCsvExport(sampleList);
-  const headerLine = csv.split('\r\n')[1];
+test('buildCsvExport: second line is the source comment, third the header row with all expected columns', () => {
+  const csv = buildCsvExport(sampleList, true, { browser: 'Firefox', basedOn: 'Firefox', browserVersion: '128.0', extensionVersion: '1.2.0' });
+  assert.strictEqual(csv.split('\r\n')[1], '# addons-hub-source: browser=Firefox; basedOn=Firefox; browserVersion=128.0; extensionVersion=1.2.0');
+  const headerLine = csv.split('\r\n')[2];
   assert.strictEqual(headerLine, 'name,version,type,enabled,link,linkType,id');
 });
 
 test('buildCsvExport: produces one data row per add-on', () => {
   const csv = buildCsvExport(sampleList);
-  // Lines: comment + header + N data rows
-  const dataRows = csv.split('\r\n').slice(2);
+  // Lines: version comment + source comment + header + N data rows
+  const dataRows = csv.split('\r\n').slice(3);
   assert.strictEqual(dataRows.length, sampleList.length);
 });
 
 test('buildCsvExport: enabled field is "true" or "false" (not 1/0)', () => {
   const csv = buildCsvExport(sampleList);
-  const rows = csv.split('\r\n').slice(2);
+  const rows = csv.split('\r\n').slice(3);
   for (const row of rows) {
     const fields = row.split(',');
     // enabled is the 4th column (index 3)
@@ -181,20 +182,20 @@ test('buildCsvExport: enabled field is "true" or "false" (not 1/0)', () => {
 test('buildCsvExport: fields containing commas are quoted per RFC 4180', () => {
   const list = [{ id: 'x@e.com', name: 'Hello, World', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
   const csv = buildCsvExport(list, false); // full names: this is about CSV quoting, not shortening
-  const dataRow = csv.split('\r\n')[2];
+  const dataRow = csv.split('\r\n')[3];
   assert.match(dataRow, /"Hello, World"/);
 });
 
 test('buildCsvExport: fields containing double-quotes double them per RFC 4180', () => {
   const list = [{ id: 'x@e.com', name: 'Say "Hi"', version: '1.0', enabled: false, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
   const csv = buildCsvExport(list);
-  const dataRow = csv.split('\r\n')[2];
+  const dataRow = csv.split('\r\n')[3];
   assert.match(dataRow, /"Say ""Hi"""/);
 });
 
 test('buildCsvExport: all seven columns are present on every data row', () => {
   const csv = buildCsvExport(sampleList);
-  const rows = csv.split('\r\n').slice(2);
+  const rows = csv.split('\r\n').slice(3);
   for (const row of rows) {
     // A naive split on comma works here since our sample data has no
     // commas inside fields - just check the column count is right.
@@ -209,7 +210,7 @@ test('buildCsvExport: all seven columns are present on every data row', () => {
 test('buildCsvExport: a name starting with = gets a leading-apostrophe guard', () => {
   const list = [{ id: 'x@e.com', name: '=HYPERLINK("https://evil.example","click")', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
   const csv = buildCsvExport(list);
-  const dataRow = csv.split('\r\n')[2];
+  const dataRow = csv.split('\r\n')[3];
   assert.match(dataRow, /^"'=HYPERLINK/);
 });
 
@@ -217,7 +218,7 @@ test('buildCsvExport: names starting with +, -, @, or a tab all get the guard', 
   for (const name of ['+SUM(1,1)', '-1+1', '@cmd', '\tstart-with-tab']) {
     const list = [{ id: 'x@e.com', name, version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
     const csv = buildCsvExport(list, false); // full names: this is about the guard, not shortening
-    const dataRow = csv.split('\r\n')[2];
+    const dataRow = csv.split('\r\n')[3];
     assert.ok(dataRow.includes(`'${name}`), `expected a guarded "${name}" in row: ${dataRow}`);
   }
 });
@@ -225,7 +226,7 @@ test('buildCsvExport: names starting with +, -, @, or a tab all get the guard', 
 test('buildCsvExport: an ordinary name is not guarded', () => {
   const list = [{ id: 'x@e.com', name: 'uBlock Origin', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
   const csv = buildCsvExport(list);
-  const dataRow = csv.split('\r\n')[2];
+  const dataRow = csv.split('\r\n')[3];
   assert.ok(dataRow.startsWith('uBlock Origin,1.0,'), `should not be guarded: ${dataRow}`);
 });
 

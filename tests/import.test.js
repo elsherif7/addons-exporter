@@ -52,12 +52,21 @@ const {
 // sandbox object - it only exists in the context's own lexical scope.
 // Evaluate it there directly instead of destructuring it from sandbox.
 const EXPORT_FORMAT_VERSION = evalInContext(sandbox, 'EXPORT_FORMAT_VERSION');
+// The hand-built files in most tests below are format 1 (the add-ons only, no
+// source): format 1 is still read, so its strict layout stays covered. Format 2,
+// which adds the source, has its own tests at the end of this file.
+const V1 = 1;
 
 // --- parseAddonsPayload ---
 // Validates the untrusted-file payload embedded in an exported report.
 
-function payload(addons, formatVersion = EXPORT_FORMAT_VERSION) {
+function payload(addons, formatVersion = V1) {
   return JSON.stringify({ formatVersion, addons });
+}
+// A format 2 file: the same, with the source after the format version.
+const SOURCE = { browser: 'Firefox', basedOn: 'Firefox', browserVersion: '128.0', extensionVersion: '1.2.0' };
+function payloadV2(addons, source = SOURCE) {
+  return JSON.stringify({ formatVersion: 2, source, addons });
 }
 
 test('parseAddonsPayload: null jsonText (no embedded data element found)', () => {
@@ -121,7 +130,7 @@ test('parseAddonsPayload: every field must be present and of the right type', ()
 
 test('parseAddonsPayload: a field the exporter does not write rejects the file', () => {
   entryRejects(entry({ extra: 'x' }), /fields are not exactly/);
-  const result = parseAddonsPayload(JSON.stringify({ formatVersion: EXPORT_FORMAT_VERSION, addons: [entry()], note: 'x' }));
+  const result = parseAddonsPayload(JSON.stringify({ formatVersion: V1, addons: [entry()], note: 'x' }));
   assert.strictEqual(result.ok, false);
   assert.match(result.error, /not exactly formatVersion, then addons/);
 });
@@ -135,7 +144,7 @@ test('parseAddonsPayload: the fields must come in the order the HTML report writ
 });
 
 test('parseAddonsPayload: the top-level fields must be formatVersion, then addons', () => {
-  const swapped = JSON.stringify({ addons: [entry()], formatVersion: EXPORT_FORMAT_VERSION });
+  const swapped = JSON.stringify({ addons: [entry()], formatVersion: V1 });
   assert.strictEqual(parseAddonsPayload(swapped).ok, false);
 });
 
@@ -157,9 +166,10 @@ test('parseAddonsPayload: formatVersion newer than supported is rejected', () =>
   assert.match(result.error, /newer version of Add-ons Exporter/);
 });
 
-test('parseAddonsPayload: formatVersion exactly at the supported boundary succeeds', () => {
-  const result = parseAddonsPayload(payload([entry()], EXPORT_FORMAT_VERSION));
-  assert.strictEqual(result.ok, true);
+test('parseAddonsPayload: the newest supported format version succeeds, and so does the one before it', () => {
+  assert.strictEqual(EXPORT_FORMAT_VERSION, 2);
+  assert.strictEqual(parseAddonsPayload(payload([entry()], V1)).ok, true);
+  assert.strictEqual(parseAddonsPayload(payloadV2([entry()])).ok, true);
 });
 
 test('parseAddonsPayload: valid file succeeds and returns the parsed addons', () => {
@@ -230,6 +240,8 @@ test('migrateAddonsData: currently a no-op, returns the list unchanged', () => {
   assert.strictEqual(migrateAddonsData(list, EXPORT_FORMAT_VERSION), list);
 });
 
+// (Format 2 only added the source around the add-ons, so the add-on entries
+// still need no migration.)
 // Deliberately hardcodes today's version number and today's no-op
 // behavior, rather than reading EXPORT_FORMAT_VERSION dynamically like
 // the test above. The moment someone bumps EXPORT_FORMAT_VERSION, this
@@ -239,7 +251,7 @@ test('migrateAddonsData: currently a no-op, returns the list unchanged', () => {
 // quietly going out with the old no-op still in place.
 test('migrateAddonsData: bumping the format version requires updating this test and migrateAddonsData', () => {
   assert.strictEqual(
-    EXPORT_FORMAT_VERSION, 1,
+    EXPORT_FORMAT_VERSION, 2,
     'EXPORT_FORMAT_VERSION changed - implement real migration logic in migrateAddonsData for the new format, then update this test to match.'
   );
   const list = [{ name: 'X' }];
@@ -540,7 +552,7 @@ testAsync('openSelectedBtn: a failing navigation still leaves the add-on tabs op
 
 // --- parseJsonPayload ---
 
-function jsonFile(addons, formatVersion = EXPORT_FORMAT_VERSION) {
+function jsonFile(addons, formatVersion = V1) {
   return JSON.stringify({ formatVersion, addons });
 }
 
@@ -599,7 +611,7 @@ test('parseCsvRecords: plain, quoted (comma, doubled quote, line break) and empt
 // The importer accepts exactly what buildCsvExport() writes and nothing else.
 
 const CSV_HEAD = 'name,version,type,enabled,link,linkType,id';
-const csvLines = (rows, formatVersion = EXPORT_FORMAT_VERSION, header = CSV_HEAD) =>
+const csvLines = (rows, formatVersion = V1, header = CSV_HEAD) =>
   [`# addons-hub-format-version: ${formatVersion}`, header, ...rows].join('\r\n');
 const csvRow = (o = {}) => {
   const a = { name: 'uBlock Origin', version: '1.0', type: 'extension', enabled: 'true', link: 'https://x.com/', linkType: 'amo-exact', id: 'a@e.com', ...o };
@@ -626,8 +638,8 @@ test('parseCsvPayload: missing format-version comment is rejected', () => {
 });
 
 test('parseCsvPayload: the format-version comment must be exactly the exporter\'s (no padding commas, no extra spaces)', () => {
-  csvRejects(`# addons-hub-format-version: ${EXPORT_FORMAT_VERSION},,,,,,\r\n${CSV_HEAD}\r\n${csvRow()}`, /no format-version comment found/);
-  csvRejects(`#addons-hub-format-version: ${EXPORT_FORMAT_VERSION}\r\n${CSV_HEAD}\r\n${csvRow()}`, /no format-version comment found/);
+  csvRejects(`# addons-hub-format-version: ${V1},,,,,,\r\n${CSV_HEAD}\r\n${csvRow()}`, /no format-version comment found/);
+  csvRejects(`#addons-hub-format-version: ${V1}\r\n${CSV_HEAD}\r\n${csvRow()}`, /no format-version comment found/);
 });
 
 test('parseCsvPayload: rejects a newer formatVersion', () => {
@@ -635,10 +647,10 @@ test('parseCsvPayload: rejects a newer formatVersion', () => {
 });
 
 test('parseCsvPayload: the header must be exactly the exporter\'s: a different column order, a missing or an extra column is rejected', () => {
-  csvRejects(csvLines([csvRow()], EXPORT_FORMAT_VERSION, 'id,name,version,enabled,type,link,linkType'), /header row must be/);
-  csvRejects(csvLines([csvRow()], EXPORT_FORMAT_VERSION, 'name,version,type,enabled,link,linkType'), /header row must be/);
-  csvRejects(csvLines([csvRow()], EXPORT_FORMAT_VERSION, CSV_HEAD + ',extra'), /header row must be/);
-  csvRejects(csvLines([csvRow()], EXPORT_FORMAT_VERSION, 'Name,Version,Type,Enabled,Link,LinkType,Id'), /header row must be/);
+  csvRejects(csvLines([csvRow()], V1, 'id,name,version,enabled,type,link,linkType'), /header row must be/);
+  csvRejects(csvLines([csvRow()], V1, 'name,version,type,enabled,link,linkType'), /header row must be/);
+  csvRejects(csvLines([csvRow()], V1, CSV_HEAD + ',extra'), /header row must be/);
+  csvRejects(csvLines([csvRow()], V1, 'Name,Version,Type,Enabled,Link,LinkType,Id'), /header row must be/);
 });
 
 test('parseCsvPayload: no data rows is rejected', () => {
@@ -737,7 +749,7 @@ const completeAddon = (a, i) => {
   // The JSON export's field order.
   return { name: full.name, version: full.version, type: full.type, enabled: full.enabled, link: full.link, linkType: full.linkType, id: full.id };
 };
-function jsonAddonsFile(addons, formatVersion = EXPORT_FORMAT_VERSION) {
+function jsonAddonsFile(addons, formatVersion = V1) {
   return { name: 'addons.json', text: async () => JSON.stringify({ formatVersion, addons: addons.map(completeAddon) }) };
 }
 
@@ -1251,10 +1263,11 @@ test('JSON export: each add-on lists name first and the id last', () => {
 });
 
 test('TXT export: a title, Enabled and Disabled sections, and lined-up columns', () => {
-  const txt = sandbox.buildTxtExport(readableSample, false);
+  const txt = sandbox.buildTxtExport(readableSample, false, SOURCE);
   const lines = txt.split('\r\n');
   assert.match(lines[0], /^# addons-hub-format-version: \d+$/);
-  assert.strictEqual(lines[2], 'Firefox Add-ons - 4 in total (2 enabled, 2 disabled)');
+  assert.strictEqual(lines[1], '# addons-hub-source: browser=Firefox; basedOn=Firefox; browserVersion=128.0; extensionVersion=1.2.0');
+  assert.strictEqual(lines[3], 'Firefox Add-ons - 4 in total (2 enabled, 2 disabled)');
   assert.ok(lines.includes('Enabled (2)') && lines.includes('Disabled (2)'));
   const rows = lines.filter((l) => l.includes(' | '));
   assert.strictEqual(rows.length, 4);
@@ -1442,7 +1455,7 @@ test('TXT round trip: with Shorten names off, the exact name also matches by nam
 
 // --- TXT: only what buildTxtExport() writes is accepted ---
 
-const txtLines = (lines, formatVersion = EXPORT_FORMAT_VERSION) => [`# addons-hub-format-version: ${formatVersion}`, '', ...lines].join('\r\n');
+const txtLines = (lines, formatVersion = V1) => [`# addons-hub-format-version: ${formatVersion}`, '', ...lines].join('\r\n');
 const txtLine = (o = {}) => {
   const a = { name: 'Dark Reader', version: '4.9', type: 'Extension', status: 'Enabled', link: 'https://example.com/d', id: 'dr@x', ...o };
   return [a.name, a.version, a.type, a.status, a.link, a.id].join(' | ');
@@ -1486,8 +1499,8 @@ test('TXT strict: an unescaped pipe inside a column cannot be mistaken for a nam
 
 test('TXT strict: the format-version comment must be exactly the first line, and a byte-order mark is not accepted', () => {
   txtRejects('\uFEFF' + txtLines([txtLine()]), /no format-version comment found/);
-  txtRejects(`#addons-hub-format-version: ${EXPORT_FORMAT_VERSION}\r\n${txtLine()}`, /no format-version comment found/);
-  txtRejects(`\r\n# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}\r\n${txtLine()}`, /no format-version comment found/);
+  txtRejects(`#addons-hub-format-version: ${V1}\r\n${txtLine()}`, /no format-version comment found/);
+  txtRejects(`\r\n# addons-hub-format-version: ${V1}\r\n${txtLine()}`, /no format-version comment found/);
 });
 
 test('TXT strict: title, section headings and blank lines (no " | " in them) are skipped, as the exporter writes them', () => {

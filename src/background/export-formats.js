@@ -21,18 +21,20 @@ function jsonAddon(a, shorten = true) {
 // each name at its first separator, exactly as the HTML report does. The
 // id is always included, and the Importer matches by id first, so a short
 // name never stops an add-on from being recognised.
-function buildJsonExport(list, shorten = true) {
+// `source` says which browser and extension version made the file (core.js).
+function buildJsonExport(list, shorten = true, source = UNKNOWN_SOURCE) {
   return JSON.stringify({
     formatVersion: EXPORT_FORMAT_VERSION,
+    source: normalizeSource(source),
     addons: groupForReading(list).all.map((a) => jsonAddon(a, shorten)),
   }, null, 2);
 }
 
 // Builds a CSV export. First line is a format-version comment so the
-// importer can validate it without guessing. Second line is the header
-// row. One data row per add-on. Fields with commas or quotes are
+// importer can validate it without guessing, second the source comment (which
+// browser made the file), third the header row. One data row per add-on. Fields with commas or quotes are
 // quoted and internal quotes are doubled per RFC 4180.
-function buildCsvExport(list, shorten = true) {
+function buildCsvExport(list, shorten = true, source = UNKNOWN_SOURCE) {
   const csvField = (val) => {
     let s = String(val == null ? '' : val);
     // A cell starting with =, +, -, @, tab, or CR is read as a formula by
@@ -59,6 +61,7 @@ function buildCsvExport(list, shorten = true) {
   // ignores it.
   const lines = [
     `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
+    sourceCommentLine(source),
     row(['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id']),
     ...groupForReading(list).all.map((a) => row([shorten ? shortName(a.name) : a.name, a.version, a.type, a.enabled, a.link, a.linkType, a.id])),
   ];
@@ -93,7 +96,7 @@ function txtEscape(value) {
     .replace(/^ +| +$/g, (spaces) => '\\s'.repeat(spaces.length));
 }
 
-function buildTxtExport(list, shorten = true) {
+function buildTxtExport(list, shorten = true, source = UNKNOWN_SOURCE) {
   const { enabled, disabled, all } = groupForReading(list);
   const nameOf = (a) => txtEscape(shorten ? shortName(a.name) : a.name);
 
@@ -124,8 +127,9 @@ function buildTxtExport(list, shorten = true) {
   const total = all.length;
   const lines = [
     `# addons-hub-format-version: ${EXPORT_FORMAT_VERSION}`,
+    sourceCommentLine(source),
     '',
-    `Firefox Add-ons - ${total} in total (${enabled.length} enabled, ${disabled.length} disabled)`,
+    `${normalizeSource(source).browser} Add-ons - ${total} in total (${enabled.length} enabled, ${disabled.length} disabled)`,
     '',
     ...section('Enabled', enabled),
     ...section('Disabled', disabled),

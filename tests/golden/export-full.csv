@@ -1,4 +1,5 @@
-﻿# addons-hub-format-version: 1
+﻿# addons-hub-format-version: 2
+# addons-hub-source: browser=Firefox; basedOn=Firefox; browserVersion=128.0; extensionVersion=1.2.0
 name,version,type,enabled,link,linkType,id
 "<script>alert(1)</script> & ""friends""",9.9,extension,true,https://example.com/?q=search&lang=en,amo-search-fallback,markup@example.com
 '=SUM(1+1) Helper,0.1,extension,true,https://addons.mozilla.org/en-US/firefox/addon/formula-helper/,amo-exact,formula@example.com

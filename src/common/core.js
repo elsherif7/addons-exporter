@@ -4,8 +4,75 @@
 // it is loaded EVERYWHERE: the background (manifest.json) and every page, always
 // first. Page-only code lives in page-ui.js, AMO lookups in background/amo.js.
 
-// Bump if the exported JSON shape ever changes.
-const EXPORT_FORMAT_VERSION = 1;
+// Bump if the exported data's shape ever changes.
+//   1: the add-ons only.
+//   2: also says where the export came from - the browser and its version and
+//      this extension's version (the "source", below). The Importer still reads 1.
+const EXPORT_FORMAT_VERSION = 2;
+
+// Where an export came from, written into every export file. The browser is
+// free text (whatever the browser calls itself: "Firefox", "LibreWolf",
+// "Waterfox", and later "Chrome" or anything else), so a new browser never needs
+// a new format version. Kept to plain characters so it reads the same in JSON,
+// CSV, TXT and HTML and can be checked strictly.
+const SOURCE_KEYS = ['browser', 'basedOn', 'browserVersion', 'extensionVersion'];
+const UNKNOWN_SOURCE = Object.freeze({ browser: 'Unknown', basedOn: 'Unknown', browserVersion: 'unknown', extensionVersion: 'unknown' });
+const SOURCE_TEXT_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9 ._+-]{0,62}[A-Za-z0-9._+-])?$/;
+
+// Reduces any value to text that passes SOURCE_TEXT_PATTERN, or `fallback`.
+function cleanSourceText(value, fallback) {
+  const text = String(value == null ? '' : value).replace(/[^A-Za-z0-9 ._+-]/g, '').replace(/ +/g, ' ').trim().slice(0, 64).trim();
+  return SOURCE_TEXT_PATTERN.test(text) ? text : fallback;
+}
+
+// A source with exactly the three keys, in order, each clean. Anything missing
+// or unusable becomes "Unknown" / "unknown", so a file is always written.
+function makeSource(browserName, browserVersion, extensionVersion, basedOn) {
+  return {
+    browser: cleanSourceText(browserName, UNKNOWN_SOURCE.browser),
+    basedOn: cleanSourceText(basedOn, UNKNOWN_SOURCE.basedOn),
+    browserVersion: cleanSourceText(browserVersion, UNKNOWN_SOURCE.browserVersion),
+    extensionVersion: cleanSourceText(extensionVersion, UNKNOWN_SOURCE.extensionVersion),
+  };
+}
+function normalizeSource(source) {
+  const s = source && typeof source === 'object' ? source : {};
+  return makeSource(s.browser, s.browserVersion, s.extensionVersion, s.basedOn);
+}
+
+// null when `source` is exactly what an exporter writes, otherwise a short reason.
+function sourceProblem(source) {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return 'it is not an object';
+  const have = Object.keys(source);
+  if (have.length !== SOURCE_KEYS.length || !SOURCE_KEYS.every((k, i) => have[i] === k)) {
+    return 'its fields are not exactly ' + SOURCE_KEYS.join(', ') + ', in that order';
+  }
+  for (const k of SOURCE_KEYS) {
+    if (typeof source[k] !== 'string' || !SOURCE_TEXT_PATTERN.test(source[k])) return `${k} is not plain text`;
+  }
+  return null;
+}
+
+// The one line CSV and TXT exports carry it in (right after the format-version
+// line), and the reader for it: the source, or null if the line is anything else.
+function sourceCommentLine(source) {
+  const s = normalizeSource(source);
+  return `# addons-hub-source: browser=${s.browser}; basedOn=${s.basedOn}; browserVersion=${s.browserVersion}; extensionVersion=${s.extensionVersion}`;
+}
+function parseSourceCommentLine(line) {
+  const m = typeof line === 'string' && line.match(/^# addons-hub-source: browser=([^;=]*); basedOn=([^;=]*); browserVersion=([^;=]*); extensionVersion=([^;=]*)$/);
+  if (!m) return null;
+  const source = { browser: m[1], basedOn: m[2], browserVersion: m[3], extensionVersion: m[4] };
+  return sourceProblem(source) ? null : source;
+}
+
+// "Firefox 128.0" for display (just the browser when its version is not known), with ", based on X" added when it is a different browser than the one it is built on.
+function sourceLabel(source) {
+  const s = normalizeSource(source);
+  const named = s.browserVersion === UNKNOWN_SOURCE.browserVersion ? s.browser : `${s.browser} ${s.browserVersion}`;
+  const known = s.basedOn !== UNKNOWN_SOURCE.basedOn && s.basedOn !== s.browser;
+  return known ? `${named}, based on ${s.basedOn}` : named;
+}
 
 // Storage key for the user's chosen export file format(s).
 // One format is stored as its plain string; more than one as an array of them,

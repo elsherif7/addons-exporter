@@ -1,4 +1,10 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
+  "source": {
+    "browser": "Firefox",
+    "basedOn": "Firefox",
+    "browserVersion": "128.0",
+    "extensionVersion": "1.2.0"
+  },
   "addons": []
 }

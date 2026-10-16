@@ -29,6 +29,8 @@ vm.createContext(sandbox);
 vm.runInContext(readCommon(), sandbox);
 vm.runInContext(readReportBuilders(), sandbox);
 const { buildHtmlReport, buildJsonExport, buildCsvExport, buildTxtExport } = sandbox;
+// A fixed source, so the files do not change with whoever regenerates them.
+const SOURCE = { browser: 'Firefox', basedOn: 'Firefox', browserVersion: '128.0', extensionVersion: '1.2.0' };
 
 const GOLDEN_DIR = path.join(__dirname, 'golden');
 const UPDATE = process.env.UPDATE_GOLDEN === '1';
@@ -80,27 +82,27 @@ const variants = [
 
 for (const [label, shorten] of variants) {
   test(`golden: JSON export (${label} names) is unchanged`, () => {
-    check(`export-${label}.json`, buildJsonExport(fixture, shorten));
+    check(`export-${label}.json`, buildJsonExport(fixture, shorten, SOURCE));
   });
   test(`golden: CSV export (${label} names) is unchanged`, () => {
-    check(`export-${label}.csv`, buildCsvExport(fixture, shorten));
+    check(`export-${label}.csv`, buildCsvExport(fixture, shorten, SOURCE));
   });
   test(`golden: TXT export (${label} names) is unchanged`, () => {
-    check(`export-${label}.txt`, buildTxtExport(fixture, shorten));
+    check(`export-${label}.txt`, buildTxtExport(fixture, shorten, SOURCE));
   });
   test(`golden: HTML report (${label} names, light) is unchanged`, () => {
-    check(`report-${label}-light.html`, maskHtml(buildHtmlReport(fixture, 'light', shorten)));
+    check(`report-${label}-light.html`, maskHtml(buildHtmlReport(fixture, 'light', shorten, SOURCE)));
   });
 }
 test('golden: HTML report (short names, dark) is unchanged', () => {
-  check('report-short-dark.html', maskHtml(buildHtmlReport(fixture, 'dark', true)));
+  check('report-short-dark.html', maskHtml(buildHtmlReport(fixture, 'dark', true, SOURCE)));
 });
 
 test('golden: an empty list gives the same (valid) output in every format', () => {
-  check('empty.json', buildJsonExport([], true));
-  check('empty.csv', buildCsvExport([], true));
-  check('empty.txt', buildTxtExport([], true));
-  check('empty.html', maskHtml(buildHtmlReport([], 'light', true)));
+  check('empty.json', buildJsonExport([], true, SOURCE));
+  check('empty.csv', buildCsvExport([], true, SOURCE));
+  check('empty.txt', buildTxtExport([], true, SOURCE));
+  check('empty.html', maskHtml(buildHtmlReport([], 'light', true, SOURCE)));
 });
 
 // Line endings are part of the format, not just of the golden files. The one
@@ -108,11 +110,11 @@ test('golden: an empty list gives the same (valid) output in every format', () =
 // TXT file never has one (its lines are one add-on each).
 test('golden: CSV and TXT exports separate lines with \\r\\n, JSON with \\n', () => {
   const lone = (text) => (text.match(/(?<!\r)\n/g) || []).length;
-  assert.ok(buildCsvExport(fixture, true).includes('\r\n'));
-  assert.strictEqual(lone(buildCsvExport(fixture, true)), 1, 'CSV: only the newline inside the quoted name');
-  assert.ok(buildTxtExport(fixture, true).includes('\r\n'));
-  assert.strictEqual(lone(buildTxtExport(fixture, true)), 0, 'TXT: no stray line breaks');
-  assert.ok(!buildJsonExport(fixture, true).includes('\r'), 'JSON has no \\r');
+  assert.ok(buildCsvExport(fixture, true, SOURCE).includes('\r\n'));
+  assert.strictEqual(lone(buildCsvExport(fixture, true, SOURCE)), 1, 'CSV: only the newline inside the quoted name');
+  assert.ok(buildTxtExport(fixture, true, SOURCE).includes('\r\n'));
+  assert.strictEqual(lone(buildTxtExport(fixture, true, SOURCE)), 0, 'TXT: no stray line breaks');
+  assert.ok(!buildJsonExport(fixture, true, SOURCE).includes('\r'), 'JSON has no \\r');
 });
 
 // A quick guard that the fixture really covers what the header comment claims,
@@ -137,5 +139,5 @@ test('golden: TXT escaping is unchanged', () => {
     { id: 'c@example.com', name: 'C:\\Tools\\ \\| end\\', version: '1.0', enabled: false, type: 'theme', link: 'https://example.com/c d', linkType: 'homepage' },
     { id: 'd@example.com', name: '  Padded  ', version: '1.0', enabled: false, type: 'extension', link: 'https://example.com/d', linkType: 'homepage' },
   ];
-  check('escapes.txt', buildTxtExport(escapes, false));
+  check('escapes.txt', buildTxtExport(escapes, false, SOURCE));
 });

@@ -245,6 +245,8 @@ async function doExport(ids, {
   // default if storage is ever unavailable.
   const { theme, exportFormats, shortenNames } = await loadSettings();
   const shorten = shortenNames !== 'off';
+  // Which browser and extension version made these files; written into each one.
+  const source = await getExportSource();
 
   // One file per chosen format, all named with the same timestamp. They are
   // built from the one list, so the (slow) AMO lookups above run only once
@@ -252,10 +254,10 @@ async function doExport(ids, {
   const timestamp = formatFilenameTimestamp(new Date());
   const files = exportFormats.map((fmt) => {
     let content;
-    if (fmt === 'json') content = buildJsonExport(list, shorten);
-    else if (fmt === 'csv') content = buildCsvExport(list, shorten);
-    else if (fmt === 'txt') content = buildTxtExport(list, shorten);
-    else content = buildHtmlReport(list, theme, shorten);
+    if (fmt === 'json') content = buildJsonExport(list, shorten, source);
+    else if (fmt === 'csv') content = buildCsvExport(list, shorten, source);
+    else if (fmt === 'txt') content = buildTxtExport(list, shorten, source);
+    else content = buildHtmlReport(list, theme, shorten, source);
     return { content, filename: `Firefox Add-ons (${timestamp}).${getExportFormat(fmt).extension}`, format: fmt };
   });
 

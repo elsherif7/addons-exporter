@@ -18,8 +18,11 @@ function safeJsonForScriptTag(value) {
 // the theme button, animation) can change freely, but the data block that
 // goes into #addons-exporter-data is what the Importer reads, and it must stay
 // exactly what the version released on addons.mozilla.org wrote:
-//   { "formatVersion": 1, "addons": [ { id, name, version, enabled, type, link, linkType }, ... ] }
-// in that order, with full (never shortened) names. Writing the fields out one
+//   { "formatVersion": 2, "source": { browser, basedOn, browserVersion, extensionVersion },
+//     "addons": [ { id, name, version, enabled, type, link, linkType }, ... ] }
+// in that order, with full (never shortened) names. (Format version 1, which
+// the release on addons.mozilla.org wrote, had no "source"; the Importer still
+// reads it.) Writing the fields out one
 // by one here keeps the order fixed whatever the caller's objects look like.
 // Changing any of this means bumping EXPORT_FORMAT_VERSION (see
 // tests/format-contract.test.js, which fails until the change is deliberate).
@@ -45,13 +48,21 @@ function reportInlineScript(theme) {
     .join('\n');
 }
 
+// "Exported from Firefox 128.0 with Add-ons Hub 1.2.0" - the visible form of the
+// source recorded in the report's data. Parts that are not known are left out.
+function sourceNote(source) {
+  const s = normalizeSource(source);
+  const withExtension = s.extensionVersion === UNKNOWN_SOURCE.extensionVersion ? '' : ` with Add-ons Hub ${s.extensionVersion}`;
+  return escapeHtml(`Exported from ${sourceLabel(s)}${withExtension}`);
+}
+
 // theme is 'light' or 'dark' - the report's starting appearance,
 // baked in from whatever the exporter's own Settings said at export
 // time (see doExport()'s call site). The toggle button lets anyone
 // viewing the report flip it, and the choice is persisted in
 // localStorage so it survives between opens of the same file.
 // Falls back to the baked-in value if localStorage is unavailable.
-function buildHtmlReport(list, theme, shorten = true) {
+function buildHtmlReport(list, theme, shorten = true, source = UNKNOWN_SOURCE) {
   const startingTheme = theme === 'dark' ? 'dark' : 'light';
   const grouped = groupForReading(list);
 
@@ -95,6 +106,7 @@ ${REPORT_CSS}
   </button>
   <h1>Add-ons Exporter</h1>
   <p class="intro-text"><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener">Add-ons Hub</a> installed, click its toolbar icon, choose <strong>Add-ons Importer</strong>, and select this file - any add-ons you don't already have will be pre-selected to open.</p>
+  <p class="intro-text source-note">${sourceNote(source)}</p>
 
   <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons...">
 
@@ -109,7 +121,7 @@ ${REPORT_CSS}
   </div>
   </div>
 
-  <script type="application/json" id="addons-exporter-data">${safeJsonForScriptTag({ formatVersion: EXPORT_FORMAT_VERSION, addons: list.map(htmlDataAddon) })}</script>
+  <script type="application/json" id="addons-exporter-data">${safeJsonForScriptTag({ formatVersion: EXPORT_FORMAT_VERSION, source: normalizeSource(source), addons: list.map(htmlDataAddon) })}</script>
   <script>
 ${reportInlineScript(startingTheme)}
   </script>

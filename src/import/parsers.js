@@ -4,9 +4,11 @@
 // writes. Nothing here touches the page, so it can be tested without a DOM.
 // Needs core.js (EXPORT_FORMAT_VERSION, parseType) loaded first.
 
-// SUPPORTED_FORMAT_VERSION tracks EXPORT_FORMAT_VERSION, and
-// migrateAddonsData() below is what's supposed to handle any shape
-// change between them. These two are coupled: bumping the format
+// SUPPORTED_FORMAT_VERSION tracks EXPORT_FORMAT_VERSION. Format 1 files (the
+// add-ons only) and format 2 files (also a "source": which browser and extension
+// version made the file) are both read; each is checked against its own exact
+// layout. migrateAddonsData() below is what's supposed to handle any shape
+// change in the add-ons themselves between versions. These two are coupled: bumping the format
 // version without also updating migrateAddonsData means old-format
 // files get passed straight through unmigrated. A tripwire test in
 // tests/import.test.js hardcodes today's version number specifically
@@ -14,8 +16,9 @@
 // format version requires updating this test and migrateAddonsData".
 const SUPPORTED_FORMAT_VERSION = EXPORT_FORMAT_VERSION;
 
-// No-op for format version 1. Update this (and the tripwire test above)
-// before bumping EXPORT_FORMAT_VERSION for real.
+// No-op for format versions 1 and 2 (the add-on entries did not change; version
+// 2 only added the source). Update this (and the tripwire test above) before
+// bumping EXPORT_FORMAT_VERSION again.
 function migrateAddonsData(addons, formatVersion) {
   return addons;
 }
@@ -48,7 +51,9 @@ function dedupeAddons(list) {
 // The check is strict: the file must be exactly what the exporter writes,
 // including the HTML report from the version released on addons.mozilla.org
 // (the same payload):
-//   { "formatVersion": 1, "addons": [ { id, name, version, enabled, type, link, linkType }, ... ] }
+//   format 2: { "formatVersion": 2, "source": { browser, basedOn, browserVersion, extensionVersion },
+//               "addons": [ { id, name, version, enabled, type, link, linkType }, ... ] }
+//   format 1: the same without "source" (what the release on addons.mozilla.org wrote)
 // Anything else - another key, a missing field, a field of the wrong type - is
 // rejected as a whole, naming the first problem, rather than guessed at.
 // Pulled out of loadFile() as a pure function so it can be unit tested without
@@ -112,8 +117,13 @@ function parseAddonsPayload(jsonText, entryKeys = HTML_ENTRY_KEYS) {
   if (!list || list.length === 0) {
     return { ok: false, error: 'No add-ons found in that file' };
   }
-  if (!sameKeys(parsed, ['formatVersion', 'addons'])) {
-    return payloadError('the data is not exactly formatVersion, then addons');
+  const topKeys = formatVersion >= 2 ? ['formatVersion', 'source', 'addons'] : ['formatVersion', 'addons'];
+  if (!sameKeys(parsed, topKeys)) {
+    return payloadError('the data is not exactly ' + topKeys.join(', then '));
+  }
+  if (formatVersion >= 2) {
+    const problem = sourceProblem(parsed.source);
+    if (problem) return payloadError(`source: ${problem}`);
   }
 
   for (let n = 0; n < list.length; n++) {
@@ -121,11 +131,11 @@ function parseAddonsPayload(jsonText, entryKeys = HTML_ENTRY_KEYS) {
     if (problem) return payloadError(`add-on ${n + 1}: ${problem}`);
   }
 
-  return { ok: true, addons: migrateAddonsData(dedupeAddons(list), formatVersion) };
+  return { ok: true, addons: migrateAddonsData(dedupeAddons(list), formatVersion), source: formatVersion >= 2 ? parsed.source : null };
 }
 
 // Validates and parses a JSON export file's text content. Same return
-// shape as parseAddonsPayload(): { ok, addons } or { ok: false, error }.
+// shape as parseAddonsPayload(): { ok, addons, source } or { ok: false, error }.
 // Throws on malformed JSON - loadFile()'s try/catch handles it.
 function parseJsonPayload(text) {
   const parsed = JSON.parse(text);
@@ -154,10 +164,11 @@ const csvError = (detail) => ({ ok: false, error: `This file doesn't match the A
 // Validates and parses a CSV export file's text content. Accepts only what
 // buildCsvExport() writes:
 //   line 1: # addons-hub-format-version: <n>
-//   line 2: name,version,type,enabled,link,linkType,id (this exact header)
-//   line 3+: one row per add-on, exactly seven fields, no blank lines
+//   line 2 (format 2 only): # addons-hub-source: browser=...; basedOn=...; browserVersion=...; extensionVersion=...
+//   next:   name,version,type,enabled,link,linkType,id (this exact header)
+//   then:   one row per add-on, exactly seven fields, no blank lines
 // Anything else is rejected, with the first problem found named.
-// Returns { ok, addons } or { ok: false, error }.
+// Returns { ok, addons, source } (source is null for format 1) or { ok: false, error }.
 function parseCsvPayload(text) {
   // The export starts with a byte-order mark (so Excel reads UTF-8); it is not part of the text.
   const normalized = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -175,11 +186,21 @@ function parseCsvPayload(text) {
     return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
   }
 
+  // Format 2: the source comment comes right after the version line.
+  let source = null;
+  let body = rest;
+  if (formatVersion >= 2) {
+    const next = rest.indexOf('\n');
+    source = parseSourceCommentLine(next === -1 ? rest : rest.slice(0, next));
+    if (!source) return csvError('the second line must be the source comment, "# addons-hub-source: browser=...; basedOn=...; browserVersion=...; extensionVersion=..."');
+    body = next === -1 ? '' : rest.slice(next + 1);
+  }
+
   // The rest is parsed as a whole, not line by line, so a quoted name that
   // contains a line break stays one field.
   let records;
   try {
-    records = parseCsvRecords(rest);
+    records = parseCsvRecords(body);
   } catch (err) {
     return csvError(err.message);
   }
@@ -206,7 +227,7 @@ function parseCsvPayload(text) {
     addons.push({ name, version, type, enabled: enabled === 'true', link, linkType, id });
   }
 
-  return { ok: true, addons: migrateAddonsData(dedupeAddons(addons), formatVersion) };
+  return { ok: true, addons: migrateAddonsData(dedupeAddons(addons), formatVersion), source };
 }
 
 // Parses an entire CSV text (RFC 4180) into an array of records, each an
@@ -294,12 +315,14 @@ const txtError = (detail) => ({ ok: false, error: `This file doesn't match the A
 // Validates and parses a TXT export file's text content. Accepts only what
 // buildTxtExport() writes:
 //   line 1: # addons-hub-format-version: <n>
+//   line 2 (format 2 only): # addons-hub-source: browser=...; basedOn=...; browserVersion=...; extensionVersion=...
 //   then the title, the section headings and their underlines (any line with
 //   no " | " in it is skipped)
 //   then one add-on per line, exactly six columns:
 //     Name | Version | Type | Status | Link | Id
 // A line with " | " in it that is not a valid add-on line rejects the whole
-// file, with its line number. Returns { ok, addons } or { ok: false, error }.
+// file, with its line number. Returns { ok, addons, source } (source is null for
+// format 1) or { ok: false, error }.
 function parseTxtPayload(text) {
   const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
@@ -310,6 +333,12 @@ function parseTxtPayload(text) {
   const formatVersion = parseInt(versionMatch[1], 10);
   if (formatVersion > SUPPORTED_FORMAT_VERSION) {
     return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
+  }
+
+  let source = null;
+  if (formatVersion >= 2) {
+    source = parseSourceCommentLine(lines[1]);
+    if (!source) return txtError('the second line must be the source comment, "# addons-hub-source: browser=...; basedOn=...; browserVersion=...; extensionVersion=..."');
   }
 
   const addons = [];
@@ -341,5 +370,5 @@ function parseTxtPayload(text) {
     return { ok: false, error: 'No add-ons found in that file' };
   }
 
-  return { ok: true, addons: migrateAddonsData(dedupeAddons(addons), formatVersion) };
+  return { ok: true, addons: migrateAddonsData(dedupeAddons(addons), formatVersion), source };
 }

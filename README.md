@@ -36,6 +36,7 @@ addons-hub/
 │   ├── settings.test.js         # Tests for the settings page: backup/restore, reset, live updates
 │   ├── confirmation.test.js     # Tests for the confirmation page's heading/message logic
 │   ├── popup.test.js            # Tests for the popup's three buttons (Export, Import, Settings)
+│   ├── source.test.js           # Tests for the export's source (browser, browser version, extension version): detection, writing in every format, reading back, format 1 files
 │   ├── zip-reader.test.js       # Tests for reading a .zip in the Importer (hand-built, Python-made and the Exporter's own zips, damaged and oversized ones)
 │   ├── coverage-preload.js      # Used only by `npm run test:coverage`: lets the coverage tool see the scripts the tests run in sandboxes
 │   └── structure.test.js        # Invariants users can see: every page loads press.js and has a real favicon, reduced motion is honoured, every button uses the shared class
@@ -52,6 +53,7 @@ addons-hub/
     ├── background/
     │   ├── background.js       # Handles messaging, export orchestration, and saveExport() (the file, or the zip)
     │   ├── amo.js              # AMO lookups: fetch with retry, name matching, findAmoPage()
+    │   ├── browser-info.js     # Works out which browser (and version) is running, for the export's source
     │   ├── export-formats.js   # Builds the JSON, CSV and TXT exports
     │   ├── report-template.js  # Builds the self-contained HTML report
     │   ├── report.css          # Source CSS for the report's inline <style> block
@@ -157,6 +159,8 @@ The Settings page controls **Appearance** (light/dark theme), **Export Format** 
 | JSON | `.json` | ✅ | Machine-readable. Same data shape as the HTML report's embedded payload, with each add-on's name first and its id last. Names are shortened when the setting is on. |
 | CSV | `.csv` | ✅ | For spreadsheets. One row per add-on (names shortened when the setting is on), name first and id last, RFC 4180-compliant, formula-injection guarded. Starts with a byte-order mark so Excel reads non-English names correctly. |
 | TXT | `.txt` | ✅ | Plain text list for reading: a title, then Enabled and Disabled sections with the columns lined up. One add-on per line: `Name \| Version \| Type \| Status \| Link \| Id`. A backslash, a pipe or a line break in a name is escaped with a backslash (a line break is written as `\n`, and a space at the very start or end as `\s`), so every add-on stays on one line and the Importer restores the name exactly. |
+
+**Format version 2 and the source.** Every export records where it came from: the browser name, what it is based on, the browser version and the Add-ons Hub version (for example LibreWolf 128.0, based on Firefox, with Add-ons Hub 1.2.0). JSON and the HTML report's data hold it as a `source` object right after `formatVersion`; CSV and TXT hold it as one comment line, `# addons-hub-source: browser=...; basedOn=...; browserVersion=...; extensionVersion=...`, right after the version line; the HTML report also says it in a line under the tip. The browser name comes from Firefox itself, so forks such as LibreWolf or Waterfox are named as they report themselves, and anything with that call is recorded as based on Firefox (a fork that reports itself as Firefox shows as Firefox); where Firefox's own call does not exist (a future Chrome or Ladybird build) the user agent is used (Edge, Opera, Vivaldi and Chrome are based on Chromium, Safari on WebKit), and anything unknown is written as `Unknown`. The Importer still reads format 1 files (which have no source); every other layout rule stays strict.
 
 ---
 

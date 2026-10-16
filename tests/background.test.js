@@ -8,7 +8,7 @@ const vm = require('vm');
 const { test, testAsync, readSrc, readCommon, readReportBuilders } = require('./helpers');
 
 const commonSrc = readCommon();
-const reportTemplateSrc = readReportBuilders();
+const reportTemplateSrc = readReportBuilders() + '\n' + readSrc('src/background/browser-info.js');
 const backgroundSrc = readSrc('src/background/background.js');
 
 // --- background.js: excludes Mozilla's own built-in components ---

@@ -1,3 +1,4 @@
-# addons-hub-format-version: 1
+# addons-hub-format-version: 2
+# addons-hub-source: browser=Firefox; basedOn=Firefox; browserVersion=128.0; extensionVersion=1.2.0
 
 Firefox Add-ons - 0 in total (0 enabled, 0 disabled)
