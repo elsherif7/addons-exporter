@@ -23,24 +23,33 @@ const { test, readSrc, evalInContext, readCommon, readReportBuilders, readImport
 
 const CONTRACT = {
   exportFormatVersion: 2,
-  // Format 2 added the source: where the export came from. (Format 1, which the
-  // release on AMO wrote, had the same without it - the Importer still reads it.)
-  sourceKeys: ['browser', 'basedOn', 'browserVersion', 'extensionVersion'],
+  // Format 2 added the source: the file's own format version and type, then
+  // where the export came from. (Format 1, which the release on AMO wrote, had
+  // none of it - the Importer still reads it.)
+  sourceKeys: ['formatVersion', 'fileType', 'browser', 'basedOn', 'browserVersion', 'extensionVersion'],
   htmlTopV1: ['formatVersion', 'addons'],
   // The HTML report's embedded data.
-  htmlTop: ['formatVersion', 'source', 'addons'],
+  htmlTop: ['source', 'addons'],
   htmlEntry: ['id', 'name', 'version', 'enabled', 'type', 'link', 'linkType'],
   // The JSON file.
-  jsonTop: ['formatVersion', 'source', 'addons'],
+  jsonTop: ['source', 'addons'],
   jsonEntry: ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id'],
-  // CSV and TXT carry the source as one comment line right after the version line.
-  sourceLine: '# addons-hub-source: browser=Firefox; basedOn=Firefox; browserVersion=128.0; extensionVersion=1.2.0',
   // The CSV header row.
   csvHeader: 'name,version,type,enabled,link,linkType,id',
   // The TXT columns, in order, and its separator.
-  txtColumns: 6,
+  txtColumns: 7,
   txtSeparator: ' | ',
 };
+
+// CSV and TXT carry the source as one comment line per field, at the very top.
+const sourceLines = (fileType, version) => [
+  `# addons-hub-source-formatVersion: ${version}`,
+  `# addons-hub-source-fileType: ${fileType}`,
+  '# addons-hub-source-browser: Firefox',
+  '# addons-hub-source-basedOn: Gecko',
+  '# addons-hub-source-browserVersion: 128.0',
+  '# addons-hub-source-extensionVersion: 1.2.0',
+];
 
 const sandbox = { URL };
 vm.createContext(sandbox);
@@ -55,7 +64,7 @@ const list = [
   { linkType: 'amo-exact', link: AMO + 'a/', type: 'extension', enabled: true, version: '1.0', name: 'Alpha - the first', id: 'a@x' },
   { linkType: 'homepage', link: 'https://example.com/n', type: 'theme', enabled: false, version: '2', name: 'Night', id: 'n@x' },
 ];
-const SOURCE = { browser: 'Firefox', basedOn: 'Firefox', browserVersion: '128.0', extensionVersion: '1.2.0' };
+const SOURCE = { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' };
 const keys = (o) => Array.from(Object.keys(o));
 const htmlData = (html) => JSON.parse(html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/)[1]);
 
@@ -65,14 +74,13 @@ test('contract: EXPORT_FORMAT_VERSION is the version CONTRACT describes' , () =>
   assert.strictEqual(VERSION, CONTRACT.exportFormatVersion, 'the format version and CONTRACT must change together' + HINT);
 });
 
-test('contract: HTML report data is formatVersion, source, then addons, each add-on id, name, version, enabled, type, link, linkType', () => {
+test('contract: HTML report data is the source, then addons, each add-on id, name, version, enabled, type, link, linkType', () => {
   for (const shorten of [true, false]) {
     for (const theme of ['light', 'dark']) {
       const data = htmlData(sandbox.buildHtmlReport(list, theme, shorten, SOURCE));
       assert.deepStrictEqual(keys(data), CONTRACT.htmlTop, 'top-level fields' + HINT);
-      assert.strictEqual(data.formatVersion, CONTRACT.exportFormatVersion);
       assert.deepStrictEqual(keys(data.source), CONTRACT.sourceKeys, 'source fields' + HINT);
-      assert.deepStrictEqual({ ...data.source }, SOURCE);
+      assert.deepStrictEqual({ ...data.source }, { formatVersion: VERSION, fileType: 'html', ...SOURCE });
       for (const a of data.addons) assert.deepStrictEqual(keys(a), CONTRACT.htmlEntry, 'add-on fields' + HINT);
     }
   }
@@ -95,25 +103,25 @@ test('contract: the add-ons in the HTML report match the released AMO report (fo
   assert.strictEqual(JSON.stringify(rebuilt.addons), JSON.stringify(released.addons), 'today\'s report writes the released add-ons exactly' + HINT);
 });
 
-test('contract: JSON export is formatVersion, source, then addons, each add-on name, version, type, enabled, link, linkType, id', () => {
+test('contract: JSON export is the source, then addons, each add-on name, version, type, enabled, link, linkType, id', () => {
   const data = JSON.parse(sandbox.buildJsonExport(list, false, SOURCE));
   assert.deepStrictEqual(keys(data), CONTRACT.jsonTop, 'top-level fields' + HINT);
-  assert.strictEqual(data.formatVersion, CONTRACT.exportFormatVersion);
   assert.deepStrictEqual(keys(data.source), CONTRACT.sourceKeys, 'source fields' + HINT);
+  assert.deepStrictEqual({ ...data.source }, { formatVersion: VERSION, fileType: 'json', ...SOURCE });
   for (const a of data.addons) assert.deepStrictEqual(keys(a), CONTRACT.jsonEntry, 'add-on fields' + HINT);
 });
 
-test('contract: CSV export starts with the version comment, the source comment, then exactly the contract header', () => {
+test('contract: CSV export starts with the source comments, then exactly the contract header', () => {
   const lines = sandbox.buildCsvExport(list, false, SOURCE).replace(/^\uFEFF/, '').split('\r\n');
-  assert.strictEqual(lines[0], `# addons-hub-format-version: ${CONTRACT.exportFormatVersion}`);
-  assert.strictEqual(lines[1], CONTRACT.sourceLine, 'CSV source line' + HINT);
-  assert.strictEqual(lines[2], CONTRACT.csvHeader, 'CSV header' + HINT);
+  const src = sourceLines('csv', VERSION);
+  assert.deepStrictEqual(lines.slice(0, src.length), src, 'CSV source lines' + HINT);
+  assert.strictEqual(lines[src.length], CONTRACT.csvHeader, 'CSV header' + HINT);
 });
 
-test('contract: TXT export starts with the version and source comments; every add-on line has exactly the contract number of columns', () => {
+test('contract: TXT export starts with the source comments; every add-on line has exactly the contract number of columns', () => {
   const lines = sandbox.buildTxtExport(list, false, SOURCE).split('\r\n');
-  assert.strictEqual(lines[0], `# addons-hub-format-version: ${CONTRACT.exportFormatVersion}`);
-  assert.strictEqual(lines[1], CONTRACT.sourceLine, 'TXT source line' + HINT);
+  const src = sourceLines('txt', VERSION);
+  assert.deepStrictEqual(lines.slice(0, src.length), src, 'TXT source lines' + HINT);
   const rows = lines.filter((l) => l.includes(CONTRACT.txtSeparator));
   assert.strictEqual(rows.length, list.length);
   for (const row of rows) assert.strictEqual(row.split(CONTRACT.txtSeparator).length, CONTRACT.txtColumns, 'TXT columns' + HINT);

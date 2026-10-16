@@ -63,10 +63,12 @@ const V1 = 1;
 function payload(addons, formatVersion = V1) {
   return JSON.stringify({ formatVersion, addons });
 }
-// A format 2 file: the same, with the source after the format version.
-const SOURCE = { browser: 'Firefox', basedOn: 'Firefox', browserVersion: '128.0', extensionVersion: '1.2.0' };
-function payloadV2(addons, source = SOURCE) {
-  return JSON.stringify({ formatVersion: 2, source, addons });
+// A format 2 file: the source (whose own first two fields are the format
+// version and the file type), then the add-ons, with no top-level format
+// version. SOURCE is the browser part, as getExportSource() returns it.
+const SOURCE = { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' };
+function payloadV2(addons, source = { formatVersion: 2, fileType: 'html', ...SOURCE }) {
+  return JSON.stringify({ source, addons });
 }
 
 test('parseAddonsPayload: null jsonText (no embedded data element found)', () => {
@@ -1259,15 +1261,21 @@ test('readable exports: every field survives the round trip in all three formats
 test('JSON export: each add-on lists name first and the id last', () => {
   const parsed = JSON.parse(sandbox.buildJsonExport(readableSample, false));
   assert.deepStrictEqual(Object.keys(parsed.addons[0]), ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id']);
-  assert.strictEqual(parsed.formatVersion, EXPORT_FORMAT_VERSION);
+  assert.strictEqual(parsed.source.formatVersion, EXPORT_FORMAT_VERSION);
 });
 
 test('TXT export: a title, Enabled and Disabled sections, and lined-up columns', () => {
   const txt = sandbox.buildTxtExport(readableSample, false, SOURCE);
   const lines = txt.split('\r\n');
-  assert.match(lines[0], /^# addons-hub-format-version: \d+$/);
-  assert.strictEqual(lines[1], '# addons-hub-source: browser=Firefox; basedOn=Firefox; browserVersion=128.0; extensionVersion=1.2.0');
-  assert.strictEqual(lines[3], 'Firefox Add-ons - 4 in total (2 enabled, 2 disabled)');
+  assert.deepStrictEqual(lines.slice(0, 6), [
+    '# addons-hub-source-formatVersion: 2',
+    '# addons-hub-source-fileType: txt',
+    '# addons-hub-source-browser: Firefox',
+    '# addons-hub-source-basedOn: Gecko',
+    '# addons-hub-source-browserVersion: 128.0',
+    '# addons-hub-source-extensionVersion: 1.2.0',
+  ]);
+  assert.strictEqual(lines[7], 'Firefox Add-ons - 4 in total (2 enabled, 2 disabled)');
   assert.ok(lines.includes('Enabled (2)') && lines.includes('Disabled (2)'));
   const rows = lines.filter((l) => l.includes(' | '));
   assert.strictEqual(rows.length, 4);
@@ -1318,14 +1326,15 @@ test('ids: every format carries each add-on\'s id, shortened names or not', () =
   }
 });
 
-test('TXT export: the id is the sixth column, after the link (the first five are unchanged)', () => {
+test('TXT export: the link type is the sixth column and the id the seventh, after the link', () => {
   const rows = sandbox.buildTxtExport(longNameAddons).split('\r\n').filter((l) => l.includes(' | '));
   assert.strictEqual(rows.length, 3);
   for (const row of rows) {
     const parts = row.split(' | ').map((p) => p.trim());
-    assert.strictEqual(parts.length, 6);
+    assert.strictEqual(parts.length, 7);
     assert.match(parts[4], /^https:\/\/example\.com\//);
-    assert.match(parts[5], /@x$/);
+    assert.match(parts[5], /^(amo-exact|amo-search|homepage|amo-search-fallback)$/);
+    assert.match(parts[6], /@x$/);
   }
 });
 

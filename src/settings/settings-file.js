@@ -15,17 +15,22 @@ const KNOWN_SETTINGS_KEYS = [
 
 // Builds the settings export object from the current stored values.
 // settings is a plain object: { theme: '...', exportFormat: '...' } (exportFormat is one format, or an array when several are chosen).
-function buildSettingsExport(settings) {
+// source is the browser part of the source (which browser and extension
+// version made it); the file's own format version and file type ("settings")
+// are added here, so the settings file carries the same source shape as an export.
+function buildSettingsExport(settings, source = UNKNOWN_BROWSER) {
   const out = {};
   for (const key of KNOWN_SETTINGS_KEYS) {
     if (settings[key] !== undefined) out[key] = settings[key];
   }
-  return JSON.stringify({ formatVersion: SETTINGS_FILE_FORMAT_VERSION, settings: out }, null, 2);
+  return JSON.stringify({ source: makeSource('settings', SETTINGS_FILE_FORMAT_VERSION, source), settings: out }, null, 2);
 }
 
 // Validates and parses a settings file's text. Accepts only what
 // buildSettingsExport() writes (given withSettingsDefaults()'s values):
-//   { "formatVersion": 1, "settings": { theme, exportFormat, shortenNames } }
+//   { "source": { formatVersion, fileType: "settings", browser, basedOn,
+//                 browserVersion, extensionVersion },
+//     "settings": { theme, exportFormat, shortenNames } }
 // with exactly those three settings, in that order, each a valid value. Anything else - a
 // missing or unknown setting, an invalid value - rejects the whole file,
 // naming the problem; nothing is dropped or guessed at. exportFormat is one
@@ -40,17 +45,16 @@ function parseSettingsFile(text) {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return { ok: false, error: 'This file doesn\'t look like an Add-ons Hub settings file.' };
   }
-  if (!Number.isInteger(parsed.formatVersion) || parsed.formatVersion < 1) {
-    return { ok: false, error: 'This file is missing its format version and can\'t be imported.' };
-  }
-  if (parsed.formatVersion > SETTINGS_FILE_FORMAT_VERSION) {
+  const sourceIssue = sourceProblem(parsed.source, 'settings');
+  if (sourceIssue) return settingsError(`source: ${sourceIssue}`);
+  if (parsed.source.formatVersion > SETTINGS_FILE_FORMAT_VERSION) {
     return { ok: false, error: 'This file was exported by a newer version of Add-ons Hub. Please update the extension and try again.' };
   }
   if (!parsed.settings || typeof parsed.settings !== 'object' || Array.isArray(parsed.settings)) {
     return { ok: false, error: 'This file doesn\'t contain valid settings.' };
   }
-  if (Object.keys(parsed).join() !== 'formatVersion,settings') {
-    return settingsError('the file is not exactly formatVersion, then settings');
+  if (Object.keys(parsed).join() !== 'source,settings') {
+    return settingsError('the file is not exactly source, then settings');
   }
 
   const given = parsed.settings;

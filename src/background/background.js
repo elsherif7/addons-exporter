@@ -5,6 +5,11 @@ browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'openTabs') {
     return Promise.resolve(queueTabOpens(message.urls));
   }
+  if (message.type === 'getExportSource') {
+    // The Settings page asks for this so its exported file records the same
+    // source the add-on exports do (browser-info.js lives here).
+    return getExportSource();
+  }
   if (message.type === 'export') {
     return doExport(message.ids).then(async ({ files, formats, stats }) => {
       await saveExport(files);

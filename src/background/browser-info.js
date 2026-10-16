@@ -1,6 +1,7 @@
-// Which browser is running this extension, for the "source" every export file
-// records (see SOURCE_KEYS in core.js). Plain classic script like the rest of
-// the background: detectBrowserFromUserAgent() and getExportSource() are globals.
+// Which browser is running this extension, for the browser part of the
+// "source" every export file records (see SOURCE_KEYS in core.js). Plain
+// classic script like the rest of the background:
+// detectBrowserFromUserAgent() and getExportSource() are globals.
 //
 // Firefox (and the forks built on it) can say what they are through
 // browser.runtime.getBrowserInfo(), which gives the name the browser reports for
@@ -28,10 +29,11 @@ const BROWSER_USER_AGENT_TOKENS = [
 
 // What each known browser is built on (its "base"). A browser not listed here
 // is recorded as built on itself, except that Firefox's own call (below) always
-// means a Firefox-based browser.
+// means a Gecko-based browser. Firefox and the forks built on it all use the
+// engine's name, Gecko, so they read the same as each other.
 const BROWSER_BASES = {
   Edge: 'Chromium', Opera: 'Chromium', Vivaldi: 'Chromium', Chrome: 'Chromium', Brave: 'Chromium',
-  LibreWolf: 'Firefox', Waterfox: 'Firefox', Floorp: 'Firefox', Firefox: 'Firefox',
+  LibreWolf: 'Gecko', Waterfox: 'Gecko', Floorp: 'Gecko', Firefox: 'Gecko',
   Safari: 'WebKit', Ladybird: 'Ladybird',
 };
 function browserBase(name) {
@@ -51,8 +53,9 @@ function detectBrowserFromUserAgent(userAgent) {
   return null;
 }
 
-// The source to write into an export: always four clean values, "Unknown" /
-// "unknown" for anything that cannot be found. Never throws.
+// The browser part of the source to write into an export: always four clean
+// values, "Unknown" / "unknown" for anything that cannot be found. Never
+// throws. (The format version and file type are added by makeSource().)
 async function getExportSource() {
   let name = '';
   let version = '';
@@ -62,7 +65,7 @@ async function getExportSource() {
       const info = await browser.runtime.getBrowserInfo();
       name = info && info.name;
       version = info && info.version;
-      basedOn = 'Firefox'; // only Firefox and the browsers built on it have this call
+      basedOn = 'Gecko'; // only Firefox and the browsers built on it have this call
     }
   } catch { /* fall back to the user agent below */ }
   if (!name && typeof navigator !== 'undefined') {
@@ -76,5 +79,5 @@ async function getExportSource() {
   try {
     extensionVersion = browser.runtime.getManifest().version;
   } catch { /* leave it unknown */ }
-  return makeSource(name, version, extensionVersion, basedOn);
+  return makeBrowserSource(name, version, extensionVersion, basedOn);
 }

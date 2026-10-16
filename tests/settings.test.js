@@ -63,10 +63,12 @@ const SHORT_NAME_STORAGE_KEY = evalInContext(sandbox, 'SHORT_NAME_STORAGE_KEY');
 
 // --- buildSettingsExport ---
 
-test('buildSettingsExport: produces valid JSON with formatVersion and settings', () => {
-  const json = buildSettingsExport({ [THEME_STORAGE_KEY]: 'dark', [EXPORT_FORMAT_STORAGE_KEY]: 'json' });
+test('buildSettingsExport: produces valid JSON with the source and settings', () => {
+  const json = buildSettingsExport({ [THEME_STORAGE_KEY]: 'dark', [EXPORT_FORMAT_STORAGE_KEY]: 'json' }, SETTINGS_BROWSER);
   const parsed = JSON.parse(json);
-  assert.strictEqual(parsed.formatVersion, SETTINGS_FILE_FORMAT_VERSION);
+  assert.deepStrictEqual(parsed.source, SETTINGS_SOURCE);
+  assert.strictEqual(parsed.source.formatVersion, SETTINGS_FILE_FORMAT_VERSION);
+  assert.strictEqual(parsed.source.fileType, 'settings');
   assert.strictEqual(parsed.settings[THEME_STORAGE_KEY], 'dark');
   assert.strictEqual(parsed.settings[EXPORT_FORMAT_STORAGE_KEY], 'json');
 });
@@ -80,7 +82,7 @@ test('buildSettingsExport: omits keys that are not in KNOWN_SETTINGS_KEYS', () =
 test('buildSettingsExport: works with an empty settings object', () => {
   const json = buildSettingsExport({});
   const parsed = JSON.parse(json);
-  assert.strictEqual(parsed.formatVersion, SETTINGS_FILE_FORMAT_VERSION);
+  assert.strictEqual(parsed.source.formatVersion, SETTINGS_FILE_FORMAT_VERSION);
   assert.deepStrictEqual(parsed.settings, {});
 });
 
@@ -90,8 +92,12 @@ test('buildSettingsExport: output is valid JSON', () => {
 
 // --- parseSettingsFile ---
 
-function makeSettingsFile(settings, formatVersion = SETTINGS_FILE_FORMAT_VERSION) {
-  return JSON.stringify({ formatVersion, settings });
+// A valid source, as the exporter records it: the browser part
+// (background/browser-info.js) plus the file's own version and type.
+const SETTINGS_BROWSER = { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' };
+const SETTINGS_SOURCE = { formatVersion: SETTINGS_FILE_FORMAT_VERSION, fileType: 'settings', ...SETTINGS_BROWSER };
+function makeSettingsFile(settings, formatVersion = SETTINGS_FILE_FORMAT_VERSION, source = SETTINGS_SOURCE) {
+  return JSON.stringify({ source: { ...source, formatVersion }, settings });
 }
 
 const ALL_SETTINGS = { [THEME_STORAGE_KEY]: 'dark', [EXPORT_FORMAT_STORAGE_KEY]: 'csv', [SHORT_NAME_STORAGE_KEY]: 'off' };
@@ -113,12 +119,12 @@ test('parseSettingsFile: throws on malformed JSON', () => {
   assert.throws(() => parseSettingsFile('{not valid json'));
 });
 
-test('parseSettingsFile: missing formatVersion is rejected', () => {
-  settingsRejects(JSON.stringify({ settings: ALL_SETTINGS }), /missing its format version/);
+test('parseSettingsFile: missing formatVersion (no source) is rejected', () => {
+  settingsRejects(JSON.stringify({ settings: ALL_SETTINGS }), /source: it is not an object/);
 });
 
 test('parseSettingsFile: non-numeric formatVersion is rejected', () => {
-  settingsRejects(JSON.stringify({ formatVersion: '1', settings: ALL_SETTINGS }), /missing its format version/);
+  settingsRejects(JSON.stringify({ source: { ...SETTINGS_SOURCE, formatVersion: '1' }, settings: ALL_SETTINGS }), /format version is not a positive whole number/);
 });
 
 test('parseSettingsFile: formatVersion newer than supported is rejected', () => {
@@ -126,11 +132,11 @@ test('parseSettingsFile: formatVersion newer than supported is rejected', () => 
 });
 
 test('parseSettingsFile: missing settings object is rejected', () => {
-  settingsRejects(JSON.stringify({ formatVersion: SETTINGS_FILE_FORMAT_VERSION }), /valid settings/);
+  settingsRejects(JSON.stringify({ formatVersion: SETTINGS_FILE_FORMAT_VERSION, source: SETTINGS_SOURCE }), /valid settings/);
 });
 
 test('parseSettingsFile: settings as an array is rejected', () => {
-  settingsRejects(JSON.stringify({ formatVersion: SETTINGS_FILE_FORMAT_VERSION, settings: [] }), /valid settings/);
+  settingsRejects(JSON.stringify({ formatVersion: SETTINGS_FILE_FORMAT_VERSION, source: SETTINGS_SOURCE, settings: [] }), /valid settings/);
 });
 
 test('parseSettingsFile: an unknown setting rejects the file (nothing is silently dropped)', () => {
@@ -145,13 +151,13 @@ test('parseSettingsFile: a missing setting rejects the file', () => {
   }
 });
 
-test('parseSettingsFile: a field next to formatVersion and settings rejects the file', () => {
-  settingsRejects(JSON.stringify({ formatVersion: SETTINGS_FILE_FORMAT_VERSION, settings: ALL_SETTINGS, note: 'x' }), /not exactly formatVersion, then settings/);
+test('parseSettingsFile: a field next to source and settings rejects the file', () => {
+  settingsRejects(JSON.stringify({ source: SETTINGS_SOURCE, settings: ALL_SETTINGS, note: 'x' }), /not exactly source, then settings/);
 });
 
 test('parseSettingsFile: the settings must come in the order the export writes them (theme, exportFormat, shortenNames)', () => {
   settingsRejects(makeSettingsFile({ [SHORT_NAME_STORAGE_KEY]: 'off', [THEME_STORAGE_KEY]: 'dark', [EXPORT_FORMAT_STORAGE_KEY]: 'csv' }), /in the order theme, exportFormat, shortenNames/);
-  settingsRejects(JSON.stringify({ settings: ALL_SETTINGS, formatVersion: SETTINGS_FILE_FORMAT_VERSION }), /not exactly formatVersion, then settings/);
+  settingsRejects(JSON.stringify({ settings: ALL_SETTINGS, source: SETTINGS_SOURCE }), /not exactly source, then settings/);
 });
 
 test('parseSettingsFile: an invalid value rejects the file', () => {
@@ -1254,11 +1260,14 @@ test('withSettingsDefaults: a stored list of formats is kept, a bad one falls ba
 // together, on purpose. If this fails after you changed the settings file:
 // bump SETTINGS_FILE_FORMAT_VERSION in src/settings/settings.js, decide whether
 // old files must still be read, and update the numbers and keys here. ---
-test('contract: the settings file is formatVersion 1 then settings: theme, exportFormat, shortenNames', () => {
+test('contract: the settings file is the source, then settings: theme, exportFormat, shortenNames', () => {
   assert.strictEqual(SETTINGS_FILE_FORMAT_VERSION, 1, 'the settings format version and this contract must change together');
   const data = JSON.parse(buildSettingsExport(withSettingsDefaults({})));
-  assert.deepStrictEqual(Array.from(Object.keys(data)), ['formatVersion', 'settings']);
-  assert.strictEqual(data.formatVersion, 1);
+  assert.deepStrictEqual(Array.from(Object.keys(data)), ['source', 'settings']);
+  assert.strictEqual(data.source.formatVersion, 1);
+  assert.strictEqual(data.source.fileType, 'settings');
+  assert.deepStrictEqual(Array.from(Object.keys(data.source)), ['formatVersion', 'fileType', 'browser', 'basedOn', 'browserVersion', 'extensionVersion'],
+    'the source changed - bump the format version on purpose');
   assert.deepStrictEqual(Array.from(Object.keys(data.settings)), ['theme', 'exportFormat', 'shortenNames'],
     'the settings changed - bump the format version on purpose');
 });

@@ -1,8 +1,9 @@
 {
-  "formatVersion": 2,
   "source": {
+    "formatVersion": 2,
+    "fileType": "json",
     "browser": "Firefox",
-    "basedOn": "Firefox",
+    "basedOn": "Gecko",
     "browserVersion": "128.0",
     "extensionVersion": "1.2.0"
   },

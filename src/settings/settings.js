@@ -225,12 +225,24 @@ for (const radio of shortenRadios) {
   });
 }
 
+// The source the settings file records (which browser and extension version
+// made it) - the same one the add-on exports carry. browser-info.js lives in
+// the background, so ask it; if that call ever fails, the file falls back to
+// the same "Unknown" the exporter uses.
+async function getSettingsSource() {
+  try {
+    return await browser.runtime.sendMessage({ type: 'getExportSource' });
+  } catch {
+    return UNKNOWN_BROWSER;
+  }
+}
+
 exportSettingsBtn.addEventListener('click', async () => {
   clearAllRows();
   exportRow.activate('');
   try {
     const stored = await browser.storage.local.get(KNOWN_SETTINGS_KEYS);
-    const json = buildSettingsExport(withSettingsDefaults(stored));
+    const json = buildSettingsExport(withSettingsDefaults(stored), await getSettingsSource());
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const pad = (n) => String(n).padStart(2, '0');

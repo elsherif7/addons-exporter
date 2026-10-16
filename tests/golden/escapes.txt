@@ -1,14 +1,18 @@
-# addons-hub-format-version: 2
-# addons-hub-source: browser=Firefox; basedOn=Firefox; browserVersion=128.0; extensionVersion=1.2.0
+# addons-hub-source-formatVersion: 2
+# addons-hub-source-fileType: txt
+# addons-hub-source-browser: Firefox
+# addons-hub-source-basedOn: Gecko
+# addons-hub-source-browserVersion: 128.0
+# addons-hub-source-extensionVersion: 1.2.0
 
 Firefox Add-ons - 4 in total (2 enabled, 2 disabled)
 
 Enabled (2)
 -----------
-Line\nBreak\r\nName    | 1.0 | Extension | Enabled  | https://example.com/b   | b@example.com
-Pipe \| Name           | 1.0 | Extension | Enabled  | https://example.com/a   | a@example.com
+Line\nBreak\r\nName    | 1.0 | Extension | Enabled  | https://example.com/b   | homepage | b@example.com
+Pipe \| Name           | 1.0 | Extension | Enabled  | https://example.com/a   | homepage | a@example.com
 
 Disabled (2)
 ------------
-\s\sPadded\s\s         | 1.0 | Extension | Disabled | https://example.com/d   | d@example.com
-C:\\Tools\\ \\\| end\\ | 1.0 | Theme     | Disabled | https://example.com/c d | c@example.com
+\s\sPadded\s\s         | 1.0 | Extension | Disabled | https://example.com/d   | homepage | d@example.com
+C:\\Tools\\ \\\| end\\ | 1.0 | Theme     | Disabled | https://example.com/c d | homepage | c@example.com

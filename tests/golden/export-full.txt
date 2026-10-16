@@ -1,23 +1,27 @@
-# addons-hub-format-version: 2
-# addons-hub-source: browser=Firefox; basedOn=Firefox; browserVersion=128.0; extensionVersion=1.2.0
+# addons-hub-source-formatVersion: 2
+# addons-hub-source-fileType: txt
+# addons-hub-source-browser: Firefox
+# addons-hub-source-basedOn: Gecko
+# addons-hub-source-browserVersion: 128.0
+# addons-hub-source-extensionVersion: 1.2.0
 
 Firefox Add-ons - 13 in total (10 enabled, 3 disabled)
 
 Enabled (10)
 ------------
-<script>alert(1)</script> & "friends"    | 9.9      | Extension | Enabled  | https://example.com/?q=search&lang=en                                 | markup@example.com
-=SUM(1+1) Helper                         | 0.1      | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/formula-helper/        | formula@example.com
-An Extremely Long Add-on Name That Goes Well Past Forty Characters Without Any Separator | 10.20.30 | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/long-name/             | long@example.com
-Buster: Captcha Solver for Humans        | 2.0.1    | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/buster-captcha-solver/ | {7be2ba16-0f1e-4d93-9ebc-5164397477e9}
-Café Tab Manager: Pro                    | 5.1.2    | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/cafe-tab-manager/      | cafe@example.com
-Dark Reader                              | 4.9.90   | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/darkreader/            | addon@darkreader.org
-Sunrise — Light Theme                    | 2.0      | Theme     | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/sunrise/               | sun@example.com
-Tab "Stash", Pro Edition                 | 1.0      | Extension | Enabled  | https://example.com/tab,stash?x=1&y="2"                               | quotes@example.com
-uBlock Origin – free ad blocker          | 1.58.0   | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/         | uBlock0@raymondhill.net
-広告ブロッカー - 日本語版                           | 2.5      | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/jp-blocker/            | jp@example.com
+<script>alert(1)</script> & "friends"    | 9.9      | Extension | Enabled  | https://example.com/?q=search&lang=en                                 | amo-search-fallback | markup@example.com
+=SUM(1+1) Helper                         | 0.1      | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/formula-helper/        | amo-exact           | formula@example.com
+An Extremely Long Add-on Name That Goes Well Past Forty Characters Without Any Separator | 10.20.30 | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/long-name/             | amo-exact           | long@example.com
+Buster: Captcha Solver for Humans        | 2.0.1    | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/buster-captcha-solver/ | amo-search          | {7be2ba16-0f1e-4d93-9ebc-5164397477e9}
+Café Tab Manager: Pro                    | 5.1.2    | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/cafe-tab-manager/      | amo-exact           | cafe@example.com
+Dark Reader                              | 4.9.90   | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/darkreader/            | amo-exact           | addon@darkreader.org
+Sunrise — Light Theme                    | 2.0      | Theme     | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/sunrise/               | amo-exact           | sun@example.com
+Tab "Stash", Pro Edition                 | 1.0      | Extension | Enabled  | https://example.com/tab,stash?x=1&y="2"                               | homepage            | quotes@example.com
+uBlock Origin – free ad blocker          | 1.58.0   | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/         | amo-exact           | uBlock0@raymondhill.net
+広告ブロッカー - 日本語版                           | 2.5      | Extension | Enabled  | https://addons.mozilla.org/en-US/firefox/addon/jp-blocker/            | amo-exact           | jp@example.com
 
 Disabled (3)
 ------------
-+Plus Notes                              | 3        | Extension | Disabled | https://addons.mozilla.org/en-US/firefox/addon/plus-notes/            | plus@example.com
-Line\nBreak Tool                         | 1.1      | Extension | Disabled | https://example.com/line-break                                        | newline@example.com
-Midnight Theme                           | 1.0      | Theme     | Disabled | https://example.com/midnight                                          | {11111111-2222-3333-4444-555555555555}
++Plus Notes                              | 3        | Extension | Disabled | https://addons.mozilla.org/en-US/firefox/addon/plus-notes/            | amo-exact           | plus@example.com
+Line\nBreak Tool                         | 1.1      | Extension | Disabled | https://example.com/line-break                                        | homepage            | newline@example.com
+Midnight Theme                           | 1.0      | Theme     | Disabled | https://example.com/midnight                                          | homepage            | {11111111-2222-3333-4444-555555555555}

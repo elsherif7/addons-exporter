@@ -390,7 +390,7 @@ testAsync('doExport: produces a .json file when exportFormat is "json"', async (
   const { content, filename } = await runDoExportForFormat(async () => ({ exportFormat: 'json' }));
   assert.match(filename, /\.json$/);
   const parsed = JSON.parse(content);
-  assert.strictEqual(typeof parsed.formatVersion, 'number');
+  assert.strictEqual(typeof parsed.source.formatVersion, 'number');
   assert.ok(Array.isArray(parsed.addons));
   assert.strictEqual(parsed.addons[0].name, baseAddon.name);
 });
@@ -398,7 +398,7 @@ testAsync('doExport: produces a .json file when exportFormat is "json"', async (
 testAsync('doExport: produces a .csv file when exportFormat is "csv"', async () => {
   const { content, filename } = await runDoExportForFormat(async () => ({ exportFormat: 'csv' }));
   assert.match(filename, /\.csv$/);
-  assert.match(content, /^\uFEFF# addons-hub-format-version:/);
+  assert.match(content, /^\uFEFF# addons-hub-source-formatVersion:/);
   assert.match(content, /name,version,type,enabled,link,linkType,id/);
   assert.match(content, new RegExp(baseAddon.name));
 });

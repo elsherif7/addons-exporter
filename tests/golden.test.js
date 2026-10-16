@@ -30,7 +30,7 @@ vm.runInContext(readCommon(), sandbox);
 vm.runInContext(readReportBuilders(), sandbox);
 const { buildHtmlReport, buildJsonExport, buildCsvExport, buildTxtExport } = sandbox;
 // A fixed source, so the files do not change with whoever regenerates them.
-const SOURCE = { browser: 'Firefox', basedOn: 'Firefox', browserVersion: '128.0', extensionVersion: '1.2.0' };
+const SOURCE = { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' };
 
 const GOLDEN_DIR = path.join(__dirname, 'golden');
 const UPDATE = process.env.UPDATE_GOLDEN === '1';

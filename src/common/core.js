@@ -6,17 +6,25 @@
 
 // Bump if the exported data's shape ever changes.
 //   1: the add-ons only.
-//   2: also says where the export came from - the browser and its version and
-//      this extension's version (the "source", below). The Importer still reads 1.
+//   2: also a "source" - the format version, the file type, and where the
+//      export came from (the browser and its version and this extension's
+//      version). The Importer still reads 1.
 const EXPORT_FORMAT_VERSION = 2;
 
-// Where an export came from, written into every export file. The browser is
-// free text (whatever the browser calls itself: "Firefox", "LibreWolf",
-// "Waterfox", and later "Chrome" or anything else), so a new browser never needs
-// a new format version. Kept to plain characters so it reads the same in JSON,
-// CSV, TXT and HTML and can be checked strictly.
-const SOURCE_KEYS = ['browser', 'basedOn', 'browserVersion', 'extensionVersion'];
-const UNKNOWN_SOURCE = Object.freeze({ browser: 'Unknown', basedOn: 'Unknown', browserVersion: 'unknown', extensionVersion: 'unknown' });
+// Where an export came from and what the file is, written into every export
+// file. The format version (the same number EXPORT_FORMAT_VERSION holds - the
+// version of the export format itself) and the file type come first, then the
+// browser details. The browser is free text (whatever the browser calls itself:
+// "Firefox", "LibreWolf", "Waterfox", and later "Chrome" or anything else), so
+// a new browser never needs a new format version. Kept to plain characters so
+// it reads the same in JSON, CSV, TXT and HTML and can be checked strictly.
+const SOURCE_KEYS = ['formatVersion', 'fileType', 'browser', 'basedOn', 'browserVersion', 'extensionVersion'];
+// The file types a source can name: one per export format, plus the Settings file.
+const FILE_TYPES = ['html', 'json', 'csv', 'txt', 'settings'];
+// The part of the source that describes the browser - everything the file
+// itself does not already know.
+const BROWSER_KEYS = ['browser', 'basedOn', 'browserVersion', 'extensionVersion'];
+const UNKNOWN_BROWSER = Object.freeze({ browser: 'Unknown', basedOn: 'Unknown', browserVersion: 'unknown', extensionVersion: 'unknown' });
 const SOURCE_TEXT_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9 ._+-]{0,62}[A-Za-z0-9._+-])?$/;
 
 // Reduces any value to text that passes SOURCE_TEXT_PATTERN, or `fallback`.
@@ -25,53 +33,77 @@ function cleanSourceText(value, fallback) {
   return SOURCE_TEXT_PATTERN.test(text) ? text : fallback;
 }
 
-// A source with exactly the three keys, in order, each clean. Anything missing
+// The browser part of the source: four clean values, in order. Anything missing
 // or unusable becomes "Unknown" / "unknown", so a file is always written.
-function makeSource(browserName, browserVersion, extensionVersion, basedOn) {
+function makeBrowserSource(browserName, browserVersion, extensionVersion, basedOn) {
   return {
-    browser: cleanSourceText(browserName, UNKNOWN_SOURCE.browser),
-    basedOn: cleanSourceText(basedOn, UNKNOWN_SOURCE.basedOn),
-    browserVersion: cleanSourceText(browserVersion, UNKNOWN_SOURCE.browserVersion),
-    extensionVersion: cleanSourceText(extensionVersion, UNKNOWN_SOURCE.extensionVersion),
+    browser: cleanSourceText(browserName, UNKNOWN_BROWSER.browser),
+    basedOn: cleanSourceText(basedOn, UNKNOWN_BROWSER.basedOn),
+    browserVersion: cleanSourceText(browserVersion, UNKNOWN_BROWSER.browserVersion),
+    extensionVersion: cleanSourceText(extensionVersion, UNKNOWN_BROWSER.extensionVersion),
   };
 }
-function normalizeSource(source) {
+function normalizeBrowserSource(source) {
   const s = source && typeof source === 'object' ? source : {};
-  return makeSource(s.browser, s.browserVersion, s.extensionVersion, s.basedOn);
+  return makeBrowserSource(s.browser, s.browserVersion, s.extensionVersion, s.basedOn);
 }
 
-// null when `source` is exactly what an exporter writes, otherwise a short reason.
-function sourceProblem(source) {
+// The full source block a file carries: its format version and file type, then
+// the browser part above. Every format writes exactly this shape, in this order.
+function makeSource(fileType, formatVersion, browserSource) {
+  const b = normalizeBrowserSource(browserSource);
+  return {
+    formatVersion,
+    fileType,
+    browser: b.browser,
+    basedOn: b.basedOn,
+    browserVersion: b.browserVersion,
+    extensionVersion: b.extensionVersion,
+  };
+}
+
+// null when `source` is exactly what an exporter writes, otherwise a short
+// reason. When `fileType` is given, the source must name exactly that file type.
+function sourceProblem(source, fileType) {
   if (!source || typeof source !== 'object' || Array.isArray(source)) return 'it is not an object';
   const have = Object.keys(source);
   if (have.length !== SOURCE_KEYS.length || !SOURCE_KEYS.every((k, i) => have[i] === k)) {
     return 'its fields are not exactly ' + SOURCE_KEYS.join(', ') + ', in that order';
   }
-  for (const k of SOURCE_KEYS) {
+  if (!Number.isInteger(source.formatVersion) || source.formatVersion < 1) return 'its format version is not a positive whole number';
+  if (!FILE_TYPES.includes(source.fileType)) return 'its file type is not one of ' + FILE_TYPES.join(', ');
+  if (fileType !== undefined && source.fileType !== fileType) return `its file type is not "${fileType}"`;
+  for (const k of BROWSER_KEYS) {
     if (typeof source[k] !== 'string' || !SOURCE_TEXT_PATTERN.test(source[k])) return `${k} is not plain text`;
   }
   return null;
 }
 
-// The one line CSV and TXT exports carry it in (right after the format-version
-// line), and the reader for it: the source, or null if the line is anything else.
-function sourceCommentLine(source) {
-  const s = normalizeSource(source);
-  return `# addons-hub-source: browser=${s.browser}; basedOn=${s.basedOn}; browserVersion=${s.browserVersion}; extensionVersion=${s.extensionVersion}`;
+// The source as CSV and TXT carry it: one comment line per field, in
+// SOURCE_KEYS order - so a plain-text file starts with a header that names its
+// own format version and file type.
+function sourceCommentLines(source) {
+  return SOURCE_KEYS.map((key) => `# addons-hub-source-${key}: ${source[key]}`);
 }
-function parseSourceCommentLine(line) {
-  const m = typeof line === 'string' && line.match(/^# addons-hub-source: browser=([^;=]*); basedOn=([^;=]*); browserVersion=([^;=]*); extensionVersion=([^;=]*)$/);
-  if (!m) return null;
-  const source = { browser: m[1], basedOn: m[2], browserVersion: m[3], extensionVersion: m[4] };
-  return sourceProblem(source) ? null : source;
-}
-
-// "Firefox 128.0" for display (just the browser when its version is not known), with ", based on X" added when it is a different browser than the one it is built on.
-function sourceLabel(source) {
-  const s = normalizeSource(source);
-  const named = s.browserVersion === UNKNOWN_SOURCE.browserVersion ? s.browser : `${s.browser} ${s.browserVersion}`;
-  const known = s.basedOn !== UNKNOWN_SOURCE.basedOn && s.basedOn !== s.browser;
-  return known ? `${named}, based on ${s.basedOn}` : named;
+// Reads those comment lines (an array, in order): the source, or null if they
+// are anything but exactly the six lines sourceCommentLines() writes.
+function parseSourceCommentLines(lines, fileType) {
+  if (!Array.isArray(lines) || lines.length !== SOURCE_KEYS.length) return null;
+  const raw = {};
+  for (let i = 0; i < SOURCE_KEYS.length; i++) {
+    const m = typeof lines[i] === 'string' && lines[i].match(/^# addons-hub-source-([A-Za-z]+): (.*)$/);
+    if (!m || m[1] !== SOURCE_KEYS[i]) return null;
+    raw[SOURCE_KEYS[i]] = m[2];
+  }
+  const source = {
+    formatVersion: /^\d+$/.test(raw.formatVersion) ? parseInt(raw.formatVersion, 10) : raw.formatVersion,
+    fileType: raw.fileType,
+    browser: raw.browser,
+    basedOn: raw.basedOn,
+    browserVersion: raw.browserVersion,
+    extensionVersion: raw.extensionVersion,
+  };
+  return sourceProblem(source, fileType) ? null : source;
 }
 
 // Storage key for the user's chosen export file format(s).

@@ -50,12 +50,13 @@ test('buildHtmlReport: escapes add-on names instead of inserting them raw', () =
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
 });
 
-test('buildHtmlReport: embeds a re-importable JSON payload with formatVersion and the given list', () => {
+test('buildHtmlReport: embeds a re-importable JSON payload with a source and the given list', () => {
   const html = buildHtmlReport(sampleList);
   const dataMatch = html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/);
   assert.ok(dataMatch, 'expected an embedded #addons-exporter-data script tag');
   const data = JSON.parse(dataMatch[1]);
-  assert.strictEqual(typeof data.formatVersion, 'number');
+  assert.strictEqual(typeof data.source.formatVersion, 'number');
+  assert.strictEqual(data.source.fileType, 'html');
   assert.strictEqual(data.addons.length, sampleList.length);
   assert.deepStrictEqual(new Set(data.addons.map((a) => a.id)), new Set(sampleList.map((a) => a.id)));
 });
@@ -116,10 +117,11 @@ test('REPORT_ICON_DATA_URI: matches icons/icon32.png byte-for-byte', () => {
 
 // --- buildJsonExport ---
 
-test('buildJsonExport: returns valid JSON with formatVersion and all addons', () => {
+test('buildJsonExport: returns valid JSON with a source and all addons', () => {
   const json = buildJsonExport(sampleList);
   const parsed = JSON.parse(json);
-  assert.strictEqual(typeof parsed.formatVersion, 'number');
+  assert.strictEqual(typeof parsed.source.formatVersion, 'number');
+  assert.strictEqual(parsed.source.fileType, 'json');
   assert.ok(Array.isArray(parsed.addons));
   assert.strictEqual(parsed.addons.length, sampleList.length);
   assert.deepStrictEqual(
@@ -148,30 +150,37 @@ test('buildJsonExport: output is valid JSON even when names contain special char
 
 // --- buildCsvExport ---
 
-test('buildCsvExport: first line is the format-version comment', () => {
+test('buildCsvExport: the first line is the start of the source, led by the byte-order mark', () => {
   const csv = buildCsvExport(sampleList);
   const firstLine = csv.split('\r\n')[0];
   // A byte-order mark leads the file so Excel reads it as UTF-8.
-  assert.match(firstLine, /^\uFEFF# addons-hub-format-version: \d+$/);
+  assert.match(firstLine, /^\uFEFF# addons-hub-source-formatVersion: \d+$/);
 });
 
-test('buildCsvExport: second line is the source comment, third the header row with all expected columns', () => {
-  const csv = buildCsvExport(sampleList, true, { browser: 'Firefox', basedOn: 'Firefox', browserVersion: '128.0', extensionVersion: '1.2.0' });
-  assert.strictEqual(csv.split('\r\n')[1], '# addons-hub-source: browser=Firefox; basedOn=Firefox; browserVersion=128.0; extensionVersion=1.2.0');
-  const headerLine = csv.split('\r\n')[2];
-  assert.strictEqual(headerLine, 'name,version,type,enabled,link,linkType,id');
+test('buildCsvExport: the six source lines come first, then the header row', () => {
+  const csv = buildCsvExport(sampleList, true, { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' });
+  const lines = csv.split('\r\n');
+  assert.deepStrictEqual(lines.slice(0, 6), [
+    '\uFEFF# addons-hub-source-formatVersion: 2',
+    '# addons-hub-source-fileType: csv',
+    '# addons-hub-source-browser: Firefox',
+    '# addons-hub-source-basedOn: Gecko',
+    '# addons-hub-source-browserVersion: 128.0',
+    '# addons-hub-source-extensionVersion: 1.2.0',
+  ]);
+  assert.strictEqual(lines[6], 'name,version,type,enabled,link,linkType,id');
 });
 
 test('buildCsvExport: produces one data row per add-on', () => {
   const csv = buildCsvExport(sampleList);
-  // Lines: version comment + source comment + header + N data rows
-  const dataRows = csv.split('\r\n').slice(3);
+  // Lines: six source lines + header + N data rows
+  const dataRows = csv.split('\r\n').slice(7);
   assert.strictEqual(dataRows.length, sampleList.length);
 });
 
 test('buildCsvExport: enabled field is "true" or "false" (not 1/0)', () => {
   const csv = buildCsvExport(sampleList);
-  const rows = csv.split('\r\n').slice(3);
+  const rows = csv.split('\r\n').slice(7);
   for (const row of rows) {
     const fields = row.split(',');
     // enabled is the 4th column (index 3)
@@ -182,20 +191,20 @@ test('buildCsvExport: enabled field is "true" or "false" (not 1/0)', () => {
 test('buildCsvExport: fields containing commas are quoted per RFC 4180', () => {
   const list = [{ id: 'x@e.com', name: 'Hello, World', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
   const csv = buildCsvExport(list, false); // full names: this is about CSV quoting, not shortening
-  const dataRow = csv.split('\r\n')[3];
+  const dataRow = csv.split('\r\n')[7];
   assert.match(dataRow, /"Hello, World"/);
 });
 
 test('buildCsvExport: fields containing double-quotes double them per RFC 4180', () => {
   const list = [{ id: 'x@e.com', name: 'Say "Hi"', version: '1.0', enabled: false, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
   const csv = buildCsvExport(list);
-  const dataRow = csv.split('\r\n')[3];
+  const dataRow = csv.split('\r\n')[7];
   assert.match(dataRow, /"Say ""Hi"""/);
 });
 
 test('buildCsvExport: all seven columns are present on every data row', () => {
   const csv = buildCsvExport(sampleList);
-  const rows = csv.split('\r\n').slice(3);
+  const rows = csv.split('\r\n').slice(7);
   for (const row of rows) {
     // A naive split on comma works here since our sample data has no
     // commas inside fields - just check the column count is right.
@@ -210,7 +219,7 @@ test('buildCsvExport: all seven columns are present on every data row', () => {
 test('buildCsvExport: a name starting with = gets a leading-apostrophe guard', () => {
   const list = [{ id: 'x@e.com', name: '=HYPERLINK("https://evil.example","click")', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
   const csv = buildCsvExport(list);
-  const dataRow = csv.split('\r\n')[3];
+  const dataRow = csv.split('\r\n')[7];
   assert.match(dataRow, /^"'=HYPERLINK/);
 });
 
@@ -218,7 +227,7 @@ test('buildCsvExport: names starting with +, -, @, or a tab all get the guard', 
   for (const name of ['+SUM(1,1)', '-1+1', '@cmd', '\tstart-with-tab']) {
     const list = [{ id: 'x@e.com', name, version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
     const csv = buildCsvExport(list, false); // full names: this is about the guard, not shortening
-    const dataRow = csv.split('\r\n')[3];
+    const dataRow = csv.split('\r\n')[7];
     assert.ok(dataRow.includes(`'${name}`), `expected a guarded "${name}" in row: ${dataRow}`);
   }
 });
@@ -226,7 +235,7 @@ test('buildCsvExport: names starting with +, -, @, or a tab all get the guard', 
 test('buildCsvExport: an ordinary name is not guarded', () => {
   const list = [{ id: 'x@e.com', name: 'uBlock Origin', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
   const csv = buildCsvExport(list);
-  const dataRow = csv.split('\r\n')[3];
+  const dataRow = csv.split('\r\n')[7];
   assert.ok(dataRow.startsWith('uBlock Origin,1.0,'), `should not be guarded: ${dataRow}`);
 });
 
@@ -440,11 +449,11 @@ const awkwardTxtList = [
   { id: 'url@example.com', name: 'Spaced Link', version: '5.0', enabled: true, type: 'extension', link: 'https://example.com/x y | z\nw', linkType: 'homepage' },
 ];
 
-test('buildTxtExport: every add-on is exactly one line with the six columns, whatever its name holds', () => {
+test('buildTxtExport: every add-on is exactly one line with the seven columns, whatever its name holds', () => {
   const txt = sandbox.buildTxtExport(awkwardTxtList, false);
   const rows = txt.split('\r\n').filter((l) => l.includes(' | '));
   assert.strictEqual(rows.length, awkwardTxtList.length, 'one line per add-on');
-  for (const row of rows) assert.strictEqual(row.split(' | ').length, 6, row);
+  for (const row of rows) assert.strictEqual(row.split(' | ').length, 7, row);
   assert.ok(!/[^\r]\n/.test(txt), 'no stray line break anywhere');
 });
 
@@ -468,5 +477,5 @@ test('buildTxtExport: the link and id columns are escaped the same way', () => {
 
 test('buildTxtExport: names without any of these characters are written exactly as before', () => {
   const plain = [{ id: 'p@example.com', name: 'Plain Name', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/p', linkType: 'amo-exact' }];
-  assert.ok(sandbox.buildTxtExport(plain, false).includes('Plain Name | 1.0 | Extension | Enabled  | https://example.com/p | p@example.com'));
+  assert.ok(sandbox.buildTxtExport(plain, false).includes('Plain Name | 1.0 | Extension | Enabled  | https://example.com/p | amo-exact | p@example.com'));
 });

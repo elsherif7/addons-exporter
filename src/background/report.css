@@ -36,7 +36,6 @@
      list box wipe in under the title, one every 0.16s; the inline script sets
      their start times in --d (the fallbacks are the same timings without it). */
   .card > .intro-text { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 0.82s); }
-  .source-note { font-size: 12px; color: var(--text-muted); }
   .cta-link { color: var(--link-accent); font-weight: bold; text-decoration: none; }
   .cta-link:hover { text-decoration: underline; }
   .theme-toggle {
