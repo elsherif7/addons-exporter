@@ -9,9 +9,14 @@
 
 // An add-on name (attacker-controlled) containing "</script>" would
 // close this tag early when the report is opened directly. Escaping
-// "</" as "<\/" stops that - JSON.parse reads it back the same either way.
+// "</" as "<\/" stops that. Escaping U+2028 and U+2029 guards older JS
+// parsers against unexpected script-break syntax errors.
+// JSON.parse reads it back the same either way.
 function safeJsonForScriptTag(value) {
-  return JSON.stringify(value).replace(/<\//g, '<\\/');
+  return JSON.stringify(value)
+    .replace(/<\//g, '<\\/')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 }
 
 // THE DATA CONTRACT OF THE HTML REPORT. The page around it (layout, colours,

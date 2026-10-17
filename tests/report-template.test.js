@@ -114,6 +114,16 @@ test('safeJsonForScriptTag: escapes "</" so an add-on name can\'t close the scri
   assert.deepStrictEqual(JSON.parse(json), { addons: [{ name: 'x</script><script>alert(1)</script>' }] });
 });
 
+test('safeJsonForScriptTag: escapes U+2028 and U+2029 line separators for safe inlining', () => {
+  const json = safeJsonForScriptTag({ addons: [{ name: 'line\u2028sep\u2029test' }] });
+  assert.ok(!json.includes('\u2028'), 'U+2028 must be escaped');
+  assert.ok(!json.includes('\u2029'), 'U+2029 must be escaped');
+  assert.ok(json.includes('\\u2028'), 'literal \\u2028 must be in output');
+  assert.ok(json.includes('\\u2029'), 'literal \\u2029 must be in output');
+  assert.deepStrictEqual(JSON.parse(json), { addons: [{ name: 'line\u2028sep\u2029test' }] });
+});
+
+
 // --- REPORT_ICON_DATA_URI stays in sync with icon32.png ---
 // The report's favicon is a hand-pasted base64 blob with nothing else
 // tying it to the actual icon file - nothing would catch it going stale

@@ -197,8 +197,17 @@ async function doExport(ids, {
     lookupFailures: 0, lookupsSkipped: 0,
   };
 
-  const list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
-    let amoMatch = null;
+  // Keep-alive timer scoped strictly to doExport: calls getPlatformInfo periodically
+  // so Firefox's event-page idle timer does not suspend the background script while
+  // resolving a large add-on list on a slow connection. Cleared in the finally block below.
+  const keepAliveTimer = (typeof browser !== 'undefined' && browser.runtime && browser.runtime.getPlatformInfo)
+    ? setInterval(() => { browser.runtime.getPlatformInfo().catch(() => {}); }, 20000)
+    : null;
+
+  let list;
+  try {
+    list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
+      let amoMatch = null;
     // Whether this add-on's own lookup requests failed (network error,
     // timeout, non-2xx). Kept per add-on and counted only if no AMO link came
     // back in the end, so a failure the name search then rescued is not
@@ -237,9 +246,12 @@ async function doExport(ids, {
         stats.searchFallback++;
       }
     }
-    reportProgress();
-    return { id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
-  });
+      reportProgress();
+      return { id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
+    });
+  } finally {
+    if (keepAliveTimer) clearInterval(keepAliveTimer);
+  }
 
   // Sort A→Z by name so every export format (HTML, JSON, CSV, TXT) comes
   // out in the same consistent alphabetical order, regardless of the order
