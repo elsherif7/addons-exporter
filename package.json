@@ -11,6 +11,7 @@
     "pretest:coverage": "npm run check",
     "test:coverage": "c8 node --require ./tests/coverage-preload.js --test",
     "lint:ext": "npx --yes web-ext@8.10.0 lint",
+    "clean": "node scripts/clean.js",
     "set-version": "node scripts/set-version.js"
   },
   "devDependencies": {

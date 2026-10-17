@@ -13,7 +13,7 @@ export default {
     // hold inline <script> blocks on purpose - that is what a saved report is.
     'tests/**',
     // Build and maintenance tooling: build-assets.js, check-syntax.js,
-    // set-version.js, clean.py.
+    // set-version.js, clean.js.
     'scripts/**',
     // Project files that are not part of the extension. (Dotfiles such as
     // .gitignore and .c8rc.json are already ignored by web-ext itself.)

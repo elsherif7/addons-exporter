@@ -12,7 +12,7 @@
 addons-hub/
 ├── manifest.json         # Extension manifest: config, permissions, and background script list
 ├── icons/                 # Toolbar and extension icons in several standard sizes
-├── scripts/               # Build helpers: generate the report's embedded assets, syntax-check every source file, set the version
+├── scripts/               # Build helpers: generate the report's embedded assets, syntax-check every source file, set the version, delete throwaway output
 ├── tests/                 # Test suite on Node's built-in runner (node:test), run via `npm test`
 │   ├── golden/                  # Expected output files used by golden.test.js
 │   ├── fixtures/                # amo-release.html: a real HTML report from the version released on addons.mozilla.org (import.test.js reads it)
@@ -27,6 +27,7 @@ addons-hub/
 │   ├── export.test.js           # Tests covering the export page's picker and click logic
 │   ├── golden.test.js           # Compares the exact text of every export format with the files in tests/golden/ (`UPDATE_GOLDEN=1 node --test tests/golden.test.js` regenerates them)
 │   ├── format-contract.test.js  # Pins the data layout of every export next to the format version, so a data change cannot happen without bumping it (a change to only the page's look never needs that)
+│   ├── clean.test.js            # Tests for scripts/clean.js (what it deletes, and what it refuses to touch)
 │   ├── set-version.test.js      # Tests for scripts/set-version.js (the version is changed in package.json and manifest.json together)
 │   ├── round-trip.test.js       # Generated lists with awkward names (commas, quotes, newlines, non-Latin text, leading =) written in all four formats and read back by the Importer
 │   ├── report-script.test.js    # Runs the report's own script in a fake page: theme button, saved theme, search box
@@ -193,9 +194,12 @@ node --test tests/import.test.js           # one file
 node --test --test-name-pattern="zip"      # tests whose name contains "zip"
 npm run test:coverage                      # coverage of src/ (needs `npm ci` once; also writes coverage/index.html)
 npm run lint:ext                           # Mozilla's web-ext lint
+npm run clean                              # delete throwaway output (node_modules, coverage, web-ext-artifacts, stray exports)
 ```
 
 Both `npm run lint:ext` and a `web-ext` you run yourself read their ignore list from `.web-ext-config.mjs`, so the tests, the tooling and the other files that are not part of the extension stay out of the lint report and out of any package.
+
+`npm run clean` deletes only output this project's tools made and can make again: `node_modules`, `coverage`, `web-ext-artifacts`, Python caches, and stray `*.zip`/`*.xpi` exports at the project root. It never opens `.git`, `tests`, or any `fixtures` folder, and it leaves an archive parked in a subfolder alone. `npm run clean -- --dry-run` lists what it would delete without deleting anything.
 
 **Changing the version**
 
