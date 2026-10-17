@@ -252,6 +252,15 @@ test('step by step: the description on the Exporter and both paragraphs on the I
   assert.strictEqual((imp.match(/<p class="intro-text">/g) || []).length, 2);
 });
 
+test('Importer: the file input takes more than one file, and the page says so', () => {
+  const imp = readSrc('src/import/import.html');
+  const tag = imp.match(/<input[^>]*id="fileInput"[^>]*>/);
+  assert.ok(tag, '#fileInput not found');
+  assert.match(tag[0], /\bmultiple\b/, '#fileInput must accept several files at once');
+  assert.match(imp, /Pick one or more <strong>exported files<\/strong>/, 'the intro must offer more than one file');
+  assert.match(imp, /id="chooseFileBtn"[^>]*>Choose files</, 'the button must say files, not file');
+});
+
 test('staged reveal: the Exporter search box takes its place in the order even though it is shown later (data-stage)', () => {
   assert.match(readSrc('src/export/export.html'), /id="searchInput"[^>]*data-stage[^>]*style="display:none;"/);
   // The Importer's search box is revealed whenever a file is chosen, so it must NOT hold a slot.

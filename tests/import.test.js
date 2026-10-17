@@ -177,16 +177,17 @@ test('AMO release: the HTML report from the released version is read in full by 
   assert.ok(result.addons.every((a) => a.id && a.link.startsWith('https://addons.mozilla.org/')));
 });
 
-// --- A6: a v1.0.0 (bare-array) export is rejected with a clear reason ---
+// --- A6: a bare-array export (the shape that predates format 1) is turned away cleanly ---
 
-test('parseAddonsPayload: a v1.0.0-style bare array is rejected with a specific message, not "No add-ons found"', () => {
-  // v1.0.0 exported a plain array with no formatVersion/addons wrapper at
-  // all - this is that exact shape.
+test('parseAddonsPayload: a bare array is rejected as a file with no format version, not "No add-ons found"', () => {
+  // A plain array with no formatVersion/addons wrapper at all. No released
+  // export ever wrote that shape, so it is turned away here by the same strict
+  // check as any other payload without a version.
   const result = parseAddonsPayload(JSON.stringify([
     { name: 'uBlock Origin', version: '1.58.0', enabled: true },
   ]));
   assert.strictEqual(result.ok, false);
-  assert.match(result.error, /old, unsupported version/);
+  assert.match(result.error, /missing its export format version/);
 });
 
 // --- A27: stricter formatVersion, type coercion, de-duplication ---

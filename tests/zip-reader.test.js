@@ -280,6 +280,8 @@ testAsync('Importer: a .zip with different exports shows a picker ("All add-ons"
   await settle();
 
   const options = () => elements.exportPickList.querySelectorAll('.export-pick-option');
+  // Two exports inside one .zip: the .zip can't tell them apart, so each is
+  // named after the file it came from, without its extension.
   assert.deepStrictEqual(options().map((o) => o.textContent), ['All add-ons (2)', 'second.json (2)', 'first.json (1)']);
   assert.strictEqual(elements.exportPickRow.style.display, 'block');
   assert.strictEqual(elements.exportPick.textContent, 'All add-ons (2)', '"All add-ons" is the default');
@@ -290,12 +292,12 @@ testAsync('Importer: a .zip with different exports shows a picker ("All add-ons"
   assert.strictEqual(elements.exportPickList.style.display, 'block');
   assert.strictEqual(elements.exportPick.getAttribute('aria-expanded'), 'true');
 
-  options()[1].click(); // second.json
+  options()[1].click(); // second
   assert.strictEqual(elements.exportPickList.style.display, 'none', 'picking a row closes the panel');
   assert.strictEqual(elements.exportPick.textContent, 'second.json (2)', 'the closed box echoes the choice');
   assert.deepStrictEqual(shownNames(elements), ['Beta', 'Gamma']);
 
-  options()[2].click(); // first.json
+  options()[2].click(); // first
   assert.strictEqual(elements.exportPick.textContent, 'first.json (1)');
   assert.deepStrictEqual(shownNames(elements), ['Alpha']);
 
@@ -311,4 +313,165 @@ test('Importer: .zip is an accepted file type, and the page lists the zip reader
   const html = readSrc('src/import/import.html');
   assert.match(html, /accept="[^"]*\.zip/);
   assert.ok(html.indexOf('zip-reader.js') !== -1 && html.indexOf('zip-reader.js') < html.indexOf('import.js'));
+});
+
+// --- several files chosen or dropped at once ---
+
+const textFile = (name, text) => ({ name, size: text.length, text: async () => text });
+const pickOptions = (elements) => elements.exportPickList.querySelectorAll('.export-pick-option').map((o) => o.textContent);
+// Exports with names and ids of their own, so a test can decide exactly which
+// files describe the same set of add-ons.
+const addonJson = (pairs) => JSON.stringify({
+  formatVersion: 1,
+  addons: pairs.map(([name, id], i) => ({ name, version: '1.0', type: 'extension', enabled: true, link: `https://example.com/${i}`, linkType: 'homepage', id })),
+});
+const addonCsv = (pairs) => [
+  '# addons-hub-format-version: 1',
+  'name,version,type,enabled,link,linkType,id',
+  ...pairs.map(([name, id], i) => `${name},1.0,extension,true,https://example.com/${i},homepage,${id}`),
+].join('\r\n');
+
+testAsync('Importer: several files chosen at once are read together, and the chip counts them', async () => {
+  const { sandbox, elements } = bootImporter();
+  sandbox.setSelectedFiles([textFile('first.json', jsonText(['Alpha'])), textFile('second.json', jsonText(['Beta', 'Gamma']))]);
+  await settle();
+  assert.strictEqual(elements.status.textContent, '');
+  assert.strictEqual(elements.fileName.textContent, '2 files');
+  assert.deepStrictEqual(pickOptions(elements), ['All add-ons (2)', 'second.json (2)', 'first.json (1)']);
+  assert.strictEqual(elements.exportPick.textContent, 'All add-ons (2)', '"All add-ons" is the default');
+  assert.deepStrictEqual(shownNames(elements), ['Alpha', 'Gamma']);
+});
+
+testAsync('Importer: a .zip holding one export in several formats is named by the .zip itself', async () => {
+  const { sandbox, elements } = bootImporter();
+  const zip = zipFile('v3.zip', makeZip([
+    { name: 'Add-ons (2026-01-02).json', data: addonJson([['Beta', 'b@x'], ['Gamma', 'c@x']]) },
+    { name: 'Add-ons (2026-01-02).csv', data: addonCsv([['Beta', 'b@x'], ['Gamma', 'c@x']]), method: 'deflate' },
+  ]));
+  // The .zip's two formats agree, so the .zip holds one export and is named by
+  // the .zip itself; the loose file is a different export of its own.
+  sandbox.setSelectedFiles([zip, textFile('Add-ons (2026-01-01).json', addonJson([['Alpha', 'a@x']]))]);
+  await settle();
+  assert.deepStrictEqual(pickOptions(elements), ['All add-ons (3)', 'v3.zip (2)', 'Add-ons (2026-01-01).json (1)']);
+});
+
+testAsync('Importer: files sharing a base name are named once, whatever formats they came in', async () => {
+  const { sandbox, elements } = bootImporter();
+  sandbox.setSelectedFiles([
+    textFile('Add-ons.json', addonJson([['Alpha', 'a@x'], ['Beta', 'b@x']])),
+    textFile('Add-ons.csv', addonCsv([['Alpha', 'a@x'], ['Beta', 'b@x']])),
+    textFile('Other.json', addonJson([['Gamma', 'c@x'], ['Delta', 'd@x'], ['Epsilon', 'e@x']])),
+  ]);
+  await settle();
+  assert.deepStrictEqual(pickOptions(elements), ['All add-ons (5)', 'Other.json (3)', 'Add-ons (.json, .csv) (2)']);
+});
+
+testAsync('Importer: files with names of their own each keep their own entry, even holding the same add-ons', async () => {
+  const { sandbox, elements } = bootImporter();
+  sandbox.setSelectedFiles([textFile('one.json', jsonText(['Alpha', 'Beta'])), textFile('two.json', jsonText(['Beta', 'Alpha']))]);
+  await settle();
+  assert.strictEqual(elements.status.textContent, '');
+  assert.strictEqual(elements.fileName.textContent, '2 files');
+  assert.deepStrictEqual(pickOptions(elements), ['All add-ons (2)', 'one.json (2)', 'two.json (2)']);
+  assert.deepStrictEqual(shownNames(elements), ['Alpha', 'Beta'], 'All merges both, each id kept once');
+});
+
+testAsync('Importer: three chosen files give three entries, even when two hold the same add-ons', async () => {
+  const { sandbox, elements } = bootImporter();
+  sandbox.setSelectedFiles([
+    textFile('Add-ons (06-15-22).json', addonJson([['Alpha', 'a@x'], ['Beta', 'b@x']])),
+    textFile('v2.csv', addonCsv([['Alpha', 'a@x'], ['Beta', 'b@x']])),
+    textFile('Add-ons (06-15-66).json', addonJson([['Alpha', 'a@x'], ['Beta', 'b@x'], ['Gamma', 'c@x']])),
+  ]);
+  await settle();
+  assert.deepStrictEqual(
+    pickOptions(elements),
+    ['All add-ons (3)', 'Add-ons (06-15-66).json (3)', 'Add-ons (06-15-22).json (2)', 'v2.csv (2)']
+  );
+});
+
+testAsync('Importer: one name holding different add-ons is two entries, so neither set is lost', async () => {
+  const { sandbox, elements } = bootImporter();
+  sandbox.setSelectedFiles([
+    textFile('Add-ons.json', addonJson([['Alpha', 'a@x'], ['Beta', 'b@x']])),
+    textFile('Add-ons.csv', addonCsv([['Gamma', 'c@x']])),
+  ]);
+  await settle();
+  assert.deepStrictEqual(pickOptions(elements), ['All add-ons (3)', 'Add-ons.json (2)', 'Add-ons.csv (1)']);
+});
+
+testAsync('Importer: the most exact format supplies an export\'s data across files, not the order they were chosen', async () => {
+  const { sandbox, elements } = bootImporter();
+  const json = JSON.stringify({ formatVersion: 1, addons: [{ name: 'FromJson', version: '1.0', type: 'extension', enabled: true, link: 'https://example.com/j', linkType: 'homepage', id: 'a@x' }] });
+  const csv = '# addons-hub-format-version: 1\r\nname,version,type,enabled,link,linkType,id\r\nFromCsv,1.0,extension,true,https://example.com/c,homepage,a@x';
+  // The CSV is chosen first, and still loses to the JSON - the same rule the
+  // files inside a .zip already follow.
+  sandbox.setSelectedFiles([textFile('list.csv', csv), textFile('list.json', json)]);
+  await settle();
+  assert.strictEqual(elements.exportPickRow.style.display, 'none', 'the same ids are one export');
+  assert.deepStrictEqual(shownNames(elements), ['FromJson']);
+});
+
+testAsync('Importer: a .zip and a loose file combine like any other selection', async () => {
+  const { sandbox, elements } = bootImporter();
+  sandbox.setSelectedFiles([
+    zipFile('pack.zip', makeZip([{ name: 'inner.json', data: jsonText(['Alpha']) }])),
+    textFile('extra.json', jsonText(['Beta', 'Gamma'])),
+  ]);
+  await settle();
+  assert.strictEqual(elements.fileName.textContent, '2 files');
+  assert.deepStrictEqual(pickOptions(elements), ['All add-ons (2)', 'extra.json (2)', 'pack.zip (1)']);
+  assert.deepStrictEqual(shownNames(elements), ['Alpha', 'Gamma']);
+});
+
+testAsync('Importer: a file that cannot be read is named under the list, and the rest still load', async () => {
+  const { sandbox, elements } = bootImporter();
+  sandbox.setSelectedFiles([textFile('addons.json', jsonText(['Alpha'])), textFile('notes.xml', 'just some notes')]);
+  await settle();
+  assert.strictEqual(elements.status.textContent, '');
+  assert.deepStrictEqual(shownNames(elements), ['Alpha']);
+  assert.strictEqual(elements.fileName.textContent, 'addons.json', 'the chip names only what loaded');
+  assert.match(elements.compareNote.textContent, /notes\.xml: That file isn't a supported file type/);
+});
+
+testAsync('Importer: a damaged .zip among good files is named too', async () => {
+  const { sandbox, elements } = bootImporter();
+  sandbox.setSelectedFiles([textFile('addons.json', jsonText(['Alpha'])), zipFile('broken.zip', new Uint8Array([1, 2, 3, 4]))]);
+  await settle();
+  assert.deepStrictEqual(shownNames(elements), ['Alpha']);
+  assert.match(elements.compareNote.textContent, /broken\.zip: /, 'the note names the file it could not read');
+});
+
+testAsync('Importer: when not one chosen file can be read, the first reason is shown and nothing loads', async () => {
+  const { sandbox, elements } = bootImporter();
+  sandbox.setSelectedFiles([textFile('notes.xml', 'just some notes'), textFile('also.xml', 'more notes')]);
+  await settle();
+  assert.match(elements.status.textContent, /isn't a supported file type/);
+  assert.strictEqual(elements.fileName.textContent, '', 'no chip - not one file was accepted');
+  assert.notStrictEqual(elements.chooseFileBtn.style.display, 'none', '"Choose files" stays put');
+  assert.strictEqual(elements.addonList.textContent, '');
+});
+
+testAsync('Importer: the file picker hands over every chosen file, not just the first', async () => {
+  const { sandbox, elements } = bootImporter();
+  elements.fileInput.files = [textFile('first.json', jsonText(['Alpha'])), textFile('second.json', jsonText(['Beta', 'Gamma']))];
+  elements.fileInput.dispatchEvent({ type: 'change' });
+  await settle();
+  assert.strictEqual(elements.fileName.textContent, '2 files');
+  assert.strictEqual(elements.exportPickRow.style.display, 'block');
+  assert.deepStrictEqual(shownNames(elements), ['Alpha', 'Gamma']);
+});
+
+testAsync('Importer: a drop hands over every dropped file, and a drop with no files changes nothing', async () => {
+  const { sandbox, elements } = bootImporter();
+  const drop = (files) => elements.picker.dispatchEvent({ type: 'drop', dataTransfer: { files }, preventDefault() {} });
+  drop([textFile('first.json', jsonText(['Alpha'])), textFile('second.json', jsonText(['Beta', 'Gamma']))]);
+  await settle();
+  assert.strictEqual(elements.fileName.textContent, '2 files');
+  // Dragging text (or anything else carrying no files) must leave the loaded
+  // list alone rather than clearing it.
+  drop([]);
+  await settle();
+  assert.strictEqual(elements.fileName.textContent, '2 files');
+  assert.deepStrictEqual(shownNames(elements), ['Alpha', 'Gamma']);
 });

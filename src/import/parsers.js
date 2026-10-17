@@ -87,12 +87,6 @@ function addonEntryProblem(a, keys) {
 // Checks an already-parsed export payload (the HTML report's embedded data, or
 // a JSON file's contents) and returns its add-ons, or a reason it was rejected.
 function validateAddonsPayload(parsed, entryKeys, fileType) {
-  // A v1.0.0 export was a bare array with no formatVersion/addons wrapper at
-  // all - checked for specifically, and first, so it gets a message that
-  // explains why.
-  if (Array.isArray(parsed)) {
-    return { ok: false, error: 'This file appears to be from an old, unsupported version of Add-ons Exporter and can\'t be imported.' };
-  }
   if (!parsed || typeof parsed !== 'object') {
     return payloadError('the data is not an object');
   }
