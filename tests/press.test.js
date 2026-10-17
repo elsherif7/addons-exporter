@@ -1,7 +1,6 @@
 // Tests for src/common/press.js - the click/tap feedback ring.
 const assert = require('assert');
-const vm = require('vm');
-const { test, readSrc } = require('./helpers');
+const { test, readSrc, makeSandbox } = require('./helpers');
 
 const pressSrc = readSrc('src/common/press.js');
 
@@ -25,16 +24,14 @@ function makeEl({ rowLike = false, matchesTarget = true, disabled = false, ariaD
 
 function loadPress({ reducedMotion = false, ringValue = 'rgba(1, 2, 3, 0.5)' } = {}) {
   const listeners = {};
-  const sandbox = {
+  const sandbox = makeSandbox({
     document: {
       documentElement: {},
       addEventListener: (type, fn, capture) => { listeners[type] = { fn, capture }; },
     },
     matchMedia: () => ({ matches: reducedMotion }),
     getComputedStyle: () => ({ getPropertyValue: (name) => (name === '--press-ring' ? ` ${ringValue} ` : '') }),
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(pressSrc, sandbox);
+  }, pressSrc);
   return { listeners };
 }
 
@@ -132,7 +129,5 @@ test('press: a page where animate() is unavailable (old browser) is simply left 
 });
 
 test('press: loading it where there is no document is a safe no-op', () => {
-  const bare = {};
-  vm.createContext(bare);
-  vm.runInContext(pressSrc, bare);
+  makeSandbox({}, pressSrc);
 });

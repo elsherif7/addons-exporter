@@ -12,16 +12,13 @@
 // at least one tool is normally available (Python or tar on Windows/macOS/Linux).
 
 const assert = require('assert');
-const vm = require('vm');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { test, readSrc, readSrcs } = require('./helpers');
+const { test, readSrc, readSrcs, makeSandbox } = require('./helpers');
 
-const sandbox = { TextEncoder, Uint8Array, Uint32Array, DataView };
-vm.createContext(sandbox);
-vm.runInContext(readSrcs('src/common/crc32.js', 'src/background/zip.js'), sandbox);
+const sandbox = makeSandbox({ TextEncoder, Uint8Array, Uint32Array, DataView }, readSrcs('src/common/crc32.js', 'src/background/zip.js'));
 
 // Names and contents like a real multi-format export, including non-ASCII.
 const files = [

@@ -3,8 +3,7 @@
 // page in turn from top to bottom (every 0.16s), the add-ons cascading in
 // under it (every 0.08s).
 const assert = require('assert');
-const vm = require('vm');
-const { test, readSrc } = require('./helpers');
+const { test, readSrc, makeSandbox } = require('./helpers');
 
 const revealSrc = readSrc('src/common/reveal.js');
 
@@ -70,7 +69,7 @@ function load({ card, byId = {}, reducedMotion = false, time = { t: 1000000 }, n
   const timers = [];
   const cleared = [];
   const observers = [];
-  const sandbox = {
+  const sandbox = makeSandbox({
     document: {
       querySelector: (sel) => (sel === '.card.staged' && !noCard ? card : null),
       getElementById: (id) => byId[id] || null,
@@ -87,9 +86,7 @@ function load({ card, byId = {}, reducedMotion = false, time = { t: 1000000 }, n
     setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
     clearTimeout: (id) => { cleared.push(id); },
     Date: { now: () => time.t },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(revealSrc, sandbox);
+  }, revealSrc);
   return { timers, cleared, observers, time };
 }
 
@@ -325,7 +322,5 @@ test('reveal: with reduced motion nothing is timed - the page is simply there', 
 
 test('reveal: a page with no staged card, or no document at all, is left alone', () => {
   load({ card: null, noCard: true });
-  const bare = {};
-  vm.createContext(bare);
-  vm.runInContext(revealSrc, bare);
+  makeSandbox({}, revealSrc);
 });

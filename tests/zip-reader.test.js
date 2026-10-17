@@ -4,16 +4,12 @@
 // Python's zipfile and from this extension's own writer (background/zip.js).
 
 const assert = require('assert');
-const vm = require('vm');
 const zlib = require('zlib');
 const { spawnSync } = require('child_process');
-const { test, testAsync, readSrc, readSrcs, readImport, readCommon, makeFakeDom } = require('./helpers');
+const { test, testAsync, readSrc, readSrcs, readImport, readCommon, makeFakeDom, makeSandbox, IMPORTER_ELEMENT_IDS } = require('./helpers');
 
 function load() {
-  const sb = { Blob, DecompressionStream, TextDecoder, TextEncoder };
-  vm.createContext(sb);
-  vm.runInContext(readSrcs('src/common/crc32.js', 'src/background/zip.js', 'src/import/zip-reader.js'), sb);
-  return sb;
+  return makeSandbox({ Blob, DecompressionStream, TextDecoder, TextEncoder }, readSrcs('src/common/crc32.js', 'src/background/zip.js', 'src/import/zip-reader.js'));
 }
 const sb = load();
 const EXT = new Set(['html', 'htm', 'json', 'csv', 'txt']);
@@ -183,22 +179,16 @@ const jsonText = (names) => JSON.stringify({
 
 function bootImporter(installed = []) {
   const { document, elements } = makeFakeDom([
-    'status', 'fileName', 'fileNameRow', 'fileInput', 'picker', 'removeFileBtn',
-    'chooseFileBtn', 'listControls', 'addonList', 'checklistBox', 'selectAllBtn',
-    'deselectAllBtn', 'selectionCount', 'openSelectedBtn', 'compareNote',
-    'searchInput', 'noSearchMatches', 'exportPickRow', 'exportPick', 'exportPickList',
+    ...IMPORTER_ELEMENT_IDS, 'exportPickRow', 'exportPick', 'exportPickList',
   ]);
-  const sandbox = {
+  const sandbox = makeSandbox({
     document, URL, Blob, DecompressionStream, TextDecoder,
     browser: {
       runtime: { sendMessage: async (m) => (m.type === 'listAddons' ? installed : undefined), getURL: (p) => p },
       storage: { local: { get: async () => ({}) } },
       tabs: { create: async () => ({}) },
     },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(readCommon(), sandbox);
-  vm.runInContext(readImport(), sandbox);
+  }, readCommon(), readImport());
   return { sandbox, elements };
 }
 
@@ -232,9 +222,7 @@ testAsync('Importer: if the first file in a .zip cannot be read, the next one is
 });
 
 testAsync('Importer: the Exporter\'s own .zip (made by its real format builders) comes back whole, from CSV alone and from TXT alone', async () => {
-  const ex = { TextEncoder };
-  vm.createContext(ex);
-  vm.runInContext(readSrcs('src/common/core.js', 'src/background/export-formats.js'), ex);
+  const ex = makeSandbox({ TextEncoder }, readSrcs('src/common/core.js', 'src/background/export-formats.js'));
   const list = [
     { id: 'a@x', name: 'Alpha "quoted" ; semi', version: '1.0', type: 'extension', enabled: true, link: 'https://example.com/a', linkType: 'amo-exact' },
     { id: 'b@x', name: "'=Beta | pipe", version: '2.0', type: 'theme', enabled: false, link: 'https://example.com/b', linkType: 'homepage' },

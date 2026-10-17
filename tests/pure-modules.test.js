@@ -4,14 +4,10 @@
 // this fails if any of them ever starts touching the page.
 
 const assert = require('assert');
-const vm = require('vm');
-const { test, readSrc, readSrcs, evalInContext } = require('./helpers');
+const { test, readSrc, readSrcs, evalInContext, makeSandbox } = require('./helpers');
 
 function load(...files) {
-  const sb = { URL };
-  vm.createContext(sb);
-  vm.runInContext(readSrcs('src/common/core.js', ...files), sb);
-  return sb;
+  return makeSandbox({ URL }, readSrcs('src/common/core.js', ...files));
 }
 
 test('parsers.js + match.js load and work with no document and no browser object', () => {

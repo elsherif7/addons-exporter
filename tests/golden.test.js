@@ -19,18 +19,14 @@
 // them out of the golden file means a colour change does not touch it.
 
 const assert = require('assert');
-const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
-const { test, readSrc, evalInContext, readCommon, readReportBuilders } = require('./helpers');
+const { test, readSrc, evalInContext, readCommon, readReportBuilders, makeSandbox, FIREFOX_SOURCE: SOURCE } = require('./helpers');
 
-const sandbox = { URL };
-vm.createContext(sandbox);
-vm.runInContext(readCommon(), sandbox);
-vm.runInContext(readReportBuilders(), sandbox);
+const sandbox = makeSandbox({ URL }, readCommon(), readReportBuilders());
 const { buildHtmlReport, buildJsonExport, buildCsvExport, buildTxtExport } = sandbox;
-// A fixed source, so the files do not change with whoever regenerates them.
-const SOURCE = { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' };
+// SOURCE is a fixed browser (FIREFOX_SOURCE from helpers), so the golden files
+// do not change with whoever regenerates them.
 
 const GOLDEN_DIR = path.join(__dirname, 'golden');
 const UPDATE = process.env.UPDATE_GOLDEN === '1';

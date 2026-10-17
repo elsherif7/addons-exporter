@@ -4,36 +4,17 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readReportBuilders, readImport, plain } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readReportBuilders, readImport, plain, stubDocument, makeSandbox, IMPORTER_ELEMENT_IDS, FIREFOX_SOURCE: SOURCE } = require('./helpers');
 
-function makeFakeElement() {
-  return {
-    style: {},
-    classList: { add() {}, remove() {}, contains() { return false; } },
-    addEventListener() {},
-    querySelectorAll() { return []; },
-    querySelector() { return null; },
-    dataset: {},
-    textContent: '',
-    innerHTML: '',
-    value: '',
-  };
-}
-
-// import.js wires up DOM elements and event listeners at load time. This
-// stub exists purely to let the file load without throwing - none of the
-// tests below trigger DOM rendering, file reading, or messaging, so a
+// import.js wires up DOM elements and event listeners at load time.
+// stubDocument() exists purely to let the file load without throwing - none of
+// the tests below trigger DOM rendering, file reading, or messaging, so a
 // generic fake element for every id is enough.
-const fakeDocument = { getElementById() { return makeFakeElement(); }, addEventListener() {} };
 
 const commonSrc = readCommon();
 const reportTemplateSrc = readReportBuilders();
 const importSrc = readImport();
-const sandbox = { URL, document: fakeDocument };
-vm.createContext(sandbox);
-vm.runInContext(commonSrc, sandbox);
-vm.runInContext(reportTemplateSrc, sandbox);
-vm.runInContext(importSrc, sandbox);
+const sandbox = makeSandbox({ URL, document: stubDocument() }, commonSrc, reportTemplateSrc, importSrc);
 
 const {
   parseAddonsPayload,
@@ -66,7 +47,6 @@ function payload(addons, formatVersion = V1) {
 // A format 2 file: the source (whose own first two fields are the format
 // version and the file type), then the add-ons, with no top-level format
 // version. SOURCE is the browser part, as getExportSource() returns it.
-const SOURCE = { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' };
 function payloadV2(addons, source = { formatVersion: 2, fileType: 'html', ...SOURCE }) {
   return JSON.stringify({ source, addons });
 }
@@ -347,7 +327,7 @@ function captureBulkSelectHandlers(checkboxList, { failNavigation = false, failS
     exportPick: { addEventListener() {}, setAttribute() {}, focus() {}, style: {}, textContent: '' },
     exportPickList: { style: {}, replaceChildren() {}, querySelectorAll: () => [] },
   };
-  const sandbox = {
+  const sandbox = makeSandbox({
     URL,
     setTimeout: (fn) => { setTimeoutCallCount++; fn(); return 0; }, // fires the stagger delay immediately - no reason for tests to actually wait
     document: { getElementById: (id) => elements[id], addEventListener() {} },
@@ -379,10 +359,7 @@ function captureBulkSelectHandlers(checkboxList, { failNavigation = false, failS
         },
       },
     },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(commonSrc, sandbox);
-  vm.runInContext(importSrc, sandbox);
+  }, commonSrc, importSrc);
   return {
     selectAllHandler, deselectAllHandler, openSelectedHandler,
     selectionCountEl: elements.selectionCount, statusEl: elements.status,
@@ -755,13 +732,8 @@ function jsonAddonsFile(addons, formatVersion = V1) {
 }
 
 async function renderRealImportList(addons, installed = []) {
-  const { document, elements } = makeFakeDom([
-    'status', 'fileName', 'fileNameRow', 'fileInput', 'picker', 'removeFileBtn',
-    'chooseFileBtn', 'listControls', 'addonList', 'checklistBox', 'selectAllBtn',
-    'deselectAllBtn', 'selectionCount', 'openSelectedBtn', 'compareNote',
-    'searchInput', 'noSearchMatches',
-  ]);
-  const sandbox = {
+  const { document, elements } = makeFakeDom(IMPORTER_ELEMENT_IDS);
+  const sandbox = makeSandbox({
     document,
     URL,
     browser: {
@@ -772,10 +744,7 @@ async function renderRealImportList(addons, installed = []) {
       storage: { local: { get: async () => ({}) } },
       tabs: { create: async () => ({}) },
     },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(commonSrc, sandbox);
-  vm.runInContext(importSrc, sandbox);
+  }, commonSrc, importSrc);
   sandbox.setSelectedFile(jsonAddonsFile(addons));
   // Let loadFile()'s file read, JSON parse, and listAddons message settle.
   await new Promise((resolve) => setTimeout(resolve, 20));
@@ -828,13 +797,8 @@ testAsync('import.js real DOM: Select All while a search is active only checks t
 // auto-driving setSelectedFile, so each test can control the timing of
 // the file read / listAddons / storage.get itself.
 function bootImportSandbox({ installed = [], storageGet } = {}) {
-  const { document, elements } = makeFakeDom([
-    'status', 'fileName', 'fileNameRow', 'fileInput', 'picker', 'removeFileBtn',
-    'chooseFileBtn', 'listControls', 'addonList', 'checklistBox', 'selectAllBtn',
-    'deselectAllBtn', 'selectionCount', 'openSelectedBtn', 'compareNote',
-    'searchInput', 'noSearchMatches',
-  ]);
-  const sandbox = {
+  const { document, elements } = makeFakeDom(IMPORTER_ELEMENT_IDS);
+  const sandbox = makeSandbox({
     document,
     URL,
     browser: {
@@ -845,10 +809,7 @@ function bootImportSandbox({ installed = [], storageGet } = {}) {
       storage: { local: { get: storageGet || (async () => ({})) } },
       tabs: { create: async () => ({}) },
     },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(commonSrc, sandbox);
-  vm.runInContext(importSrc, sandbox);
+  }, commonSrc, importSrc);
   return { sandbox, elements };
 }
 
@@ -1016,14 +977,9 @@ testAsync('import.js real DOM: no note shown when everything is new and nothing 
 // --- Live "Shorten add-on names": an already-open Importer follows the setting ---
 
 async function renderRealImportListLive(addons, stored = {}) {
-  const { document, elements } = makeFakeDom([
-    'status', 'fileName', 'fileNameRow', 'fileInput', 'picker', 'removeFileBtn',
-    'chooseFileBtn', 'listControls', 'addonList', 'checklistBox', 'selectAllBtn',
-    'deselectAllBtn', 'selectionCount', 'openSelectedBtn', 'compareNote',
-    'searchInput', 'noSearchMatches',
-  ]);
+  const { document, elements } = makeFakeDom(IMPORTER_ELEMENT_IDS);
   const listeners = [];
-  const sandbox = {
+  const sandbox = makeSandbox({
     document,
     URL,
     browser: {
@@ -1031,10 +987,7 @@ async function renderRealImportListLive(addons, stored = {}) {
       storage: { local: { get: async () => stored }, onChanged: { addListener: (fn) => listeners.push(fn) } },
       tabs: { create: async () => ({}) },
     },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(commonSrc, sandbox);
-  vm.runInContext(importSrc, sandbox);
+  }, commonSrc, importSrc);
   sandbox.setSelectedFile(jsonAddonsFile(addons));
   await new Promise((resolve) => setTimeout(resolve, 20));
   const fire = (changes, area = 'local') => listeners.forEach((fn) => fn(changes, area));
@@ -1079,12 +1032,7 @@ testAsync('live names (Importer): a search in progress is applied again to the n
 // --- Removing the file (the x) plays the opening in reverse, then really removes it ---
 
 async function renderImportForRemoval(addons, { reducedMotion = false, slowFile = null } = {}) {
-  const { document, elements } = makeFakeDom([
-    'status', 'fileName', 'fileNameRow', 'fileInput', 'picker', 'removeFileBtn',
-    'chooseFileBtn', 'listControls', 'addonList', 'checklistBox', 'selectAllBtn',
-    'deselectAllBtn', 'selectionCount', 'openSelectedBtn', 'compareNote',
-    'searchInput', 'noSearchMatches',
-  ]);
+  const { document, elements } = makeFakeDom(IMPORTER_ELEMENT_IDS);
   const log = [];     // every element.animate() call, in order
   const pending = []; // controllable animations
   const animatable = (el, name) => {
@@ -1098,7 +1046,7 @@ async function renderImportForRemoval(addons, { reducedMotion = false, slowFile 
     };
   };
   for (const name of ['checklistBox', 'listControls', 'searchInput', 'compareNote', 'fileNameRow', 'chooseFileBtn']) animatable(elements[name], name);
-  const sandbox = {
+  const sandbox = makeSandbox({
     document,
     URL,
     matchMedia: () => ({ matches: reducedMotion }),
@@ -1107,10 +1055,7 @@ async function renderImportForRemoval(addons, { reducedMotion = false, slowFile 
       storage: { local: { get: async () => ({}) }, onChanged: { addListener() {} } },
       tabs: { create: async () => ({}) },
     },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(commonSrc, sandbox);
-  vm.runInContext(importSrc, sandbox);
+  }, commonSrc, importSrc);
   sandbox.setSelectedFile(slowFile || jsonAddonsFile(addons));
   await new Promise((resolve) => setTimeout(resolve, 20));
   log.length = 0; // forget animations from loading the file

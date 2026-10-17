@@ -4,7 +4,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readSettings } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readSettings, makeSandbox, FIREFOX_SOURCE: SETTINGS_BROWSER } = require('./helpers');
 
 const themeSrc = readSrc('src/common/theme.js');
 const commonSrc = readCommon();
@@ -34,7 +34,7 @@ function makeSettingsSandbox() {
     createElement: () => makeFakeElement(),
     documentElement: { setAttribute() {} },
   };
-  const sandbox = {
+  const sandbox = makeSandbox({
     URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
     Blob: function Blob() {},
     setTimeout: () => 0,
@@ -44,11 +44,7 @@ function makeSettingsSandbox() {
       storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
       runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
     },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(themeSrc, sandbox);
-  vm.runInContext(commonSrc, sandbox);
-  vm.runInContext(settingsSrc, sandbox);
+  }, themeSrc, commonSrc, settingsSrc);
   return sandbox;
 }
 
@@ -94,7 +90,6 @@ test('buildSettingsExport: output is valid JSON', () => {
 
 // A valid source, as the exporter records it: the browser part
 // (background/browser-info.js) plus the file's own version and type.
-const SETTINGS_BROWSER = { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' };
 const SETTINGS_SOURCE = { formatVersion: SETTINGS_FILE_FORMAT_VERSION, fileType: 'settings', ...SETTINGS_BROWSER };
 function makeSettingsFile(settings, formatVersion = SETTINGS_FILE_FORMAT_VERSION, source = SETTINGS_SOURCE) {
   return JSON.stringify({ source: { ...source, formatVersion }, settings });
@@ -241,7 +236,7 @@ function makeSettingsSandboxWithRadios(storageSet, { stored = {} } = {}) {
   };
   const setCalls = [];
   const changeListeners = [];
-  const sb = {
+  const sb = makeSandbox({
     URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
     Blob: function Blob() {},
     setTimeout: () => 0,
@@ -258,11 +253,7 @@ function makeSettingsSandboxWithRadios(storageSet, { stored = {} } = {}) {
       },
       runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
     },
-  };
-  vm.createContext(sb);
-  vm.runInContext(themeSrc, sb);
-  vm.runInContext(commonSrc, sb);
-  vm.runInContext(settingsSrc, sb);
+  }, themeSrc, commonSrc, settingsSrc);
   return { themeRadioEls, formatBoxEls, shortenRadioEls, statusEl, setCalls, sandbox: sb, stored, changeListeners };
 }
 
@@ -329,7 +320,7 @@ function makeResetDialogSandbox() {
   document.body.appendChild(pageContent);
   document.body.appendChild(elements.resetSettingsBtn);
 
-  const sb = {
+  const sb = makeSandbox({
     URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
     Blob: function Blob() {},
     setTimeout: () => 0,
@@ -345,11 +336,7 @@ function makeResetDialogSandbox() {
       },
       runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
     },
-  };
-  vm.createContext(sb);
-  vm.runInContext(themeSrc, sb);
-  vm.runInContext(commonSrc, sb);
-  vm.runInContext(settingsSrc, sb);
+  }, themeSrc, commonSrc, settingsSrc);
   return { document, elements, pageContent };
 }
 
@@ -496,11 +483,8 @@ function makeSettingsInitDom(cachedFormat, cachedShorten) {
   const localStorage = {
     getItem: (key) => Object.prototype.hasOwnProperty.call(cache, key) ? cache[key] : null,
   };
-  const sb = { document, localStorage };
-  vm.createContext(sb);
   // settings.html loads core.js (the format registry) before settings-init.js.
-  vm.runInContext(commonSrc, sb);
-  vm.runInContext(settingsInitSrc, sb);
+  const sb = makeSandbox({ document, localStorage }, commonSrc, settingsInitSrc);
   return radios;
 }
 
@@ -561,12 +545,10 @@ test('settings-init: localStorage throwing still applies defaults', () => {
     shortenNamesOn:  { checked: false },
     shortenNamesOff: { checked: false },
   };
-  const sb = {
+  const sb = makeSandbox({
     document: { getElementById: (id) => radios[id] || null },
     localStorage: { getItem() { throw new Error('storage unavailable'); } },
-  };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
+  }, commonSrc);
   assert.doesNotThrow(() => vm.runInContext(settingsInitSrc, sb));
   assert.strictEqual(radios.formatHtml.checked,    true,  'html default applied after localStorage error');
   assert.strictEqual(radios.shortenNamesOn.checked, true,  'on default applied after localStorage error');
@@ -574,12 +556,10 @@ test('settings-init: localStorage throwing still applies defaults', () => {
 
 test('settings-init: null getElementById (element not found) does not throw', () => {
   // Simulates an element being absent from the DOM — should degrade gracefully.
-  const sb = {
+  const sb = makeSandbox({
     document: { getElementById: () => null },
     localStorage: { getItem: () => 'json' },
-  };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
+  }, commonSrc);
   assert.doesNotThrow(() => vm.runInContext(settingsInitSrc, sb));
 });
 
@@ -609,7 +589,7 @@ testAsync('settings.js batched init writes exportFormat to the localStorage cach
     createElement: () => ({ style: {}, textContent: '', href: '' }),
     documentElement: { setAttribute() {} },
   };
-  const sb = {
+  const sb = makeSandbox({
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
     Blob: function Blob() {},
     setTimeout: () => 0,
@@ -626,11 +606,7 @@ testAsync('settings.js batched init writes exportFormat to the localStorage cach
       },
       runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
     },
-  };
-  vm.createContext(sb);
-  vm.runInContext(themeSrc, sb);
-  vm.runInContext(commonSrc, sb);
-  vm.runInContext(settingsSrc, sb);
+  }, themeSrc, commonSrc, settingsSrc);
   await new Promise((resolve) => setTimeout(resolve, 30));
   assert.strictEqual(cacheStore['addons-hub-settings-exportFormat'], 'csv',
     'the batched init should write the confirmed exportFormat to localStorage');
@@ -659,7 +635,7 @@ testAsync('settings.js batched init writes shortenNames to the localStorage cach
     createElement: () => ({ style: {}, textContent: '', href: '' }),
     documentElement: { setAttribute() {} },
   };
-  const sb = {
+  const sb = makeSandbox({
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
     Blob: function Blob() {},
     setTimeout: () => 0,
@@ -675,11 +651,7 @@ testAsync('settings.js batched init writes shortenNames to the localStorage cach
       },
       runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
     },
-  };
-  vm.createContext(sb);
-  vm.runInContext(themeSrc, sb);
-  vm.runInContext(commonSrc, sb);
-  vm.runInContext(settingsSrc, sb);
+  }, themeSrc, commonSrc, settingsSrc);
   await new Promise((resolve) => setTimeout(resolve, 30));
   assert.strictEqual(cacheStore['addons-hub-settings-shortenNames'], 'off',
     'the batched init should write the confirmed shortenNames to localStorage');
@@ -827,7 +799,7 @@ function makeResetDialogSandboxWithWindow({ withAnimate = false, scrollbarWidth 
     };
   }
 
-  const sb = {
+  const sb = makeSandbox({
     URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
     Blob: function Blob() {},
     setTimeout: () => 0,
@@ -843,11 +815,7 @@ function makeResetDialogSandboxWithWindow({ withAnimate = false, scrollbarWidth 
       storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
       runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
     },
-  };
-  vm.createContext(sb);
-  vm.runInContext(themeSrc, sb);
-  vm.runInContext(commonSrc, sb);
-  vm.runInContext(settingsSrc, sb);
+  }, themeSrc, commonSrc, settingsSrc);
   return {
     document, elements, pageContent, scrollCalls, replayLog,
     finishAnimations: () => pendingAnimations.forEach((resolve) => resolve()),
@@ -878,7 +846,7 @@ function makeSuccessSandbox({ failRemove = false } = {}) {
   row.appendChild(desc);
   const timers = [];
   const cleared = [];
-  const sb = {
+  const sb = makeSandbox({
     URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
     Blob: function Blob() {},
     setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
@@ -895,11 +863,7 @@ function makeSuccessSandbox({ failRemove = false } = {}) {
       },
       runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
     },
-  };
-  vm.createContext(sb);
-  vm.runInContext(themeSrc, sb);
-  vm.runInContext(commonSrc, sb);
-  vm.runInContext(settingsSrc, sb);
+  }, themeSrc, commonSrc, settingsSrc);
   return { sb, document, elements, row, desc, timers, cleared };
 }
 
@@ -996,7 +960,7 @@ function makeCancelSandbox({ downloadError = null, reducedMotion = false } = {})
     rows[name] = row;
   }
 
-  const sb = {
+  const sb = makeSandbox({
     URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
     Blob: function Blob() {},
     setTimeout: () => 0,
@@ -1014,11 +978,7 @@ function makeCancelSandbox({ downloadError = null, reducedMotion = false } = {})
         download: async () => { if (downloadError) throw new Error(downloadError); return 1; },
       },
     },
-  };
-  vm.createContext(sb);
-  vm.runInContext(themeSrc, sb);
-  vm.runInContext(commonSrc, sb);
-  vm.runInContext(settingsSrc, sb);
+  }, themeSrc, commonSrc, settingsSrc);
   return { document, elements, rows };
 }
 

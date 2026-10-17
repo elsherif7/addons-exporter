@@ -3,12 +3,10 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext, readCommon, readReportBuilders, makeFakeDom } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, readCommon, readReportBuilders, makeFakeDom, makeSandbox } = require('./helpers');
 
 const commonSrc = readCommon();
-const sandbox = { URL };
-vm.createContext(sandbox);
-vm.runInContext(commonSrc, sandbox);
+const sandbox = makeSandbox({ URL }, commonSrc);
 
 const { escapeHtml, isSafeUrl, byName, filterAddonRows, visibleCheckboxes, extractTranslatedField, isPlausibleNameMatch, shortName } = sandbox;
 
@@ -34,12 +32,10 @@ function loadReportFilterAddonRows(addonListContainer) {
       return id === 'addonList' ? addonListContainer : stubEl();
     },
   };
-  const reportSandbox = {
+  const reportSandbox = makeSandbox({
     document: reportDocument,
     localStorage: { getItem() { return null; }, setItem() {} },
-  };
-  vm.createContext(reportSandbox);
-  vm.runInContext(reportInlineScript, reportSandbox);
+  }, reportInlineScript);
   return reportSandbox.filterAddonRows;
 }
 
@@ -461,9 +457,7 @@ test('computeRetryAfterMs: falls back to the default for a non-numeric or negati
 // background.test.js uses for its own fetch-dependent tests.
 
 function bootFetchSandbox(fetchImpl) {
-  const fetchSandbox = { URL, AbortController, setTimeout, clearTimeout, fetch: fetchImpl };
-  vm.createContext(fetchSandbox);
-  vm.runInContext(commonSrc, fetchSandbox);
+  const fetchSandbox = makeSandbox({ URL, AbortController, setTimeout, clearTimeout, fetch: fetchImpl }, commonSrc);
   return fetchSandbox;
 }
 
@@ -549,9 +543,7 @@ test('indefiniteArticleFor: falls back to ordinary spelling for a non-acronym wo
 // --- A34: loadSettings ---
 
 function bootSettingsSandbox(storageGetImpl) {
-  const sb = { browser: { storage: { local: { get: storageGetImpl } } } };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
+  const sb = makeSandbox({ browser: { storage: { local: { get: storageGetImpl } } } }, commonSrc);
   return sb;
 }
 
@@ -605,13 +597,11 @@ test('resolveShortenNames: valid values pass through, invalid ones fall back', (
 // changed, this test is what would catch the two falling out of sync.
 test('A34 tripwire: loadSettings\' literal theme key matches theme.js\'s THEME_STORAGE_KEY', () => {
   const themeSrc = readSrc('src/common/theme.js');
-  const themeSandbox = {
+  const themeSandbox = makeSandbox({
     browser: { storage: { local: { get: async () => ({}) } } },
     document: { documentElement: { setAttribute() {} } },
     localStorage: { getItem() { return null; }, setItem() {} },
-  };
-  vm.createContext(themeSandbox);
-  vm.runInContext(themeSrc, themeSandbox);
+  }, themeSrc);
   const themeKey = evalInContext(themeSandbox, 'THEME_STORAGE_KEY');
 
   assert.strictEqual(themeKey, 'theme');
@@ -633,15 +623,13 @@ test('A34: formatLabel maps each export format to its label', () => {
 // never block the caller.
 function makeFadeSandbox({ card, reducedMotion = false, replaceImpl } = {}) {
   const navigated = [];
-  const sb = {
+  const sb = makeSandbox({
     URL,
     document: { querySelector: (sel) => (sel === '.card' ? card : null) },
     matchMedia: () => ({ matches: reducedMotion }),
     location: { replace: replaceImpl || ((url) => navigated.push(url)) },
     browser: { runtime: { getURL: (p) => `moz-extension://test-id/${p}` } },
-  };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
+  }, commonSrc);
   return { sb, navigated };
 }
 
@@ -675,9 +663,7 @@ testAsync('fadeOutPage: does nothing when the user prefers reduced motion', asyn
 testAsync('fadeOutPage: safe no-op when there is no .card, no animate(), or no document', async () => {
   assert.strictEqual(await makeFadeSandbox({ card: null }).sb.fadeOutPage(), null);
   assert.strictEqual(await makeFadeSandbox({ card: {} }).sb.fadeOutPage(), null);
-  const bare = { URL };
-  vm.createContext(bare);
-  vm.runInContext(commonSrc, bare);
+  const bare = makeSandbox({ URL }, commonSrc);
   assert.strictEqual(await bare.fadeOutPage(), null);
 });
 
@@ -759,22 +745,16 @@ test('replayEntrance: adds .replay-reset, forces a reflow, then removes it so th
     },
     get offsetWidth() { log.push('reflow'); return 100; },
   };
-  const sb = { URL, document: { querySelector: (sel) => (sel === '.card' ? card : null) } };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
+  const sb = makeSandbox({ URL, document: { querySelector: (sel) => (sel === '.card' ? card : null) } }, commonSrc);
   sb.replayEntrance();
   assert.deepStrictEqual(log, ['add:replay-reset', 'reflow', 'remove:replay-reset']);
   assert.strictEqual(classes.size, 0);
 });
 
 test('replayEntrance: safe no-op without a document or .card', () => {
-  const bare = { URL };
-  vm.createContext(bare);
-  vm.runInContext(commonSrc, bare);
+  const bare = makeSandbox({ URL }, commonSrc);
   bare.replayEntrance();
-  const sb = { URL, document: { querySelector: () => null } };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
+  const sb = makeSandbox({ URL, document: { querySelector: () => null } }, commonSrc);
   sb.replayEntrance();
 });
 
@@ -828,9 +808,7 @@ test('applyNameShortening: rows that never recorded a full name are skipped, and
 
 test('onShortenNamesChanged: calls the handler with true/false, and a reset (setting removed) means the default, true', () => {
   const listeners = [];
-  const sb = { URL, browser: { storage: { onChanged: { addListener: (fn) => listeners.push(fn) } } } };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
+  const sb = makeSandbox({ URL, browser: { storage: { onChanged: { addListener: (fn) => listeners.push(fn) } } } }, commonSrc);
   const seen = [];
   sb.onShortenNamesChanged((v) => seen.push(v));
   assert.strictEqual(listeners.length, 1);
@@ -843,18 +821,14 @@ test('onShortenNamesChanged: calls the handler with true/false, and a reset (set
 
 test('onShortenNamesChanged: other settings, other storage areas, and pages without storage.onChanged are ignored safely', () => {
   const listeners = [];
-  const sb = { URL, browser: { storage: { onChanged: { addListener: (fn) => listeners.push(fn) } } } };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
+  const sb = makeSandbox({ URL, browser: { storage: { onChanged: { addListener: (fn) => listeners.push(fn) } } } }, commonSrc);
   const seen = [];
   sb.onShortenNamesChanged((v) => seen.push(v));
   listeners[0]({ theme: { newValue: 'dark' } }, 'local');
   listeners[0]({ shortenNames: { newValue: 'off' } }, 'sync');
   assert.deepStrictEqual(seen, []);
 
-  const bare = { URL, browser: { storage: {} } };
-  vm.createContext(bare);
-  vm.runInContext(commonSrc, bare);
+  const bare = makeSandbox({ URL, browser: { storage: {} } }, commonSrc);
   bare.onShortenNamesChanged(() => {}); // must not throw
 });
 
@@ -1008,9 +982,7 @@ test('setSelectionCount: without a document to build the slot in, the pop and ti
 });
 
 test('setSelectionCount: an element that cannot animate just gets its text', () => {
-  const sb = { URL };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
+  const sb = makeSandbox({ URL }, commonSrc);
   const plain = { textContent: '3 of 12 selected' };
   sb.setSelectionCount(plain, '4 of 12 selected');
   assert.strictEqual(plain.textContent, '4 of 12 selected');
@@ -1042,9 +1014,7 @@ test('formatLabelsText: labels are joined like a sentence', () => {
 });
 
 test('loadSettings: exportFormats lists every stored format, in the fixed order, and there is no single exportFormat field', async () => {
-  const sb = { URL, browser: { storage: { local: { get: async () => ({ exportFormat: ['json', 'html'] }) } } } };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
+  const sb = makeSandbox({ URL, browser: { storage: { local: { get: async () => ({ exportFormat: ['json', 'html'] }) } } } }, commonSrc);
   const s = await sb.loadSettings();
   assert.deepStrictEqual(Array.from(s.exportFormats), ['html', 'json']);
   assert.ok(!('exportFormat' in s), 'only the list is returned');
@@ -1090,9 +1060,7 @@ test('registry: getExportFormat falls back to the default for anything unknown',
 });
 
 async function loadWith(stored) {
-  const sb = { browser: { storage: { local: { get: async () => stored } } } };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
+  const sb = makeSandbox({ browser: { storage: { local: { get: async () => stored } } } }, commonSrc);
   return sb.loadSettings();
 }
 
@@ -1107,24 +1075,18 @@ testAsync('loadSettings: stored value shapes - lone string, array, comma string,
 
 testAsync('loadSettings: one storage read for everything; a failing read gives every default', async () => {
   let calls = 0, asked;
-  const sb = { browser: { storage: { local: { get: async (k) => { calls++; asked = k; return {}; } } } } };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
+  const sb = makeSandbox({ browser: { storage: { local: { get: async (k) => { calls++; asked = k; return {}; } } } } }, commonSrc);
   await sb.loadSettings();
   assert.strictEqual(calls, 1);
   assert.deepStrictEqual(Array.from(asked).sort(), ['exportFormat', 'shortenNames', 'theme']);
-  const bad = { browser: { storage: { local: { get: async () => { throw new Error('x'); } } } } };
-  vm.createContext(bad);
-  vm.runInContext(commonSrc, bad);
+  const bad = makeSandbox({ browser: { storage: { local: { get: async () => { throw new Error('x'); } } } } }, commonSrc);
   const r = await bad.loadSettings();
   assert.deepStrictEqual([r.theme, Array.from(r.exportFormats), r.shortenNames], ['light', ['html'], 'on']);
 });
 
 testAsync('onSettingsChanged: reports which settings changed with fresh values; other areas/keys ignored; no storage.onChanged is safe', async () => {
   const listeners = [];
-  const sb = { browser: { storage: { local: { get: async () => ({ exportFormat: ['html', 'csv'] }) }, onChanged: { addListener: (fn) => listeners.push(fn) } } } };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
+  const sb = makeSandbox({ browser: { storage: { local: { get: async () => ({ exportFormat: ['html', 'csv'] }) }, onChanged: { addListener: (fn) => listeners.push(fn) } } } }, commonSrc);
   const seen = [];
   sb.onSettingsChanged((changed, settings) => seen.push([Array.from(changed), Array.from(settings.exportFormats)]));
   listeners[0]({ exportFormat: { newValue: ['html', 'csv'] } }, 'local');
@@ -1132,9 +1094,7 @@ testAsync('onSettingsChanged: reports which settings changed with fresh values; 
   listeners[0]({ unrelated: {} }, 'local');
   await new Promise((r) => setTimeout(r, 0));
   assert.deepStrictEqual(seen, [[['exportFormats'], ['html', 'csv']]]);
-  const bare = { browser: {} };
-  vm.createContext(bare);
-  vm.runInContext(commonSrc, bare);
+  const bare = makeSandbox({ browser: {} }, commonSrc);
   bare.onSettingsChanged(() => {}); // must not throw
 });
 
@@ -1142,9 +1102,7 @@ testAsync('onSettingsChanged: reports which settings changed with fresh values; 
 
 function loadAddonListSandbox() {
   const { document } = makeFakeDom();
-  const sb = { document, URL };
-  vm.createContext(sb);
-  vm.runInContext(readCommon(), sb);
+  const sb = makeSandbox({ document, URL }, readCommon());
   return sb;
 }
 

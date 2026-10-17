@@ -16,10 +16,9 @@
 // Changing only the page's look (HTML/CSS) must never need any of this.
 
 const assert = require('assert');
-const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
-const { test, readSrc, evalInContext, readCommon, readReportBuilders, readImport, htmlData } = require('./helpers');
+const { test, readSrc, evalInContext, readCommon, readReportBuilders, readImport, htmlData, stubDocument, makeSandbox, FIREFOX_SOURCE: SOURCE } = require('./helpers');
 
 const CONTRACT = {
   exportFormatVersion: 2,
@@ -51,10 +50,7 @@ const sourceLines = (fileType, version) => [
   '# addons-hub-source-extensionVersion: 1.2.0',
 ];
 
-const sandbox = { URL };
-vm.createContext(sandbox);
-vm.runInContext(readCommon(), sandbox);
-vm.runInContext(readReportBuilders(), sandbox);
+const sandbox = makeSandbox({ URL }, readCommon(), readReportBuilders());
 const VERSION = evalInContext(sandbox, 'EXPORT_FORMAT_VERSION');
 
 const AMO = 'https://addons.mozilla.org/en-US/firefox/addon/';
@@ -64,7 +60,6 @@ const list = [
   { linkType: 'amo-exact', link: AMO + 'a/', type: 'extension', enabled: true, version: '1.0', name: 'Alpha - the first', id: 'a@x' },
   { linkType: 'homepage', link: 'https://example.com/n', type: 'theme', enabled: false, version: '2', name: 'Night', id: 'n@x' },
 ];
-const SOURCE = { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' };
 const keys = (o) => Array.from(Object.keys(o));
 
 const HINT = ' - the data layout changed. Read the note at the top of tests/format-contract.test.js: bump the format version and update CONTRACT on purpose.';
@@ -127,11 +122,7 @@ test('contract: TXT export starts with the source comments; every add-on line ha
 });
 
 test('contract: the Importer reads exactly what each export writes (the contract and the parsers agree)', () => {
-  const importSb = { URL, document: { getElementById: () => ({ style: {}, classList: { add() {}, remove() {}, contains() { return false; } }, addEventListener() {}, querySelectorAll() { return []; }, querySelector() { return null; }, dataset: {}, textContent: '', innerHTML: '', value: '' }), addEventListener() {} } };
-  vm.createContext(importSb);
-  vm.runInContext(readCommon(), importSb);
-  vm.runInContext(readReportBuilders(), importSb);
-  vm.runInContext(readImport(), importSb);
+  const importSb = makeSandbox({ URL, document: stubDocument() }, readCommon(), readReportBuilders(), readImport());
   const ids = (r) => { assert.strictEqual(r.ok, true, r.error); return Array.from(r.addons, (a) => a.id).sort(); };
   assert.deepStrictEqual(ids(importSb.parseAddonsPayload(JSON.stringify(htmlData(importSb.buildHtmlReport(list, 'light', false, SOURCE))))), ['a@x', 'n@x']);
   assert.deepStrictEqual(ids(importSb.parseJsonPayload(importSb.buildJsonExport(list, false, SOURCE))), ['a@x', 'n@x']);

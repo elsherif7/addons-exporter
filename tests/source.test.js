@@ -5,22 +5,21 @@
 // reads back (format 2, and format 1 files that have none).
 
 const assert = require('assert');
-const vm = require('vm');
-const { test, testAsync, readSrcs, readReportBuilders, plain, htmlData } = require('./helpers');
+const { test, testAsync, readSrcs, readReportBuilders, plain, htmlData, makeSandbox, FIREFOX_SOURCE: BROWSER } = require('./helpers');
 
 function load(globals = {}) {
-  const sb = { URL, ...globals };
-  vm.createContext(sb);
-  vm.runInContext(readSrcs('src/common/core.js'), sb);
-  vm.runInContext(readReportBuilders(), sb);
-  vm.runInContext(readSrcs('src/import/parsers.js', 'src/background/browser-info.js'), sb);
-  return sb;
+  return makeSandbox(
+    { URL, ...globals },
+    readSrcs('src/common/core.js'),
+    readReportBuilders(),
+    readSrcs('src/import/parsers.js', 'src/background/browser-info.js')
+  );
 }
 const sb = load();
 const UNKNOWN = { browser: 'Unknown', basedOn: 'Unknown', browserVersion: 'unknown', extensionVersion: 'unknown' };
-// The browser part of the source (what getExportSource returns), and a full
-// source as a given file type writes it (makeSource adds the version and type).
-const BROWSER = { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' };
+// The browser part of the source (BROWSER is FIREFOX_SOURCE from helpers: what
+// getExportSource returns), and a full source as a given file type writes it
+// (makeSource adds the version and type).
 const source = (fileType, formatVersion = 2, browser = BROWSER) => ({ formatVersion, fileType, ...browser });
 const addon = (o = {}) => ({ id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/a', linkType: 'amo-exact', ...o });
 const list = [addon(), addon({ id: 'b@x', name: 'Beta', enabled: false, type: 'theme', link: 'https://example.com/b', linkType: 'homepage' })];

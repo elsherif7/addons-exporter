@@ -4,8 +4,7 @@
 // called directly in isolation).
 
 const assert = require('assert');
-const vm = require('vm');
-const { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, plain } = require('./helpers');
+const { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, plain, makeSandbox } = require('./helpers');
 
 const commonSrc = readCommon();
 const reportTemplateSrc = readReportBuilders() + '\n' + readSrc('src/background/browser-info.js');
@@ -16,7 +15,7 @@ const backgroundSrc = readSrc('src/background/background.js');
 // actually installed and are excluded from the exportable set.
 
 testAsync('listInstalledAddons: excludes both @mozilla.org and @mozac.org built-ins', async () => {
-  const bgSandbox = {
+  const bgSandbox = makeSandbox({
     URL,
     console: { warn() {}, debug() {}, log() {}, error() {} },
     browser: {
@@ -30,11 +29,7 @@ testAsync('listInstalledAddons: excludes both @mozilla.org and @mozac.org built-
         ],
       },
     },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
   const result = await bgSandbox.listInstalledAddons();
   assert.deepStrictEqual(Array.from(result, (a) => a.id), ['ublock@example.com']);
 });
@@ -50,7 +45,7 @@ async function captureExportMessageResult(storageLocalGetImpl) {
   let downloadOptions = null;
   const createdTabUrls = [];
   let messageListener = null;
-  const bgSandbox = {
+  const bgSandbox = makeSandbox({
     URL,
     Blob,
     AbortController,
@@ -89,11 +84,7 @@ async function captureExportMessageResult(storageLocalGetImpl) {
         },
       },
     },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
   const result = await messageListener({ type: 'export', ids: ['ext1@example.com'] });
   return { downloadOptions, createdTabUrls, result };
 }
@@ -121,7 +112,7 @@ testAsync('export message: downloads with saveAs, opens no tab itself, and retur
 const baseAddon = { id: 'ext1@example.com', name: 'Test Addon', version: '1.0', enabled: true, type: 'extension' };
 
 async function runDoExportWithFetch(addon, fetchImpl) {
-  const bgSandbox = {
+  const bgSandbox = makeSandbox({
     URL,
     AbortController,
     setTimeout,
@@ -132,18 +123,14 @@ async function runDoExportWithFetch(addon, fetchImpl) {
       runtime: { onMessage: { addListener() {} }, sendMessage: async () => {} },
       management: { getAll: async () => [addon] },
     },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
   const { files: [{ content: html }] } = await bgSandbox.doExport([addon.id]);
   const dataMatch = html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/);
   return JSON.parse(dataMatch[1]).addons[0];
 }
 
 async function runDoExportWithOptions(addons, fetchImpl, options) {
-  const bgSandbox = {
+  const bgSandbox = makeSandbox({
     URL,
     AbortController,
     setTimeout,
@@ -154,11 +141,7 @@ async function runDoExportWithOptions(addons, fetchImpl, options) {
       runtime: { onMessage: { addListener() {} }, sendMessage: async () => {} },
       management: { getAll: async () => addons },
     },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
   return bgSandbox.doExport(addons.map((a) => a.id), options);
 }
 
@@ -283,7 +266,7 @@ async function runDoExportForTheme(storageLocalGetImpl) {
     if (url.includes('/addons/addon/')) return { ok: true, status: 200, json: async () => ({ url: 'https://addons.mozilla.org/en-US/firefox/addon/exact-match/' }) };
     return { ok: true, status: 200, json: async () => ({ results: [] }) };
   };
-  const bgSandbox = {
+  const bgSandbox = makeSandbox({
     URL,
     AbortController,
     setTimeout,
@@ -295,11 +278,7 @@ async function runDoExportForTheme(storageLocalGetImpl) {
       management: { getAll: async () => [baseAddon] },
       storage: { local: { get: storageLocalGetImpl } },
     },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
   const { files: [{ content: html }] } = await bgSandbox.doExport([baseAddon.id]);
   return html;
 }
@@ -327,15 +306,11 @@ testAsync('doExport: falls back to light if storage.local.get throws', async () 
 // here, not the AMO lookup logic already covered above.
 
 testAsync('mapWithConcurrency: never runs more than `limit` calls at once', async () => {
-  const bgSandbox = {
+  const bgSandbox = makeSandbox({
     URL,
     console: { warn() {}, debug() {}, log() {}, error() {} },
     browser: { runtime: { onMessage: { addListener() {} } } },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
 
   let current = 0;
   let maxConcurrent = 0;
@@ -365,7 +340,7 @@ async function runDoExportForFormat(storageLocalGetImpl) {
     if (url.includes('/addons/addon/')) return { ok: true, status: 200, json: async () => ({ url: 'https://addons.mozilla.org/en-US/firefox/addon/exact-match/' }) };
     return { ok: true, status: 200, json: async () => ({ results: [] }) };
   };
-  const bgSandbox = {
+  const bgSandbox = makeSandbox({
     URL,
     AbortController,
     setTimeout,
@@ -377,11 +352,7 @@ async function runDoExportForFormat(storageLocalGetImpl) {
       management: { getAll: async () => [baseAddon] },
       storage: { local: { get: storageLocalGetImpl } },
     },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
   const { files: [{ content, filename }] } = await bgSandbox.doExport([baseAddon.id]);
   return { content, filename };
 }
@@ -438,7 +409,7 @@ testAsync('export message: on desktop with CSV format, the result reports format
 // --- listInstalledAddons: includes optionsUrl ---
 
 testAsync('listInstalledAddons: includes optionsUrl when present, null when absent', async () => {
-  const bgSandbox = {
+  const bgSandbox = makeSandbox({
     URL,
     console: { warn() {}, debug() {}, log() {}, error() {} },
     browser: {
@@ -450,11 +421,7 @@ testAsync('listInstalledAddons: includes optionsUrl when present, null when abse
         ],
       },
     },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
   const result = await bgSandbox.listInstalledAddons();
   assert.strictEqual(result[0].optionsUrl, 'moz-extension://abc/options.html');
   assert.strictEqual(result[1].optionsUrl, null);
@@ -469,7 +436,7 @@ testAsync('listInstalledAddons: includes optionsUrl when present, null when abse
 
 testAsync('background.js: loads with only the management API and registers its message listener', async () => {
   let listener = null;
-  const bgSandbox = {
+  const bgSandbox = makeSandbox({
     URL,
     console: { warn() {}, debug() {}, log() {}, error() {} },
     browser: {
@@ -478,11 +445,7 @@ testAsync('background.js: loads with only the management API and registers its m
         getAll: async () => [],
       },
     },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
   assert.strictEqual(typeof listener, 'function', 'background.js must register a runtime.onMessage listener');
 });
 
@@ -492,7 +455,7 @@ function loadBackgroundForOpenTabs({ failUrls = [] } = {}) {
   let messageListener = null;
   const created = [];
   let timeoutCalls = 0;
-  const sb = {
+  const sb = makeSandbox({
     URL, Blob, AbortController,
     setTimeout: (fn) => { timeoutCalls++; fn(); return 0; },
     clearTimeout() {},
@@ -511,11 +474,7 @@ function loadBackgroundForOpenTabs({ failUrls = [] } = {}) {
         },
       },
     },
-  };
-  vm.createContext(sb);
-  vm.runInContext(commonSrc, sb);
-  vm.runInContext(reportTemplateSrc, sb);
-  vm.runInContext(backgroundSrc, sb);
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
   return { send: (msg) => messageListener(msg), created, getTimeoutCalls: () => timeoutCalls };
 }
 
@@ -570,7 +529,7 @@ testAsync('openTabs: caps a single batch at 500 tabs', async () => {
 
 testAsync('doExport: with several formats ticked it builds one file per format, all with the same timestamp', async () => {
   const addon = { id: 'ext1@example.com', name: 'Test Addon', version: '1.0', enabled: true, type: 'extension' };
-  const bgSandbox = {
+  const bgSandbox = makeSandbox({
     URL, AbortController, setTimeout, clearTimeout,
     console: { warn() {}, debug() {}, log() {}, error() {} },
     fetch: async () => ({ ok: false, status: 404, json: async () => ({}) }),
@@ -579,11 +538,7 @@ testAsync('doExport: with several formats ticked it builds one file per format, 
       management: { getAll: async () => [addon] },
       storage: { local: { get: async () => ({ exportFormat: ['json', 'html', 'csv'] }) } },
     },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
   const result = await bgSandbox.doExport([addon.id]);
   assert.deepStrictEqual(Array.from(result.formats), ['html', 'json', 'csv']);
   assert.strictEqual(result.files.length, 3);
@@ -620,9 +575,7 @@ function readZip(bytes) {
 
 test('zip.js: buildZip stores every file intact, with correct names and CRCs (incl. non-ASCII)', () => {
   const zipSrc = readSrcs('src/common/crc32.js', 'src/background/zip.js');
-  const sb = { TextEncoder, Uint8Array, Uint32Array, DataView };
-  vm.createContext(sb);
-  vm.runInContext(zipSrc, sb);
+  const sb = makeSandbox({ TextEncoder, Uint8Array, Uint32Array, DataView }, zipSrc);
   const files = [
     { name: 'Firefox Add-ons (x).html', content: '<p>héllo – ✓</p>' },
     { name: 'Firefox Add-ons (x).json', content: '{"a":1}' },
@@ -642,7 +595,7 @@ testAsync('export message: several formats are downloaded as one .zip with a sin
   const downloads = [];
   const addon = { id: 'ext1@example.com', name: 'Test Addon', version: '1.0', enabled: true, type: 'extension' };
   let listener;
-  const bgSandbox = {
+  const bgSandbox = makeSandbox({
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} }, AbortController, setTimeout: () => 0, clearTimeout,
     Blob, TextEncoder, Uint8Array, Uint32Array, DataView,
     console: { warn() {}, debug() {}, log() {}, error() {} },
@@ -653,12 +606,7 @@ testAsync('export message: several formats are downloaded as one .zip with a sin
       storage: { local: { get: async () => ({ exportFormat: ['html', 'json'] }) } },
       downloads: { download: async (opts) => { downloads.push(opts); return 1; } },
     },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(readSrcs('src/common/crc32.js', 'src/background/zip.js'), bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
+  }, commonSrc, reportTemplateSrc, readSrcs('src/common/crc32.js', 'src/background/zip.js'), backgroundSrc);
   const result = await listener({ type: 'export', ids: [addon.id] });
   assert.strictEqual(downloads.length, 1, 'one download, so one Save dialog');
   assert.ok(/\.zip$/.test(downloads[0].filename));
@@ -672,7 +620,7 @@ testAsync('export message: several formats are downloaded as one .zip with a sin
 const longNameAddon = { id: 'buster@x', name: 'Buster: Captcha Solver for Humans', version: '3.4.0', enabled: true, type: 'extension' };
 
 async function exportContent(storage, addon = longNameAddon) {
-  const bgSandbox = {
+  const bgSandbox = makeSandbox({
     URL, AbortController, setTimeout, clearTimeout,
     console: { warn() {}, debug() {}, log() {}, error() {} },
     fetch: async () => ({ ok: true, status: 200, json: async () => ({ results: [] }) }),
@@ -681,11 +629,7 @@ async function exportContent(storage, addon = longNameAddon) {
       management: { getAll: async () => [addon] },
       storage: { local: { get: async () => storage } },
     },
-  };
-  vm.createContext(bgSandbox);
-  vm.runInContext(commonSrc, bgSandbox);
-  vm.runInContext(reportTemplateSrc, bgSandbox);
-  vm.runInContext(backgroundSrc, bgSandbox);
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
   return (await bgSandbox.doExport([addon.id])).files[0].content;
 }
 

@@ -78,6 +78,46 @@ function htmlData(html) {
   return JSON.parse(html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/)[1].replace(/<\\\//g, '</'));
 }
 
+// The browser part of an export's "source" (what getExportSource() returns for
+// Firefox), exactly as the real thing looks. One copy for every test that
+// builds an export carrying a source.
+const FIREFOX_SOURCE = { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' };
+
+// A stand-in element for tests that only need a page script to load: its
+// top-level code wires up DOM elements, so give it something to wire up. It
+// carries every property and method those scripts touch while loading, each
+// returning nothing. Not a real element - use makeFakeDom for anything that
+// actually renders.
+function stubElement() {
+  return {
+    style: {},
+    classList: { add() {}, remove() {}, contains() { return false; } },
+    addEventListener() {},
+    querySelectorAll() { return []; },
+    querySelector() { return null; },
+    dataset: {},
+    textContent: '',
+    innerHTML: '',
+    value: '',
+  };
+}
+
+// A minimal `document` for those same tests: every id yields a fresh stub
+// element, and listening does nothing.
+function stubDocument() {
+  return { getElementById() { return stubElement(); }, addEventListener() {} };
+}
+
+// Builds a vm context and runs each source in it, in order - the
+// `vm.createContext(sb); vm.runInContext(...)` pair every sandbox test used to
+// repeat, in one call.
+function makeSandbox(globals, ...sources) {
+  const sb = { ...globals };
+  vm.createContext(sb);
+  for (const src of sources) vm.runInContext(src, sb);
+  return sb;
+}
+
 // --- Minimal fake DOM -------------------------------------------------
 // A small, real element tree (not a per-call stub) for tests that need
 // to run actual rendering and interaction code - renderList/
@@ -286,6 +326,22 @@ class FakeElement {
 // access in assertions; ids not listed still resolve (to a generic div)
 // so a source file's top-level `document.getElementById(...)` calls
 // never throw for ids a given test doesn't care about.
+// The element ids the real pages wire up at load time, as the page scripts
+// expect to find them. Tests that render a whole page hand these to
+// makeFakeDom so the fake DOM has every element the script touches.
+const EXPORTER_ELEMENT_IDS = [
+  'addonList', 'selectAllBtn', 'deselectAllBtn', 'exportSelectedBtn',
+  'status', 'selectionCount', 'searchInput', 'noSearchMatches', 'exportDesc',
+];
+// The .zip picker row (exportPickRow/exportPick/exportPickList) is only needed
+// by the tests that open a .zip, so it is not part of the base list.
+const IMPORTER_ELEMENT_IDS = [
+  'status', 'fileName', 'fileNameRow', 'fileInput', 'picker', 'removeFileBtn',
+  'chooseFileBtn', 'listControls', 'addonList', 'checklistBox', 'selectAllBtn',
+  'deselectAllBtn', 'selectionCount', 'openSelectedBtn', 'compareNote',
+  'searchInput', 'noSearchMatches',
+];
+
 function makeFakeDom(ids = []) {
   const elements = {};
   for (const id of ids) {
@@ -330,4 +386,4 @@ function makeFakeDom(ids = []) {
   return { document, elements };
 }
 
-module.exports = { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, readImport, readSettings, evalInContext, plain, htmlData, makeFakeDom };
+module.exports = { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, readImport, readSettings, evalInContext, plain, htmlData, FIREFOX_SOURCE, stubElement, stubDocument, makeSandbox, EXPORTER_ELEMENT_IDS, IMPORTER_ELEMENT_IDS, makeFakeDom };

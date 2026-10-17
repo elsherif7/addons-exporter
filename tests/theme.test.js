@@ -2,8 +2,7 @@
 // fake document/browser.storage, same pattern as the other test files.
 
 const assert = require('assert');
-const vm = require('vm');
-const { test, testAsync, readSrc } = require('./helpers');
+const { test, testAsync, readSrc, makeSandbox } = require('./helpers');
 
 const themeSrc = readSrc('src/common/theme.js');
 
@@ -15,7 +14,7 @@ function loadThemeInSandbox(storageGetImpl, onChangedImpl) {
     },
   };
   if (onChangedImpl) storage.onChanged = onChangedImpl;
-  const sandbox = {
+  const sandbox = makeSandbox({
     document: {
       documentElement: {
         setAttribute: (name, value) => setAttributeCalls.push([name, value]),
@@ -23,9 +22,7 @@ function loadThemeInSandbox(storageGetImpl, onChangedImpl) {
     },
     localStorage: { getItem() { return null; }, setItem() {} },
     browser: { storage },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(themeSrc, sandbox);
+  }, themeSrc);
   return { sandbox, setAttributeCalls };
 }
 
@@ -118,16 +115,14 @@ function loadThemeForSwitch({ reducedMotion = false, withViewTransitions = true 
     // Real browsers call the update callback for us once the old frame is captured.
     document.startViewTransition = (cb) => { transitions.push(cb); };
   }
-  const sandbox = {
+  const sandbox = makeSandbox({
     document,
     matchMedia: () => ({ matches: reducedMotion }),
     localStorage: { getItem() { return null; }, setItem() {} },
     setTimeout: (fn) => { timers.push(fn); return timers.length; },
     clearTimeout() {},
     browser: { storage: { local: { get: async () => ({}) } } },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(themeSrc, sandbox);
+  }, themeSrc);
   return { sandbox, transitions, classes, timers, getAttr: () => attr };
 }
 

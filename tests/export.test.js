@@ -4,8 +4,7 @@
 // and invokes its actual exportBtn click handler.
 
 const assert = require('assert');
-const vm = require('vm');
-const { test, testAsync, readSrc, makeFakeDom, readCommon } = require('./helpers');
+const { test, testAsync, readSrc, makeFakeDom, readCommon, makeSandbox, EXPORTER_ELEMENT_IDS } = require('./helpers');
 
 const commonSrc = readCommon();
 const exportSrc = readSrc('src/export/export.js');
@@ -35,7 +34,7 @@ async function captureExportClick({ selectedIds, exportResponse }) {
     noSearchMatches: { style: {} },
     exportDesc: { innerHTML: '', textContent: '', append() {} },
   };
-  const exSandbox = {
+  const exSandbox = makeSandbox({
     URL: { createObjectURL: () => 'blob:fake-url', revokeObjectURL() {} },
     setTimeout: (fn) => { fn(); return 0; },
     clearTimeout() {},
@@ -60,10 +59,7 @@ async function captureExportClick({ selectedIds, exportResponse }) {
       tabs: { create: async (options) => { createdTabUrls.push(options.url); return {}; } },
       storage: { local: { get: async () => ({}) } },
     },
-  };
-  vm.createContext(exSandbox);
-  vm.runInContext(commonSrc, exSandbox);
-  vm.runInContext(exportSrc, exSandbox);
+  }, commonSrc, exportSrc);
   // Let the top-level IIFE's listAddons call settle before the button
   // even exists to be clicked.
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -191,7 +187,7 @@ testAsync('export.js: a non-array listAddons response shows a friendly error, no
     noSearchMatches: { style: {} },
     exportDesc: { innerHTML: '', textContent: '', append() {} },
   };
-  const exSandbox = {
+  const exSandbox = makeSandbox({
     URL,
     setTimeout,
     clearTimeout,
@@ -203,10 +199,7 @@ testAsync('export.js: a non-array listAddons response shows a friendly error, no
       runtime: { onMessage: { addListener() {} }, sendMessage: async () => undefined },
       storage: { local: { get: async () => ({}) } },
     },
-  };
-  vm.createContext(exSandbox);
-  vm.runInContext(commonSrc, exSandbox);
-  vm.runInContext(exportSrc, exSandbox);
+  }, commonSrc, exportSrc);
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.strictEqual(listElStub.children.length, 1);
@@ -222,11 +215,8 @@ testAsync('export.js: a non-array listAddons response shows a friendly error, no
 // targets, but through actual rendering rather than a hand-built fixture.
 
 async function renderRealExportList(addons) {
-  const { document, elements } = makeFakeDom([
-    'addonList', 'selectAllBtn', 'deselectAllBtn', 'exportSelectedBtn',
-    'status', 'selectionCount', 'searchInput', 'noSearchMatches', 'exportDesc',
-  ]);
-  const sandbox = {
+  const { document, elements } = makeFakeDom(EXPORTER_ELEMENT_IDS);
+  const sandbox = makeSandbox({
     document,
     URL,
     browser: {
@@ -237,10 +227,7 @@ async function renderRealExportList(addons) {
       },
       storage: { local: { get: async () => ({}) } },
     },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(commonSrc, sandbox);
-  vm.runInContext(exportSrc, sandbox);
+  }, commonSrc, exportSrc);
   // Let the top-level IIFE's listAddons() message and renderList() settle.
   await new Promise((resolve) => setTimeout(resolve, 0));
   return elements;
@@ -292,11 +279,8 @@ testAsync('export.js real DOM: Select All while a search is active only checks t
 testAsync('storage.onChanged: an export-format change from another tab refreshes the description', async () => {
   const registeredListeners = [];
   let getCallCount = 0;
-  const { document, elements } = makeFakeDom([
-    'addonList', 'selectAllBtn', 'deselectAllBtn', 'exportSelectedBtn',
-    'status', 'selectionCount', 'searchInput', 'noSearchMatches', 'exportDesc',
-  ]);
-  const sandbox = {
+  const { document, elements } = makeFakeDom(EXPORTER_ELEMENT_IDS);
+  const sandbox = makeSandbox({
     document,
     URL,
     browser: {
@@ -314,10 +298,7 @@ testAsync('storage.onChanged: an export-format change from another tab refreshes
         onChanged: { addListener: (fn) => { registeredListeners.push(fn); } },
       },
     },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(commonSrc, sandbox);
-  vm.runInContext(exportSrc, sandbox);
+  }, commonSrc, exportSrc);
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.ok(registeredListeners.length > 0, 'a storage.onChanged listener should have been registered');
@@ -349,22 +330,16 @@ testAsync('export.js real DOM: the AMO link searches by name (not a guessed id U
 // --- Live "Shorten add-on names": an already-open Exporter follows the setting ---
 
 async function renderExportListWithLiveSettings(addons, stored = {}) {
-  const { document, elements } = makeFakeDom([
-    'addonList', 'selectAllBtn', 'deselectAllBtn', 'exportSelectedBtn',
-    'status', 'selectionCount', 'searchInput', 'noSearchMatches', 'exportDesc',
-  ]);
+  const { document, elements } = makeFakeDom(EXPORTER_ELEMENT_IDS);
   const listeners = [];
-  const sandbox = {
+  const sandbox = makeSandbox({
     document,
     URL,
     browser: {
       runtime: { sendMessage: async (msg) => (msg.type === 'listAddons' ? addons : undefined), onMessage: { addListener() {} }, getURL: (p) => p },
       storage: { local: { get: async () => stored }, onChanged: { addListener: (fn) => listeners.push(fn) } },
     },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(commonSrc, sandbox);
-  vm.runInContext(exportSrc, sandbox);
+  }, commonSrc, exportSrc);
   await new Promise((resolve) => setTimeout(resolve, 0));
   const fire = (changes, area = 'local') => listeners.forEach((fn) => fn(changes, area));
   const names = () => elements.addonList.querySelectorAll('.addon-name').map((n) => n.textContent);

@@ -6,18 +6,14 @@
 // be tested entirely on its own.
 
 const assert = require('assert');
-const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
-const { test, readSrc, evalInContext, readCommon, readReportBuilders } = require('./helpers');
+const { test, readSrc, evalInContext, readCommon, readReportBuilders, makeSandbox, FIREFOX_SOURCE } = require('./helpers');
 
 const commonSrc = readCommon();
 const reportTemplateSrc = readReportBuilders();
 
-const sandbox = { URL };
-vm.createContext(sandbox);
-vm.runInContext(commonSrc, sandbox);
-vm.runInContext(reportTemplateSrc, sandbox);
+const sandbox = makeSandbox({ URL }, commonSrc, reportTemplateSrc);
 const { buildHtmlReport, safeJsonForScriptTag, buildJsonExport, buildCsvExport } = sandbox;
 
 // REPORT_ICON_DATA_URI is declared with top-level `const` in
@@ -164,7 +160,7 @@ test('buildCsvExport: the first line is the start of the source, led by the byte
 });
 
 test('buildCsvExport: the six source lines come first, then the header row', () => {
-  const csv = buildCsvExport(sampleList, true, { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' });
+  const csv = buildCsvExport(sampleList, true, FIREFOX_SOURCE);
   const lines = csv.split('\r\n');
   assert.deepStrictEqual(lines.slice(0, 6), [
     '\uFEFF# addons-hub-source-formatVersion: 2',
@@ -441,9 +437,7 @@ test('report-assets.generated.js is in sync with report.css, report-inline.js an
 
 test('the report embeds REPORT_CSS: tokens.css, then report.css', () => {
   const css = tokensCssSrc + '\n' + lf(fs.readFileSync(path.join(__dirname, '..', 'src', 'background', 'report.css'), 'utf8'));
-  const sb = {};
-  vm.createContext(sb);
-  vm.runInContext(readReportBuilders(), sb);
+  const sb = makeSandbox({}, readReportBuilders());
   assert.strictEqual(evalInContext(sb, 'REPORT_CSS'), css);
 });
 

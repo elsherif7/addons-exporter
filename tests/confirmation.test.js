@@ -2,9 +2,8 @@
 // coverage at all before - it's exercised here via a fake DOM (S1) since
 // it reads location.search and writes into #heading/#message at load time.
 
-const vm = require('vm');
 const assert = require('assert');
-const { test, readSrc, makeFakeDom, readCommon } = require('./helpers');
+const { test, readSrc, makeFakeDom, readCommon, makeSandbox } = require('./helpers');
 
 const commonSrc = readCommon();
 const confirmationSrc = readSrc('src/confirmation/confirmation.js');
@@ -13,14 +12,7 @@ function loadConfirmation(search, { prefillMessage } = {}) {
   const { document, elements } = makeFakeDom(['heading', 'message']);
   // The real confirmation.html ships #message with static fallback text.
   if (prefillMessage) elements.message.textContent = prefillMessage;
-  const sandbox = {
-    document,
-    location: { search },
-    URLSearchParams,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(commonSrc, sandbox);
-  vm.runInContext(confirmationSrc, sandbox);
+  const sandbox = makeSandbox({ document, location: { search }, URLSearchParams }, commonSrc, confirmationSrc);
   return { document, elements };
 }
 

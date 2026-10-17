@@ -7,17 +7,9 @@
 // names the exact add-on that broke.
 
 const assert = require('assert');
-const vm = require('vm');
-const { test, readCommon, readReportBuilders, readImport, htmlData } = require('./helpers');
+const { test, readCommon, readReportBuilders, readImport, htmlData, stubDocument, makeSandbox } = require('./helpers');
 
-const sb = {
-  URL,
-  document: { getElementById: () => ({ style: {}, classList: { add() {}, remove() {}, contains() { return false; } }, addEventListener() {}, querySelectorAll() { return []; }, querySelector() { return null; }, dataset: {}, textContent: '', innerHTML: '', value: '' }), addEventListener() {} },
-};
-vm.createContext(sb);
-vm.runInContext(readCommon(), sb);
-vm.runInContext(readReportBuilders(), sb);
-vm.runInContext(readImport(), sb);
+const sb = makeSandbox({ URL, document: stubDocument() }, readCommon(), readReportBuilders(), readImport());
 
 // A small seeded generator (mulberry32).
 function rng(seed) {

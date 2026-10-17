@@ -5,13 +5,12 @@
 // how those pages answer "are you open?" (answerWhereIsPage in page-ui.js).
 
 const assert = require('assert');
-const vm = require('vm');
-const { test, testAsync, readSrc, readSrcs } = require('./helpers');
+const { test, testAsync, readSrc, readSrcs, makeSandbox } = require('./helpers');
 
 function load({ sendMessage, tabsUpdate } = {}) {
   const handlers = {};
   const calls = [];
-  const sb = {
+  const sb = makeSandbox({
     document: { getElementById: (id) => ({ addEventListener: (type, fn) => { if (type === 'click') handlers[id] = fn; } }) },
     window: { close: () => calls.push(['close']) },
     browser: {
@@ -26,9 +25,7 @@ function load({ sendMessage, tabsUpdate } = {}) {
         sendMessage: sendMessage || (async (m) => { calls.push(['sendMessage', m.type, m.page]); }),
       },
     },
-  };
-  vm.createContext(sb);
-  vm.runInContext(readSrc('src/popup/popup.js'), sb);
+  }, readSrc('src/popup/popup.js'));
   return { handlers, calls };
 }
 
@@ -82,9 +79,7 @@ testAsync('popup: Settings still closes the popup when nothing is listening for 
 // --- the page's side: answerWhereIsPage() ---
 
 function loadPage(browserStub) {
-  const sb = { browser: browserStub };
-  vm.createContext(sb);
-  vm.runInContext(readSrcs('src/common/core.js', 'src/common/page-ui.js'), sb);
+  const sb = makeSandbox({ browser: browserStub }, readSrcs('src/common/core.js', 'src/common/page-ui.js'));
   return sb;
 }
 function stubWithTab(tab) {

@@ -4,8 +4,7 @@
 // built into every report by scripts/build-assets.js.)
 
 const assert = require('assert');
-const vm = require('vm');
-const { test, readSrc } = require('./helpers');
+const { test, readSrc, makeSandbox } = require('./helpers');
 
 const SCRIPT = readSrc('src/background/report-inline.js');
 
@@ -52,15 +51,13 @@ function run(page, { baked = 'light', stored = null, storageThrows = false, star
   if (stored) store['addons-hub-report-theme'] = stored;
   const transitions = [];
   if (startViewTransition) page.document.startViewTransition = (fn) => { transitions.push('vt'); fn(); };
-  const sandbox = {
+  const sandbox = makeSandbox({
     document: page.document,
     localStorage: storageThrows
       ? { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } }
       : { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; } },
     setTimeout, clearTimeout,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(SCRIPT.replace('__BAKED_THEME__', baked), sandbox);
+  }, SCRIPT.replace('__BAKED_THEME__', baked));
   return { store, transitions };
 }
 
