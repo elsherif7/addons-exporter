@@ -7,7 +7,7 @@
 const assert = require('assert');
 const { test, testAsync, readSrc, readSrcs, makeSandbox } = require('./helpers');
 
-function load({ sendMessage, tabsUpdate } = {}) {
+function load({ sendMessage, tabsUpdate, tabsCreate, openOptionsPage } = {}) {
   const handlers = {};
   const calls = [];
   const sb = makeSandbox({
@@ -15,13 +15,13 @@ function load({ sendMessage, tabsUpdate } = {}) {
     window: { close: () => calls.push(['close']) },
     browser: {
       tabs: {
-        create: async (o) => { calls.push(['tabs.create', o.url]); },
+        create: tabsCreate || (async (o) => { calls.push(['tabs.create', o.url]); }),
         update: tabsUpdate || (async (id, props) => { calls.push(['tabs.update', id, props.active]); }),
       },
       windows: { update: async (id, props) => { calls.push(['windows.update', id, props.focused]); } },
       runtime: {
         getURL: (p) => `moz-extension://x/${p}`,
-        openOptionsPage: async () => { calls.push(['openOptionsPage']); },
+        openOptionsPage: openOptionsPage || (async () => { calls.push(['openOptionsPage']); }),
         sendMessage: sendMessage || (async (m) => { calls.push(['sendMessage', m.type, m.page]); }),
       },
     },
@@ -76,6 +76,18 @@ testAsync('popup: Settings still closes the popup when nothing is listening for 
   assert.deepStrictEqual(calls, [['openOptionsPage'], ['close']]);
 });
 
+testAsync('popup: the popup closes even when opening the options page fails', async () => {
+  const { handlers, calls } = load({ openOptionsPage: async () => { throw new Error('no options page'); } });
+  await handlers.settingsBtn();
+  assert.deepStrictEqual(calls, [['close']]);
+});
+
+testAsync('popup: the popup closes even when the page cannot be opened at all', async () => {
+  const { handlers, calls } = load({ tabsCreate: async () => { throw new Error('no tabs'); } });
+  await handlers.exportBtn();
+  assert.deepStrictEqual(calls, [['sendMessage', 'whereIsPage', 'export'], ['close']]);
+});
+
 // --- the page's side: answerWhereIsPage() ---
 
 function loadPage(browserStub) {
@@ -114,6 +126,6 @@ test('answerWhereIsPage: a page with no runtime messaging or tabs API is left al
 });
 
 test('the Exporter and Importer answer to their own name', () => {
-  assert.match(readSrc('src/export/export.js'), /answerWhereIsPage\('export'\)/);
-  assert.match(readSrc('src/import/import.js'), /answerWhereIsPage\('import'\)/);
+  assert.match(readSrc('src/export/export.js'), /answerWhereIsPage\('export',/);
+  assert.match(readSrc('src/import/import.js'), /answerWhereIsPage\('import',/);
 });

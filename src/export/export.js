@@ -171,8 +171,10 @@ exportBtn.addEventListener('click', async () => {
   }
 });
 
-// The popup brings this tab to the front instead of opening a second Exporter.
-answerWhereIsPage('export');
+// The popup brings this tab to the front - and replays its opening - instead
+// of opening a second Exporter. A search left in the box goes with it, so the
+// page shows the whole list again, exactly like a fresh one.
+answerWhereIsPage('export', () => list.clearSearch());
 
 // background.js broadcasts progress as each link is resolved.
 browser.runtime.onMessage.addListener((message) => {

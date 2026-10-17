@@ -216,25 +216,28 @@ testAsync('export.js: a non-array listAddons response shows a friendly error, no
 
 async function renderRealExportList(addons) {
   const { document, elements } = makeFakeDom(EXPORTER_ELEMENT_IDS);
+  const listeners = [];
   const sandbox = makeSandbox({
     document,
     URL,
+    setTimeout,
     browser: {
       runtime: {
         sendMessage: async (msg) => (msg.type === 'listAddons' ? addons : undefined),
-        onMessage: { addListener() {} },
+        onMessage: { addListener: (fn) => listeners.push(fn) },
         getURL: (p) => p,
       },
       storage: { local: { get: async () => ({}) } },
+      tabs: { getCurrent: async () => ({ id: 1, windowId: 1 }) },
     },
   }, commonSrc, exportSrc);
   // Let the top-level IIFE's listAddons() message and renderList() settle.
   await new Promise((resolve) => setTimeout(resolve, 0));
-  return elements;
+  return { elements, listeners };
 }
 
 testAsync('export.js real DOM: search hides non-matching rows and their group', async () => {
-  const elements = await renderRealExportList([
+  const { elements } = await renderRealExportList([
     { id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension' },
     { id: 'b@x', name: 'Beta', version: '2.0', enabled: true, type: 'extension' },
   ]);
@@ -248,7 +251,7 @@ testAsync('export.js real DOM: search hides non-matching rows and their group', 
 });
 
 testAsync('export.js real DOM: a query matching nothing shows the "no matches" message and hides every row', async () => {
-  const elements = await renderRealExportList([
+  const { elements } = await renderRealExportList([
     { id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension' },
   ]);
   elements.searchInput.value = 'zzz-nomatch';
@@ -260,7 +263,7 @@ testAsync('export.js real DOM: a query matching nothing shows the "no matches" m
 });
 
 testAsync('export.js real DOM: Select All while a search is active only checks the visible row', async () => {
-  const elements = await renderRealExportList([
+  const { elements } = await renderRealExportList([
     { id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension' },
     { id: 'b@x', name: 'Beta', version: '2.0', enabled: true, type: 'extension' },
   ]);
@@ -272,6 +275,26 @@ testAsync('export.js real DOM: Select All while a search is active only checks t
   const checked = elements.addonList.querySelectorAll('input[type="checkbox"]:checked');
   assert.strictEqual(checked.length, 1, 'Select All should only check the row the active search still shows');
   assert.strictEqual(elements.selectionCount.textContent, '1 of 2 selected');
+});
+
+testAsync('export.js real DOM: reopening from the popup clears the search box and shows the whole list again', async () => {
+  const { elements, listeners } = await renderRealExportList([
+    { id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension' },
+    { id: 'b@x', name: 'Beta', version: '2.0', enabled: true, type: 'extension' },
+  ]);
+  elements.searchInput.value = 'zzz-nomatch';
+  elements.searchInput.dispatchEvent('input');
+  assert.ok(elements.addonList.querySelectorAll('.addon-row').every((r) => r.style.display === 'none'));
+  assert.strictEqual(elements.noSearchMatches.style.display, 'block');
+
+  listeners.forEach((fn) => fn({ type: 'whereIsPage', page: 'export' }));
+
+  assert.strictEqual(elements.searchInput.value, '', 'the box is empty again');
+  assert.strictEqual(elements.noSearchMatches.style.display, 'none', 'and the "no matches" note is gone');
+  assert.ok(elements.addonList.querySelectorAll('.addon-row').every((r) => r.style.display !== 'none'),
+    'every row is showing again');
+  assert.ok(elements.addonList.querySelectorAll('input[type="checkbox"]:checked').length > 0,
+    'and the ticks are untouched');
 });
 
 // --- A33: cross-tab export-format sync via storage.onChanged ---
@@ -313,7 +336,7 @@ testAsync('storage.onChanged: an export-format change from another tab refreshes
 // --- A32/A21: the AMO link is a name search, and lives outside the label ---
 
 testAsync('export.js real DOM: the AMO link searches by name (not a guessed id URL) and sits outside the label', async () => {
-  const elements = await renderRealExportList([
+  const { elements } = await renderRealExportList([
     { id: 'weird@id.example', name: 'Some Theme', version: '1.0', enabled: true, type: 'theme' },
   ]);
   const row = elements.addonList.querySelector('.addon-row');

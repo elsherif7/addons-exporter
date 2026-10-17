@@ -118,7 +118,7 @@ addons-hub/
 
 ## Tools
 
-Both are opened from the toolbar icon's popup. If one is already open, the popup brings that tab to the front instead of opening a second copy.
+Both are opened from the toolbar icon's popup. If one is already open, the popup brings that tab to the front and plays its opening animation again, exactly as if it had just been opened: back at the top, with the search box emptied and showing the whole list again, and with the page's own popup dismissed — the Settings reset confirmation and any message sitting in its Import/Export rows, or the Importer's open `.zip` export picker. Nothing else is touched: a chosen file, the list it drew and every ticked add-on all stay as they were.
 
 ### Add-ons Exporter
 

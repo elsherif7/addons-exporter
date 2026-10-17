@@ -193,7 +193,13 @@ class FakeElement {
     this.childNodes = [];
     this._attrs = {};
     this._classes = new Set();
-    this.style = {};
+    // A real style declaration: plain properties (display, opacity, ...) are
+    // read and written directly, and custom properties - the --rd delay
+    // reveal.js puts on each row - go through setProperty/getPropertyValue.
+    this.style = {
+      setProperty(name, value) { this[name] = String(value); },
+      getPropertyValue(name) { return this[name] || ''; },
+    };
     this.dataset = {};
     this._listeners = {};
     this._checked = false;

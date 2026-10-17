@@ -758,6 +758,80 @@ test('replayEntrance: safe no-op without a document or .card', () => {
   sb.replayEntrance();
 });
 
+// --- replayStagedReveal / scrollPageToTop ---
+
+test('replayStagedReveal: restarts the card, puts the row-cascade flag back, then takes it off after the last row', () => {
+  const log = [];
+  const classes = new Set();
+  const card = {
+    classList: {
+      add: (c) => { classes.add(c); log.push('add:' + c); },
+      remove: (c) => { classes.delete(c); log.push('remove:' + c); },
+    },
+    get offsetWidth() { log.push('reflow'); return 100; },
+  };
+  const row = (rd) => ({ style: { getPropertyValue: (k) => (k === '--rd' ? rd : '') } });
+  const list = {
+    classList: {
+      add: (c) => { classes.add(c); log.push('list-add:' + c); },
+      remove: (c) => { classes.delete(c); log.push('list-remove:' + c); },
+    },
+    querySelectorAll: (sel) => (sel === '.addon-row' ? [row('1.22s'), row('1.38s'), row('0.98s')] : []),
+  };
+  const timers = [];
+  const sb = makeSandbox({
+    URL,
+    document: {
+      querySelector: (sel) => (sel === '.card' ? card : null),
+      getElementById: (id) => (id === 'addonList' ? list : null),
+    },
+    setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
+  }, commonSrc);
+
+  sb.replayStagedReveal();
+  assert.deepStrictEqual(log, ['list-add:revealing', 'add:replay-reset', 'reflow', 'remove:replay-reset']);
+  assert.strictEqual(timers.length, 1);
+  assert.strictEqual(timers[0].ms, 2230, 'the last row\'s 1.38s delay plus its own wipe');
+  timers[0].fn();
+  assert.strictEqual(classes.has('revealing'), false);
+});
+
+test('replayStagedReveal: with no rows, or no list at all, it only restarts the card', () => {
+  const classes = new Set();
+  const card = { classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c) }, get offsetWidth() { return 100; } };
+  const list = { classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c) }, querySelectorAll: () => [] };
+  const timers = [];
+  const sb = makeSandbox({
+    URL,
+    document: {
+      querySelector: (sel) => (sel === '.card' ? card : null),
+      getElementById: () => list,
+    },
+    setTimeout: (fn, ms) => { timers.push(ms); return 1; },
+  }, commonSrc);
+  sb.replayStagedReveal();
+  assert.strictEqual(classes.has('revealing'), false, 'nothing to cascade');
+  assert.strictEqual(timers.length, 0, 'and so nothing to take the flag off from');
+
+  makeSandbox({ URL }, commonSrc).replayStagedReveal();
+});
+
+test('scrollPageToTop: smooth normally, instant with reduced motion, and a no-op without a window', () => {
+  const calls = [];
+  const withWindow = (reduced) => makeSandbox({
+    URL,
+    window: { scrollTo: (opts) => calls.push(JSON.parse(JSON.stringify(opts))) },
+    matchMedia: () => ({ matches: reduced }),
+  }, commonSrc);
+  withWindow(false).scrollPageToTop();
+  withWindow(true).scrollPageToTop();
+  assert.deepStrictEqual(calls, [
+    { top: 0, left: 0, behavior: 'smooth' },
+    { top: 0, left: 0, behavior: 'auto' },
+  ]);
+  makeSandbox({ URL }, commonSrc).scrollPageToTop();
+});
+
 // --- Live settings: applyNameShortening / onShortenNamesChanged ---
 
 function makeNameEl(full, shown, { animate = true } = {}) {

@@ -1159,6 +1159,63 @@ testAsync('remove file (x): with reduced motion, or when nothing can animate, th
   assert.strictEqual(reduced.elements.addonList.querySelectorAll('.addon-row').length, 0);
 });
 
+// --- Reopening from the popup: the .zip picker closes, nothing else moves ---
+
+testAsync('Importer: reopening from the popup closes the .zip picker and clears the search, keeping the file, the list and the ticks', async () => {
+  const { document, elements } = makeFakeDom(IMPORTER_ELEMENT_IDS);
+  const listeners = [];
+  const timers = [];
+  const sandbox = makeSandbox({
+    document,
+    URL,
+    // replayStagedReveal clears the .revealing flag again on a timer; recording
+    // it instead of scheduling one keeps the test from leaving a timer behind.
+    setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
+    browser: {
+      runtime: {
+        sendMessage: async (msg) => (msg.type === 'listAddons' ? [] : undefined),
+        getURL: (p) => p,
+        onMessage: { addListener: (fn) => listeners.push(fn) },
+      },
+      storage: { local: { get: async () => ({}), onChanged: { addListener() {} } } },
+      tabs: { create: async () => ({}), getCurrent: async () => ({ id: 1, windowId: 1 }) },
+    },
+  }, commonSrc, importSrc);
+
+  sandbox.setSelectedFile(jsonAddonsFile([
+    { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
+    { id: 'b@x', name: 'Beta', version: '2.0', link: 'https://example.com/b' },
+  ]));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  elements.deselectAllBtn.click();
+  elements.selectAllBtn.click();
+  assert.strictEqual(elements.selectionCount.textContent, '2 of 2 selected');
+
+  sandbox.openExportPicker();
+  assert.strictEqual(elements.exportPickList.style.display, 'block', 'the picker is open');
+
+  elements.searchInput.value = 'zzz-nomatch';
+  elements.searchInput.dispatchEvent('input');
+  assert.ok(elements.addonList.querySelectorAll('.addon-row').every((r) => r.style.display === 'none'));
+  assert.strictEqual(elements.noSearchMatches.style.display, 'block');
+
+  listeners.forEach((fn) => fn({ type: 'whereIsPage', page: 'import' }));
+
+  assert.strictEqual(elements.exportPickList.style.display, 'none', 'the picker panel is closed');
+  assert.strictEqual(elements.exportPick.getAttribute('aria-expanded'), 'false');
+  assert.strictEqual(elements.searchInput.value, '', 'the search box is empty again');
+  assert.strictEqual(elements.noSearchMatches.style.display, 'none', 'and its "no matches" note is gone');
+  assert.ok(elements.addonList.querySelectorAll('.addon-row').every((r) => r.style.display !== 'none'),
+    'every row is showing again');
+  assert.strictEqual(elements.fileNameRow.style.display, 'flex', 'the chosen file is still there');
+  assert.strictEqual(elements.chooseFileBtn.style.display, 'none', 'still replaced by its name');
+  assert.strictEqual(elements.addonList.querySelectorAll('.addon-row').length, 2, 'its list is untouched');
+  assert.strictEqual(elements.addonList.querySelectorAll('input[type="checkbox"]:checked').length, 2, 'and so are the ticks');
+  assert.strictEqual(elements.selectionCount.textContent, '2 of 2 selected', 'the count still reads the same');
+  assert.strictEqual(elements.addonList.classList.contains('revealing'), true, 'the rows are set to cascade again');
+  assert.strictEqual(timers[0].ms, 850, 'and the flag comes off once the last row has wiped');
+});
+
 // --- the readable JSON / CSV / TXT exports still import back unchanged ---
 
 const readableSample = [

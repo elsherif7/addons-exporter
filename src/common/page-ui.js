@@ -125,6 +125,39 @@ function replayEntrance() {
   card.classList.remove('replay-reset');
 }
 
+// Smoothly back to the top of the page - what a freshly opened page shows.
+// Instantly with reduced motion. Used when an already-open Settings, Exporter
+// or Importer page is opened again from the popup.
+function scrollPageToTop() {
+  if (typeof window === 'undefined' || typeof window.scrollTo !== 'function') return;
+  const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({ top: 0, left: 0, behavior: reduced ? 'auto' : 'smooth' });
+}
+
+// Replays the whole staged reveal (reveal.js) on a page that has one - the
+// Exporter and the Importer - so an already-open tab brought back to the front
+// opens exactly like a fresh one. This only runs the animations again: what the
+// page itself has on it is the caller's business (see answerWhereIsPage). The
+// rows animate only while their list carries .revealing (and reveal.js takes
+// that flag off once they are all in), so this puts it back and takes it off
+// again once the last row - its --rd delay plus its own wipe - has finished.
+function replayStagedReveal() {
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
+  const list = document.getElementById('addonList');
+  const rows = list && typeof list.querySelectorAll === 'function' ? list.querySelectorAll('.addon-row') : [];
+  if (rows.length) {
+    let longest = 0;
+    for (const row of rows) {
+      const delay = parseFloat(row.style && row.style.getPropertyValue('--rd'));
+      if (delay > longest) longest = delay;
+    }
+    list.classList.add('revealing');
+    // The row's own 0.55s wipe plus a margin - ROW_DURATION in reveal.js.
+    setTimeout(() => list.classList.remove('revealing'), Math.ceil((longest + 0.85) * 1000));
+  }
+  replayEntrance();
+}
+
 // --- Live settings ------------------------------------------------------------
 // Settings changed anywhere (the Settings page, a settings import, a reset)
 // reach every other open extension page through storage.onChanged. The theme
@@ -254,10 +287,22 @@ function setSelectionCount(el, text) {
 // front instead of opening a second copy. (The extension's own pages can read
 // their own tab without any extra permission.) Safe to call anywhere: a page
 // without runtime messaging just never answers.
-function answerWhereIsPage(page) {
+//
+// The only thing that ever asks is the popup's own Exporter/Importer button, so
+// answering also means "bring this page back to the front": it goes back to the
+// top, plays its opening reveal again, and leaves nothing open on it - exactly
+// as if the tab had just been opened. `resetToFresh` (optional) is a page's own
+// extra step for that last part: closing the popup the page itself has open (the
+// Importer's .zip export picker) and clearing the search box. It must never
+// touch the user's work - a chosen file, the list it drew and every ticked
+// add-on all stay.
+function answerWhereIsPage(page, resetToFresh) {
   if (typeof browser === 'undefined' || !browser.runtime || !browser.runtime.onMessage || !browser.tabs || !browser.tabs.getCurrent) return;
   browser.runtime.onMessage.addListener((message) => {
     if (!message || message.type !== 'whereIsPage' || message.page !== page) return undefined;
+    scrollPageToTop();
+    if (typeof resetToFresh === 'function') resetToFresh();
+    replayStagedReveal();
     return browser.tabs.getCurrent().then(
       (tab) => (tab ? { tabId: tab.id, windowId: tab.windowId } : undefined),
       () => undefined

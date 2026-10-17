@@ -83,6 +83,7 @@ function createAddonGroups(groups, makeRow) {
 //   selectAllBtn, deselectAllBtn, searchInput, noMatchesEl
 //   shownDisplay  what display the list gets when a search shows it again
 //                 ('' = stylesheet default)
+// Returns { checkboxes, updateSelectionCount, render, clearSearch }.
 // Select all / Deselect all only touch rows the search still shows, and never a
 // disabled one.
 function createAddonList({ listEl, countEl, actionBtn, selectAllBtn, deselectAllBtn, searchInput, noMatchesEl, shownDisplay = '' }) {
@@ -111,6 +112,18 @@ function createAddonList({ listEl, countEl, actionBtn, selectAllBtn, deselectAll
     const anyMatch = filterAddonRows(listEl, searchInput.value);
     setFilterVisible(listEl, anyMatch, shownDisplay);
     noMatchesEl.style.display = anyMatch ? 'none' : 'block';
+  }
+
+  // Empties the search box and shows the whole list again - the unfiltered
+  // list a freshly opened page has. Used when an already-open page is brought
+  // back to the front from the popup (see answerWhereIsPage), which opens it
+  // exactly like a fresh one. A no-op when there is nothing typed, so it can
+  // never un-hide a list that is hidden for another reason (the Importer with
+  // no file chosen yet).
+  function clearSearch() {
+    if (!searchInput.value) return;
+    searchInput.value = '';
+    applySearch();
   }
 
   selectAllBtn.addEventListener('click', () => {
@@ -148,5 +161,5 @@ function createAddonList({ listEl, countEl, actionBtn, selectAllBtn, deselectAll
     cb.click();
   });
 
-  return { checkboxes, updateSelectionCount, render };
+  return { checkboxes, updateSelectionCount, render, clearSearch };
 }

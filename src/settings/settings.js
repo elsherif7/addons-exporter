@@ -339,6 +339,12 @@ if (versionLink) {
 
 // --- Reset Settings ---
 
+// Set while the reset confirmation is on screen, so the page can be put back to
+// its freshly-opened look (see the replaySettingsEntrance handler below) by
+// dismissing it the same way Cancel does - but quietly, since the reveal is
+// playing again at that moment.
+let dismissResetDialog = null;
+
 document.getElementById('resetSettingsBtn').addEventListener('click', function () {
   const resetBtn = this;
   clearAllRows();
@@ -411,7 +417,10 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
 
   new Promise((resolve) => {
     let closed = false;
-    function close(result) {
+    // `silent` is for a dismissal that is not the user's own answer to the
+    // dialog (the page being reopened from the popup): the Reset row is left
+    // alone rather than flashing "cancelled" under the replaying reveal.
+    function close(result, silent) {
       if (closed) return;
       closed = true;
       const finish = () => {
@@ -419,6 +428,7 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
         root.style.paddingRight = savedPaddingRight;
         others.forEach((el) => { el.inert = false; });
         overlay.remove();
+        dismissResetDialog = null;
         // Return focus to what opened the dialog, without scrolling back to
         // it - after a reset the page has just been taken to the top.
         resetBtn.focus({ preventScroll: true });
@@ -438,21 +448,26 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
       } else {
         finish();
       }
-      resolve(result);
+      resolve({ confirmed: result, silent: !!silent });
     }
+    // How the page puts itself back to a freshly-opened look while this is up.
+    dismissResetDialog = (silent) => close(false, silent);
     cancelBtn.addEventListener('click', () => close(false));
     confirmBtn.addEventListener('click', () => close(true));
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
     overlay.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') close(false);
     });
-  }).then((confirmed) => {
+  }).then(({ confirmed, silent }) => {
     if (!confirmed) {
-      resetRow.cancelled();
+      // Dismissed quietly by the page being reopened: leave the Reset row
+      // alone (the caller has already put every row back).
+      if (silent) resetRow.restore();
+      else resetRow.cancelled();
       return;
     }
     // Take the user back to the top right away while the dialog fades out.
-    scrollSettingsToTop();
+    scrollPageToTop();
     return browser.storage.local.remove([THEME_STORAGE_KEY, EXPORT_FORMAT_STORAGE_KEY, SHORT_NAME_STORAGE_KEY])
       .then(() => {
         applyTheme('light');
@@ -475,19 +490,14 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
 // switches to it), so the page never reloads and its opening animation would
 // not play again. The popup's Settings button sends a message after opening
 // it, and this plays the whole reveal again and scrolls back to the top
-// (smoothly, or instantly with reduced motion). Deliberately NOT triggered
-// by merely switching back to the tab: the reveal takes about two seconds,
-// and replaying it every time would hide the page and lose your scroll
+// (smoothly, or instantly with reduced motion). Anything the page had left open
+// goes with it - the reset confirmation, a message in the Export/Import rows -
+// so it ends up looking exactly like a freshly opened page. Deliberately NOT
+// triggered by merely switching back to the tab: the reveal takes about two
+// seconds, and replaying it every time would hide the page and lose your scroll
 // position. The time check keeps a brand-new tab, which is already playing
 // its own reveal, from restarting it.
 let lastEntranceAt = Date.now();
-
-function scrollSettingsToTop() {
-  if (typeof window === 'undefined' || typeof window.scrollTo !== 'function') return;
-  const reduced = typeof matchMedia === 'function' &&
-    matchMedia('(prefers-reduced-motion: reduce)').matches;
-  window.scrollTo({ top: 0, left: 0, behavior: reduced ? 'auto' : 'smooth' });
-}
 
 function replayEntranceIfIdle() {
   const now = Date.now();
@@ -499,7 +509,12 @@ function replayEntranceIfIdle() {
 if (browser.runtime.onMessage) {
   browser.runtime.onMessage.addListener((message) => {
     if (message && message.type === 'replaySettingsEntrance') {
-      scrollSettingsToTop();
+      // As if the page had just been opened: back to the top, nothing left
+      // open on it - the reset confirmation, a message sitting in the Export or
+      // Import row - and the reveal playing again.
+      scrollPageToTop();
+      if (dismissResetDialog) dismissResetDialog(true);
+      clearAllRows();
       replayEntranceIfIdle();
     }
   });

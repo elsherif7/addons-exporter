@@ -751,6 +751,20 @@ testAsync('Reset dialog: cancelling does NOT scroll or replay anything', async (
   assert.strictEqual(replayLog.length, 0);
 });
 
+test('Reset dialog: reopening the page from the popup dismisses it quietly, back to the top', () => {
+  const ctx = makeResetDialogSandboxWithWindow();
+  const { document, elements, listeners, scrollCalls } = ctx;
+  openResetDialog(document, elements.resetSettingsBtn);
+  assert.ok(document.body.querySelector('.s-overlay'), 'the dialog is up');
+
+  listeners.forEach((fn) => fn({ type: 'replaySettingsEntrance' }));
+
+  assert.strictEqual(document.body.querySelector('.s-overlay'), null, 'the dialog is gone');
+  assert.notStrictEqual(document.documentElement.style.overflow, 'hidden', 'the page can scroll again');
+  assert.strictEqual(ctx.pageContent.inert, false, 'and is reachable again');
+  assert.deepStrictEqual(scrollCalls.at(-1), { top: 0, left: 0, behavior: 'smooth' }, 'taken back to the top');
+});
+
 test('Reset dialog: with animation available, it fades out first and is only removed when that finishes', async () => {
   const ctx = makeResetDialogSandboxWithWindow({ withAnimate: true });
   const { document, elements, pageContent, finishAnimations } = ctx;
@@ -778,6 +792,7 @@ function makeResetDialogSandboxWithWindow({ withAnimate = false, scrollbarWidth 
   const scrollCalls = [];
   const replayLog = [];
   const pendingAnimations = [];
+  const listeners = [];
   document.documentElement.clientWidth = 1000; // window.innerWidth - this = the scrollbar's width
 
   const cardStub = {
@@ -813,11 +828,15 @@ function makeResetDialogSandboxWithWindow({ withAnimate = false, scrollbarWidth 
     },
     browser: {
       storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
-      runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
+      runtime: {
+        getManifest: () => ({ version: '1.2.0' }),
+        id: 'addons-exporter@local',
+        onMessage: { addListener: (fn) => listeners.push(fn) },
+      },
     },
   }, themeSrc, commonSrc, settingsSrc);
   return {
-    document, elements, pageContent, scrollCalls, replayLog,
+    document, elements, pageContent, scrollCalls, replayLog, listeners,
     finishAnimations: () => pendingAnimations.forEach((resolve) => resolve()),
   };
 }

@@ -160,13 +160,42 @@ test('motion: popup Settings button asks an already-open Settings tab to replay 
 
 test('settings: pressing Settings again (popup message) scrolls to the top and replays the reveal; a plain tab switch does neither', () => {
   const src = readSrc('src/settings/settings.js');
-  assert.match(src, /function scrollSettingsToTop\(\)[\s\S]*window\.scrollTo\(\{ top: 0/);
+  assert.match(readSrc('src/common/page-ui.js'), /function scrollPageToTop\(\)[\s\S]*window\.scrollTo\(\{ top: 0/);
   const onMessage = src.match(/message\.type === 'replaySettingsEntrance'\) \{([\s\S]*?)\n    \}/);
   assert.ok(onMessage, 'message handler not found');
-  assert.match(onMessage[1], /scrollSettingsToTop\(\)/);
+  assert.match(onMessage[1], /scrollPageToTop\(\)/);
   assert.match(onMessage[1], /replayEntranceIfIdle\(\)/);
+  // Nothing is left open on the page either: the reset confirmation goes, and
+  // any message sitting in the Export/Import rows is cleared.
+  assert.match(onMessage[1], /dismissResetDialog\(true\)/);
+  assert.match(onMessage[1], /clearAllRows\(\)/);
   // Switching back to the tab must not replay the ~2s reveal or reset scroll.
   assert.doesNotMatch(src, /addEventListener\('visibilitychange'/);
+});
+
+test('export/import: opening the Exporter or Importer again replays its entrance, without resetting the page', () => {
+  const pageUi = readSrc('src/common/page-ui.js');
+  const answer = pageUi.match(/function answerWhereIsPage\(page, resetToFresh\) \{([\s\S]*?)\n\}/);
+  assert.ok(answer, 'answerWhereIsPage not found');
+  assert.match(answer[1], /scrollPageToTop\(\)/);
+  assert.match(answer[1], /resetToFresh\(\)/);
+  assert.match(answer[1], /replayStagedReveal\(\)/);
+  // The rows only cascade while the list carries .revealing (reveal.js takes
+  // the flag off once they are in), so the replay puts it back and restarts the
+  // card and its parts too.
+  const replay = pageUi.match(/function replayStagedReveal\(\) \{([\s\S]*?)\n\}/);
+  assert.ok(replay, 'replayStagedReveal not found');
+  assert.match(replay[1], /classList\.add\('revealing'\)/);
+  assert.match(replay[1], /classList\.remove\('revealing'\)/);
+  assert.match(replay[1], /replayEntrance\(\)/);
+  assert.match(readSrc('src/export/export.js'), /answerWhereIsPage\('export', \(\) => list\.clearSearch\(\)\)/);
+  // The Importer has a popup of its own to close (the .zip export picker) and a
+  // search box to empty. Its file, list and ticks are left alone.
+  assert.match(readSrc('src/import/import.js'), /answerWhereIsPage\('import', \(\) => \{[\s\S]*?closeExportPicker\(\);[\s\S]*?list\.clearSearch\(\);[\s\S]*?\}\);/);
+  // The shared list is where clearing the search lives (addon-list.js).
+  const addonList = readSrc('src/common/addon-list.js');
+  assert.match(addonList, /function clearSearch\(\) \{[\s\S]*?searchInput\.value = '';[\s\S]*?applySearch\(\);/);
+  assert.match(addonList, /return \{ checkboxes, updateSelectionCount, render, clearSearch \};/);
 });
 
 // --- Press feedback (click/tap ring) ---

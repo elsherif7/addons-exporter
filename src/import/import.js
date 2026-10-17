@@ -616,5 +616,11 @@ openSelectedBtn.addEventListener('click', async () => {
   }
 });
 
-// The popup brings this tab to the front instead of opening a second Importer.
-answerWhereIsPage('import');
+// The popup brings this tab to the front - and replays its opening - instead
+// of opening a second Importer. The .zip export picker closes and any search
+// left in the box is cleared with it, but the chosen file, the list it drew and
+// everything ticked in that list are left exactly as they were.
+answerWhereIsPage('import', () => {
+  closeExportPicker();
+  list.clearSearch();
+});
