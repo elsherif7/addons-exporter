@@ -228,7 +228,9 @@ Break Tool</span>
       var START = 0.82, PART_STEP = 0.16, ROW_LEAD = 0.08, ROW_STEP = 0.08, ROW_ANIMATED_MAX = 14, ROW_DURATION = 0.55;
       function round(n) { return Math.round(n * 1000) / 1000; }
       var t = START;
-      var listBase = 1.22;
+      // Rows start just after the list box, the third part (after the intro and the
+      // search box). The loop below overrides this if it finds the list box itself.
+      var listBase = START + 2 * PART_STEP + ROW_LEAD;
       Array.prototype.forEach.call(card.children, function (child) {
         if (child.id === 'themeToggle' || child.tagName === 'H1') return;
         if (getComputedStyle(child).display === 'none') return;

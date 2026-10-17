@@ -14,8 +14,6 @@
       --bg: #eff1f3;
       --card-bg: #fff;
       --text: #1f2937;
-      --btn-bg: #1f2937;
-      --btn-bg-hover: #111827;
       --border: #747b87;
       --border-hover: #1f2937;
       --hover-bg: #fafbfc;
@@ -23,19 +21,17 @@
       --press-ring: rgba(0, 96, 223, 0.4);
       /* Spring easing: a real spring curve where linear() is supported,
          a plain overshoot curve otherwise. */
-      --spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+      --motion-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
     }
     @supports (animation-timing-function: linear(0, 1)) {
       :root {
-        --spring: linear(0, 0.046, 0.163, 0.321, 0.495, 0.666, 0.819, 0.946, 1.042, 1.109, 1.147, 1.162, 1.159, 1.143, 1.118, 1.09, 1.062, 1.036, 1.014, 0.997, 0.985, 0.977, 0.974, 0.974, 0.976, 0.979, 0.984, 0.989, 1);
+        --motion-spring: linear(0, 0.046, 0.163, 0.321, 0.495, 0.666, 0.819, 0.946, 1.042, 1.109, 1.147, 1.162, 1.159, 1.143, 1.118, 1.09, 1.062, 1.036, 1.014, 0.997, 0.985, 0.977, 0.974, 0.974, 0.976, 0.979, 0.984, 0.989, 1);
       }
     }
     :root[data-theme="dark"] {
       --bg: #1a1c21;
       --card-bg: #24272e;
       --text: #e8e9ec;
-      --btn-bg: #374151;
-      --btn-bg-hover: #4b5563;
       --border: #70767f;
       --border-hover: #d1d5db;
       --hover-bg: #262a33;
@@ -71,7 +67,7 @@
       user-select: none;
       /* The transform part is a springy release: pressed in quickly (see
          :active below), it bounces back out when let go. */
-      transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.35s var(--spring);
+      transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.35s var(--motion-spring);
     }
     .hub-btn:last-of-type { margin-bottom: 0; }
     .hub-btn:hover { background: var(--hover-bg); border-color: var(--border-hover); transform: scale(1.02); }
@@ -99,11 +95,11 @@
     }
     .card {
       transform-origin: top center;
-      animation: popup-card-in 0.55s var(--spring) backwards;
+      animation: popup-card-in 0.55s var(--motion-spring) backwards;
       animation-delay: 0.12s;
     }
     h3 { animation: popup-title-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
-    .hub-btn { animation: popup-in 0.55s var(--spring) backwards; }
+    .hub-btn { animation: popup-in 0.55s var(--motion-spring) backwards; }
     h3 { animation-delay: 0.45s; }
     #exportBtn { animation-delay: 0.65s; }
     #importBtn { animation-delay: 0.8s; }

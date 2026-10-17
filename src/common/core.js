@@ -356,3 +356,15 @@ function formatFilenameTimestamp(d) {
 // Stagger between opening add-on tabs, so dozens of add-ons don't all burst
 // open at once. Used by import.js (fallback) and background.js.
 const TAB_OPEN_DELAY_MS = 150;
+
+// How long a downloaded blob's object URL is kept alive before it is revoked -
+// long enough that a slow Save dialog cannot break the download. Used by
+// background.js (an add-on export) and settings.js (a settings export).
+const OBJECT_URL_REVOKE_MS = 30000;
+
+// The AMO search page for an add-on's name - the last-resort link. Used by the
+// Exporter's row link (export.js) and by the background's own fallback when no
+// exact AMO page or homepage was found, so the two always point at the same URL.
+function amoSearchUrl(name) {
+  return `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(name)}`;
+}

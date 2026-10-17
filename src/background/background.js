@@ -38,7 +38,7 @@ async function saveExport(files) {
   try {
     await browser.downloads.download({ url, filename: saveName, saveAs: true });
   } finally {
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    setTimeout(() => URL.revokeObjectURL(url), OBJECT_URL_REVOKE_MS);
   }
 }
 
@@ -223,7 +223,7 @@ async function doExport(ids, {
       linkType = 'homepage';
       stats.homepage++;
     } else {
-      link = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
+      link = amoSearchUrl(a.name);
       linkType = 'amo-search-fallback';
       stats.searchFallback++;
     }

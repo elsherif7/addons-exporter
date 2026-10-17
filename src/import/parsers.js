@@ -84,13 +84,9 @@ function addonEntryProblem(a, keys) {
   return null;
 }
 
-function parseAddonsPayload(jsonText, entryKeys = HTML_ENTRY_KEYS, fileType = 'html') {
-  if (jsonText == null) {
-    return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no embedded data found)' };
-  }
-
-  const parsed = JSON.parse(jsonText);
-
+// Checks an already-parsed export payload (the HTML report's embedded data, or
+// a JSON file's contents) and returns its add-ons, or a reason it was rejected.
+function validateAddonsPayload(parsed, entryKeys, fileType) {
   // A v1.0.0 export was a bare array with no formatVersion/addons wrapper at
   // all - checked for specifically, and first, so it gets a message that
   // explains why.
@@ -140,14 +136,20 @@ function parseAddonsPayload(jsonText, entryKeys = HTML_ENTRY_KEYS, fileType = 'h
   return { ok: true, addons: migrateAddonsData(dedupeAddons(list), formatVersion), source };
 }
 
+// Reads the embedded data out of an HTML report's text (the data element's
+// content) and validates it. Same return shape as validateAddonsPayload().
+function parseAddonsPayload(jsonText, entryKeys = HTML_ENTRY_KEYS, fileType = 'html') {
+  if (jsonText == null) {
+    return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no embedded data found)' };
+  }
+  return validateAddonsPayload(JSON.parse(jsonText), entryKeys, fileType);
+}
+
 // Validates and parses a JSON export file's text content. Same return
-// shape as parseAddonsPayload(): { ok, addons, source } or { ok: false, error }.
+// shape as validateAddonsPayload(): { ok, addons, source } or { ok: false, error }.
 // Throws on malformed JSON - loadFile()'s try/catch handles it.
 function parseJsonPayload(text) {
-  const parsed = JSON.parse(text);
-  return parseAddonsPayload(parsed && typeof parsed === 'object'
-    ? JSON.stringify(parsed)
-    : text, JSON_ENTRY_KEYS, 'json');
+  return validateAddonsPayload(JSON.parse(text), JSON_ENTRY_KEYS, 'json');
 }
 
 // Undoes the leading-apostrophe formula-injection guard buildCsvExport()

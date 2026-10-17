@@ -263,7 +263,7 @@ testAsync('theme radio: a storage write failure shows an error and reverts the r
   darkRadio.checked = true;
   await darkRadio._onChange();
 
-  assert.match(statusEl.textContent, /Could not save theme/);
+  assert.match(statusEl.textContent, /Could not save the theme/);
   assert.strictEqual(statusEl.className, 'error');
   // storage.local.get() in this sandbox always returns {} (the write
   // never actually landed), so loadCurrentTheme() should revert back to
@@ -289,7 +289,7 @@ testAsync('exportFormat tick box: a storage write failure shows an error and rev
   jsonRadio.checked = true;
   await jsonRadio._onChange();
 
-  assert.match(statusEl.textContent, /Could not save export format/);
+  assert.match(statusEl.textContent, /Could not save the export format/);
   assert.strictEqual(formatBoxEls[0].checked, true, 'html (the default) should be re-checked');
   assert.strictEqual(formatBoxEls[1].checked, false, 'json should be reverted since the write failed');
 });

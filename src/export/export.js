@@ -97,7 +97,7 @@ function createAddonRow(a, index, shorten) {
 
   const amoLink = document.createElement('a');
   amoLink.className = 'match-label';
-  amoLink.href = `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(a.name)}`;
+  amoLink.href = amoSearchUrl(a.name);
   amoLink.target = '_blank';
   amoLink.rel = 'noopener';
   amoLink.textContent = 'AMO';

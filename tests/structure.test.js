@@ -192,8 +192,8 @@ test('press: the report carries its own copy of the press feedback (it cannot lo
 });
 
 test('press: buttons press in fast and spring back out (a long transform transition, a short one while :active)', () => {
-  for (const [name, src, spring] of [['shared.css', sharedCssForMotion, '--motion-spring'], ['popup.html', popupHtml, '--spring']]) {
-    assert.match(src, new RegExp(`transform 0\\.35s var\\(${spring}\\)`), `${name}: .hub-btn needs the springy release`);
+  for (const [name, src] of [['shared.css', sharedCssForMotion], ['popup.html', popupHtml]]) {
+    assert.match(src, /transform 0\.35s var\(--motion-spring\)/, `${name}: .hub-btn needs the springy release`);
     assert.match(src, /\.hub-btn:active \{ transform: scale\(0\.95\); transition-duration: 0\.08s; \}/, `${name}: .hub-btn:active`);
   }
 });

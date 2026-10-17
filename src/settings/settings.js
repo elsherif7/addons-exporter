@@ -179,7 +179,7 @@ for (const radio of themeRadios) {
     try {
       await browser.storage.local.set({ [THEME_STORAGE_KEY]: radio.value });
     } catch (err) {
-      setSettingsStatus('Could not save theme: ' + err.message, true);
+      setSettingsStatus('Could not save the theme: ' + err.message, true);
       // The write failed - put the radio AND the page back to what's actually stored.
       applyTheme(await loadCurrentTheme());
     }
@@ -199,7 +199,7 @@ for (const box of formatBoxes) {
       await browser.storage.local.set({ [EXPORT_FORMAT_STORAGE_KEY]: serializeExportFormats(ticked) });
       try { localStorage.setItem(SETTINGS_CACHE_KEYS.exportFormat, resolveExportFormats(ticked).join(',')); } catch (e) {}
     } catch (err) {
-      setSettingsStatus('Could not save export format: ' + err.message, true);
+      setSettingsStatus('Could not save the export format: ' + err.message, true);
       await loadCurrentExportFormat();
     }
   });
@@ -251,7 +251,7 @@ exportSettingsBtn.addEventListener('click', async () => {
     try {
       await browser.downloads.download({ url, filename, saveAs: true });
     } finally {
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      setTimeout(() => URL.revokeObjectURL(url), OBJECT_URL_REVOKE_MS);
     }
 
     exportRow.setMsg('Settings exported.');

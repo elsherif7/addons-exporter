@@ -245,7 +245,7 @@ test('buildCsvExport: an ordinary name is not guarded', () => {
 // The report embeds its own copy of shared layout CSS since it's a
 // standalone file. These tests catch drift between the two copies for
 // rules that must stay in sync. Intentional differences are excluded:
-// - --btn-bg-hover/--btn-disabled-bg - the report
+// - --btn-disabled-bg - the report
 //   has no primary-btn or checkbox-disabled states
 // - Flex/checkbox layout on .addon-row (report rows have no checkboxes)
 // - margin-left on .addon-version (report compensates without flex)
