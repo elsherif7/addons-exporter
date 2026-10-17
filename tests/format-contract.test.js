@@ -18,7 +18,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { test, readSrc, evalInContext, readCommon, readReportBuilders, readImport, htmlData, stubDocument, makeSandbox, FIREFOX_SOURCE: SOURCE } = require('./helpers');
+const { test, evalInContext, readCommon, readReportBuilders, readImport, htmlData, stubDocument, makeSandbox, FIREFOX_SOURCE: SOURCE } = require('./helpers');
 
 const CONTRACT = {
   exportFormatVersion: 2,

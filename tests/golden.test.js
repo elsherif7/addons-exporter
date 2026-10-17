@@ -21,7 +21,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { test, readSrc, evalInContext, readCommon, readReportBuilders, makeSandbox, FIREFOX_SOURCE: SOURCE } = require('./helpers');
+const { test, readCommon, readReportBuilders, makeSandbox, FIREFOX_SOURCE: SOURCE } = require('./helpers');
 
 const sandbox = makeSandbox({ URL }, readCommon(), readReportBuilders());
 const { buildHtmlReport, buildJsonExport, buildCsvExport, buildTxtExport } = sandbox;

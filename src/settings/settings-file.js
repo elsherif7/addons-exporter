@@ -6,12 +6,9 @@
 const SETTINGS_FILE_FORMAT_VERSION = 1;
 
 // The settings keys this page knows about: exactly the ones an export holds
-// and an import requires.
-const KNOWN_SETTINGS_KEYS = [
-  SETTINGS_SCHEMA.theme.key,
-  EXPORT_FORMAT_STORAGE_KEY,
-  SHORT_NAME_STORAGE_KEY,
-];
+// and an import requires. This is core.js's SETTINGS_STORAGE_KEYS, given a
+// name that reads well here, so the two can never drift apart.
+const KNOWN_SETTINGS_KEYS = SETTINGS_STORAGE_KEYS;
 
 // Builds the settings export object from the current stored values.
 // settings is a plain object: { theme: '...', exportFormat: '...' } (exportFormat is one format, or an array when several are chosen).

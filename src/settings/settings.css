@@ -111,9 +111,8 @@ label.settings-option-row:active { transform: scale(0.985); }
   animation-fill-mode: backwards;
 }
 .card > h1:first-child { animation-delay: 0.55s; }
-/* The sections themselves don't animate (the shared card-children rule is
-   switched off here); they only carry their start time, --gd, which their
-   heading and rows below count from. */
+/* The sections themselves don't animate; they only carry their start time,
+   --gd, which their heading and rows below count from. */
 .card > .settings-group { --gd: 0s; animation: none; }
 .card > .settings-group:nth-of-type(1) { --gd: 0.7s; }
 .card > .settings-group:nth-of-type(2) { --gd: 0.86s; }

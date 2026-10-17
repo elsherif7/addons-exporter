@@ -6,14 +6,15 @@
 //
 // Only the "version" line changes: the rest of each file, including its
 // formatting and line endings, is kept exactly as it is. Firefox accepts one to
-// four dot-separated whole numbers (1, 1.3, 1.3.0, 1.3.0.1).
+// four dot-separated whole numbers (1, 1.3, 1.3.0, 1.3.0.1), each written
+// without a leading zero (so 01.2 is rejected).
 
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
 
-const VERSION_PATTERN = /^\d+(\.\d+){0,3}$/;
+const VERSION_PATTERN = /^(0|[1-9]\d*)(\.(0|[1-9]\d*)){0,3}$/;
 const FILES = ['package.json', 'manifest.json'];
 
 // Replaces the top-level "version" value in each file under root. Throws (and

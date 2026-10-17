@@ -16,7 +16,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { test, readSrc, readSrcs, makeSandbox } = require('./helpers');
+const { test, readSrcs, makeSandbox } = require('./helpers');
 
 const sandbox = makeSandbox({ TextEncoder, Uint8Array, Uint32Array, DataView }, readSrcs('src/common/crc32.js', 'src/background/zip.js'));
 

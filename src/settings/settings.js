@@ -294,9 +294,7 @@ settingsFileInput.addEventListener('change', async () => {
       return;
     }
     await browser.storage.local.set(result.settings);
-    if (result.settings[THEME_STORAGE_KEY]) {
-      applyTheme(result.settings[THEME_STORAGE_KEY]);
-    }
+    applyTheme(result.settings[THEME_STORAGE_KEY]);
     await loadCurrentTheme();
     await loadCurrentExportFormat();
     await loadCurrentShortenNames();

@@ -30,7 +30,6 @@
   // The format list comes from the registry in core.js (loaded before this
   // script), so a new format needs no change here.
   var VALID_FORMATS   = EXPORT_FORMATS;
-  var VALID_SHORTEN   = ['on', 'off'];
 
   var fmt     = null;
   var shorten = null;
@@ -51,7 +50,7 @@
   if (fmtList.length === 0) fmtList = [DEFAULT_FORMAT];
 
   // Validate; fall back to defaults for missing or invalid cache values.
-  if (VALID_SHORTEN.indexOf(shorten) === -1) shorten = DEFAULT_SHORTEN;
+  if (!isValidShortenNames(shorten)) shorten = DEFAULT_SHORTEN;
 
   // One tick box per registry format, id "format" + the id with a capital
   // first letter (html -> formatHtml). settings.html has to match the

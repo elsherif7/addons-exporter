@@ -8,7 +8,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { test, readSrc, evalInContext, readCommon, readReportBuilders, makeSandbox, FIREFOX_SOURCE } = require('./helpers');
+const { test, evalInContext, readCommon, readReportBuilders, makeSandbox, FIREFOX_SOURCE } = require('./helpers');
 
 const commonSrc = readCommon();
 const reportTemplateSrc = readReportBuilders();
@@ -245,7 +245,7 @@ test('buildCsvExport: an ordinary name is not guarded', () => {
 // The report embeds its own copy of shared layout CSS since it's a
 // standalone file. These tests catch drift between the two copies for
 // rules that must stay in sync. Intentional differences are excluded:
-// - --btn-bg-hover/--btn-disabled-bg (VAR_ALLOWLIST below) - the report
+// - --btn-bg-hover/--btn-disabled-bg - the report
 //   has no primary-btn or checkbox-disabled states
 // - Flex/checkbox layout on .addon-row (report rows have no checkboxes)
 // - margin-left on .addon-version (report compensates without flex)
@@ -411,16 +411,12 @@ test('A22: the report has a prefers-reduced-motion rule', () => {
 // --- A36: the report's tip no longer overstates what the Importer does ---
 
 test('A36: the report tip does not claim every link opens automatically', () => {
-  const reportTemplateSrc = readReportBuilders();
   assert.doesNotMatch(reportTemplateSrc, /open every link below as a tab automatically/);
 });
 
 test('A36: the report tip accurately describes selecting the file and pre-selecting new add-ons', () => {
-  const reportTemplateSrc = readReportBuilders();
   assert.match(reportTemplateSrc, /select this file[\s\S]{0,80}pre-selected to open/);
 });
-
-// --- A30: dead code cleanup ---
 
 // --- the generated assets file is in sync with its sources ---
 // report.css, report-inline.js and icons/icon32.png are built into

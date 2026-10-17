@@ -4,7 +4,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readReportBuilders, readImport, plain, stubDocument, makeSandbox, IMPORTER_ELEMENT_IDS, FIREFOX_SOURCE: SOURCE } = require('./helpers');
+const { test, testAsync, evalInContext, makeFakeDom, readCommon, readReportBuilders, readImport, plain, stubDocument, makeSandbox, IMPORTER_ELEMENT_IDS, FIREFOX_SOURCE: SOURCE } = require('./helpers');
 
 // import.js wires up DOM elements and event listeners at load time.
 // stubDocument() exists purely to let the file load without throwing - none of

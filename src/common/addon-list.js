@@ -148,5 +148,5 @@ function createAddonList({ listEl, countEl, actionBtn, selectAllBtn, deselectAll
     cb.click();
   });
 
-  return { checkboxes, updateSelectionCount, render, applySearch };
+  return { checkboxes, updateSelectionCount, render };
 }

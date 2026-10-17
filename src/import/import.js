@@ -574,7 +574,7 @@ openSelectedBtn.addEventListener('click', async () => {
     // Nothing opened means there's nothing to confirm - stay here so the
     // status (all failed) is what the user sees.
     if (firstIdx === -1) {
-      setStatus(`Opened 0 tabs, ${failed} failed to open`);
+      setStatus(`Opened ${pluralTabs(0)}, ${failed} failed to open`);
       return;
     }
 

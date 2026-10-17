@@ -12,7 +12,7 @@ const AMO_RETRY_AFTER_MAX_MS = 10000;
 // delay in ms. Split out from fetchJsonWithTimeout so the parsing/capping
 // itself can be tested without an actual wait.
 function computeRetryAfterMs(headerValue) {
-  if (headerValue === null || headerValue === undefined || headerValue === '') {
+  if (headerValue == null || headerValue === '') {
     return AMO_RETRY_AFTER_DEFAULT_MS;
   }
   const seconds = Number(headerValue);
@@ -63,7 +63,7 @@ async function fetchJsonWithTimeout(url, timeoutMs) {
   }
 
   const first = await attempt();
-  if (!first.ok && first.status === 429) {
+  if (first.status === 429) {
     await new Promise((resolve) => setTimeout(resolve, first.retryAfterMs));
     const second = await attempt();
     // A second 429 isn't retried again - one retry is enough to ride out

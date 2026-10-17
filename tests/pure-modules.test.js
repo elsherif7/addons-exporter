@@ -4,7 +4,7 @@
 // this fails if any of them ever starts touching the page.
 
 const assert = require('assert');
-const { test, readSrc, readSrcs, evalInContext, makeSandbox } = require('./helpers');
+const { test, readSrcs, makeSandbox } = require('./helpers');
 
 function load(...files) {
   return makeSandbox({ URL }, readSrcs('src/common/core.js', ...files));

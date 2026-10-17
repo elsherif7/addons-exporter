@@ -39,7 +39,7 @@ test('set-version: it does not touch strict_min_version or any other "version" k
 test('set-version: a version that is not numbers and dots is rejected and nothing is written', () => {
   const dir = tempCopy();
   const before = read(dir, 'manifest.json');
-  for (const bad of ['', 'v1.2', '1.2.3.4.5', '1..2', 'latest', '1.2.3-beta']) {
+  for (const bad of ['', 'v1.2', '01.2', '1.02', '1.2.3.4.5', '1..2', 'latest', '1.2.3-beta']) {
     assert.throws(() => setVersion(dir, bad), /not a valid version/, bad);
   }
   assert.strictEqual(read(dir, 'manifest.json'), before);

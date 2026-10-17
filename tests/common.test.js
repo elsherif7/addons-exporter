@@ -3,7 +3,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext, readCommon, readReportBuilders, makeFakeDom, makeSandbox } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, readCommon, makeFakeDom, makeSandbox } = require('./helpers');
 
 const commonSrc = readCommon();
 const sandbox = makeSandbox({ URL }, commonSrc);
