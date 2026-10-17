@@ -118,6 +118,47 @@ function makeSandbox(globals, ...sources) {
   return sb;
 }
 
+// A page starts its own async work without handing the promise to anyone -
+// import.js's setSelectedFiles kicks loadFiles off and drops the result - so a
+// test has nothing to await and would otherwise sleep a fixed time and hope.
+// recordLoad() wraps that starter function so the promise it returns is kept,
+// and returns a `settle` that awaits it: the test waits for the work itself,
+// not for the clock. That matters most for a .zip, whose decoding runs on real
+// streams rather than on the microtask queue alone, so a short fixed wait there
+// is a race a busy machine can lose (exactly the rare flake this suite had).
+// Bounded, so a page that never finishes fails the test that waits for it
+// instead of hanging the run.
+function recordLoad(sandbox, starterName, timeoutMs = 2000) {
+  let inFlight = Promise.resolve();
+  const starter = sandbox[starterName];
+  sandbox[starterName] = (...args) => (inFlight = Promise.resolve(starter(...args)));
+  return async () => {
+    let timer;
+    try {
+      await Promise.race([
+        inFlight,
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`the page did not finish loading within ${timeoutMs} ms`)), timeoutMs);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
+// Waits for a condition a test is about to assert on, rather than sleeping a
+// fixed time and hoping it has happened by then (which races a busy machine).
+// `what` names the condition in the failure, and the wait is bounded, so a test
+// fails with a reason instead of hanging the run.
+async function waitFor(condition, what, timeoutMs = 2000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error(`timed out after ${timeoutMs} ms waiting for ${what}`);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 // --- Minimal fake DOM -------------------------------------------------
 // A small, real element tree (not a per-call stub) for tests that need
 // to run actual rendering and interaction code - renderList/
@@ -422,4 +463,4 @@ function makeFakeDom(ids = []) {
   return { document, elements };
 }
 
-module.exports = { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, readImport, readSettings, evalInContext, plain, htmlData, FIREFOX_SOURCE, stubElement, stubDocument, makeSandbox, EXPORTER_ELEMENT_IDS, IMPORTER_ELEMENT_IDS, makeFakeDom };
+module.exports = { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, readImport, readSettings, evalInContext, plain, htmlData, FIREFOX_SOURCE, stubElement, stubDocument, makeSandbox, recordLoad, waitFor, EXPORTER_ELEMENT_IDS, IMPORTER_ELEMENT_IDS, makeFakeDom };

@@ -4,7 +4,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, evalInContext, makeFakeDom, readCommon, readReportBuilders, readImport, plain, stubDocument, makeSandbox, IMPORTER_ELEMENT_IDS, FIREFOX_SOURCE: SOURCE } = require('./helpers');
+const { test, testAsync, evalInContext, makeFakeDom, readCommon, readReportBuilders, readImport, plain, stubDocument, makeSandbox, recordLoad, IMPORTER_ELEMENT_IDS, FIREFOX_SOURCE: SOURCE } = require('./helpers');
 
 // import.js wires up DOM elements and event listeners at load time.
 // stubDocument() exists purely to let the file load without throwing - none of
@@ -767,9 +767,11 @@ async function renderRealImportList(addons, installed = []) {
       tabs: { create: async () => ({}) },
     },
   }, commonSrc, importSrc);
+  const settle = recordLoad(sandbox, 'loadFiles');
   sandbox.setSelectedFile(jsonAddonsFile(addons));
-  // Let loadFile()'s file read, JSON parse, and listAddons message settle.
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  // Waits for the load itself rather than for the clock: a fixed sleep here
+  // raced a busy machine (see recordLoad in tests/helpers.js).
+  await settle();
   return elements;
 }
 
@@ -812,6 +814,96 @@ testAsync('import.js real DOM: Select All while a search is active only checks t
   const checked = elements.addonList.querySelectorAll('input[type="checkbox"]:checked');
   assert.strictEqual(checked.length, 1, 'Select All should only check the row the active search still shows');
   assert.strictEqual(elements.selectionCount.textContent, '1 of 2 selected');
+});
+
+// --- the row is the click target, not just its checkbox ---
+// The shared list delegates a click anywhere in a row to that row's checkbox
+// (addon-list.js), so the native toggle has to fire exactly once wherever the
+// click lands. The fake DOM's click() and its change bubbling are real, so a
+// second toggle shows up here as a box that ended where it started.
+testAsync('import.js real DOM: clicking the row ticks it, the checkbox once, and a link not at all', async () => {
+  const elements = await renderRealImportList([
+    { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
+    { id: 'b@x', name: 'Beta', version: '2.0', link: 'https://example.com/b' },
+  ]);
+  const rows = () => elements.addonList.querySelectorAll('.addon-row');
+  const box = (i) => rows()[i].querySelector('input[type="checkbox"]');
+
+  elements.deselectAllBtn.click();
+  assert.strictEqual(elements.selectionCount.textContent, '0 of 2 selected', 'start from nothing ticked');
+
+  rows()[0].querySelector('.addon-name').click(); // an ordinary element inside the row
+  assert.strictEqual(box(0).checked, true, 'clicking the row ticks its checkbox');
+  assert.strictEqual(box(1).checked, false, 'and only that row\'s');
+  assert.strictEqual(elements.selectionCount.textContent, '1 of 2 selected', 'the count follows');
+
+  box(0).click(); // the checkbox itself: one toggle, not two
+  assert.strictEqual(box(0).checked, false, 'clicking the checkbox itself does not toggle it twice');
+
+  rows()[1].querySelector('a').click(); // the add-on's link
+  assert.strictEqual(box(1).checked, false, 'a click on the link is left to the link');
+});
+
+// --- the real HTML report path ---
+// Node has no DOMParser, so the browser's is stood in for: what can be checked
+// without one is the Importer's half of the contract - that the whole file goes
+// to DOMParser as HTML (never scraped as text), that it asks for the report's
+// data element, and what it does with each answer.
+function bootHtmlImporter(parseFromString) {
+  const { document, elements } = makeFakeDom(IMPORTER_ELEMENT_IDS);
+  const sandbox = makeSandbox({
+    document,
+    URL,
+    DOMParser: function DOMParser() { this.parseFromString = parseFromString; },
+    browser: {
+      runtime: { sendMessage: async (msg) => (msg.type === 'listAddons' ? [] : undefined), getURL: (p) => p },
+      storage: { local: { get: async () => ({}) } },
+      tabs: { create: async () => ({}) },
+    },
+  }, commonSrc, importSrc);
+  const settle = recordLoad(sandbox, 'loadFiles');
+  return { sandbox, elements, settle };
+}
+
+// What a parsed report looks like from the Importer's side: the one element it
+// asks for, holding the export's JSON (or null when the report has no such
+// element at all).
+const reportDocument = (json) => ({
+  getElementById: (id) => (id === 'addons-exporter-data' && json !== null ? { textContent: json } : null),
+});
+const htmlFile = (name, text) => ({ name, size: text.length, text: async () => text });
+
+testAsync('import.js: an .html report is read from the document DOMParser returns', async () => {
+  // The report's entry order, which is not the JSON export's (see
+  // HTML_ENTRY_KEYS in parsers.js) - the reader is strict about it.
+  const json = JSON.stringify({
+    formatVersion: V1,
+    addons: [{ id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/a', linkType: 'amo-exact' }],
+  });
+  const calls = [];
+  const { sandbox, elements, settle } = bootHtmlImporter((text, mode) => {
+    calls.push({ text, mode });
+    return reportDocument(json);
+  });
+  const text = '<!doctype html><html><body><p>the report</p></body></html>';
+  sandbox.setSelectedFile(htmlFile('Add-ons (2026-01-02).html', text));
+  await settle();
+
+  assert.deepStrictEqual(calls, [{ text, mode: 'text/html' }], 'the file goes to DOMParser whole, as HTML');
+  assert.strictEqual(elements.status.textContent, '');
+  assert.deepStrictEqual(elements.addonList.querySelectorAll('.addon-name').map((n) => n.textContent), ['Alpha']);
+});
+
+testAsync('import.js: an .html file with no data element says so, and an empty one says it holds no add-ons', async () => {
+  const missing = bootHtmlImporter(() => reportDocument(null));
+  missing.sandbox.setSelectedFile(htmlFile('other.html', '<html><body>not a report</body></html>'));
+  await missing.settle();
+  assert.match(missing.elements.status.textContent, /no embedded data found/);
+
+  const empty = bootHtmlImporter(() => reportDocument('   '));
+  empty.sandbox.setSelectedFile(htmlFile('empty-report.html', '<html><body></body></html>'));
+  await empty.settle();
+  assert.match(empty.elements.status.textContent, /No add-ons found in that file/);
 });
 
 // --- A2: stale-load races ---
@@ -1026,8 +1118,11 @@ async function renderRealImportListLive(addons, stored = {}) {
       tabs: { create: async () => ({}) },
     },
   }, commonSrc, importSrc);
+  const settle = recordLoad(sandbox, 'loadFiles');
   sandbox.setSelectedFile(jsonAddonsFile(addons));
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  // Waits for the load itself rather than for the clock: a fixed sleep here
+  // raced a busy machine (see recordLoad in tests/helpers.js).
+  await settle();
   const fire = (changes, area = 'local') => listeners.forEach((fn) => fn(changes, area));
   const names = () => elements.addonList.querySelectorAll('.addon-name').map((n) => n.textContent);
   return { elements, fire, names };
@@ -1094,15 +1189,20 @@ async function renderImportForRemoval(addons, { reducedMotion = false, slowFile 
       tabs: { create: async () => ({}) },
     },
   }, commonSrc, importSrc);
+  const settle = recordLoad(sandbox, 'loadFiles');
   sandbox.setSelectedFile(slowFile || jsonAddonsFile(addons));
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  // Waits for the load itself rather than for the clock: a fixed sleep here
+  // raced a busy machine (see recordLoad in tests/helpers.js). A slowFile is
+  // deliberately still loading, and the test that passes one decides when it
+  // finishes, so this waits only for the ordinary file.
+  if (!slowFile) await settle();
   log.length = 0; // forget animations from loading the file
   pending.length = 0;
   const finishAll = async () => {
     pending.forEach((a) => a.resolve());
     await new Promise((resolve) => setTimeout(resolve, 0));
   };
-  return { elements, sandbox, log, finishAll };
+  return { elements, sandbox, log, settle, finishAll };
 }
 
 const REMOVAL_ADDONS = [
@@ -1167,11 +1267,11 @@ testAsync('remove file (x): a note under the file name is part of the exit; with
 });
 
 testAsync('remove file (x): choosing another file while it is animating out keeps that file and its list visible', async () => {
-  const { elements, sandbox, log, finishAll } = await renderImportForRemoval(REMOVAL_ADDONS);
+  const { elements, sandbox, log, settle, finishAll } = await renderImportForRemoval(REMOVAL_ADDONS);
   elements.removeFileBtn.click();
   const exit = log.slice();
   sandbox.setSelectedFile(jsonAddonsFile([{ id: 'c@x', name: 'Gamma', version: '3', link: 'https://example.com/c' }]));
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await settle();
   await finishAll();
   assert.ok(exit.every((a) => a.cancelled), 'the held frames are released so the new list shows');
   assert.deepStrictEqual(elements.addonList.querySelectorAll('.addon-name').map((n) => n.textContent), ['Gamma']);
@@ -1181,10 +1281,10 @@ testAsync('remove file (x): choosing another file while it is animating out keep
 testAsync('remove file (x): a load that is still in flight can no longer draw anything once x is pressed', async () => {
   let release;
   const slowFile = { name: 'slow.json', size: 10, text: () => new Promise((resolve) => { release = () => resolve(JSON.stringify({ formatVersion: 1, addons: [{ name: 'Late', version: '1', type: 'extension', enabled: true, link: 'https://example.com/z', linkType: 'amo-exact', id: 'z@x' }] })); }) };
-  const { elements, finishAll } = await renderImportForRemoval(REMOVAL_ADDONS, { slowFile });
+  const { elements, settle, finishAll } = await renderImportForRemoval(REMOVAL_ADDONS, { slowFile });
   elements.removeFileBtn.click();
   release();
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await settle();
   await finishAll();
   assert.strictEqual(elements.addonList.querySelectorAll('.addon-row').length, 0, 'the late result is thrown away');
 });
@@ -1220,11 +1320,12 @@ testAsync('Importer: reopening from the popup closes the .zip picker and clears 
     },
   }, commonSrc, importSrc);
 
+  const settle = recordLoad(sandbox, 'loadFiles');
   sandbox.setSelectedFile(jsonAddonsFile([
     { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
     { id: 'b@x', name: 'Beta', version: '2.0', link: 'https://example.com/b' },
   ]));
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await settle();
   elements.deselectAllBtn.click();
   elements.selectAllBtn.click();
   assert.strictEqual(elements.selectionCount.textContent, '2 of 2 selected');

@@ -4,7 +4,7 @@
 
 const assert = require('assert');
 const vm = require('vm');
-const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readSettings, makeSandbox, FIREFOX_SOURCE: SETTINGS_BROWSER } = require('./helpers');
+const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readSettings, makeSandbox, waitFor, FIREFOX_SOURCE: SETTINGS_BROWSER } = require('./helpers');
 
 const themeSrc = readSrc('src/common/theme.js');
 const commonSrc = readCommon();
@@ -206,6 +206,75 @@ test('A7 regression: a pristine export (nothing ever stored) can be re-imported 
   const result = parseSettingsFile(json);
   assert.strictEqual(result.ok, true);
   assert.strictEqual(Object.keys(result.settings).length, 3, 'all three defaults should be present, not an empty {}');
+});
+
+// --- Importing a settings file: the whole path, not just the parser ---
+// The A7 tests above check the file format on its own. This drives the row a
+// user actually uses: choose a file, and the settings in it are stored, applied
+// to the page's own controls, and reported - the half no pure function test
+// reaches.
+
+testAsync('import: choosing a settings file stores what is in it, applies it to the page, and says so', async () => {
+  const { document, elements } = makeFakeDom([
+    'importSettingsBtn', 'importSettingsDesc', 'importSettingsStatus', 'settingsFileInput',
+  ]);
+  // The row feedback animates the status and the description.
+  for (const el of [elements.importSettingsDesc, elements.importSettingsStatus]) {
+    el.animate = () => ({ finished: Promise.resolve(), cancel() {} });
+  }
+  // The controls the page reads back after an import, found the way the page
+  // finds them: three groups of radios.
+  const radio = (name, value) => {
+    const el = document.createElement('input');
+    el.name = name;
+    el.value = value;
+    document.body.appendChild(el);
+    return el;
+  };
+  const dark = radio('theme', 'dark');
+  radio('theme', 'light');
+  radio('exportFormat', 'html');
+  const csv = radio('exportFormat', 'csv');
+  const off = radio('shortenNames', 'off');
+  radio('shortenNames', 'on');
+
+  const setCalls = [];
+  const stored = {};
+  makeSandbox({
+    URL: { createObjectURL: () => 'blob:fake', revokeObjectURL() {} },
+    Blob: function Blob() {},
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+    fetch: async () => ({ ok: false, status: 0, json: async () => ({}) }),
+    document,
+    browser: {
+      storage: {
+        local: {
+          get: async () => ({ ...stored }),
+          // The page reads the settings back after storing them, so this keeps
+          // what was written, as the real storage does.
+          set: async (values) => { Object.assign(stored, JSON.parse(JSON.stringify(values))); setCalls.push(values); },
+          remove: async () => {},
+        },
+      },
+      runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
+    },
+  }, themeSrc, commonSrc, settingsSrc);
+
+  const imported = withSettingsDefaults({
+    [THEME_STORAGE_KEY]: 'dark',
+    [EXPORT_FORMAT_STORAGE_KEY]: 'csv',
+    [SHORT_NAME_STORAGE_KEY]: 'off',
+  });
+  elements.settingsFileInput.files = [{ name: 'Add-ons Hub Settings.json', text: async () => buildSettingsExport(imported) }];
+  elements.settingsFileInput.dispatchEvent({ type: 'change' });
+  await waitFor(() => elements.importSettingsStatus.textContent !== '', 'the import to be reported');
+
+  assert.strictEqual(elements.importSettingsStatus.textContent, 'Settings imported successfully.');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(setCalls[0])), JSON.parse(JSON.stringify(imported)), 'the file\'s own settings are what gets stored');
+  assert.strictEqual(dark.checked, true, 'the theme control follows the file');
+  assert.strictEqual(csv.checked, true, 'so does the export format');
+  assert.strictEqual(off.checked, true, 'and name shortening');
 });
 
 // --- A33: a storage write failure reverts the radio and shows an error ---
@@ -607,7 +676,7 @@ testAsync('settings.js batched init writes exportFormat to the localStorage cach
       runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
     },
   }, themeSrc, commonSrc, settingsSrc);
-  await new Promise((resolve) => setTimeout(resolve, 30));
+  await waitFor(() => 'addons-hub-settings-exportFormat' in cacheStore, 'the exportFormat cache write');
   assert.strictEqual(cacheStore['addons-hub-settings-exportFormat'], 'csv',
     'the batched init should write the confirmed exportFormat to localStorage');
 });
@@ -652,7 +721,7 @@ testAsync('settings.js batched init writes shortenNames to the localStorage cach
       runtime: { getManifest: () => ({ version: '1.2.0' }), id: 'addons-exporter@local' },
     },
   }, themeSrc, commonSrc, settingsSrc);
-  await new Promise((resolve) => setTimeout(resolve, 30));
+  await waitFor(() => 'addons-hub-settings-shortenNames' in cacheStore, 'the shortenNames cache write');
   assert.strictEqual(cacheStore['addons-hub-settings-shortenNames'], 'off',
     'the batched init should write the confirmed shortenNames to localStorage');
 });

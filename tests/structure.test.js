@@ -502,6 +502,24 @@ test('manifest: strict_min_version is at least 128 and the README states the sam
   }
 });
 
+// The rest of the manifest, pinned the same way: the id is the extension's
+// identity (Firefox treats a changed id as a different extension, so an update
+// would not reach anyone), the three permissions and the one host are what the
+// user is asked to trust, and the options page is where Settings opens. None of
+// these is the kind of thing to change by accident, so a change has to be made
+// here too, on purpose.
+test('manifest: the id, the permissions (no more than these) and the options page are pinned', () => {
+  const manifest = JSON.parse(readSrc('manifest.json'));
+  assert.strictEqual(manifest.browser_specific_settings.gecko.id, 'addons-exporter@local',
+    'the Gecko id is the extension\'s identity - changing it makes this a different extension');
+  assert.deepStrictEqual(manifest.permissions, ['management', 'downloads', 'storage'],
+    'these three permissions, in this order - a fourth is a new promise to the user');
+  assert.deepStrictEqual(manifest.host_permissions, ['https://addons.mozilla.org/*'],
+    'AMO is the only host the extension talks to');
+  assert.deepStrictEqual(manifest.options_ui, { page: 'src/settings/settings.html', open_in_tab: true },
+    'the options page is the Settings page, in a tab of its own');
+});
+
 // web-ext reads .web-ext-config.mjs for every command, so `web-ext lint` and
 // `web-ext build` behave the same whether they run through `npm run lint:ext`
 // or are typed by hand. This list is what keeps development-only files out of
@@ -548,16 +566,34 @@ function filesUnder(dir, extension) {
   return out;
 }
 
-// Every stylesheet a page can be affected by: the .css files, plus the inline
-// <style> blocks that import.html, popup.html and confirmation.html carry (the
-// picker's .dragover highlight and the .zip picker's options live there, not
-// in a .css file).
-function stylesheetSources() {
-  const sources = filesUnder('src', '.css').map(readSrc);
-  for (const file of filesUnder('src', '.html')) {
-    for (const block of readSrc(file).matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) sources.push(block[1]);
-  }
-  return sources;
+// A page's own files, as project-relative paths with forward slashes: its
+// markup, every file it loads (scripts, stylesheets, icons), the scripts it
+// loads, and the stylesheets that can affect it (the .css files it links, plus
+// its own inline <style> blocks - where the Importer's drag highlight, the
+// .zip picker's options and the popup's whole look live). Refs resolve from the
+// page's own folder, the way the browser resolves them.
+function pageFiles(page) {
+  const markup = readSrc(page);
+  const resolveRef = (ref) => path.posix.normalize(path.posix.join(path.posix.dirname(page), ref));
+  const refs = [...markup.matchAll(/<(?:script|link)[^>]*\b(?:src|href)="([^"]+)"/g)]
+    .map((m) => m[1])
+    .filter((ref) => !/^(?:[a-z]+:|\/\/|#)/i.test(ref)); // external, or an in-page anchor
+  return {
+    page,
+    markup,
+    refs: [...new Set(refs.map(resolveRef))],
+    scripts: [...markup.matchAll(/<script src="([^"]+)"/g)].map((m) => resolveRef(m[1])),
+    linkedStyles: [...markup.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => resolveRef(m[1])),
+    inlineStyles: [...markup.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]),
+  };
+}
+
+const PAGES = HTML_PAGES.map(pageFiles);
+
+// Everything that can really style a page: its linked .css files, read here,
+// and its own inline <style> blocks.
+function stylesFor(page) {
+  return [...page.linkedStyles.map(readSrc), ...page.inlineStyles].join('\n');
 }
 
 // Every class a page script puts on an element, by either route: classList
@@ -581,17 +617,84 @@ function classesSetByScripts() {
   return found;
 }
 
-test('fake DOM boundary: every class the page scripts set is styled by a stylesheet', () => {
+test('fake DOM boundary: every class the page scripts set is styled by a page that loads that script', () => {
   const classes = classesSetByScripts();
   // Guard the guard: if the scan or the file walk broke, this must not pass by
   // finding almost nothing.
   assert.ok(classes.size >= 25, `only ${classes.size} classes found - did the scan break?`);
 
-  const stylesheets = stylesheetSources().join('\n');
+  // Every stylesheet in the project, for the scripts no page loads (see below).
+  const anyStylesheet = [
+    ...filesUnder('src', '.css').map(readSrc),
+    ...PAGES.flatMap((p) => p.inlineStyles),
+  ].join('\n');
+
   for (const [cls, file] of classes) {
-    assert.match(stylesheets, new RegExp(`\\.${cls}(?![\\w-])`),
-      `${file} sets .${cls}, but no stylesheet styles it - it does nothing in Firefox, and the fake DOM cannot tell`);
+    // The pages that load this script - the only ones it can be running on, so
+    // the only ones whose stylesheets can style what it sets. A rule moved into
+    // another page's stylesheet used to pass here, and does nothing in Firefox.
+    const hosts = PAGES.filter((p) => p.scripts.includes(file));
+    // A script no page loads is a background script, or the report's own script
+    // (the report carries it inside the saved file): those are checked against
+    // every stylesheet, which is what this did before.
+    const styles = hosts.length === 0 ? anyStylesheet : hosts.map(stylesFor).join('\n');
+    const where = hosts.length === 0
+      ? 'no stylesheet styles it'
+      : `none of the pages that load it (${hosts.map((p) => p.page).join(', ')}) styles it`;
+    assert.match(styles, new RegExp(`\\.${cls}(?![\\w-])`),
+      `${file} sets .${cls}, but ${where} - it does nothing in Firefox, and the fake DOM cannot tell`);
   }
+});
+
+// The fake DOM's other blind spot, from the same helpers.js comment:
+// getElementById never returns null - an id no test listed is created on the
+// spot - so a page script that asks for an element the real page does not have
+// passes every test and breaks only in Firefox. Each script's literal ids are
+// looked up in the markup of the pages that load it, which is where they have
+// to be.
+test('fake DOM boundary: every id a page script asks for is in the markup of a page that loads it', () => {
+  // The report's own script is built into the saved file, so its markup is the
+  // template the report is made from, not one of the pages above.
+  const reportMarkup = readSrc('src/background/report-template.js');
+  let checked = 0;
+  for (const file of filesUnder('src', '.js')) {
+    // Only the page's own document: import.js also reads a parsed report
+    // (doc.getElementById('addons-exporter-data')), whose id belongs to the
+    // report's markup, not to a page that loads import.js.
+    const ids = [...readSrc(file).matchAll(/(?<![\w.])document\.getElementById\('([\w-]+)'\)/g)].map((m) => m[1]);
+    if (ids.length === 0) continue;
+    const isReport = file === 'src/background/report-inline.js';
+    const hosts = PAGES.filter((p) => p.scripts.includes(file));
+    // Background scripts build markup rather than touch a live page (and they
+    // carry the report's script as a string), so they have no markup to check.
+    if (hosts.length === 0 && !isReport) continue;
+
+    const markup = isReport ? reportMarkup : hosts.map((p) => p.markup).join('\n');
+    for (const id of ids) {
+      assert.match(markup, new RegExp(`id="${id}"`),
+        `${file} asks for #${id}, but no page that loads it has that id - the fake DOM invents it, and Firefox returns null`);
+      checked++;
+    }
+  }
+  // Guard the guard, as above.
+  assert.ok(checked >= 40, `only ${checked} ids checked - did the scan break?`);
+});
+
+// A page names the scripts, stylesheets and icons it loads by relative path, and
+// nothing but the browser follows those paths: a renamed or deleted file leaves
+// a page that quietly does nothing (a missing theme.js is "the theme stopped
+// following the setting", with no test failing). Each one is resolved here, from
+// the page's own folder, the way the browser resolves it.
+test('pages: every file a page loads (scripts, stylesheets, icons) really exists', () => {
+  const root = path.join(__dirname, '..');
+  let checked = 0;
+  for (const page of PAGES) {
+    for (const ref of page.refs) {
+      assert.ok(fs.existsSync(path.join(root, ref)), `${page.page} loads "${ref}", which does not exist`);
+      checked++;
+    }
+  }
+  assert.ok(checked >= 25, `only ${checked} files referenced - did the scan break?`);
 });
 
 // The report is a standalone file: it carries its own copy of the CSS and

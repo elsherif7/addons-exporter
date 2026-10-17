@@ -6,7 +6,7 @@
 const assert = require('assert');
 const zlib = require('zlib');
 const { spawnSync } = require('child_process');
-const { test, testAsync, readSrc, readSrcs, readImport, readCommon, makeFakeDom, makeSandbox, IMPORTER_ELEMENT_IDS } = require('./helpers');
+const { test, testAsync, readSrc, readSrcs, readImport, readCommon, makeFakeDom, makeSandbox, recordLoad, IMPORTER_ELEMENT_IDS } = require('./helpers');
 
 function load() {
   return makeSandbox({ Blob, DecompressionStream, TextDecoder, TextEncoder }, readSrcs('src/common/crc32.js', 'src/background/zip.js', 'src/import/zip-reader.js'));
@@ -197,15 +197,17 @@ function bootImporter(installed = []) {
       tabs: { create: async () => ({}) },
     },
   }, readCommon(), readImport());
-  return { sandbox, elements };
+  // Waits for the load this page starts, instead of sleeping a fixed time: a
+  // .zip's decoding runs on real streams, so a fixed wait is a race.
+  const settle = recordLoad(sandbox, 'loadFiles');
+  return { sandbox, elements, settle };
 }
 
 const zipFile = (name, bytes) => ({ name, size: bytes.length, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) });
-const settle = () => new Promise((resolve) => setTimeout(resolve, 40));
 const shownNames = (elements) => elements.addonList.querySelectorAll('.addon-name').map((n) => n.textContent);
 
 testAsync('Importer: a .zip with several formats is read, using the JSON file', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   const zip = makeZip([
     { name: 'add-ons.txt', data: 'not used', method: 'deflate' },
     { name: 'add-ons.json', data: jsonText(['Alpha', 'Beta']), method: 'deflate' },
@@ -218,7 +220,7 @@ testAsync('Importer: a .zip with several formats is read, using the JSON file', 
 });
 
 testAsync('Importer: if the first file in a .zip cannot be read, the next one is tried', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   const csv = '# addons-hub-format-version: 1\r\nname,version,type,enabled,link,linkType,id\r\nAlpha,1.0,extension,true,https://example.com/,homepage,a@x';
   sandbox.setSelectedFile(zipFile('mixed.zip', makeZip([
     { name: 'add-ons.json', data: '{ this is not json' },
@@ -237,7 +239,7 @@ testAsync('Importer: the Exporter\'s own .zip (made by its real format builders)
   ];
   const expected = ["'=Beta | pipe", 'Alpha "quoted" ; semi'].sort();
   for (const [name, content] of [['list.csv', ex.buildCsvExport(list, false)], ['list.txt', ex.buildTxtExport(list, false)]]) {
-    const { sandbox, elements } = bootImporter();
+    const { sandbox, elements, settle } = bootImporter();
     sandbox.setSelectedFile(zipFile('export.zip', sb.buildZip([{ name, content }])));
     await settle();
     assert.strictEqual(elements.status.textContent, '', name);
@@ -246,7 +248,7 @@ testAsync('Importer: the Exporter\'s own .zip (made by its real format builders)
 });
 
 testAsync('Importer: a .zip with no export file in it says so', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFile(zipFile('photos.zip', makeZip([{ name: 'cat.png', data: 'x' }])));
   await settle();
   assert.match(elements.status.textContent, /doesn't contain an Add-ons Exporter file/);
@@ -254,20 +256,20 @@ testAsync('Importer: a .zip with no export file in it says so', async () => {
 });
 
 testAsync('Importer: a damaged .zip shows the reader\'s sentence, and a file that is not an export is ignored', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFile(zipFile('broken.zip', new Uint8Array(Buffer.from('definitely not a zip file, just some text'))));
   await settle();
   assert.match(elements.status.textContent, /isn't a \.zip file the Importer can read/);
 
   const again = bootImporter();
   again.sandbox.setSelectedFile(zipFile('bad-json.zip', makeZip([{ name: 'list.json', data: '{"formatVersion":1}' }])));
-  await settle();
+  await again.settle();
   assert.match(again.elements.status.textContent, /doesn't contain an Add-ons Exporter file/);
   assert.deepStrictEqual(shownNames(again.elements), []);
 });
 
 testAsync('Importer: files in a .zip that hold the same add-ons are one export, with no picker', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFile(zipFile('same.zip', makeZip([
     { name: 'one.json', data: jsonText(['Alpha', 'Beta']) },
     { name: 'two.json', data: jsonText(['Beta', 'Alpha']), method: 'deflate' },
@@ -280,7 +282,7 @@ testAsync('Importer: files in a .zip that hold the same add-ons are one export, 
 });
 
 testAsync('Importer: a .zip with different exports shows a picker ("All add-ons" first and default, then the biggest export), and the choice redraws the list', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFile(zipFile('mixed.zip', makeZip([
     { name: 'first.json', data: jsonText(['Alpha']) },
     { name: 'second.json', data: jsonText(['Beta', 'Gamma']), method: 'deflate' },
@@ -315,7 +317,7 @@ testAsync('Importer: a .zip with different exports shows a picker ("All add-ons"
 });
 
 testAsync('Importer: a search in progress survives the export picker redrawing the list', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFiles([
     textFile('first.json', addonJson([['Alpha', 'a@x']])),
     textFile('second.json', addonJson([['Beta', 'b@x'], ['Gamma', 'c@x']])),
@@ -371,7 +373,7 @@ const addonCsv = (pairs) => [
 ].join('\r\n');
 
 testAsync('Importer: several files chosen at once are read together, and the chip counts them', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFiles([textFile('first.json', jsonText(['Alpha'])), textFile('second.json', jsonText(['Beta', 'Gamma']))]);
   await settle();
   assert.strictEqual(elements.status.textContent, '');
@@ -382,7 +384,7 @@ testAsync('Importer: several files chosen at once are read together, and the chi
 });
 
 testAsync('Importer: a .zip holding one export in several formats is named by the .zip itself', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   const zip = zipFile('v3.zip', makeZip([
     { name: 'Add-ons (2026-01-02).json', data: addonJson([['Beta', 'b@x'], ['Gamma', 'c@x']]) },
     { name: 'Add-ons (2026-01-02).csv', data: addonCsv([['Beta', 'b@x'], ['Gamma', 'c@x']]), method: 'deflate' },
@@ -395,7 +397,7 @@ testAsync('Importer: a .zip holding one export in several formats is named by th
 });
 
 testAsync('Importer: files sharing a base name are named once, whatever formats they came in', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFiles([
     textFile('Add-ons.json', addonJson([['Alpha', 'a@x'], ['Beta', 'b@x']])),
     textFile('Add-ons.csv', addonCsv([['Alpha', 'a@x'], ['Beta', 'b@x']])),
@@ -406,7 +408,7 @@ testAsync('Importer: files sharing a base name are named once, whatever formats 
 });
 
 testAsync('Importer: files with names of their own each keep their own entry, even holding the same add-ons', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFiles([textFile('one.json', jsonText(['Alpha', 'Beta'])), textFile('two.json', jsonText(['Beta', 'Alpha']))]);
   await settle();
   assert.strictEqual(elements.status.textContent, '');
@@ -416,7 +418,7 @@ testAsync('Importer: files with names of their own each keep their own entry, ev
 });
 
 testAsync('Importer: three chosen files give three entries, even when two hold the same add-ons', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFiles([
     textFile('Add-ons (06-15-22).json', addonJson([['Alpha', 'a@x'], ['Beta', 'b@x']])),
     textFile('v2.csv', addonCsv([['Alpha', 'a@x'], ['Beta', 'b@x']])),
@@ -430,7 +432,7 @@ testAsync('Importer: three chosen files give three entries, even when two hold t
 });
 
 testAsync('Importer: one name holding different add-ons is two entries, so neither set is lost', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFiles([
     textFile('Add-ons.json', addonJson([['Alpha', 'a@x'], ['Beta', 'b@x']])),
     textFile('Add-ons.csv', addonCsv([['Gamma', 'c@x']])),
@@ -440,7 +442,7 @@ testAsync('Importer: one name holding different add-ons is two entries, so neith
 });
 
 testAsync('Importer: the most exact format supplies an export\'s data across files, not the order they were chosen', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   const json = JSON.stringify({ formatVersion: 1, addons: [{ name: 'FromJson', version: '1.0', type: 'extension', enabled: true, link: 'https://example.com/j', linkType: 'homepage', id: 'a@x' }] });
   const csv = '# addons-hub-format-version: 1\r\nname,version,type,enabled,link,linkType,id\r\nFromCsv,1.0,extension,true,https://example.com/c,homepage,a@x';
   // The CSV is chosen first, and still loses to the JSON - the same rule the
@@ -452,7 +454,7 @@ testAsync('Importer: the most exact format supplies an export\'s data across fil
 });
 
 testAsync('Importer: a .zip and a loose file combine like any other selection', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFiles([
     zipFile('pack.zip', makeZip([{ name: 'inner.json', data: jsonText(['Alpha']) }])),
     textFile('extra.json', jsonText(['Beta', 'Gamma'])),
@@ -464,7 +466,7 @@ testAsync('Importer: a .zip and a loose file combine like any other selection', 
 });
 
 testAsync('Importer: a file that cannot be read is named under the list, and the rest still load', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFiles([textFile('addons.json', jsonText(['Alpha'])), textFile('notes.xml', 'just some notes')]);
   await settle();
   assert.strictEqual(elements.status.textContent, '');
@@ -474,7 +476,7 @@ testAsync('Importer: a file that cannot be read is named under the list, and the
 });
 
 testAsync('Importer: a damaged .zip among good files is named too', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFiles([textFile('addons.json', jsonText(['Alpha'])), zipFile('broken.zip', new Uint8Array([1, 2, 3, 4]))]);
   await settle();
   assert.deepStrictEqual(shownNames(elements), ['Alpha']);
@@ -482,7 +484,7 @@ testAsync('Importer: a damaged .zip among good files is named too', async () => 
 });
 
 testAsync('Importer: when not one chosen file can be read, the first reason is shown and nothing loads', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   sandbox.setSelectedFiles([textFile('notes.xml', 'just some notes'), textFile('also.xml', 'more notes')]);
   await settle();
   assert.match(elements.status.textContent, /isn't a supported file type/);
@@ -492,7 +494,7 @@ testAsync('Importer: when not one chosen file can be read, the first reason is s
 });
 
 testAsync('Importer: the file picker hands over every chosen file, not just the first', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   elements.fileInput.files = [textFile('first.json', jsonText(['Alpha'])), textFile('second.json', jsonText(['Beta', 'Gamma']))];
   elements.fileInput.dispatchEvent({ type: 'change' });
   await settle();
@@ -502,7 +504,7 @@ testAsync('Importer: the file picker hands over every chosen file, not just the 
 });
 
 testAsync('Importer: a drop hands over every dropped file, and a drop with no files changes nothing', async () => {
-  const { sandbox, elements } = bootImporter();
+  const { sandbox, elements, settle } = bootImporter();
   const drop = (files) => elements.picker.dispatchEvent({ type: 'drop', dataTransfer: { files }, preventDefault() {} });
   drop([textFile('first.json', jsonText(['Alpha'])), textFile('second.json', jsonText(['Beta', 'Gamma']))]);
   await settle();
