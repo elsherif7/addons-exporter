@@ -713,3 +713,59 @@ test('fake DOM boundary: the report script only relies on classes report.css sty
       `.${cls} is toggled by report-inline.js, but report.css does not style it`);
   }
 });
+
+// --- Parity checks: report-inline.js and common/ modules must stay in sync ---
+// Because standalone reports cannot load common modules, logic is duplicated in
+// report-inline.js by design. These tripwire tests ensure neither side drifts.
+test('parity: search filter logic in report-inline.js matches page-ui.js', () => {
+  const reportInline = readSrc('src/background/report-inline.js');
+  const pageUi = readSrc('src/common/page-ui.js');
+
+  // Both must toggle .is-filtered and set display
+  assert.match(reportInline, /el\.style\.display = visible \? '' : 'none';/);
+  assert.match(reportInline, /el\.classList\.toggle\('is-filtered', !visible\);/);
+  assert.match(pageUi, /el\.style\.display = visible \? shownDisplay : 'none';/);
+  assert.match(pageUi, /el\.classList\.toggle\('is-filtered', !visible\);/);
+
+  // Both must search .group-container depth-independently
+  assert.match(reportInline, /querySelectorAll\('\.group-container'\)/);
+  assert.match(pageUi, /querySelectorAll\('\.group-container'\)/);
+
+  // Both must check .addon-name textContent case-insensitively
+  assert.match(reportInline, /nameEl\.textContent\.toLowerCase\(\)\.indexOf\(q\) !== -1/);
+  assert.match(pageUi, /nameEl\.textContent\.toLowerCase\(\)\.includes\(q\)/);
+});
+
+test('parity: staged reveal constants in report-inline.js match reveal.js', () => {
+  const reportInline = readSrc('src/background/report-inline.js');
+  const reveal = readSrc('src/common/reveal.js');
+
+  for (const [name, val] of [
+    ['START', '0.82'],
+    ['PART_STEP', '0.16'],
+    ['ROW_LEAD', '0.08'],
+    ['ROW_STEP', '0.08'],
+    ['ROW_ANIMATED_MAX', '14'],
+    ['ROW_DURATION', '0.55'],
+  ]) {
+    assert.match(reportInline, new RegExp(`\\b${name} = ${val.replace('.', '\\.')}\\b`), `report-inline.js: ${name} should be ${val}`);
+    assert.match(reveal, new RegExp(`\\bconst ${name} = ${val.replace('.', '\\.')};`), `reveal.js: ${name} should be ${val}`);
+  }
+});
+
+test('parity: click feedback pulse animation in report-inline.js matches press.js', () => {
+  const reportInline = readSrc('src/background/report-inline.js');
+  const press = readSrc('src/common/press.js');
+
+  // Both use element.animate with 520ms duration and ease-out
+  assert.match(reportInline, /duration: 520, easing: 'ease-out'/);
+  assert.match(press, /DURATION_MS = 520/);
+  assert.match(press, /easing: 'ease-out'/);
+
+  // Both use the same box-shadow pulse shapes
+  assert.match(reportInline, /boxShadow:\s*'inset 0 0 0 999px '\s*\+\s*c/);
+  assert.match(reportInline, /boxShadow:\s*'0 0 0 2px '\s*\+\s*c/);
+  assert.match(press, /boxShadow:\s*'inset 0 0 0 999px '\s*\+\s*color/);
+  assert.match(press, /boxShadow:\s*'0 0 0 2px '\s*\+\s*color/);
+});
+
