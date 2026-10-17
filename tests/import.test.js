@@ -57,6 +57,12 @@ test('parseAddonsPayload: null jsonText (no embedded data element found)', () =>
   assert.match(result.error, /no embedded data found/);
 });
 
+test('parseAddonsPayload: an empty data element reads as a file with no add-ons, not as a JSON error', () => {
+  const result = parseAddonsPayload('   ');
+  assert.strictEqual(result.ok, false);
+  assert.match(result.error, /No add-ons found in that file/);
+});
+
 test('parseAddonsPayload: throws on malformed JSON', () => {
   assert.throws(() => parseAddonsPayload('{not valid json'));
 });
@@ -625,6 +631,21 @@ test('parseCsvPayload: rejects a newer formatVersion', () => {
   csvRejects(csvLines([csvRow()], EXPORT_FORMAT_VERSION + 1), /newer version of Add-ons Exporter/);
 });
 
+test('parseCsvPayload: a format version below 1 is rejected as no usable version, in both header shapes', () => {
+  csvRejects(csvLines([csvRow()], 0), /missing its export format version/);
+  const zeroSource = [
+    '# addons-hub-source-formatVersion: 0',
+    '# addons-hub-source-fileType: csv',
+    '# addons-hub-source-browser: Firefox',
+    '# addons-hub-source-basedOn: Gecko',
+    '# addons-hub-source-browserVersion: 128.0',
+    '# addons-hub-source-extensionVersion: 1.2.0',
+  ].join('\r\n');
+  // Not "the file must start with the source comments": the comments are there,
+  // the version in them is what cannot be used.
+  csvRejects(`${zeroSource}\r\n${CSV_HEAD}\r\n${csvRow()}`, /missing its export format version/);
+});
+
 test('parseCsvPayload: the header must be exactly the exporter\'s: a different column order, a missing or an extra column is rejected', () => {
   csvRejects(csvLines([csvRow()], V1, 'id,name,version,enabled,type,link,linkType'), /header row must be/);
   csvRejects(csvLines([csvRow()], V1, 'name,version,type,enabled,link,linkType'), /header row must be/);
@@ -830,6 +851,22 @@ testAsync('import.js: removing the file mid-load leaves the list empty once the 
   assert.strictEqual(elements.addonList.querySelectorAll('.addon-row').length, 0, 'the stale load should not have rendered anything');
   assert.strictEqual(elements.fileNameRow.style.display, 'none');
   assert.strictEqual(elements.chooseFileBtn.style.display, '');
+});
+
+testAsync('import.js: a selection nothing can be read from cancels a load still in flight', async () => {
+  const { sandbox, elements } = bootImportSandbox();
+  const slowFile = jsonAddonsFile([{ id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' }]);
+  const realText = slowFile.text;
+  slowFile.text = async () => { await sleep(30); return realText(); };
+
+  sandbox.setSelectedFile(slowFile);
+  await sleep(5); // in flight: past the start, not past the slow file.text()
+  sandbox.setSelectedFile({ name: 'notes.pdf', size: 10 }); // nothing readable in it
+  assert.match(elements.status.textContent, /isn't a supported file type/, 'the reason is shown at once');
+  await sleep(50); // give the stale load plenty of time to (wrongly) finish
+
+  assert.match(elements.status.textContent, /isn't a supported file type/, 'and it is what stands, not the stale load\'s own result');
+  assert.strictEqual(elements.addonList.querySelectorAll('.addon-row').length, 0, 'the stale load rendered nothing');
 });
 
 testAsync('import.js: a second file wins even if the first is still awaiting storage.get', async () => {
@@ -1494,6 +1531,7 @@ test('TXT strict: type must be Extension or Theme and status Enabled or Disabled
 
 test('TXT strict: no name or no id rejects the file', () => {
   txtRejects(txtLines([txtLine({ name: '' })]), /no name/);
+  txtRejects(txtLines([txtLine({ name: '   ' })]), /no name/);
   txtRejects(txtLines([txtLine({ id: '' })]), /no id/);
 });
 
@@ -1512,6 +1550,10 @@ test('TXT strict: the format-version comment must be exactly the first line, and
   txtRejects('\uFEFF' + txtLines([txtLine()]), /no format-version comment found/);
   txtRejects(`#addons-hub-format-version: ${V1}\r\n${txtLine()}`, /no format-version comment found/);
   txtRejects(`\r\n# addons-hub-format-version: ${V1}\r\n${txtLine()}`, /no format-version comment found/);
+});
+
+test('TXT strict: a format version below 1 is rejected as no usable version', () => {
+  txtRejects(txtLines([txtLine()], 0), /missing its export format version/);
 });
 
 test('TXT strict: title, section headings and blank lines (no " | " in them) are skipped, as the exporter writes them', () => {

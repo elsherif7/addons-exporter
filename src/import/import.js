@@ -515,8 +515,11 @@ function setSelectedFiles(files) {
   }
 
   // Not one readable file was chosen: say why, the way a single rejected file
-  // always has, and leave the page exactly as it was.
+  // always has, and leave the page exactly as it was. Any load already in
+  // flight is invalidated with it, so an earlier file cannot finish and render
+  // over the message (the same reason the removal branch above bumps this).
   if (accepted.length === 0) {
+    loadGeneration++;
     setStatus(rejected[0].error);
     return;
   }

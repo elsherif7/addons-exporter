@@ -17,6 +17,13 @@
 // format version requires updating this test and migrateAddonsData".
 const SUPPORTED_FORMAT_VERSION = EXPORT_FORMAT_VERSION;
 
+// The two ways a format version can be unusable, one message each: no usable
+// version at all (missing, non-numeric, or a "0" in a hand-edited comment), and
+// a version newer than this Importer understands. Every reader uses these two,
+// so a file gets the same wording whichever format it is in.
+const NO_VERSION_ERROR = 'This file is missing its export format version and can\'t be imported.';
+const NEWER_VERSION_ERROR = 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.';
+
 // No-op for format versions 1 and 2 (the add-on entries did not change; version
 // 2 only added the source). Update this (and the tripwire test above) before
 // bumping EXPORT_FORMAT_VERSION again.
@@ -107,10 +114,10 @@ function validateAddonsPayload(parsed, entryKeys, fileType) {
     formatVersion = parsed.formatVersion;
   }
   if (!Number.isInteger(formatVersion) || formatVersion < 1) {
-    return { ok: false, error: 'This file is missing its export format version and can\'t be imported.' };
+    return { ok: false, error: NO_VERSION_ERROR };
   }
   if (formatVersion > SUPPORTED_FORMAT_VERSION) {
-    return { ok: false, error: 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.' };
+    return { ok: false, error: NEWER_VERSION_ERROR };
   }
 
   const list = Array.isArray(parsed.addons) ? parsed.addons : null;
@@ -136,6 +143,10 @@ function parseAddonsPayload(jsonText, entryKeys = HTML_ENTRY_KEYS, fileType = 'h
   if (jsonText == null) {
     return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no embedded data found)' };
   }
+  // An empty data element (a report with its data stripped, say) is not JSON at
+  // all, and "Unexpected end of JSON input" would be the only thing the user
+  // saw. It holds no add-ons, which is what this says.
+  if (jsonText.trim() === '') return { ok: false, error: 'No add-ons found in that file' };
   return validateAddonsPayload(JSON.parse(jsonText), entryKeys, fileType);
 }
 
@@ -161,9 +172,6 @@ function stripCsvFormulaGuard(s) {
 // The one header row buildCsvExport() (export-formats.js) writes.
 const CSV_HEADER = ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id'];
 
-// One message for every "this file is from the future" case below.
-const NEWER_VERSION_ERROR = 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.';
-
 // Reads the header a CSV or TXT export starts with: the format-2 source
 // comments (whose first line carries the format version) or the format-1 plain
 // format-version comment. `formatError` is the format's own error builder
@@ -174,6 +182,9 @@ function readFormatHeader(lines, fileType, formatError) {
   const sourceVersion = first.match(/^# addons-hub-source-formatVersion: (\d+)$/);
   if (sourceVersion) {
     const formatVersion = parseInt(sourceVersion[1], 10);
+    // Below 1 and above the supported version are both refused before the rest
+    // of the source is read, so a "0" is not blamed on the source comments.
+    if (formatVersion < 1) return { ok: false, error: NO_VERSION_ERROR };
     if (formatVersion > SUPPORTED_FORMAT_VERSION) return { ok: false, error: NEWER_VERSION_ERROR };
     const source = parseSourceCommentLines(lines.slice(0, SOURCE_KEYS.length), fileType);
     if (!source) return formatError('the file must start with the source comments, "# addons-hub-source-formatVersion: ..." and the five more');
@@ -182,6 +193,7 @@ function readFormatHeader(lines, fileType, formatError) {
   const versionMatch = first.match(/^# addons-hub-format-version: (\d+)$/);
   if (!versionMatch) return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no format-version comment found)' };
   const formatVersion = parseInt(versionMatch[1], 10);
+  if (formatVersion < 1) return { ok: false, error: NO_VERSION_ERROR };
   if (formatVersion > SUPPORTED_FORMAT_VERSION) return { ok: false, error: NEWER_VERSION_ERROR };
   return { ok: true, formatVersion, source: null, start: 1 };
 }
@@ -369,7 +381,7 @@ function parseTxtPayload(text) {
     const status = cells[3];
     const link = cells[4];
     const id = cells[cells.length - 1];
-    if (name === '') return txtError(`${where} has no name`);
+    if (name.trim() === '') return txtError(`${where} has no name`);
     if (id === '') return txtError(`${where} has no id`);
     const parsedType = parseType(type);
     if (!parsedType) return txtError(`${where} has an unknown type`);

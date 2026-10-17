@@ -7,8 +7,9 @@
 // What it supports: files that are stored or deflated (the two methods every
 // zip tool uses), UTF-8 text, any number of entries. What it refuses, with a
 // plain message instead of guessing: encrypted entries, zip64 (archives over
-// 4 GB), split archives, a damaged entry (its CRC does not match), and any
-// entry that is bigger than the limit it is given.
+// 4 GB), split archives, a damaged entry (its CRC does not match), an entry
+// bigger than the limit it is given, and export files that together would take
+// more memory than a real export ever needs.
 //
 // readZipEntries(bytes, { extensions, maxEntryBytes }) resolves to
 //   { ok: true, entries: [{ name, text }] }   - only the entries whose file
@@ -22,6 +23,11 @@ const ZIP_CENTRAL_SIGNATURE = 0x02014b50;
 const ZIP_LOCAL_SIGNATURE = 0x04034b50;
 const ZIP_MAX_COMMENT = 0xFFFF;
 const ZIP_MAX_ENTRIES_READ = 50; // an export holds at most one file per format
+// The wanted entries together, however many of them there are: the per-entry
+// limit alone still lets a 50-entry zip declare (and then hold) fifty files
+// just under it. A real export is a handful of formats of one list, so this is
+// far above anything genuine while keeping the worst case small.
+const ZIP_MAX_TOTAL_BYTES = 64 * 1024 * 1024;
 
 // An entry's checksum is checked with zipCrc32() from src/common/crc32.js - the
 // very same function the writer stamps entries with.
@@ -78,6 +84,7 @@ async function readZipEntries(bytes, { extensions, maxEntryBytes }) {
 
     const decoder = new TextDecoder('utf-8');
     const wanted = [];
+    let totalBytes = 0;
     let pos = centralStart;
     for (let i = 0; i < count; i++) {
       if (pos + 46 > end || view.getUint32(pos, true) !== ZIP_CENTRAL_SIGNATURE) return unzipError('its directory is damaged');
@@ -104,6 +111,8 @@ async function readZipEntries(bytes, { extensions, maxEntryBytes }) {
       if (method !== 0 && method !== 8) return unzipError(`"${name}" uses a compression method that is not supported`);
       if (compressedSize === 0xFFFFFFFF || size === 0xFFFFFFFF || localStart === 0xFFFFFFFF) return unzipError('zip64 archives are not supported');
       if (size > maxEntryBytes) return { ok: false, error: `"${name}" inside the .zip is too large (over ${Math.round(maxEntryBytes / (1024 * 1024))} MB) to be a real export.` };
+      totalBytes += size;
+      if (totalBytes > ZIP_MAX_TOTAL_BYTES) return unzipError('it holds far more export data than an export does');
       wanted.push({ name, method, crc, compressedSize, size, localStart });
       if (wanted.length > ZIP_MAX_ENTRIES_READ) return unzipError('it holds far more files than an export does');
     }

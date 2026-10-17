@@ -155,6 +155,14 @@ testAsync('zip reader: refuses an entry bigger than the limit, as declared and a
   await refused(bomb, /"a\.json" is damaged/, 1_000_000);
 });
 
+testAsync('zip reader: refuses export files that together would take more memory than an export does', async () => {
+  // Each entry is under the per-entry limit; their declared sizes add up past
+  // the combined one, which is noticed in the directory - before any of them
+  // is held in memory.
+  const many = Array.from({ length: 3 }, (_, i) => ({ name: `part${i}.json`, data: '{}', size: 30 * 1024 * 1024 }));
+  await refused(makeZip(many), /far more export data than an export does/, 40 * 1024 * 1024);
+});
+
 testAsync('zip reader: refuses a damaged directory', async () => {
   const z = makeZip([{ name: 'a.json', data: '{}' }]);
   new DataView(z.buffer).setUint32(z.length - 22 + 16, 5000, true); // directory "starts" past the end
