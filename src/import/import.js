@@ -125,7 +125,7 @@ function createAddonRow(a, i, isInstalled, shorten) {
     lnk.href = a.link;
     lnk.target = '_blank';
     lnk.rel = 'noopener';
-    lnk.textContent = 'AMO';
+    lnk.textContent = linkLabel(a.link);
     row.append(lnk);
   }
   return row;

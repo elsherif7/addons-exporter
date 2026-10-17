@@ -1514,6 +1514,17 @@ test('matching: a short name shared by two installed add-ons is ambiguous, so it
   assert.strictEqual(sandbox.findInstalledMatch({ id: 'b@x', name: 'Dark' }, index).id, 'b@x', 'the id still decides');
 });
 
+test('matching: an exact name shared by two installed add-ons is ambiguous, so it matches neither', () => {
+  const index = sandbox.buildInstalledIndex([
+    { id: 'a@x', name: 'Twin' },
+    { id: 'b@x', name: 'twin' },
+    { id: 'c@x', name: 'Solo' },
+  ]);
+  assert.strictEqual(sandbox.findInstalledMatch({ name: 'Twin' }, index), null);
+  assert.strictEqual(sandbox.findInstalledMatch({ id: 'b@x', name: 'Twin' }, index).id, 'b@x', 'the id still decides');
+  assert.strictEqual(sandbox.findInstalledMatch({ name: 'Solo' }, index).id, 'c@x', 'a unique name still matches');
+});
+
 test('matching: an unknown add-on matches nothing', () => {
   const index = sandbox.buildInstalledIndex(installedFull);
   assert.strictEqual(sandbox.findInstalledMatch({ name: 'Something Else' }, index), null);

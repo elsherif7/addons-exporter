@@ -362,6 +362,20 @@ const TAB_OPEN_DELAY_MS = 150;
 // background.js (an add-on export) and settings.js (a settings export).
 const OBJECT_URL_REVOKE_MS = 30000;
 
+// What a row's link is called on screen: "AMO" for a page on addons.mozilla.org,
+// otherwise the site it really points to ("example.com"), so a homepage or a
+// hand-edited link is never presented as an AMO page. Anything that is not a
+// readable web address gets the plain word "Link".
+function linkLabel(link) {
+  try {
+    const host = new URL(link).hostname.toLowerCase().replace(/^www\./, '');
+    if (!host) return 'Link';
+    return host === 'addons.mozilla.org' ? 'AMO' : host;
+  } catch {
+    return 'Link';
+  }
+}
+
 // The AMO search page for an add-on's name - the last-resort link. Used by the
 // Exporter's row link (export.js) and by the background's own fallback when no
 // exact AMO page or homepage was found, so the two always point at the same URL.

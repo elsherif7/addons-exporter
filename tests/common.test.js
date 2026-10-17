@@ -57,6 +57,18 @@ test('escapeHtml coerces non-strings via String()', () => {
 
 // --- isSafeUrl ---
 
+test('linkLabel: AMO for addons.mozilla.org, the real site for anything else, "Link" for junk', () => {
+  const { linkLabel } = sandbox;
+  assert.strictEqual(linkLabel('https://addons.mozilla.org/en-US/firefox/addon/x/'), 'AMO');
+  assert.strictEqual(linkLabel('https://ADDONS.mozilla.org/search/?q=x'), 'AMO');
+  assert.strictEqual(linkLabel('https://example.com/tab,stash?x=1'), 'example.com');
+  assert.strictEqual(linkLabel('https://www.example.com/'), 'example.com');
+  assert.strictEqual(linkLabel('https://addons.mozilla.org.evil.example/'), 'addons.mozilla.org.evil.example', 'a look-alike host is never called AMO');
+  assert.strictEqual(linkLabel('not a url'), 'Link');
+  assert.strictEqual(linkLabel(''), 'Link');
+  assert.strictEqual(linkLabel(undefined), 'Link');
+});
+
 test('isSafeUrl accepts http and https', () => {
   assert.strictEqual(isSafeUrl('http://example.com'), true);
   assert.strictEqual(isSafeUrl('https://example.com'), true);

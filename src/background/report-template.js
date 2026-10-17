@@ -1,7 +1,7 @@
 // Builds the HTML report returned by doExport() in background.js:
 // buildHtmlReport(). Pure string templating only - nothing here touches
 // browser.* APIs, so it can be loaded and tested on its own. Needs core.js
-// (escapeHtml, byName, LINK_TYPE_LABELS, UNCERTAIN_LINK_TYPES,
+// (escapeHtml, linkLabel, byName, LINK_TYPE_LABELS, UNCERTAIN_LINK_TYPES,
 // EXPORT_FORMAT_VERSION, groupForReading) and report-assets.generated.js
 // (REPORT_CSS, REPORT_INLINE_SCRIPT, REPORT_ICON_DATA_URI) loaded before it -
 // see manifest.json's background.scripts order. The JSON, CSV and TXT builders are
@@ -74,7 +74,7 @@ function buildHtmlReport(list, theme, shorten = true, source = UNKNOWN_BROWSER) 
       <span class="addon-version">${escapeHtml(a.version)}</span>
       <span class="match-label">${escapeHtml(typeText)}</span>
       ${match}</span>
-      <a class="match-label" href="${escapeHtml(a.link)}" target="_blank" rel="noopener">AMO</a>
+      <a class="match-label" href="${escapeHtml(a.link)}" target="_blank" rel="noopener">${escapeHtml(linkLabel(a.link))}</a>
     </div>`;
   };
 
