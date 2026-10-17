@@ -25,7 +25,7 @@ const CONTRACT = {
   // Format 2 added the source: the file's own format version and type, then
   // where the export came from. (Format 1, which the release on AMO wrote, had
   // none of it - the Importer still reads it.)
-  sourceKeys: ['formatVersion', 'fileType', 'browser', 'basedOn', 'browserVersion', 'extensionVersion'],
+  sourceKeys: ['formatVersion', 'fileType', 'basedOn', 'browser', 'browserVersion', 'extensionVersion'],
   htmlTopV1: ['formatVersion', 'addons'],
   // The HTML report's embedded data.
   htmlTop: ['source', 'addons'],
@@ -44,8 +44,8 @@ const CONTRACT = {
 const sourceLines = (fileType, version) => [
   `# addons-hub-source-formatVersion: ${version}`,
   `# addons-hub-source-fileType: ${fileType}`,
-  '# addons-hub-source-browser: Firefox',
   '# addons-hub-source-basedOn: Gecko',
+  '# addons-hub-source-browser: Firefox',
   '# addons-hub-source-browserVersion: 128.0',
   '# addons-hub-source-extensionVersion: 1.2.0',
 ];

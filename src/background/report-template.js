@@ -23,7 +23,7 @@ function safeJsonForScriptTag(value) {
 // the theme button, animation) can change freely, but the data block that
 // goes into #addons-exporter-data is what the Importer reads, and its add-ons
 // must stay exactly what the version released on addons.mozilla.org wrote:
-//   { "source": { formatVersion, fileType, browser, basedOn, browserVersion, extensionVersion },
+//   { "source": { formatVersion, fileType, basedOn, browser, browserVersion, extensionVersion },
 //     "addons": [ { id, name, version, enabled, type, link, linkType }, ... ] }
 // in that order, with full (never shortened) names. (Format version 1, which
 // the release on addons.mozilla.org wrote, had no "source" and carried the

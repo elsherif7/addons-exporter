@@ -18,13 +18,13 @@ const EXPORT_FORMAT_VERSION = 2;
 // "Firefox", "LibreWolf", "Waterfox", and later "Chrome" or anything else), so
 // a new browser never needs a new format version. Kept to plain characters so
 // it reads the same in JSON, CSV, TXT and HTML and can be checked strictly.
-const SOURCE_KEYS = ['formatVersion', 'fileType', 'browser', 'basedOn', 'browserVersion', 'extensionVersion'];
+const SOURCE_KEYS = ['formatVersion', 'fileType', 'basedOn', 'browser', 'browserVersion', 'extensionVersion'];
 // The file types a source can name: one per export format, plus the Settings file.
 const FILE_TYPES = ['html', 'json', 'csv', 'txt', 'settings'];
 // The part of the source that describes the browser - everything the file
 // itself does not already know.
-const BROWSER_KEYS = ['browser', 'basedOn', 'browserVersion', 'extensionVersion'];
-const UNKNOWN_BROWSER = Object.freeze({ browser: 'Unknown', basedOn: 'Unknown', browserVersion: 'unknown', extensionVersion: 'unknown' });
+const BROWSER_KEYS = ['basedOn', 'browser', 'browserVersion', 'extensionVersion'];
+const UNKNOWN_BROWSER = Object.freeze({ basedOn: 'Unknown', browser: 'Unknown', browserVersion: 'unknown', extensionVersion: 'unknown' });
 const SOURCE_TEXT_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9 ._+-]{0,62}[A-Za-z0-9._+-])?$/;
 
 // Reduces any value to text that passes SOURCE_TEXT_PATTERN, or `fallback`.
@@ -37,8 +37,8 @@ function cleanSourceText(value, fallback) {
 // or unusable becomes "Unknown" / "unknown", so a file is always written.
 function makeBrowserSource(browserName, browserVersion, extensionVersion, basedOn) {
   return {
-    browser: cleanSourceText(browserName, UNKNOWN_BROWSER.browser),
     basedOn: cleanSourceText(basedOn, UNKNOWN_BROWSER.basedOn),
+    browser: cleanSourceText(browserName, UNKNOWN_BROWSER.browser),
     browserVersion: cleanSourceText(browserVersion, UNKNOWN_BROWSER.browserVersion),
     extensionVersion: cleanSourceText(extensionVersion, UNKNOWN_BROWSER.extensionVersion),
   };
@@ -55,8 +55,8 @@ function makeSource(fileType, formatVersion, browserSource) {
   return {
     formatVersion,
     fileType,
-    browser: b.browser,
     basedOn: b.basedOn,
+    browser: b.browser,
     browserVersion: b.browserVersion,
     extensionVersion: b.extensionVersion,
   };
@@ -105,8 +105,8 @@ function parseSourceCommentLines(lines, fileType) {
   const source = {
     formatVersion: /^\d+$/.test(raw.formatVersion) ? parseInt(raw.formatVersion, 10) : raw.formatVersion,
     fileType: raw.fileType,
-    browser: raw.browser,
     basedOn: raw.basedOn,
+    browser: raw.browser,
     browserVersion: raw.browserVersion,
     extensionVersion: raw.extensionVersion,
   };

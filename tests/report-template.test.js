@@ -189,8 +189,8 @@ test('buildCsvExport: the six source lines come first, then the header row', () 
   assert.deepStrictEqual(lines.slice(0, 6), [
     '\uFEFF# addons-hub-source-formatVersion: 2',
     '# addons-hub-source-fileType: csv',
-    '# addons-hub-source-browser: Firefox',
     '# addons-hub-source-basedOn: Gecko',
+    '# addons-hub-source-browser: Firefox',
     '# addons-hub-source-browserVersion: 128.0',
     '# addons-hub-source-extensionVersion: 1.2.0',
   ]);

@@ -636,8 +636,8 @@ test('parseCsvPayload: a format version below 1 is rejected as no usable version
   const zeroSource = [
     '# addons-hub-source-formatVersion: 0',
     '# addons-hub-source-fileType: csv',
-    '# addons-hub-source-browser: Firefox',
     '# addons-hub-source-basedOn: Gecko',
+    '# addons-hub-source-browser: Firefox',
     '# addons-hub-source-browserVersion: 128.0',
     '# addons-hub-source-extensionVersion: 1.2.0',
   ].join('\r\n');
@@ -1410,8 +1410,8 @@ test('TXT export: a title, Enabled and Disabled sections, and lined-up columns',
   assert.deepStrictEqual(lines.slice(0, 6), [
     '# addons-hub-source-formatVersion: 2',
     '# addons-hub-source-fileType: txt',
-    '# addons-hub-source-browser: Firefox',
     '# addons-hub-source-basedOn: Gecko',
+    '# addons-hub-source-browser: Firefox',
     '# addons-hub-source-browserVersion: 128.0',
     '# addons-hub-source-extensionVersion: 1.2.0',
   ]);

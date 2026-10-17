@@ -81,7 +81,7 @@ function htmlData(html) {
 // The browser part of an export's "source" (what getExportSource() returns for
 // Firefox), exactly as the real thing looks. One copy for every test that
 // builds an export carrying a source.
-const FIREFOX_SOURCE = { browser: 'Firefox', basedOn: 'Gecko', browserVersion: '128.0', extensionVersion: '1.2.0' };
+const FIREFOX_SOURCE = { basedOn: 'Gecko', browser: 'Firefox', browserVersion: '128.0', extensionVersion: '1.2.0' };
 
 // A stand-in element for tests that only need a page script to load: its
 // top-level code wires up DOM elements, so give it something to wire up. It

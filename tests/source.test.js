@@ -16,7 +16,7 @@ function load(globals = {}) {
   );
 }
 const sb = load();
-const UNKNOWN = { browser: 'Unknown', basedOn: 'Unknown', browserVersion: 'unknown', extensionVersion: 'unknown' };
+const UNKNOWN = { basedOn: 'Unknown', browser: 'Unknown', browserVersion: 'unknown', extensionVersion: 'unknown' };
 // The browser part of the source (BROWSER is FIREFOX_SOURCE from helpers: what
 // getExportSource returns), and a full source as a given file type writes it
 // (makeSource adds the version and type).
@@ -36,14 +36,14 @@ test('source: cleanSourceText keeps plain text and falls back for anything unusa
 
 test('source: makeBrowserSource and normalizeBrowserSource always give exactly the four browser keys, in order', () => {
   assert.deepStrictEqual(plain(sb.makeBrowserSource('Firefox', '128.0', '1.2.0', 'Gecko')), BROWSER);
-  assert.deepStrictEqual(Object.keys(sb.normalizeBrowserSource({ extensionVersion: '1', browserVersion: '2', browser: 'B', extra: 'x' })), ['browser', 'basedOn', 'browserVersion', 'extensionVersion']);
+  assert.deepStrictEqual(Object.keys(sb.normalizeBrowserSource({ extensionVersion: '1', browserVersion: '2', browser: 'B', extra: 'x' })), ['basedOn', 'browser', 'browserVersion', 'extensionVersion']);
   assert.deepStrictEqual(plain(sb.normalizeBrowserSource(undefined)), UNKNOWN);
   assert.deepStrictEqual(plain(sb.normalizeBrowserSource('nope')), UNKNOWN);
 });
 
 test('source: makeSource puts the format version and file type before the browser, always six keys in order', () => {
   assert.deepStrictEqual(plain(sb.makeSource('json', 2, BROWSER)), source('json'));
-  assert.deepStrictEqual(Object.keys(sb.makeSource('csv', 2, undefined)), ['formatVersion', 'fileType', 'browser', 'basedOn', 'browserVersion', 'extensionVersion']);
+  assert.deepStrictEqual(Object.keys(sb.makeSource('csv', 2, undefined)), ['formatVersion', 'fileType', 'basedOn', 'browser', 'browserVersion', 'extensionVersion']);
   assert.deepStrictEqual(plain(sb.makeSource('txt', 2, undefined)), source('txt', 2, UNKNOWN));
 });
 
@@ -52,7 +52,7 @@ test('source: sourceProblem accepts exactly what the exporter writes and names t
   assert.strictEqual(sb.sourceProblem(source('csv'), 'csv'), null);
   assert.match(sb.sourceProblem(null), /not an object/);
   assert.match(sb.sourceProblem([]), /not an object/);
-  assert.match(sb.sourceProblem({ browser: 'F', basedOn: 'F', browserVersion: '1' }), /not exactly formatVersion, fileType, browser, basedOn, browserVersion, extensionVersion/);
+  assert.match(sb.sourceProblem({ browser: 'F', basedOn: 'F', browserVersion: '1' }), /not exactly formatVersion, fileType, basedOn, browser, browserVersion, extensionVersion/);
   assert.match(sb.sourceProblem({ browserVersion: '1', basedOn: 'F', browser: 'F', extensionVersion: '1' }), /not exactly/);
   assert.match(sb.sourceProblem({ ...source('json'), extra: 'x' }), /not exactly/);
   assert.match(sb.sourceProblem({ ...source('json'), formatVersion: 0 }), /format version is not a positive whole number/);
@@ -70,8 +70,8 @@ test('source: the comment lines round-trip, and anything else is not a source li
   assert.deepStrictEqual(plain(lines), [
     '# addons-hub-source-formatVersion: 2',
     '# addons-hub-source-fileType: csv',
-    '# addons-hub-source-browser: Firefox',
     '# addons-hub-source-basedOn: Gecko',
+    '# addons-hub-source-browser: Firefox',
     '# addons-hub-source-browserVersion: 128.0',
     '# addons-hub-source-extensionVersion: 1.2.0',
   ]);

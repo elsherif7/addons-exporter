@@ -1314,7 +1314,7 @@ test('contract: the settings file is the source, then settings: theme, exportFor
   assert.deepStrictEqual(Array.from(Object.keys(data)), ['source', 'settings']);
   assert.strictEqual(data.source.formatVersion, 1);
   assert.strictEqual(data.source.fileType, 'settings');
-  assert.deepStrictEqual(Array.from(Object.keys(data.source)), ['formatVersion', 'fileType', 'browser', 'basedOn', 'browserVersion', 'extensionVersion'],
+  assert.deepStrictEqual(Array.from(Object.keys(data.source)), ['formatVersion', 'fileType', 'basedOn', 'browser', 'browserVersion', 'extensionVersion'],
     'the source changed - bump the format version on purpose');
   assert.deepStrictEqual(Array.from(Object.keys(data.settings)), ['theme', 'exportFormat', 'shortenNames'],
     'the settings changed - bump the format version on purpose');

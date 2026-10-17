@@ -25,7 +25,7 @@ function buildSettingsExport(settings, source = UNKNOWN_BROWSER) {
 
 // Validates and parses a settings file's text. Accepts only what
 // buildSettingsExport() writes (given withSettingsDefaults()'s values):
-//   { "source": { formatVersion, fileType: "settings", browser, basedOn,
+//   { "source": { formatVersion, fileType: "settings", basedOn, browser,
 //                 browserVersion, extensionVersion },
 //     "settings": { theme, exportFormat, shortenNames } }
 // with exactly those three settings, in that order, each a valid value. Anything else - a

@@ -59,7 +59,7 @@ function dedupeAddons(list) {
 // The check is strict: the file must be exactly what the exporter writes,
 // including the HTML report from the version released on addons.mozilla.org
 // (the same payload):
-//   format 2: { "source": { formatVersion, fileType, browser, basedOn, browserVersion, extensionVersion },
+//   format 2: { "source": { formatVersion, fileType, basedOn, browser, browserVersion, extensionVersion },
 //               "addons": [ { id, name, version, enabled, type, link, linkType }, ... ] }
 //   format 1: { "formatVersion": 1, "addons": [ ... ] } (what the release on addons.mozilla.org wrote)
 // Anything else - another key, a missing field, a field of the wrong type - is
