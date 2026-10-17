@@ -1,3 +1,9 @@
+# All text, LF endings, on every platform. The tests and `build-assets --check`
+# read source files byte-for-byte, so a checkout that rewrote them to CRLF (a
+# Windows clone with core.autocrlf=true) would fail the pretest gate.
+* text=auto eol=lf
+
+# Compared byte-for-byte; never normalise these.
 tests/golden/** -text
 tests/fixtures/** -text
 src/background/report-assets.generated.js linguist-generated=true

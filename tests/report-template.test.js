@@ -335,7 +335,10 @@ for (const [selector, property] of sharedRules) {
 // scripts/build-assets.js). So neither shared.css nor report.css may declare
 // its own :root block - that would be a second source that could drift.
 
-const tokensCssSrc = fs.readFileSync(path.join(__dirname, '..', 'src/common/tokens.css'), 'utf8');
+// Line endings normalised to "\n", exactly as scripts/build-assets.js does, so
+// the REPORT_CSS comparison below holds whether the working tree is LF or CRLF.
+const lf = (text) => text.replace(/\r\n/g, '\n');
+const tokensCssSrc = lf(fs.readFileSync(path.join(__dirname, '..', 'src/common/tokens.css'), 'utf8'));
 
 function extractCssVars(src, rootSelector) {
   const sel = rootSelector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -437,7 +440,7 @@ test('report-assets.generated.js is in sync with report.css, report-inline.js an
 });
 
 test('the report embeds REPORT_CSS: tokens.css, then report.css', () => {
-  const css = tokensCssSrc + '\n' + fs.readFileSync(path.join(__dirname, '..', 'src', 'background', 'report.css'), 'utf8');
+  const css = tokensCssSrc + '\n' + lf(fs.readFileSync(path.join(__dirname, '..', 'src', 'background', 'report.css'), 'utf8'));
   const sb = {};
   vm.createContext(sb);
   vm.runInContext(readReportBuilders(), sb);
