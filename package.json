@@ -9,7 +9,7 @@
     "pretest": "npm run check",
     "test": "node --test --test-reporter=spec",
     "pretest:coverage": "npm run check",
-    "test:coverage": "c8 node --require ./tests/coverage-preload.js --test",
+    "test:coverage": "npx --yes c8 node --require ./tests/coverage-preload.js --test",
     "lint:ext": "npx --yes web-ext@10.8.0 lint",
     "clean": "node scripts/clean.js",
     "set-version": "node scripts/set-version.js"
