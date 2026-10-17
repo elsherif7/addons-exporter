@@ -195,6 +195,8 @@ npm run test:coverage                      # coverage of src/ (needs `npm ci` on
 npm run lint:ext                           # Mozilla's web-ext lint
 ```
 
+Both `npm run lint:ext` and a `web-ext` you run yourself read their ignore list from `.web-ext-config.mjs`, so the tests, the tooling and the other files that are not part of the extension stay out of the lint report and out of any package.
+
 **Changing the version**
 
 The version is written in two files, `package.json` and `manifest.json`, and a test fails if they differ. To change both at once:

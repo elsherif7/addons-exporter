@@ -483,3 +483,18 @@ test('manifest: strict_min_version is at least 128 and the README states the sam
   const readme = readSrc('README.md');
   assert.match(readme, new RegExp(`Requires Firefox ${parseInt(min, 10)} or newer`), 'README states the same minimum version');
 });
+
+// web-ext reads .web-ext-config.mjs for every command, so `web-ext lint` and
+// `web-ext build` behave the same whether they run through `npm run lint:ext`
+// or are typed by hand. This list is what keeps development-only files out of
+// the lint report and out of any package.
+test('web-ext config: development-only files are ignored, however web-ext is started', () => {
+  const config = readSrc('.web-ext-config.mjs');
+  for (const pattern of ['tests/**', 'scripts/**', 'package.json', 'package-lock.json', 'README.md', 'LICENSE', 'coverage/**']) {
+    assert.ok(config.includes(`'${pattern}'`), `.web-ext-config.mjs does not ignore ${pattern}`);
+  }
+  // The report's build input is a real script the linter should see, so it must
+  // not be in the list.
+  assert.ok(!config.includes('report-inline.js'), 'report-inline.js should be linted, not ignored');
+  assert.match(readSrc('package.json'), /"lint:ext": "npx --yes web-ext@8\.10\.0 lint"/, 'lint:ext must rely on the config file, not a repeated ignore list');
+});

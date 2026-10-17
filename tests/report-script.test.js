@@ -84,13 +84,12 @@ test('report script: junk in storage is ignored, blocked storage still works', (
   assert.strictEqual(blocked.root.getAttribute('data-theme'), 'light');
 });
 
-test('report script: the theme button flips the theme, swaps its icon and remembers the choice', () => {
+test('report script: the theme button flips the theme and remembers the choice', () => {
   const page = makePage(['A']);
   const { store } = run(page, { baked: 'light' });
-  assert.match(page.ids.themeToggle.innerHTML, /M21 12\.79/, 'light theme shows the moon (switch to dark)');
+  assert.strictEqual(page.root.getAttribute('data-theme'), 'light');
   page.ids.themeToggle.fire('click');
   assert.strictEqual(page.root.getAttribute('data-theme'), 'dark');
-  assert.match(page.ids.themeToggle.innerHTML, /<circle cx="12" cy="12" r="5"/, 'dark theme shows the sun');
   assert.strictEqual(store['addons-hub-report-theme'], 'dark');
   page.ids.themeToggle.fire('click');
   assert.strictEqual(page.root.getAttribute('data-theme'), 'light');

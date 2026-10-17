@@ -58,6 +58,12 @@
   }
   .theme-toggle:hover { background: var(--hover-bg); border-color: var(--border-hover); transform: scale(1.02); }
   .theme-toggle:active { transform: scale(0.9); }
+  /* Both icons live in the button and data-theme decides which one is shown,
+     so nothing has to swap them at runtime. Only the visible one is rendered,
+     which is also what replays its spin (below) each time it appears. */
+  .theme-toggle .theme-icon { display: none; }
+  [data-theme="light"] .theme-toggle .theme-icon-moon,
+  [data-theme="dark"] .theme-toggle .theme-icon-sun { display: block; }
   .search-input {
     display: block;
     width: 100%;
@@ -193,7 +199,7 @@
       fill var(--motion-theme) ease-in-out, stroke var(--motion-theme) ease-in-out !important;
   }
 
-  /* The sun/moon icon spins and pops in each time it is swapped. */
+  /* The sun/moon icon spins and pops in each time it appears. */
   @keyframes hub-icon-spin {
     from { opacity: 0; transform: rotate(-200deg) scale(0.3); }
     to   { opacity: 1; transform: none; }

@@ -21,10 +21,10 @@ const reportInlineScript = readSrc('src/background/report-inline.js');
 // returns its filterAddonRows, so it can be called directly the same way
 // page-ui.js's version is called in the test below.
 function loadReportFilterAddonRows(addonListContainer) {
-  // The inline script now calls applyTheme() on load, which needs
-  // setAttribute/textContent on the themeToggle element, and also reads
-  // from localStorage. Provide minimal stubs for both so the script can
-  // initialise without throwing.
+  // The inline script calls applyTheme() on load, which needs setAttribute
+  // on the document element and also reads from localStorage; it also wires
+  // up the theme toggle's click listener. Provide minimal stubs for both so
+  // the script can initialise without throwing.
   const stubEl = () => ({ style: {}, addEventListener() {}, setAttribute() {}, textContent: '', children: [], classList: { contains: () => false }, querySelector: () => null });
   const reportDocument = {
     documentElement: { setAttribute() {} },

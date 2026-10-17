@@ -88,6 +88,20 @@ test('buildHtmlReport: includes a theme toggle button', () => {
   assert.match(darkHtml, /id="themeToggle"/);
 });
 
+// Both icons ship in the markup and report.css shows the one data-theme calls
+// for, so no script ever swaps them (which is also what keeps the report's own
+// script free of innerHTML).
+test('buildHtmlReport: the toggle carries both icons, and report.css shows the one the theme calls for', () => {
+  const html = buildHtmlReport(sampleList, 'light');
+  assert.match(html, /class="theme-icon theme-icon-sun"/);
+  assert.match(html, /class="theme-icon theme-icon-moon"/);
+
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src/background/report.css'), 'utf8');
+  assert.match(css, /\.theme-toggle \.theme-icon \{ display: none; \}/);
+  assert.match(css, /\[data-theme="light"\] \.theme-toggle \.theme-icon-moon/);
+  assert.match(css, /\[data-theme="dark"\] \.theme-toggle \.theme-icon-sun/);
+});
+
 test('buildHtmlReport: the icon-only theme toggle and the search box have accessible names', () => {
   const html = buildHtmlReport(sampleList, 'light');
   assert.match(html, /<button[^>]*id="themeToggle"[^>]*aria-label="[^"]+"/, 'the icon-only toggle needs an aria-label');
