@@ -203,6 +203,19 @@ Both `npm run lint:ext` and a `web-ext` you run yourself read their ignore list 
 
 `npm run clean` deletes only output this project's tools made and can make again: `node_modules`, `coverage`, `web-ext-artifacts`, Python caches, and stray `*.zip`/`*.xpi` exports at the project root. It never opens `.git`, `tests`, or any `fixtures` folder, and it leaves an archive parked in a subfolder alone. `npm run clean -- --dry-run` lists what it would delete without deleting anything.
 
+**What the tests can and cannot see**
+
+The page scripts run against a small fake DOM in `tests/helpers.js`, not a real browser, so the suite needs no dependencies. It has no CSS engine and no layout: a test can prove that a script added a class or set a style property, never that anything is styled, positioned or visible. The CSS half of those contracts is checked as source text instead — every class the page scripts set has to be styled by some stylesheet, and the standalone report has to find the classes its own script toggles in `report.css` (both in `tests/structure.test.js`). The comment above the fake DOM lists the rest of what it cannot do.
+
+**Checking a change by eye**
+
+Anything that needs a real paint — an animation replaying, a colour gliding, a row fading out on search — has to be looked at once in a browser:
+
+1. Load the add-on as in [Installation](#installation) (`about:debugging#/runtime/this-firefox`, then **Load Temporary Add-on** → `manifest.json`) and use the page you changed.
+2. For the exported report: export an HTML report, open the downloaded file in a new tab, and try its search box and its light/dark toggle.
+
+Worth doing whenever a change touches a stylesheet, `tokens.css`, or a page script's visual states.
+
 **Changing the version**
 
 The version is written in two files, `package.json` and `manifest.json`, and a test fails if they differ. To change both at once:

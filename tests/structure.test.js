@@ -516,3 +516,88 @@ test('tooling: package.json and the README agree on the Node version', () => {
   const major = engines.node.replace(/[^0-9]/g, '');
   assert.match(readSrc('README.md'), new RegExp(`needs Node ${major} or newer`), 'README states the same Node version');
 });
+
+// --- The fake DOM's blind spot: the CSS half of a JS/CSS contract ---
+// The page scripts are tested against a fake DOM with no CSS engine (see the
+// "Minimal fake DOM" comment in tests/helpers.js for the full list of what it
+// cannot do). It can see that a script put a class on an element, but never
+// that anything styles that class - so a class whose rule was renamed,
+// deleted, or moved into a stylesheet the page never loads does nothing in
+// Firefox and nothing in the test suite either. These two tests read the
+// stylesheets as text instead, which is the only place that half of the
+// contract can be checked without a browser.
+
+// Every file under src/ with the given extension, as project-relative paths
+// with forward slashes, so a new file is picked up without touching these.
+function filesUnder(dir, extension) {
+  const out = [];
+  for (const entry of fs.readdirSync(path.join(__dirname, '..', dir), { withFileTypes: true })) {
+    const relative = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) out.push(...filesUnder(relative, extension));
+    else if (entry.name.endsWith(extension)) out.push(relative);
+  }
+  return out;
+}
+
+// Every stylesheet a page can be affected by: the .css files, plus the inline
+// <style> blocks that import.html, popup.html and confirmation.html carry (the
+// picker's .dragover highlight and the .zip picker's options live there, not
+// in a .css file).
+function stylesheetSources() {
+  const sources = filesUnder('src', '.css').map(readSrc);
+  for (const file of filesUnder('src', '.html')) {
+    for (const block of readSrc(file).matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) sources.push(block[1]);
+  }
+  return sources;
+}
+
+// Every class a page script puts on an element, by either route: classList
+// (toggled states such as .revealing or .dragover) or an assigned className
+// (the rows, labels and dialogs built by addon-list.js, page-ui.js and the
+// page scripts). The value maps a class to the file that sets it, for the
+// failure message.
+function classesSetByScripts() {
+  const found = new Map();
+  for (const file of filesUnder('src', '.js')) {
+    const src = readSrc(file);
+    for (const m of src.matchAll(/classList\.(?:add|remove|toggle)\(\s*'([\w-]+)'/g)) {
+      if (!found.has(m[1])) found.set(m[1], file);
+    }
+    for (const m of src.matchAll(/\.className\s*=\s*'([^']*)'/g)) {
+      for (const cls of m[1].split(/\s+/).filter(Boolean)) {
+        if (!found.has(cls)) found.set(cls, file);
+      }
+    }
+  }
+  return found;
+}
+
+test('fake DOM boundary: every class the page scripts set is styled by a stylesheet', () => {
+  const classes = classesSetByScripts();
+  // Guard the guard: if the scan or the file walk broke, this must not pass by
+  // finding almost nothing.
+  assert.ok(classes.size >= 25, `only ${classes.size} classes found - did the scan break?`);
+
+  const stylesheets = stylesheetSources().join('\n');
+  for (const [cls, file] of classes) {
+    assert.match(stylesheets, new RegExp(`\\.${cls}(?![\\w-])`),
+      `${file} sets .${cls}, but no stylesheet styles it - it does nothing in Firefox, and the fake DOM cannot tell`);
+  }
+});
+
+// The report is a standalone file: it carries its own copy of the CSS and
+// loads nothing else. A class its script toggles therefore has to be in
+// report.css itself - moving such a rule into shared.css would leave the
+// report silently unstyled, which is invisible to the fake DOM either way.
+test('fake DOM boundary: the report script only relies on classes report.css styles', () => {
+  const toggled = new Set(
+    [...readSrc('src/background/report-inline.js').matchAll(/classList\.(?:add|remove|toggle)\(\s*'([\w-]+)'/g)].map((m) => m[1])
+  );
+  assert.ok(toggled.size >= 3, `only ${toggled.size} classes found - did the scan break?`);
+
+  const reportCss = readSrc('src/background/report.css');
+  for (const cls of toggled) {
+    assert.match(reportCss, new RegExp(`\\.${cls}(?![\\w-])`),
+      `.${cls} is toggled by report-inline.js, but report.css does not style it`);
+  }
+});

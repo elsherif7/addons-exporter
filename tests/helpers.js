@@ -132,6 +132,36 @@ function makeSandbox(globals, ...sources) {
 // with bubbling for delegated click handlers. It is not a general DOM
 // implementation - extend it only when a new test genuinely needs more
 // of the real API surface.
+//
+// What it cannot do. None of the following can fail here, so a green test
+// says nothing about them:
+// - No styling and no layout. classList is a Set and style is a plain
+//   object: there is no cascade, no computed style and no geometry, so a
+//   test can see that a script added a class or set a property, never that
+//   anything is styled by it, overridden, or where it lands on screen. The
+//   CSS half of those contracts is checked as source text instead, in
+//   tests/structure.test.js ("every class the page scripts set is styled by
+//   a stylesheet") and tests/report-template.test.js (the colour, contrast
+//   and motion rules).
+// - No real HTML parsing. innerHTML keeps the raw string and strips tags for
+//   textContent; it never builds elements from markup, so structure that
+//   arrived that way cannot be asserted.
+// - Single compound selectors only (tag, #id, .class, [attr="value"],
+//   :checked): no descendant combinators, no :not(), no :nth-child(). A
+//   selector like "a .b" quietly matches nothing.
+// - getElementById never returns null: an id no test listed is created on the
+//   spot as a plain div, so a script asking for an element the real page does
+//   not have passes here and breaks in Firefox.
+// - No focus, keyboard or input behaviour. focus() only records that it was
+//   called, there is no document.activeElement and no tab order, and no event
+//   carries key, input or coordinate data: only click, and the change a
+//   checkbox click fires, is really dispatched.
+// - No timers, requestAnimationFrame, observers or getComputedStyle: a test
+//   supplies those as sandbox globals when the script under test needs them.
+//
+// Anything that needs a real paint - an animation replaying, a colour gliding,
+// a row fading out on search - is a manual check; the README's "Checking a
+// change by eye" has the recipe.
 
 // Parses a single compound selector (no descendant combinators) into
 // {tag, classes[], attrs{}, pseudos[]} once, so matching against many
