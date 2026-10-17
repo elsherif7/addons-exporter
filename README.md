@@ -189,7 +189,7 @@ Bug reports and feature requests are welcome via [GitHub Issues](https://github.
 **Running the tests**
 
 ```
-npm test                                   # everything (needs Node 20 or newer)
+npm test                                   # everything (needs Node 22 or newer)
 node --test tests/import.test.js           # one file
 node --test --test-name-pattern="zip"      # tests whose name contains "zip"
 npm run test:coverage                      # coverage of src/ (needs `npm ci` once; also writes coverage/index.html)
@@ -198,6 +198,8 @@ npm run clean                              # delete throwaway output (node_modul
 ```
 
 Both `npm run lint:ext` and a `web-ext` you run yourself read their ignore list from `.web-ext-config.mjs`, so the tests, the tooling and the other files that are not part of the extension stay out of the lint report and out of any package.
+
+`npm run lint:ext` finishes with 0 errors, 0 notices and 2 warnings. Both say the same thing, once for desktop and once for Android: `data_collection_permissions` is a key web-ext only expects from Firefox 140 (`KEY_FIREFOX_UNSUPPORTED_BY_MIN_VERSION`) and Firefox for Android 142 (`KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION`), while `strict_min_version` is 128. The 128 floor is deliberate: it is the first version that accepts that key without an error, and a Firefox that does not know a key ignores it, so raising the floor to 140 would only drop support for Firefox 128–139. The two warnings are expected, not something to fix.
 
 `npm run clean` deletes only output this project's tools made and can make again: `node_modules`, `coverage`, `web-ext-artifacts`, Python caches, and stray `*.zip`/`*.xpi` exports at the project root. It never opens `.git`, `tests`, or any `fixtures` folder, and it leaves an archive parked in a subfolder alone. `npm run clean -- --dry-run` lists what it would delete without deleting anything.
 

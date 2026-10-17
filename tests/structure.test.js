@@ -475,6 +475,12 @@ test('a11y: status messages are polite live regions', () => {
 // - 127: MV3 host permissions are granted at install (the AMO lookups need them)
 // - 128: the first version that accepts data_collection_permissions without an error
 // - 112: element.inert (the reset dialog) and linear() easing
+//
+// web-ext warns twice about that floor, because the key it looks for,
+// data_collection_permissions, is only expected from Firefox 140 (142 on
+// Android). Both warnings are deliberate: a Firefox that does not know a key
+// ignores it, and 128 is what the rest of the extension needs, so neither
+// warning is a reason to raise the floor. The README explains both by name.
 test('manifest: strict_min_version is at least 128 and the README states the same', () => {
   const manifest = JSON.parse(readSrc('manifest.json'));
   const min = manifest.browser_specific_settings.gecko.strict_min_version;
@@ -482,6 +488,9 @@ test('manifest: strict_min_version is at least 128 and the README states the sam
   assert.ok(manifest.browser_specific_settings.gecko.data_collection_permissions, 'data_collection_permissions is declared');
   const readme = readSrc('README.md');
   assert.match(readme, new RegExp(`Requires Firefox ${parseInt(min, 10)} or newer`), 'README states the same minimum version');
+  for (const code of ['KEY_FIREFOX_UNSUPPORTED_BY_MIN_VERSION', 'KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION']) {
+    assert.ok(readme.includes(code), `README explains the ${code} warning instead of leaving it unexplained`);
+  }
 });
 
 // web-ext reads .web-ext-config.mjs for every command, so `web-ext lint` and
@@ -496,5 +505,14 @@ test('web-ext config: development-only files are ignored, however web-ext is sta
   // The report's build input is a real script the linter should see, so it must
   // not be in the list.
   assert.ok(!config.includes('report-inline.js'), 'report-inline.js should be linted, not ignored');
-  assert.match(readSrc('package.json'), /"lint:ext": "npx --yes web-ext@8\.10\.0 lint"/, 'lint:ext must rely on the config file, not a repeated ignore list');
+  assert.match(readSrc('package.json'), /"lint:ext": "npx --yes web-ext@10\.8\.0 lint"/, 'lint:ext must rely on the config file, not a repeated ignore list');
+});
+
+// Node 20 reached end of life in April 2026, so the project asks for the
+// oldest Node that is still supported. The README states the same number, so a
+// reader is never told something the tooling does not ask for.
+test('tooling: package.json and the README agree on the Node version', () => {
+  const { engines } = JSON.parse(readSrc('package.json'));
+  const major = engines.node.replace(/[^0-9]/g, '');
+  assert.match(readSrc('README.md'), new RegExp(`needs Node ${major} or newer`), 'README states the same Node version');
 });
