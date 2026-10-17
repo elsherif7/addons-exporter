@@ -29,7 +29,7 @@ const PIECES = [
   'Ünïcödé', '😀 emoji', 'x'.repeat(200), '<b>tag</b>', '</script>', '&amp;', '# not a comment', ',', '"', '|',
 ];
 const TYPES = ['extension', 'theme'];
-const LINK_TYPES = ['amo-exact', 'amo-search', 'homepage', 'search-fallback'];
+const LINK_TYPES = ['amo-exact', 'amo-search', 'homepage', 'amo-search-fallback'];
 
 function makeList(seed, size) {
   const r = rng(seed);

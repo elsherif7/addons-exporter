@@ -64,9 +64,9 @@ function dedupeAddons(list) {
 //   format 1: { "formatVersion": 1, "addons": [ ... ] } (what the release on addons.mozilla.org wrote)
 // Anything else - another key, a missing field, a field of the wrong type - is
 // rejected as a whole, naming the first problem, rather than guessed at.
-// Pulled out of loadFile() as a pure function so it can be unit tested without
-// a DOM. Throws if jsonText is present but isn't valid JSON - loadFile()'s
-// try/catch handles that.
+// Pulled out of parseChosenFile() as a pure function so it can be unit tested without
+// a DOM. Throws if jsonText is present but isn't valid JSON - the caller's
+// try/catch (parseChosenFile() in import.js) handles that.
 // The field order of an entry in each file: the HTML report's embedded data
 // (also what the AMO release wrote) starts with the id; the JSON export lists
 // the name first and the id last. A file must use its own format's order.
@@ -152,7 +152,7 @@ function parseAddonsPayload(jsonText, entryKeys = HTML_ENTRY_KEYS, fileType = 'h
 
 // Validates and parses a JSON export file's text content. Same return
 // shape as validateAddonsPayload(): { ok, addons, source } or { ok: false, error }.
-// Throws on malformed JSON - loadFile()'s try/catch handles it.
+// Throws on malformed JSON - the caller's try/catch handles it.
 function parseJsonPayload(text) {
   return validateAddonsPayload(JSON.parse(text), JSON_ENTRY_KEYS, 'json');
 }

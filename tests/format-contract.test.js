@@ -11,7 +11,7 @@
 //      if the Importer must still read it (then keep a reader for it, in
 //      migrateAddonsData() and the parsers), or not.
 //   2. Bump EXPORT_FORMAT_VERSION in src/common/core.js (the settings file has
-//      its own SETTINGS_FILE_FORMAT_VERSION in src/settings/settings.js).
+//      its own SETTINGS_FILE_FORMAT_VERSION in src/settings/settings-file.js).
 //   3. Update CONTRACT below, with the new version number.
 // Changing only the page's look (HTML/CSS) must never need any of this.
 

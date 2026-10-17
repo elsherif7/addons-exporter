@@ -145,17 +145,11 @@ async function listInstalledAddons() {
 // lifetime tracker.
 //
 // A known workaround (confirmed working as of 2025) is to call any
-// browser.* API on a short interval, e.g.:
-//   self.setInterval(() => browser.runtime.getPlatformInfo(), 20000)
-// This converts the event page into an effectively persistent background
-// script. It has not been adopted here because the existing two mechanisms
-// above already cover the normal export window (up to the 90s deadline
-// below), and making the background unconditionally persistent would prevent
-// Firefox from ever reclaiming its memory between sessions. If future testing
-// shows exports are still being killed despite those two mechanisms (e.g. on
-// a very slow connection with a huge add-on list), the getPlatformInfo
-// interval is the recommended fix - scoped to the duration of doExport()
-// only, not the lifetime of the background script.
+// browser.* API on a short interval. doExport() below does exactly that:
+//   setInterval(() => browser.runtime.getPlatformInfo(), 20000)
+// scoped to the duration of the export only (cleared in its finally block), so
+// Firefox can still reclaim the background page's memory between exports.
+
 // After this much wall time spent on AMO lookups, stop attempting them
 // and fall back to a homepage/search link for whatever's left - large
 // lists could otherwise take a very long time (up to two 15s lookups per
@@ -208,44 +202,44 @@ async function doExport(ids, {
   try {
     list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
       let amoMatch = null;
-    // Whether this add-on's own lookup requests failed (network error,
-    // timeout, non-2xx). Kept per add-on and counted only if no AMO link came
-    // back in the end, so a failure the name search then rescued is not
-    // reported as a missing link while its link is a perfectly good AMO one.
-    let lookupFailed = false;
-    if (Date.now() < deadlineAt && consecutiveFailures < maxConsecutiveFailures) {
-      amoMatch = await findAmoPage(a.id, a.name, () => { lookupFailed = true; });
-      if (lookupFailed) {
-        consecutiveFailures++;
+      // Whether this add-on's own lookup requests failed (network error,
+      // timeout, non-2xx). Kept per add-on and counted only if no AMO link came
+      // back in the end, so a failure the name search then rescued is not
+      // reported as a missing link while its link is a perfectly good AMO one.
+      let lookupFailed = false;
+      if (Date.now() < deadlineAt && consecutiveFailures < maxConsecutiveFailures) {
+        amoMatch = await findAmoPage(a.id, a.name, () => { lookupFailed = true; });
+        if (lookupFailed) {
+          consecutiveFailures++;
+        } else {
+          consecutiveFailures = 0;
+        }
       } else {
-        consecutiveFailures = 0;
+        stats.lookupsSkipped++;
       }
-    } else {
-      stats.lookupsSkipped++;
-    }
 
-    let link;
-    let linkType;
-    if (amoMatch && isSafeUrl(amoMatch.url)) {
-      link = amoMatch.url;
-      linkType = amoMatch.matchType;
-      if (linkType === 'amo-exact') stats.amoExact++; else stats.amoSearch++;
-    } else {
-      // No AMO link for this add-on. Only a lookup that actually failed counts
-      // as a failure here: a clean "not on AMO" answer, an implausible name
-      // match, or a lookup skipped for the deadline simply gets a fallback
-      // link, and the success message words the two cases differently.
-      if (lookupFailed) stats.lookupFailures++;
-      if (a.homepageUrl && isSafeUrl(a.homepageUrl)) {
-        link = a.homepageUrl;
-        linkType = 'homepage';
-        stats.homepage++;
+      let link;
+      let linkType;
+      if (amoMatch && isSafeUrl(amoMatch.url)) {
+        link = amoMatch.url;
+        linkType = amoMatch.matchType;
+        if (linkType === 'amo-exact') stats.amoExact++; else stats.amoSearch++;
       } else {
-        link = amoSearchUrl(a.name);
-        linkType = 'amo-search-fallback';
-        stats.searchFallback++;
+        // No AMO link for this add-on. Only a lookup that actually failed counts
+        // as a failure here: a clean "not on AMO" answer, an implausible name
+        // match, or a lookup skipped for the deadline simply gets a fallback
+        // link, and the success message words the two cases differently.
+        if (lookupFailed) stats.lookupFailures++;
+        if (a.homepageUrl && isSafeUrl(a.homepageUrl)) {
+          link = a.homepageUrl;
+          linkType = 'homepage';
+          stats.homepage++;
+        } else {
+          link = amoSearchUrl(a.name);
+          linkType = 'amo-search-fallback';
+          stats.searchFallback++;
+        }
       }
-    }
       reportProgress();
       return { id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
     });
