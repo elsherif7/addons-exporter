@@ -98,7 +98,9 @@ function createAddonList({ listEl, countEl, actionBtn, selectAllBtn, deselectAll
 
   // Shows the groups built by createAddonGroups() and makes every checkbox
   // update the count. The page updates the count itself once it has finished
-  // its own bits of rendering.
+  // its own bits of rendering. Redrawing an already-searched list (the
+  // Importer, when another export is chosen) applies the query again, so the
+  // search box and the rows can never end up disagreeing.
   function render(outerBox) {
     const fragment = document.createDocumentFragment();
     fragment.appendChild(outerBox);
@@ -106,6 +108,7 @@ function createAddonList({ listEl, countEl, actionBtn, selectAllBtn, deselectAll
     checkboxes().forEach((cb) => {
       cb.addEventListener('change', updateSelectionCount);
     });
+    if (searchInput.value) applySearch();
   }
 
   function applySearch() {

@@ -7,7 +7,7 @@
 const assert = require('assert');
 const { test, testAsync, readSrc, readSrcs, makeSandbox } = require('./helpers');
 
-function load({ sendMessage, tabsUpdate, tabsCreate, openOptionsPage } = {}) {
+function load({ sendMessage, tabsUpdate, tabsCreate, windowsUpdate, openOptionsPage } = {}) {
   const handlers = {};
   const calls = [];
   const sb = makeSandbox({
@@ -18,7 +18,7 @@ function load({ sendMessage, tabsUpdate, tabsCreate, openOptionsPage } = {}) {
         create: tabsCreate || (async (o) => { calls.push(['tabs.create', o.url]); }),
         update: tabsUpdate || (async (id, props) => { calls.push(['tabs.update', id, props.active]); }),
       },
-      windows: { update: async (id, props) => { calls.push(['windows.update', id, props.focused]); } },
+      windows: { update: windowsUpdate || (async (id, props) => { calls.push(['windows.update', id, props.focused]); }) },
       runtime: {
         getURL: (p) => `moz-extension://x/${p}`,
         openOptionsPage: openOptionsPage || (async () => { calls.push(['openOptionsPage']); }),
@@ -54,6 +54,15 @@ testAsync('popup: if the open tab cannot be focused (it has just closed), a new 
   });
   await handlers.importBtn();
   assert.deepStrictEqual(calls, [['tabs.create', 'moz-extension://x/src/import/import.html'], ['close']]);
+});
+
+testAsync('popup: a window that cannot be brought forward still focuses the tab, without opening a second one', async () => {
+  const { handlers, calls } = load({
+    sendMessage: async () => ({ tabId: 7, windowId: 3 }),
+    windowsUpdate: async () => { throw new Error('Invalid window ID: 3'); },
+  });
+  await handlers.exportBtn();
+  assert.deepStrictEqual(calls, [['tabs.update', 7, true], ['close']], 'the tab is focused and the page is not opened twice');
 });
 
 testAsync('popup: if asking fails or the answer is junk, a new tab is opened', async () => {

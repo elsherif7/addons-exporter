@@ -235,6 +235,29 @@ testAsync('doExport: stops attempting AMO lookups after enough consecutive failu
   assert.ok(fetchCallCount < 12, `expected the breaker to cut lookups short, got ${fetchCallCount} fetch calls`);
 });
 
+testAsync('doExport: a lookup failure the name search rescues is not reported as a lost link', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('/addons/addon/')) throw new Error('network down'); // the exact lookup fails outright
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ results: [{ url: 'https://addons.mozilla.org/en-US/firefox/addon/test-addon/', name: { 'en-US': 'Test Addon' } }] }),
+    };
+  };
+  const result = await runDoExportWithOptions([baseAddon], fetchImpl, {});
+  assert.strictEqual(result.stats.amoSearch, 1, 'the name search did find the add-on');
+  assert.strictEqual(result.stats.lookupFailures, 0, 'so no link was lost to report');
+  const dataMatch = result.files[0].content.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/);
+  assert.strictEqual(JSON.parse(dataMatch[1]).addons[0].linkType, 'amo-search');
+});
+
+testAsync('doExport: a lookup that fails outright is reported as a lost link', async () => {
+  const fetchImpl = async () => { throw new Error('network down'); };
+  const result = await runDoExportWithOptions([baseAddon], fetchImpl, {});
+  assert.strictEqual(result.stats.lookupFailures, 1);
+  assert.strictEqual(result.stats.searchFallback, 1);
+});
+
 testAsync('doExport: stats reflect a mix of exact, homepage, and fallback outcomes', async () => {
   const addons = [
     { id: 'exact@x', name: 'Exact Match', version: '1', enabled: true, type: 'extension' },

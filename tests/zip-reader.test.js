@@ -306,6 +306,37 @@ testAsync('Importer: a .zip with different exports shows a picker ("All add-ons"
   assert.deepStrictEqual(shownNames(elements), ['Alpha', 'Gamma']);
 });
 
+testAsync('Importer: a search in progress survives the export picker redrawing the list', async () => {
+  const { sandbox, elements } = bootImporter();
+  sandbox.setSelectedFiles([
+    textFile('first.json', addonJson([['Alpha', 'a@x']])),
+    textFile('second.json', addonJson([['Beta', 'b@x'], ['Gamma', 'c@x']])),
+  ]);
+  await settle();
+
+  const options = () => elements.exportPickList.querySelectorAll('.export-pick-option');
+  const rowsShowing = () => elements.addonList.querySelectorAll('.addon-row')
+    .filter((r) => r.style.display !== 'none')
+    .map((r) => r.querySelector('.addon-name').textContent);
+
+  elements.searchInput.value = 'beta';
+  elements.searchInput.dispatchEvent({ type: 'input' });
+  assert.deepStrictEqual(rowsShowing(), ['Beta'], 'the search hides every other row');
+
+  options()[2].click(); // first.json: Alpha only - nothing here matches "beta"
+  assert.deepStrictEqual(shownNames(elements), ['Alpha'], 'the chosen export is drawn');
+  assert.strictEqual(elements.searchInput.value, 'beta', 'the search box still holds the query');
+  assert.deepStrictEqual(rowsShowing(), [], 'and the new rows answer it, rather than the box disagreeing with the list');
+  assert.strictEqual(elements.noSearchMatches.style.display, 'block', 'so the "no matches" note is shown');
+  assert.strictEqual(elements.addonList.style.display, 'none', 'and the list itself is out of the way');
+
+  options()[1].click(); // second.json: Beta, Gamma
+  assert.deepStrictEqual(shownNames(elements), ['Beta', 'Gamma']);
+  assert.deepStrictEqual(rowsShowing(), ['Beta'], 'the export that does match answers the search');
+  assert.strictEqual(elements.addonList.style.display, 'block', 'the list is back');
+  assert.strictEqual(elements.noSearchMatches.style.display, 'none', 'and the note goes with the query it answered');
+});
+
 test('Importer: .zip is an accepted file type, and the page lists the zip reader before import.js', () => {
   const s = bootImporter().sandbox;
   assert.strictEqual(s.validateSelectedFile({ name: 'x.zip', size: 10 }).ok, true);

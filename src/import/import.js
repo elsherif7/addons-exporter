@@ -148,6 +148,15 @@ function renderAddonList(addons, installed, shorten) {
   alreadyInstalled.sort(byName);
   displayItems = [...notInstalled, ...alreadyInstalled];
 
+  // Every container is shown first, then the rows are drawn: render() applies
+  // an active search itself, so it has to come last or its filtering (and the
+  // "no matches" note) would be undone here.
+  addonListEl.style.display = 'block';
+  checklistBoxEl.style.display = 'block';
+  listControls.style.display = 'flex';
+  searchInput.style.display = 'block';
+  noSearchMatchesEl.style.display = 'none';
+
   list.render(createAddonGroups(
     [
       { title: 'Not Installed Yet', items: notInstalled, isInstalled: false },
@@ -155,11 +164,6 @@ function renderAddonList(addons, installed, shorten) {
     ],
     (a, i, group) => createAddonRow(a, i, group.isInstalled, shorten)
   ));
-  addonListEl.style.display = 'block';
-  checklistBoxEl.style.display = 'block';
-  listControls.style.display = 'flex';
-  searchInput.style.display = 'block';
-  noSearchMatchesEl.style.display = 'none';
 
   const notes = [];
   if (notInstalled.length === 0 && alreadyInstalled.length > 0) {

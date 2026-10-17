@@ -10,7 +10,12 @@ async function openOrFocus(page) {
       const found = await browser.runtime.sendMessage({ type: 'whereIsPage', page });
       if (found && Number.isInteger(found.tabId)) {
         await browser.tabs.update(found.tabId, { active: true });
-        if (Number.isInteger(found.windowId)) await browser.windows.update(found.windowId, { focused: true });
+        // Bringing the window forward too is a nicety on top: if that fails
+        // (the window closed in between), the page is still on screen and
+        // focusing succeeded - falling through here would open a second tab.
+        try {
+          if (Number.isInteger(found.windowId)) await browser.windows.update(found.windowId, { focused: true });
+        } catch { /* the window went away - the tab itself is focused */ }
         return;
       }
     } catch { /* nobody answered, or the tab is gone - open a new one */ }

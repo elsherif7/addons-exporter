@@ -199,12 +199,15 @@ async function doExport(ids, {
 
   const list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
     let amoMatch = null;
+    // Whether this add-on's own lookup requests failed (network error,
+    // timeout, non-2xx). Kept per add-on and counted only if no AMO link came
+    // back in the end, so a failure the name search then rescued is not
+    // reported as a missing link while its link is a perfectly good AMO one.
+    let lookupFailed = false;
     if (Date.now() < deadlineAt && consecutiveFailures < maxConsecutiveFailures) {
-      let lookupFailed = false;
       amoMatch = await findAmoPage(a.id, a.name, () => { lookupFailed = true; });
       if (lookupFailed) {
         consecutiveFailures++;
-        stats.lookupFailures++;
       } else {
         consecutiveFailures = 0;
       }
@@ -218,14 +221,21 @@ async function doExport(ids, {
       link = amoMatch.url;
       linkType = amoMatch.matchType;
       if (linkType === 'amo-exact') stats.amoExact++; else stats.amoSearch++;
-    } else if (a.homepageUrl && isSafeUrl(a.homepageUrl)) {
-      link = a.homepageUrl;
-      linkType = 'homepage';
-      stats.homepage++;
     } else {
-      link = amoSearchUrl(a.name);
-      linkType = 'amo-search-fallback';
-      stats.searchFallback++;
+      // No AMO link for this add-on. Only a lookup that actually failed counts
+      // as a failure here: a clean "not on AMO" answer, an implausible name
+      // match, or a lookup skipped for the deadline simply gets a fallback
+      // link, and the success message words the two cases differently.
+      if (lookupFailed) stats.lookupFailures++;
+      if (a.homepageUrl && isSafeUrl(a.homepageUrl)) {
+        link = a.homepageUrl;
+        linkType = 'homepage';
+        stats.homepage++;
+      } else {
+        link = amoSearchUrl(a.name);
+        linkType = 'amo-search-fallback';
+        stats.searchFallback++;
+      }
     }
     reportProgress();
     return { id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
