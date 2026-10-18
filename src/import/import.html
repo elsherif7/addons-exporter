@@ -23,13 +23,10 @@
     background: var(--border-soft);
     transform: scale(1.01);
   }
-  /* The chosen-file chip slides in each time it's shown. */
   #fileNameRow { animation: hub-rise-in var(--motion-slow) var(--motion-spring) backwards; }
   #chooseFileBtn {
     padding: 12px 20px;
   }
-  /* A single file's name, or the count once several were chosen; the picker
-     below names the exports those files hold. */
   #fileName {
     display: block;
     font-size: 14px;
@@ -52,12 +49,9 @@
     --press-ring: rgba(239, 106, 94, 0.5);
   }
   #removeFileBtn:hover { color: var(--danger-color); }
-  /* The export picker, shown only when a .zip holds more than one distinct
-     export. The closed box borrows the add-on list's own "search-input"
-     styling; opening it drops a list of rows - styled exactly like the add-on
-     list rows, same padding, borders and little grow on hover - into the page,
-     pushing the search box and the list below it down (and back up when it
-     closes). */
+  /* Export picker, shown only when a .zip holds more than one distinct export.
+     The closed box borrows the list's "search-input" look and opening it pushes
+     the content below down. Its rows match the add-on rows. */
   #exportPickRow { margin-bottom: 10px; }
   .export-pick-trigger {
     display: flex;
@@ -68,7 +62,7 @@
     cursor: pointer;
     text-align: left;
   }
-  /* The caret, like the one a native dropdown shows - it flips while open. */
+  /* caret, flips while open */
   .export-pick-trigger::after {
     content: "";
     flex: none;
@@ -107,15 +101,12 @@
   .export-pick-option:last-child { border-bottom: none; }
   .export-pick-option:hover { background: var(--hover-bg); transform: scale(1.01); }
   .export-pick-option:active { transform: scale(0.985); }
-  /* The same darker hover the add-on rows use in the dark theme. */
   :root[data-theme="dark"] .export-pick-option:hover { background: #2e3340; }
-  /* The add-on rows' grow-on-hover is switched off under reduced motion in
-     shared.css; the picker's rows must match, so switch theirs off here. */
+  /* shared.css turns the rows' grow-on-hover off for reduced motion; the picker
+     rows must match */
   @media (prefers-reduced-motion: reduce) {
     .export-pick-option:hover { transform: none; }
   }
-  /* compareNote's notes each get their own line instead of running
-     together in one sentence. */
   .compare-note-line {
     display: block;
   }

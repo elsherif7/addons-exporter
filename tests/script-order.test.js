@@ -1,11 +1,7 @@
-// Script order is load-bearing: the extension's scripts are classic scripts
-// that share one global scope per context (the background, and each page), so
-// a script that uses a function from a file that is not loaded - or is loaded
-// AFTER it - only fails at runtime, in that one context. This reads the real
-// script lists (manifest.json for the background, the <script> tags of each
-// page) and checks, for every file in every context, that each shared
-// function or constant it uses comes from a file loaded earlier in the SAME
-// context. It also keeps page-only code out of the background.
+// classic scripts share one global scope per context (background, each page), so a
+// function from a file that's missing or loaded later only fails at runtime. this checks
+// every context's real script list (manifest.json, <script> tags) for that, and keeps
+// page-only code out of the background.
 
 const assert = require('assert');
 const fs = require('fs');
@@ -14,8 +10,7 @@ const { test, readSrc } = require('./helpers');
 
 const ROOT = path.join(__dirname, '..');
 
-// The shared libraries: their top-level names are what other scripts depend on.
-// (Page scripts - export.js, import.js, settings.js... - are consumers only.)
+// shared libraries, whose top-level names other scripts depend on. page scripts are consumers only.
 const LIBRARIES = [
   'src/common/theme.js',
   'src/common/core.js',
@@ -34,16 +29,14 @@ const LIBRARIES = [
   'src/settings/settings-file.js',
 ];
 
-// The code of a script with comments and string contents blanked out, so that
-// words in comments and text are not mistaken for uses. Template-literal
-// ${...} expressions are code and are kept. A "/" starts a regular expression
-// when the last real character before it cannot end an operand.
+// script code with comments and string contents blanked, so words in them don't count as uses.
+// ${...} in templates is code and is kept. a "/" starts a regex when the previous real
+// character can't end an operand.
 function codeOnly(src) {
   let out = '';
   let i = 0;
   let last = '';
   function template() {
-    // i is just after the opening backtick
     out += ' ';
     while (i < src.length && src[i] !== '`') {
       if (src[i] === '\\') { out += '  '; i += 2; continue; }
@@ -84,7 +77,6 @@ function codeOnly(src) {
     if (c === "'" || c === '"') { skipString(c); last = 'x'; continue; }
     if (c === '`') { i++; template(); last = 'x'; continue; }
     if (c === '/' && (last === '' || '(,=:[!&|?{};+-*%<>~^'.includes(last))) {
-      // regular expression literal
       out += ' '; i++;
       let inClass = false;
       while (i < src.length && (src[i] !== '/' || inClass)) {
@@ -105,8 +97,7 @@ function codeOnly(src) {
   return out;
 }
 
-// Names declared at the top level of a script (column 0, which is how every
-// file in this project is written).
+// top-level names of a script (column 0, how every file here is written)
 function topLevelNames(src) {
   const names = new Set();
   for (const m of src.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm)) names.add(m[1]);
@@ -114,7 +105,7 @@ function topLevelNames(src) {
   return names;
 }
 
-const definedIn = new Map(); // library name -> the file that declares it
+const definedIn = new Map(); // // library name -> the file that declares it
 for (const file of LIBRARIES) {
   for (const n of topLevelNames(readSrc(file))) {
     assert.ok(!definedIn.has(n), `${n} is declared in both ${definedIn.get(n)} and ${file}`);
@@ -122,7 +113,6 @@ for (const file of LIBRARIES) {
   }
 }
 
-// Every context the extension runs scripts in, with its scripts in load order.
 function contexts() {
   const list = [];
   const manifest = JSON.parse(readSrc('manifest.json'));
@@ -151,7 +141,7 @@ test('script order: every script in every context only uses shared names from fi
       const used = new Set(code.match(/[A-Za-z_$][\w$]*/g) || []);
       for (const name of used) {
         const owner = definedIn.get(name);
-        if (!owner || owner === file || own.has(name)) continue; // not shared, or its own
+        if (!owner || owner === file || own.has(name)) continue;
         if (!before.has(owner)) {
           problems.push(`${ctx.name}: ${file} uses ${name} (from ${owner}), which is not loaded before it`);
         }
@@ -185,7 +175,6 @@ test('script order: core.js comes first among the shared scripts of every contex
 });
 
 test('script order: no library file declares the same top-level name as another (they share one scope)', () => {
-  // Checked while building the table above - this just makes the intent a test.
   assert.ok(definedIn.size > 50, 'the table of shared names should be filled');
 });
 

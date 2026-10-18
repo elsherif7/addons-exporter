@@ -1,10 +1,3 @@
-// Tests for src/background/report-template.js. Loads the real source via
-// vm, same as the other test files, but needs no browser/fetch mocking at
-// all - buildHtmlReport(), buildJsonExport(), buildCsvExport(), and
-// buildTxtExport() are pure string templating with no browser.* dependency.
-// That's the point of splitting them out of background.js: this file can
-// be tested entirely on its own.
-
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -16,11 +9,7 @@ const reportTemplateSrc = readReportBuilders();
 const sandbox = makeSandbox({ URL }, commonSrc, reportTemplateSrc);
 const { buildHtmlReport, safeJsonForScriptTag, buildJsonExport, buildCsvExport } = sandbox;
 
-// REPORT_ICON_DATA_URI is declared with top-level `const` in
-// report-template.js, so (unlike the function declarations above) it
-// isn't copied onto the sandbox object - it only exists in the context's
-// own lexical scope. Evaluate it there directly instead of destructuring
-// it from sandbox, same as import.test.js does for EXPORT_FORMAT_VERSION.
+// top-level const, so it isn't on the sandbox object, eval it in the context
 const REPORT_ICON_DATA_URI = evalInContext(sandbox, 'REPORT_ICON_DATA_URI');
 
 const sampleList = [
@@ -88,9 +77,8 @@ test('buildHtmlReport: includes a theme toggle button', () => {
   assert.match(darkHtml, /id="themeToggle"/);
 });
 
-// Both icons ship in the markup and report.css shows the one data-theme calls
-// for, so no script ever swaps them (which is also what keeps the report's own
-// script free of innerHTML).
+// both icons are in the markup and css picks one, so the report script never
+// swaps them (keeps it free of innerHTML)
 test('buildHtmlReport: the toggle carries both icons, and report.css shows the one the theme calls for', () => {
   const html = buildHtmlReport(sampleList, 'light');
   assert.match(html, /class="theme-icon theme-icon-sun"/);
@@ -124,13 +112,6 @@ test('safeJsonForScriptTag: escapes U+2028 and U+2029 line separators for safe i
 });
 
 
-// --- REPORT_ICON_DATA_URI stays in sync with icon32.png ---
-// The report's favicon is a hand-pasted base64 blob with nothing else
-// tying it to the actual icon file - nothing would catch it going stale
-// if the icons are ever regenerated. REPORT_ICON_DATA_URI above is the
-// real value from the actual loaded report-template.js (not a copy),
-// compared here byte-for-byte against the real icon32.png file on disk.
-
 test('REPORT_ICON_DATA_URI: matches icons/icon32.png byte-for-byte', () => {
   const base64Payload = REPORT_ICON_DATA_URI.slice('data:image/png;base64,'.length);
   const embeddedBytes = Buffer.from(base64Payload, 'base64');
@@ -140,8 +121,6 @@ test('REPORT_ICON_DATA_URI: matches icons/icon32.png byte-for-byte', () => {
     'REPORT_ICON_DATA_URI no longer matches icons/icon32.png - re-encode it if the icon changed intentionally'
   );
 });
-
-// --- buildJsonExport ---
 
 test('buildJsonExport: returns valid JSON with a source and all addons', () => {
   const json = buildJsonExport(sampleList);
@@ -174,12 +153,10 @@ test('buildJsonExport: output is valid JSON even when names contain special char
   assert.doesNotThrow(() => JSON.parse(buildJsonExport(list)));
 });
 
-// --- buildCsvExport ---
-
 test('buildCsvExport: the first line is the start of the source, led by the byte-order mark', () => {
   const csv = buildCsvExport(sampleList);
   const firstLine = csv.split('\r\n')[0];
-  // A byte-order mark leads the file so Excel reads it as UTF-8.
+  // BOM so Excel reads it as UTF-8
   assert.match(firstLine, /^\uFEFF# addons-hub-source-formatVersion: \d+$/);
 });
 
@@ -199,7 +176,7 @@ test('buildCsvExport: the six source lines come first, then the header row', () 
 
 test('buildCsvExport: produces one data row per add-on', () => {
   const csv = buildCsvExport(sampleList);
-  // Lines: six source lines + header + N data rows
+  // six source lines + header, then the rows
   const dataRows = csv.split('\r\n').slice(7);
   assert.strictEqual(dataRows.length, sampleList.length);
 });
@@ -209,14 +186,13 @@ test('buildCsvExport: enabled field is "true" or "false" (not 1/0)', () => {
   const rows = csv.split('\r\n').slice(7);
   for (const row of rows) {
     const fields = row.split(',');
-    // enabled is the 4th column (index 3)
     assert.ok(fields[3] === 'true' || fields[3] === 'false', `expected true/false, got "${fields[3]}"`);
   }
 });
 
 test('buildCsvExport: fields containing commas are quoted per RFC 4180', () => {
   const list = [{ id: 'x@e.com', name: 'Hello, World', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
-  const csv = buildCsvExport(list, false); // full names: this is about CSV quoting, not shortening
+  const csv = buildCsvExport(list, false);
   const dataRow = csv.split('\r\n')[7];
   assert.match(dataRow, /"Hello, World"/);
 });
@@ -232,15 +208,11 @@ test('buildCsvExport: all seven columns are present on every data row', () => {
   const csv = buildCsvExport(sampleList);
   const rows = csv.split('\r\n').slice(7);
   for (const row of rows) {
-    // A naive split on comma works here since our sample data has no
-    // commas inside fields - just check the column count is right.
-    // (RFC 4180 quoting is tested separately above.)
+    // plain split is fine, the sample data has no commas inside fields
     const fields = row.split(',');
     assert.strictEqual(fields.length, 7, `expected 7 columns, got ${fields.length} in row: ${row}`);
   }
 });
-
-// --- A24: CSV/formula-injection guard ---
 
 test('buildCsvExport: a name starting with = gets a leading-apostrophe guard', () => {
   const list = [{ id: 'x@e.com', name: '=HYPERLINK("https://evil.example","click")', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
@@ -252,7 +224,7 @@ test('buildCsvExport: a name starting with = gets a leading-apostrophe guard', (
 test('buildCsvExport: names starting with +, -, @, or a tab all get the guard', () => {
   for (const name of ['+SUM(1,1)', '-1+1', '@cmd', '\tstart-with-tab']) {
     const list = [{ id: 'x@e.com', name, version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }];
-    const csv = buildCsvExport(list, false); // full names: this is about the guard, not shortening
+    const csv = buildCsvExport(list, false);
     const dataRow = csv.split('\r\n')[7];
     assert.ok(dataRow.includes(`'${name}`), `expected a guarded "${name}" in row: ${dataRow}`);
   }
@@ -265,14 +237,10 @@ test('buildCsvExport: an ordinary name is not guarded', () => {
   assert.ok(dataRow.startsWith('uBlock Origin,1.0,'), `should not be guarded: ${dataRow}`);
 });
 
-// --- CSS drift-detection: report.css vs shared.css ---
-// The report embeds its own copy of shared layout CSS since it's a
-// standalone file. These tests catch drift between the two copies for
-// rules that must stay in sync. Intentional differences are excluded:
-// - --btn-disabled-bg - the report
-//   has no primary-btn or checkbox-disabled states
-// - Flex/checkbox layout on .addon-row (report rows have no checkboxes)
-// - margin-left on .addon-version (report compensates without flex)
+// report.css is a standalone copy of some shared.css rules, these catch drift.
+// Left out on purpose: --btn-disabled-bg, the flex/checkbox layout on
+// .addon-row, margin-left on .addon-version (the report has no checkboxes or
+// disabled buttons).
 
 const sharedCssSrc = fs.readFileSync(
   path.join(__dirname, '..', 'src/common/shared.css'), 'utf8'
@@ -281,13 +249,9 @@ const reportTemplateSrcRaw = fs.readFileSync(
   path.join(__dirname, '..', 'src/background/report.css'), 'utf8'
 );
 
-// Extracts the first value of a CSS property within a named selector block
-// from a raw CSS/JS string. Looks for "selector { ... property: value ... }".
 function extractCssProp(src, selector, property) {
-  // Escape selector for regex
   const sel = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const propName = property.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Find the block for this selector and pull the property value
   const blockRe = new RegExp(sel + '\\s*\\{([^}]+)\\}');
   const block = src.match(blockRe);
   if (!block) return null;
@@ -296,7 +260,6 @@ function extractCssProp(src, selector, property) {
   return prop ? prop[1].trim() : null;
 }
 
-// Selectors and properties that must be identical in both files.
 const sharedRules = [
   ['.card', 'border'],
   ['.groups-outer-box', 'border'],
@@ -349,14 +312,11 @@ for (const [selector, property] of sharedRules) {
   });
 }
 
-// --- CSS custom properties: one source (tokens.css) ---
-// The colour and motion variables are defined once, in src/common/tokens.css.
-// The pages load it before shared.css; the report gets it built in (see
-// scripts/build-assets.js). So neither shared.css nor report.css may declare
-// its own :root block - that would be a second source that could drift.
+// colour and motion variables live only in tokens.css, so neither shared.css
+// nor report.css may have its own :root block
 
-// Line endings normalised to "\n", exactly as scripts/build-assets.js does, so
-// the REPORT_CSS comparison below holds whether the working tree is LF or CRLF.
+// same LF normalising as scripts/build-assets.js, so the REPORT_CSS comparison
+// holds on a CRLF checkout
 const lf = (text) => text.replace(/\r\n/g, '\n');
 const tokensCssSrc = lf(fs.readFileSync(path.join(__dirname, '..', 'src/common/tokens.css'), 'utf8'));
 
@@ -386,11 +346,7 @@ test('tokens: every full page loads tokens.css before shared.css', () => {
   }
 });
 
-// --- A18: --text-faint meets WCAG AA contrast against --card-bg ---
-// A17: the search input's :focus-visible outline color meets the 3:1
-// minimum for UI components, in both themes.
-// Reads the actual CSS variable values (via extractCssVars above) rather
-// than hardcoding colors, so this stays honest if the palette changes.
+// reads the real css variables instead of hardcoding colours, so it follows palette changes
 
 function relLuminance(hex) {
   hex = hex.replace('#', '');
@@ -432,8 +388,6 @@ test('A22: the report has a prefers-reduced-motion rule', () => {
   assert.match(reportTemplateSrcRaw, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
-// --- A36: the report's tip no longer overstates what the Importer does ---
-
 test('A36: the report tip does not claim every link opens automatically', () => {
   assert.doesNotMatch(reportTemplateSrc, /open every link below as a tab automatically/);
 });
@@ -442,11 +396,7 @@ test('A36: the report tip accurately describes selecting the file and pre-select
   assert.match(reportTemplateSrc, /select this file[\s\S]{0,80}pre-selected to open/);
 });
 
-// --- the generated assets file is in sync with its sources ---
-// report.css, report-inline.js and icons/icon32.png are built into
-// report-assets.generated.js by scripts/build-assets.js. This catches the case
-// where a source was edited but `npm run build` wasn't re-run.
-
+// catches editing a source without re-running `npm run build`
 test('report-assets.generated.js is in sync with report.css, report-inline.js and the icon', () => {
   const { buildAssets, OUT_PATH } = require('../scripts/build-assets');
   assert.strictEqual(
@@ -461,8 +411,6 @@ test('the report embeds REPORT_CSS: tokens.css, then report.css', () => {
   assert.strictEqual(evalInContext(sb, 'REPORT_CSS'), css);
 });
 
-
-// --- TXT: escaping, so a name can never break the line layout ---
 
 const awkwardTxtList = [
   { id: 'nl@example.com', name: 'Line\nBreak\r\nTool', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/a', linkType: 'homepage' },

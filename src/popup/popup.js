@@ -1,26 +1,24 @@
-// Export and Import bring an already-open Exporter / Importer tab to the front
-// instead of opening a second one (like Settings, whose page the browser
-// reuses itself). Each of those pages answers { type: 'whereIsPage', page }
-// with its own tab - see answerWhereIsPage() in src/common/page-ui.js. If none
-// answers (or the tab has just closed), a new tab is opened. The popup closes
-// either way - nothing below is allowed to leave it open.
+// Export and Import focus an already-open Exporter/Importer tab instead of
+// opening a second one. Each of those pages answers { type: 'whereIsPage',
+// page } with its own tab (answerWhereIsPage() in common/page-ui.js). If
+// nobody answers, or the tab just closed, a new tab opens. The popup always
+// closes, whatever happens.
 async function openOrFocus(page) {
   try {
     try {
       const found = await browser.runtime.sendMessage({ type: 'whereIsPage', page });
       if (found && Number.isInteger(found.tabId)) {
         await browser.tabs.update(found.tabId, { active: true });
-        // Bringing the window forward too is a nicety on top: if that fails
-        // (the window closed in between), the page is still on screen and
-        // focusing succeeded - falling through here would open a second tab.
+        // Raising the window is a bonus. If it fails the tab is already
+        // focused, and falling through would open a second one.
         try {
           if (Number.isInteger(found.windowId)) await browser.windows.update(found.windowId, { focused: true });
-        } catch { /* the window went away - the tab itself is focused */ }
+        } catch { /* window went away, the tab is focused anyway */ }
         return;
       }
-    } catch { /* nobody answered, or the tab is gone - open a new one */ }
+    } catch { /* nobody answered, or the tab is gone */ }
     await browser.tabs.create({ url: browser.runtime.getURL(`src/${page}/${page}.html`) });
-  } catch { /* even that failed - the popup still has to close */ } finally {
+  } catch { /* the popup still has to close */ } finally {
     window.close();
   }
 }
@@ -31,10 +29,9 @@ document.getElementById('importBtn').addEventListener('click', () => openOrFocus
 document.getElementById('settingsBtn').addEventListener('click', async () => {
   try {
     await browser.runtime.openOptionsPage();
-    // An already-open Settings tab is reused rather than reloaded, so ask it
-    // to play its entrance again. Harmless if it was just opened.
+    // an open Settings tab is reused, not reloaded, so ask it to replay its entrance
     try { await browser.runtime.sendMessage({ type: 'replaySettingsEntrance' }); } catch { /* nothing listening */ }
-  } catch { /* the options page could not be opened - the popup still has to close */ } finally {
+  } catch { /* the popup still has to close */ } finally {
     window.close();
   }
 });

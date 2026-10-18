@@ -1,41 +1,33 @@
-// Reads the export files out of a .zip, so the Importer can open the .zip the
-// Exporter writes when several formats are ticked (and a .zip made by any
-// other tool). Pure: no page, no extension APIs - only the standard Blob,
-// DecompressionStream and TextDecoder plus the shared CRC-32
-// (src/common/crc32.js), so it can be tested on its own.
+// Reads the export files out of a .zip, so the Importer can open the zip the
+// Exporter writes when several formats are ticked, or one made by any other
+// tool. Pure: only Blob, DecompressionStream, TextDecoder and the shared
+// CRC-32 (common/crc32.js).
 //
-// What it supports: files that are stored or deflated (the two methods every
-// zip tool uses), UTF-8 text, any number of entries. What it refuses, with a
-// plain message instead of guessing: encrypted entries, zip64 (archives over
-// 4 GB), split archives, a damaged entry (its CRC does not match), an entry
-// bigger than the limit it is given, and export files that together would take
-// more memory than a real export ever needs.
+// Handles stored and deflated entries, UTF-8 text, any number of entries.
+// Refuses with a plain message rather than guessing: encrypted entries,
+// zip64, split archives, a damaged entry (CRC mismatch), an entry over the
+// given size limit, and export files that together need more memory than a
+// real export would.
 //
 // readZipEntries(bytes, { extensions, maxEntryBytes }) resolves to
-//   { ok: true, entries: [{ name, text }] }   - only the entries whose file
-//                                               name ends in one of `extensions`,
-//                                               in the order they are in the zip
-//   { ok: false, error }                      - one readable sentence
-// It never rejects: every failure becomes { ok: false, error }.
+//   { ok: true, entries: [{ name, text }] }  only entries whose name ends in
+//                                            one of `extensions`, in zip order
+//   { ok: false, error }                     one readable sentence
+// It never rejects.
 
 const ZIP_EOCD_SIGNATURE = 0x06054b50;
 const ZIP_CENTRAL_SIGNATURE = 0x02014b50;
 const ZIP_LOCAL_SIGNATURE = 0x04034b50;
 const ZIP_MAX_COMMENT = 0xFFFF;
 const ZIP_MAX_ENTRIES_READ = 50; // an export holds at most one file per format
-// The wanted entries together, however many of them there are: the per-entry
-// limit alone still lets a 50-entry zip declare (and then hold) fifty files
-// just under it. A real export is a handful of formats of one list, so this is
-// far above anything genuine while keeping the worst case small.
+// All wanted entries together. The per-entry limit alone would still let 50
+// entries each sit just under it. Far above any real export.
 const ZIP_MAX_TOTAL_BYTES = 64 * 1024 * 1024;
-
-// An entry's checksum is checked with zipCrc32() from src/common/crc32.js - the
-// very same function the writer stamps entries with.
 
 const unzipError = (detail) => ({ ok: false, error: `This isn't a .zip file the Importer can read (${detail}).` });
 
-// Finds the "end of central directory" record by looking back from the end of
-// the file (a comment of up to 64 KB can follow it). Returns its offset or -1.
+// Looks back from the end for the "end of central directory" record (a comment
+// of up to 64 KB can follow it). Returns its offset or -1.
 function findZipEnd(view) {
   const last = view.byteLength - 22;
   const first = Math.max(0, last - ZIP_MAX_COMMENT);
@@ -45,8 +37,8 @@ function findZipEnd(view) {
   return -1;
 }
 
-// Inflates raw deflate data, giving up as soon as more than `limit` bytes come
-// out (so a tiny zip that expands to gigabytes cannot fill the memory).
+// Inflates raw deflate data and gives up once more than `limit` bytes come out,
+// so a tiny zip can't expand to gigabytes.
 async function unzipInflate(bytes, limit) {
   const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
   const chunks = [];
@@ -101,7 +93,7 @@ async function readZipEntries(bytes, { extensions, maxEntryBytes }) {
       const name = decoder.decode(bytes.subarray(pos + 46, pos + 46 + nameLength));
       pos += 46 + nameLength + extraLength + commentLength;
 
-      // Folders, the "__MACOSX" copies and "._" files macOS adds are not exports.
+      // skip folders and the __MACOSX / ._ files macOS adds
       const baseName = name.slice(name.lastIndexOf('/') + 1);
       if (name.endsWith('/') || name.startsWith('__MACOSX/') || baseName.startsWith('._')) continue;
       const dot = baseName.lastIndexOf('.');

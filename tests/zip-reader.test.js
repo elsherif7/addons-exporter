@@ -1,7 +1,6 @@
-// The .zip reader (src/import/zip-reader.js) and the Importer opening a .zip.
-// Zips are built here byte by byte, so the odd ones (encrypted, damaged,
-// zip64, oversized) can be made on purpose; the real-tool ones come from
-// Python's zipfile and from this extension's own writer (background/zip.js).
+// the zip reader (src/import/zip-reader.js) and the Importer opening a .zip.
+// zips are hand-built byte by byte so the odd ones (encrypted, damaged, zip64, oversized)
+// can exist; real-tool ones come from Python's zipfile and our own writer (background/zip.js)
 
 const assert = require('assert');
 const zlib = require('zlib');
@@ -47,8 +46,6 @@ function makeZip(entries, { comment = '' } = {}) {
   return new Uint8Array(Buffer.concat([...parts, centralBuf, end, Buffer.from(comment)]));
 }
 
-// --- what it reads ---
-
 testAsync('zip reader: reads stored and deflated entries, in the order they are in the zip', async () => {
   const r = await read(makeZip([
     { name: 'a.json', data: '{"a":1}', method: 'store' },
@@ -80,7 +77,7 @@ testAsync('zip reader: reads a zip made by Python\'s zipfile (deflated, with a c
     'z.close()',
     'sys.stdout.buffer.write(b.getvalue())',
   ].join('\n')]);
-  if (py.status !== 0) return; // no Python here: the hand-built zips above and below still cover the format
+  if (py.status !== 0) return;  // no python here, the hand-built zips still cover the format
   const r = await read(new Uint8Array(py.stdout));
   assert.strictEqual(r.ok, true);
   assert.deepStrictEqual(r.entries.map((e) => e.name), ['export/list.json']);
@@ -108,8 +105,6 @@ testAsync('zip reader: a zip comment after the directory is allowed', async () =
   const r = await read(makeZip([{ name: 'a.txt', data: 'hi' }], { comment: 'a comment' }));
   assert.strictEqual(r.entries[0].text, 'hi');
 });
-
-// --- what it refuses, in plain words ---
 
 const refused = async (bytes, pattern, max) => {
   const r = await read(bytes, max);
@@ -149,7 +144,7 @@ testAsync('zip reader: refuses an entry whose content does not match its checksu
 
 testAsync('zip reader: refuses an entry bigger than the limit, as declared and as it really unpacks', async () => {
   await refused(makeZip([{ name: 'a.json', data: 'x'.repeat(200) }]), /too large/, 100);
-  // A small zip that claims to be small but unpacks to far more: stopped while unpacking.
+  // claims to be small but unpacks to far more: stopped while unpacking
   const bomb = makeZip([{ name: 'a.json', data: 'x'.repeat(2_000_000), method: 'deflate', size: 1000 }]);
   assert.ok(bomb.length < 10_000, 'the bomb itself is tiny');
   await refused(bomb, /"a\.json" is damaged/, 1_000_000);
@@ -178,8 +173,6 @@ testAsync('zip reader: random bytes never throw, they give a sentence', async ()
   }
 });
 
-// --- the Importer opening a .zip ---
-
 const jsonText = (names) => JSON.stringify({
   formatVersion: 1,
   addons: names.map((n, i) => ({ name: n, version: '1.0', type: 'extension', enabled: true, link: `https://example.com/${i}`, linkType: 'homepage', id: `${i}@x` })),
@@ -197,8 +190,8 @@ function bootImporter(installed = []) {
       tabs: { create: async () => ({}) },
     },
   }, readCommon(), readImport());
-  // Waits for the load this page starts, instead of sleeping a fixed time: a
-  // .zip's decoding runs on real streams, so a fixed wait is a race.
+  // wait for the load this page starts instead of sleeping, since .zip decoding
+  // runs on real streams and a fixed wait is a race
   const settle = recordLoad(sandbox, 'loadFiles');
   return { sandbox, elements, settle };
 }
@@ -298,7 +291,7 @@ testAsync('Importer: a .zip with different exports shows a picker ("All add-ons"
   assert.strictEqual(elements.exportPickList.style.display, 'none', 'the row panel starts closed');
   assert.deepStrictEqual(shownNames(elements), ['Alpha', 'Gamma'], 'All merges, keeping id 0@x once - from the first export');
 
-  elements.exportPick.click(); // the closed box opens the row panel
+  elements.exportPick.click();
   assert.strictEqual(elements.exportPickList.style.display, 'block');
   assert.strictEqual(elements.exportPick.getAttribute('aria-expanded'), 'true');
 
@@ -311,7 +304,7 @@ testAsync('Importer: a .zip with different exports shows a picker ("All add-ons"
   assert.strictEqual(elements.exportPick.textContent, 'first.json (1)');
   assert.deepStrictEqual(shownNames(elements), ['Alpha']);
 
-  options()[0].click(); // back to All add-ons
+  options()[0].click();
   assert.strictEqual(elements.exportPick.textContent, 'All add-ons (2)');
   assert.deepStrictEqual(shownNames(elements), ['Alpha', 'Gamma']);
 });
@@ -356,12 +349,9 @@ test('Importer: .zip is an accepted file type, and the page lists the zip reader
   assert.ok(html.indexOf('zip-reader.js') !== -1 && html.indexOf('zip-reader.js') < html.indexOf('import.js'));
 });
 
-// --- several files chosen or dropped at once ---
-
 const textFile = (name, text) => ({ name, size: text.length, text: async () => text });
 const pickOptions = (elements) => elements.exportPickList.querySelectorAll('.export-pick-option').map((o) => o.textContent);
-// Exports with names and ids of their own, so a test can decide exactly which
-// files describe the same set of add-ons.
+// exports with their own names and ids, so a test controls which files describe the same add-ons
 const addonJson = (pairs) => JSON.stringify({
   formatVersion: 1,
   addons: pairs.map(([name, id], i) => ({ name, version: '1.0', type: 'extension', enabled: true, link: `https://example.com/${i}`, linkType: 'homepage', id })),

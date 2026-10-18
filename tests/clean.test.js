@@ -1,7 +1,5 @@
-// scripts/clean.js: what it decides is throwaway, and what it refuses to
-// touch. The rules are the whole point of that script, so they get tests like
-// any other logic - each one runs against a scratch tree in the OS temp
-// folder, never against this project.
+// scripts/clean.js: what counts as throwaway and what it won't touch. Every
+// case runs on a scratch tree in the OS temp folder, never on this project.
 
 const assert = require('assert');
 const fs = require('fs');
@@ -11,8 +9,7 @@ const { test } = require('./helpers');
 
 const { find, remove, sizeOf, human, ROOT } = require('../scripts/clean');
 
-// Builds a scratch tree. A name ending in "/" makes an empty folder; anything
-// else makes a one-byte file, with its folders as needed.
+// a name ending in "/" makes an empty folder, anything else a one-byte file
 function makeTree(entries) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'addons-hub-clean-'));
   for (const entry of entries) {
@@ -33,7 +30,6 @@ function relative(root, found) {
 
 test('clean: finds throwaway output and leaves everything that is not', (t) => {
   const root = makeTree([
-    // matched wherever they turn up
     'node_modules/left-pad/index.js',
     'sub/node_modules/left-pad/index.js',
     'coverage/index.html',
@@ -42,22 +38,19 @@ test('clean: finds throwaway output and leaves everything that is not', (t) => {
     'src/app.pyc',
     '.DS_Store',
     'Thumbs.db',
-    // matched only at the root
     'build/output.js',
     'dist/bundle.js',
     '.cache/',
     'export.zip',
-    // not matched: generic folder names deeper in the tree
+    // generic folder names deeper in the tree are left alone
     'src/build/real-source.js',
     'src/dist/real-source.js',
     'notes/build/real-source.js',
-    // not matched: an archive parked in a subfolder
     'downloads/export.zip',
-    // not matched: ordinary project files
     'src/main.js',
     'README.md',
     'icons/icon48.png',
-    // never entered, so never matched, however they are named
+    // never entered, whatever they're called
     '.git/objects/ab/cdef',
     'tests/fixtures/amo.zip',
     'tests/node_modules/left-pad/index.js',
@@ -84,7 +77,7 @@ test('clean: finds throwaway output and leaves everything that is not', (t) => {
 test('clean: removes a whole folder, read-only files included, and nothing else', (t) => {
   const root = makeTree(['node_modules/pkg/index.js', 'keep.txt']);
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  // npm writes read-only files; removing them must not need a chmod first.
+  // npm writes read-only files, removing them can't need a chmod
   fs.chmodSync(path.join(root, 'node_modules', 'pkg', 'index.js'), 0o444);
 
   const targets = find(root);
@@ -109,7 +102,7 @@ test('clean: reports readable sizes, and treats anything unreadable as zero', (t
   assert.strictEqual(human(5 * 1024 * 1024), '5.0 MB');
 });
 
-// The one that would hurt: the script must never decide that source is output.
+// the bad one: never treat source as output
 test('clean: on this project, nothing it would delete is source or history', () => {
   const found = relative(ROOT, find(ROOT));
   for (const item of found) {

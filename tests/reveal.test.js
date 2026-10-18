@@ -1,13 +1,10 @@
-// Tests for src/common/reveal.js - the opening of the Exporter and Importer
-// pages, which has the same cadence as the Settings page: each part of the
-// page in turn from top to bottom (every 0.16s), the add-ons cascading in
-// under it (every 0.08s).
+// reveal.js: the Exporter and Importer open on the same cadence as Settings,
+// each part top to bottom (every 0.16s) with the add-ons cascading in (every 0.08s)
 const assert = require('assert');
 const { test, readSrc, makeSandbox } = require('./helpers');
 
 const revealSrc = readSrc('src/common/reveal.js');
 
-// --- a tiny DOM: just enough tree for reveal.js -------------------------------
 class TextNode {
   constructor(text) { this.nodeType = 3; this.textContent = text; this.parentNode = null; }
 }
@@ -64,7 +61,7 @@ class El {
   querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
 }
 
-// Builds a card and loads reveal.js against it. `time` is a mutable clock.
+// `time` is a mutable clock
 function load({ card, byId = {}, reducedMotion = false, time = { t: 1000000 }, noCard = false } = {}) {
   const timers = [];
   const cleared = [];
@@ -118,8 +115,6 @@ function addRows(list, n, { headings = 0 } = {}) {
   }
   return items;
 }
-
-// ---------------------------------------------------------------------------
 
 test('reveal: it only decides timing - no text is split, hidden or rewritten', () => {
   const p = exporterCard();
@@ -233,7 +228,7 @@ test('reveal: rows are never scheduled in the past, even if the list loads late'
   const p = exporterCard();
   const time = { t: 1000000 };
   const ctx = load({ card: p.card, byId: { addonList: p.list }, time });
-  time.t += 10000; // the list arrives 10 seconds in
+  time.t += 10000;  // list arrives 10s in
   const items = addRows(p.list, 3);
   ctx.observers.find((o) => o.target === p.list).cb();
   const starts = items.map((i) => secs(i, '--rd'));
@@ -248,8 +243,6 @@ test('reveal: an empty list (placeholder text only) starts no row reveal', () =>
   ctx.observers.find((o) => o.target === p.list).cb();
   assert.strictEqual(p.list.classes.has('revealing'), false);
 });
-
-// --- the Importer: the list, search box and controls only appear after a file is chosen ---
 
 function importerCard() {
   const card = new El('div', { classes: ['card', 'staged'] });
@@ -285,7 +278,7 @@ test('reveal (Importer): when a file is chosen, the search box, Select all row, 
   const p = importerCard();
   const time = { t: 1000000 };
   const ctx = load({ card: p.card, byId: { addonList: p.list, searchInput: p.search, listControls: p.controls, checklistBox: p.box }, time });
-  time.t += 5000; // the user picks a file five seconds in
+  time.t += 5000;  // file picked 5s in
   const rows = addRows(p.list, 2);
   ctx.observers.find((o) => o.target === p.list).cb();
 
@@ -310,8 +303,6 @@ test('reveal (Importer): a second file only re-times the rows - the search box a
   assert.ok(second[0].vars['--rd'], 'new rows get their turn');
   assert.strictEqual(p.search.vars['--d'], searchTiming);
 });
-
-// --- switches and edge cases -------------------------------------------------
 
 test('reveal: with reduced motion nothing is timed - the page is simply there', () => {
   const p = exporterCard();

@@ -1,20 +1,16 @@
-// The settings file: the pure code that builds the Export settings file and
-// strictly reads one back (Import settings). Nothing here touches the page, so
-// it can be tested without a DOM. Needs core.js (the settings schema and format
-// helpers) loaded first.
+// The settings file: builds the Export settings file and strictly reads one
+// back. No page code. Needs core.js (settings schema, format helpers).
 
 const SETTINGS_FILE_FORMAT_VERSION = 1;
 
-// The settings keys this page knows about: exactly the ones an export holds
-// and an import requires. This is core.js's SETTINGS_STORAGE_KEYS, given a
-// name that reads well here, so the two can never drift apart.
+// Exactly the keys an export holds and an import requires (an alias of core.js's
+// SETTINGS_STORAGE_KEYS, so they can't drift apart).
 const KNOWN_SETTINGS_KEYS = SETTINGS_STORAGE_KEYS;
 
-// Builds the settings export object from the current stored values.
-// settings is a plain object: { theme: '...', exportFormat: '...' } (exportFormat is one format, or an array when several are chosen).
-// source is the browser part of the source (which browser and extension
-// version made it); the file's own format version and file type ("settings")
-// are added here, so the settings file carries the same source shape as an export.
+// `settings` is a plain object of the stored values (exportFormat is one
+// format, or an array when several are chosen). `source` is the browser part;
+// the format version and file type ("settings") are added here, so the file
+// has the same source shape as an export.
 function buildSettingsExport(settings, source = UNKNOWN_BROWSER) {
   const out = {};
   for (const key of KNOWN_SETTINGS_KEYS) {
@@ -23,17 +19,16 @@ function buildSettingsExport(settings, source = UNKNOWN_BROWSER) {
   return JSON.stringify({ source: makeSource('settings', SETTINGS_FILE_FORMAT_VERSION, source), settings: out }, null, 2);
 }
 
-// Validates and parses a settings file's text. Accepts only what
-// buildSettingsExport() writes (given withSettingsDefaults()'s values):
+// Accepts only what buildSettingsExport() writes:
 //   { "source": { formatVersion, fileType: "settings", basedOn, browser,
 //                 browserVersion, extensionVersion },
 //     "settings": { theme, exportFormat, shortenNames } }
-// with exactly those three settings, in that order, each a valid value. Anything else - a
-// missing or unknown setting, an invalid value - rejects the whole file,
-// naming the problem; nothing is dropped or guessed at. exportFormat is one
-// format as a string, or two or more as an array in the fixed order.
-// Returns { ok: true, settings: {...} } or { ok: false, error: '...' }.
-// Throws on malformed JSON - the caller's try/catch handles it.
+// exactly those three settings, in that order, each valid. Anything else (a
+// missing or unknown setting, a bad value) rejects the whole file and names
+// the problem; nothing is dropped or guessed. exportFormat is a string, or an
+// array of two or more in the fixed order.
+// Returns { ok: true, settings } or { ok: false, error }. Throws on malformed
+// JSON, so the caller needs a try/catch.
 const settingsError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Hub settings format (${detail}).` });
 
 function parseSettingsFile(text) {
@@ -79,13 +74,9 @@ function parseSettingsFile(text) {
   return { ok: true, settings: { [SETTINGS_SCHEMA.theme.key]: t, [EXPORT_FORMAT_STORAGE_KEY]: f, [SHORT_NAME_STORAGE_KEY]: s } };
 }
 
-// Fills in the default value for any of the three known settings that
-// aren't in `stored` yet - a pristine profile has never written any of
-// them, so exporting straight from storage.local.get() produced an empty
-// {} settings object that couldn't be re-imported (nothing in it passed
-// parseSettingsFile's "no recognised settings" check). Only used by the
-// Export handler below - buildSettingsExport() itself is unchanged, and
-// still only writes whatever it's actually given.
+// A fresh profile has stored none of the settings, so exporting straight from
+// storage gave an empty file that couldn't be imported again. This fills in
+// the defaults for the export.
 function withSettingsDefaults(stored) {
   return {
     [SETTINGS_SCHEMA.theme.key]: SETTINGS_SCHEMA.theme.resolve(stored && stored[SETTINGS_SCHEMA.theme.key]),

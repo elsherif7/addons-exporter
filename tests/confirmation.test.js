@@ -1,7 +1,3 @@
-// Tests for src/confirmation/confirmation.js. This page had no test
-// coverage at all before - it's exercised here via a fake DOM (S1) since
-// it reads location.search and writes into #heading/#message at load time.
-
 const assert = require('assert');
 const { test, readSrc, makeFakeDom, readCommon, makeSandbox } = require('./helpers');
 
@@ -10,7 +6,7 @@ const confirmationSrc = readSrc('src/confirmation/confirmation.js');
 
 function loadConfirmation(search, { prefillMessage } = {}) {
   const { document, elements } = makeFakeDom(['heading', 'message']);
-  // The real confirmation.html ships #message with static fallback text.
+  // the real confirmation.html ships #message with static fallback text
   if (prefillMessage) elements.message.textContent = prefillMessage;
   const sandbox = makeSandbox({ document, location: { search }, URLSearchParams }, commonSrc, confirmationSrc);
   return { document, elements };
@@ -84,9 +80,8 @@ test('document.title is set to the same heading text', () => {
   assert.strictEqual(document.title, elements.heading.textContent);
 });
 
-// The real page's #message already contains static text before the script
-// runs. The message must replace it, not be appended after it (which
-// showed the text twice).
+// the real #message has static text before the script runs. it has to be replaced,
+// not appended to (that showed the text twice)
 test('the message replaces the static fallback text in the HTML instead of duplicating it', () => {
   const fallback = 'Thanks for using Add-ons Exporter. Your add-ons were exported as an HTML report. On another browser, choose Add-ons Importer to select which ones to install.';
   const { elements } = loadConfirmation('?from=export&format=html', { prefillMessage: fallback });
@@ -103,9 +98,8 @@ test('import message replaces the export-worded fallback text, not appended afte
 });
 
 test('a prototype-pollution-shaped ?from= value falls back to the export message safely', () => {
-  // MESSAGES['constructor'] resolves to Object.prototype.constructor (a
-  // function, truthy) via the old `|| MESSAGES.export` fallback, so this
-  // specific value is the one that would have slipped past it.
+  // MESSAGES['constructor'] is truthy (Object.prototype.constructor), so the old
+  // `|| MESSAGES.export` fallback let this exact value through
   const { elements } = loadConfirmation('?from=constructor');
   assert.strictEqual(elements.heading.textContent, 'Add-ons Exporter');
   assert.doesNotMatch(elements.message.textContent, /undefined/);

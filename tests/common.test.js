@@ -1,6 +1,3 @@
-// Tests for the shared helpers in src/common/core.js, page-ui.js and src/background/amo.js. Loads the real
-// source via vm so these run against the actual file, not a copy.
-
 const assert = require('assert');
 const vm = require('vm');
 const { test, testAsync, readSrc, evalInContext, readCommon, makeFakeDom, makeSandbox } = require('./helpers');
@@ -10,21 +7,14 @@ const sandbox = makeSandbox({ URL }, commonSrc);
 
 const { escapeHtml, isSafeUrl, byName, filterAddonRows, visibleCheckboxes, extractTranslatedField, isPlausibleNameMatch, shortName } = sandbox;
 
-// The exported report carries its own copy of filterAddonRows (it can't load
-// page-ui.js once saved elsewhere). The report's script lives in
-// src/background/report-inline.js - the real file, not a hand-copied
-// snapshot - so an edit to one copy and not the other gets caught here
-// instead of silently drifting.
+// the exported report has its own copy of filterAddonRows (it can't load
+// page-ui.js once saved elsewhere), tested against the real inline script so
+// the two copies can't drift
 const reportInlineScript = readSrc('src/background/report-inline.js');
 
-// Runs the report's inline script against a fake `addonList` container and
-// returns its filterAddonRows, so it can be called directly the same way
-// page-ui.js's version is called in the test below.
 function loadReportFilterAddonRows(addonListContainer) {
-  // The inline script calls applyTheme() on load, which needs setAttribute
-  // on the document element and also reads from localStorage; it also wires
-  // up the theme toggle's click listener. Provide minimal stubs for both so
-  // the script can initialise without throwing.
+  // the script calls applyTheme() and wires the toggle on load, so it needs
+  // these stubs to get through init
   const stubEl = () => ({ style: {}, addEventListener() {}, setAttribute() {}, textContent: '', children: [], classList: { contains: () => false }, querySelector: () => null });
   const reportDocument = {
     documentElement: { setAttribute() {} },
@@ -39,8 +29,6 @@ function loadReportFilterAddonRows(addonListContainer) {
   return reportSandbox.filterAddonRows;
 }
 
-// --- escapeHtml ---
-
 test('escapeHtml escapes & < > " \'', () => {
   assert.strictEqual(escapeHtml(`& < > " '`), '&amp; &lt; &gt; &quot; &#39;');
 });
@@ -54,8 +42,6 @@ test('escapeHtml coerces non-strings via String()', () => {
   assert.strictEqual(escapeHtml(null), 'null');
   assert.strictEqual(escapeHtml(undefined), 'undefined');
 });
-
-// --- isSafeUrl ---
 
 test('linkLabel: AMO for addons.mozilla.org, the real site for anything else, "Link" for junk', () => {
   const { linkLabel } = sandbox;
@@ -87,22 +73,16 @@ test('isSafeUrl rejects near-miss schemes (the startsWith("http") bug)', () => {
   assert.strictEqual(isSafeUrl('httpx://example.com'), false);
 });
 
-// --- byName ---
-
 test('byName sorts case-insensitively', () => {
   const items = [{ name: 'uBlock Origin' }, { name: 'Dark Reader' }, { name: 'adblock' }];
   items.sort(byName);
   assert.deepStrictEqual(items.map((i) => i.name), ['adblock', 'Dark Reader', 'uBlock Origin']);
 });
 
-// --- filterAddonRows ---
-// Minimal fake DOM - just enough surface area (children, classList.contains,
-// style.display, querySelector, textContent) for filterAddonRows to run
-// against. Name and version are modeled as separate sub-elements, same as
-// the real .addon-name / .addon-version markup, so tests can tell them apart.
+// fake DOM for filterAddonRows. name and version are separate sub-elements like
+// the real markup, so tests can tell them apart.
 
-// classList stand-in: reports its base class, and records the
-// .is-filtered class that setFilterVisible() toggles for the search fade.
+// remembers the .is-filtered class setFilterVisible() toggles
 function fakeClassList(baseCls) {
   const extra = new Set();
   return {
@@ -143,11 +123,8 @@ function makeGroupContainer(heading, rows) {
   return { container, box };
 }
 
-// filterAddonRows now finds group-containers via container.querySelectorAll
-// rather than only container.children (see the A1 fix), since export.js/
-// import.js can nest them inside an outer .groups-outer-box. This fixture
-// doesn't nest them, but still needs querySelectorAll to exist - a plain
-// recursive walk by class name is all these fixtures ever need it for.
+// filterAddonRows uses querySelectorAll because the pages nest groups in an
+// outer .groups-outer-box. this fixture doesn't nest, it still needs the method.
 function queryAllByClass(root, selector) {
   const cls = selector.replace(/^\./, '');
   const out = [];
@@ -207,14 +184,13 @@ test('filterAddonRows: no matches hides everything and returns false', () => {
 });
 
 test('filterAddonRows: query matching a version number does not match the row', () => {
-  const { container, row1 } = makeContainer(); // row1 is "uBlock Origin" / "1.58.0"
+  const { container, row1 } = makeContainer();
   const anyMatch = filterAddonRows(container, '58');
   assert.strictEqual(anyMatch, false);
   assert.strictEqual(row1.style.display, 'none');
 });
 
 test('filterAddonRows: page-ui.js and the report\'s inline copy agree on the same fixture', () => {
-  // Both now use group-container structure — use the same fixture for both.
   const fixtureA = makeContainer();
   const fixtureB = makeContainer();
 
@@ -233,15 +209,9 @@ test('filterAddonRows: page-ui.js and the report\'s inline copy agree on the sam
   }
 });
 
-// --- filterAddonRows: group-containers nested inside an outer wrapper ---
-// export.js's renderList() and import.js's renderAddonList() both wrap
-// their group-containers in an outer .groups-outer-box (see appendGroup()
-// in each file) rather than appending them straight into the list
-// container. filterAddonRows used to only ever look at container.children,
-// so once that wrapper was introduced it silently stopped finding any
-// group-container at all - search matched nothing and "no matches" showed
-// for every query, including a matching one. This section pins that
-// nested case down directly instead of relying on the flat fixture above.
+// renderList() and renderAddonList() wrap groups in .groups-outer-box. filterAddonRows
+// once only looked at container.children, so after that wrapper search matched
+// nothing at all. these use the nested layout.
 
 function makeContainerWithOuterBox() {
   const { container: flatContainer, ...rest } = makeContainer();
@@ -304,27 +274,21 @@ test('filterAddonRows: page-ui.js and the report\'s inline copy agree with a nes
   }
 });
 
-// --- byName (tie-breaking) ---
-
 test('byName: locale-aware and case-insensitive, and a stable sort keeps identical names in order', () => {
-  // Identical names compare equal...
   assert.strictEqual(byName({ name: 'uBlock Origin' }, { name: 'uBlock Origin' }), 0);
-  // ...and sensitivity: 'base' makes the comparison case- and accent-insensitive.
+  // sensitivity 'base' ignores case and accents
   assert.strictEqual(byName({ name: 'UBlock' }, { name: 'ublock' }), 0);
   assert.ok(byName({ name: 'alpha' }, { name: 'beta' }) < 0);
   assert.ok(byName({ name: 'beta' }, { name: 'alpha' }) > 0);
-  // Two add-ons with the same name keep their original order (a stable sort),
-  // so an export never reshuffles them.
+  // stable sort, so an export never reshuffles same-named add-ons
   const first = { name: 'Same', id: 'first' };
   const second = { name: 'Same', id: 'second' };
   const sorted = [second, first].sort(byName);
   assert.deepStrictEqual(sorted.map((a) => a.id), ['second', 'first']);
 });
 
-// --- extractTranslatedField ---
-// AMO's API returns translated fields (name, summary, etc.) as a
-// locale-keyed object unless a `lang` param is passed - findAmoPage()
-// doesn't pass one, so it always gets the object form back.
+// AMO returns translated fields as a locale-keyed object unless `lang` is
+// passed, and findAmoPage() doesn't pass it
 
 test('extractTranslatedField: plain string passes through unchanged', () => {
   assert.strictEqual(extractTranslatedField('uBlock Origin'), 'uBlock Origin');
@@ -339,10 +303,6 @@ test('extractTranslatedField: null/undefined/empty object returns empty string',
   assert.strictEqual(extractTranslatedField(undefined), '');
   assert.strictEqual(extractTranslatedField({}), '');
 });
-
-// --- isPlausibleNameMatch ---
-// Guards findAmoPage()'s fuzzy name search from handing back an
-// unrelated add-on just because it happened to rank first.
 
 test('isPlausibleNameMatch: exact name (case/whitespace-insensitive) matches', () => {
   assert.strictEqual(isPlausibleNameMatch('uBlock Origin', '  UBLOCK   origin  '), true);
@@ -366,29 +326,22 @@ test('isPlausibleNameMatch: empty installed or result name is rejected', () => {
   assert.strictEqual(isPlausibleNameMatch('uBlock Origin', ''), false);
 });
 
-// A4: normalize() used to strip everything outside a-z0-9, so even an
-// identical non-Latin name never matched itself - findAmoPage()'s fuzzy
-// search would treat a real match as unrelated for any add-on whose name
-// isn't written in Latin script.
+// normalize() used to strip everything outside a-z0-9, so a non-Latin name
+// never matched itself
 test('isPlausibleNameMatch: identical names in non-Latin scripts still match', () => {
   assert.strictEqual(isPlausibleNameMatch('مانع الإعلانات', 'مانع الإعلانات'), true, 'Arabic');
   assert.strictEqual(isPlausibleNameMatch('广告拦截器', '广告拦截器'), true, 'Chinese');
   assert.strictEqual(isPlausibleNameMatch('Блокировщик рекламы', 'Блокировщик рекламы'), true, 'Cyrillic');
 });
 
-// A5: the old one-sided "at least half of the installed name's words"
-// threshold let a short, generic name match an unrelated add-on that
-// merely happened to share one word with it.
+// the old "half of the installed name's words" rule let a short generic name
+// match anything sharing one word
 test('isPlausibleNameMatch: rejects same-shaped but unrelated add-on names', () => {
   assert.strictEqual(isPlausibleNameMatch('Dark Mode', 'Dark Reader'), false);
   assert.strictEqual(isPlausibleNameMatch('Privacy Badger', 'Privacy Possum'), false);
   assert.strictEqual(isPlausibleNameMatch('uBlock Origin', 'uBlock Origin Lite'), false,
     'a real product-variant suffix with no tagline separator is a different add-on, not a tagline');
 });
-
-// --- visibleCheckboxes ---
-// Minimal fake checkboxes — visibleCheckboxes only needs cb.closest('.addon-row')
-// and the row's style.display.
 
 function makeCheckbox(rowDisplay) {
   const row = { style: { display: rowDisplay } };
@@ -408,10 +361,6 @@ test('visibleCheckboxes: excludes checkboxes whose row is hidden', () => {
   assert.strictEqual(visible[0], cbs[0]);
   assert.strictEqual(visible[1], cbs[2]);
 });
-
-// --- shortName ---
-// shortName lives in core.js and is used by export.js, import.js,
-// and report-inline.js to shorten long add-on names at separators.
 
 test('shortName: truncates at " - "', () => {
   assert.strictEqual(shortName('StayFree - Website Blocker, Web Usage Stats'), 'StayFree');
@@ -437,16 +386,11 @@ test('shortName: truncates at comma', () => {
   assert.strictEqual(shortName('Dark Reader, night mode'), 'Dark Reader');
 });
 
-// --- computeRetryAfterMs ---
-
 test('computeRetryAfterMs: converts seconds to ms', () => {
   assert.strictEqual(sandbox.computeRetryAfterMs('2'), 2000);
 });
 
-// Read straight out of the sandbox so they can never drift from amo.js.
-// They're declared with const, so (unlike the function declarations used
-// everywhere else in this file) they never attach to the vm context as
-// sandbox properties - evalInContext is what reads them back.
+// read from amo.js so they can't drift. top-level const, so they need evalInContext
 const RETRY_AFTER_MAX_MS = evalInContext(sandbox, 'AMO_RETRY_AFTER_MAX_MS');
 const RETRY_AFTER_DEFAULT_MS = evalInContext(sandbox, 'AMO_RETRY_AFTER_DEFAULT_MS');
 
@@ -463,10 +407,7 @@ test('computeRetryAfterMs: falls back to the default for a non-numeric or negati
   assert.strictEqual(sandbox.computeRetryAfterMs('-5'), RETRY_AFTER_DEFAULT_MS);
 });
 
-// --- fetchJsonWithTimeout ---
-// A separate, minimal sandbox (own fetch/AbortController/setTimeout) per
-// test rather than reusing the shared `sandbox` above, the same pattern
-// background.test.js uses for its own fetch-dependent tests.
+// own sandbox per test, with its own fetch/AbortController/setTimeout
 
 function bootFetchSandbox(fetchImpl) {
   const fetchSandbox = makeSandbox({ URL, AbortController, setTimeout, clearTimeout, fetch: fetchImpl }, commonSrc);
@@ -482,10 +423,8 @@ testAsync('fetchJsonWithTimeout: treats 404 as "not found", not a failure', asyn
 });
 
 testAsync('fetchJsonWithTimeout: aborts even when only the response body stalls, not just the request', async () => {
-  // fetch() itself resolves right away with a response whose .json()
-  // never settles on its own - only aborting should ever reject it. This
-  // is exactly the case a timer wrapped only around fetch() misses: it's
-  // already been cleared by the time a slow/wedged body would matter.
+  // fetch() resolves right away but .json() never settles. a timer around
+  // fetch() alone misses this, it's already cleared by then
   const fetchSandbox = bootFetchSandbox(async (url, opts) => ({
     ok: true,
     status: 200,
@@ -508,7 +447,7 @@ testAsync('fetchJsonWithTimeout: retries exactly once on 429, honoring Retry-Aft
       return {
         ok: false,
         status: 429,
-        headers: { get: (h) => (h === 'Retry-After' ? '0' : null) }, // '0' keeps the test fast
+        headers: { get: (h) => (h === 'Retry-After' ? '0' : null) },
         json: async () => ({}),
       };
     }
@@ -533,8 +472,6 @@ testAsync('fetchJsonWithTimeout: a second 429 in a row is not retried again', as
   assert.strictEqual(result.status, 429);
 });
 
-// --- A15: indefiniteArticleFor ---
-
 test('indefiniteArticleFor: "HTML report" needs "an" (H is "aitch", a vowel sound)', () => {
   assert.strictEqual(sandbox.indefiniteArticleFor('HTML report'), 'an');
 });
@@ -551,8 +488,6 @@ test('indefiniteArticleFor: falls back to ordinary spelling for a non-acronym wo
   assert.strictEqual(sandbox.indefiniteArticleFor('extension'), 'an');
   assert.strictEqual(sandbox.indefiniteArticleFor('theme'), 'a');
 });
-
-// --- A34: loadSettings ---
 
 function bootSettingsSandbox(storageGetImpl) {
   const sb = makeSandbox({ browser: { storage: { local: { get: storageGetImpl } } } }, commonSrc);
@@ -603,10 +538,8 @@ test('resolveShortenNames: valid values pass through, invalid ones fall back', (
   assert.strictEqual(sandbox.resolveShortenNames('maybe'), 'on');
 });
 
-// A34 tripwire: loadSettings() (used by background.js, which can't
-// load theme.js) hardcodes the literal 'theme' key rather than importing
-// theme.js's THEME_STORAGE_KEY constant. If that constant's value is ever
-// changed, this test is what would catch the two falling out of sync.
+// loadSettings() runs in background.js, which can't load theme.js, so it
+// hardcodes the 'theme' key. this catches THEME_STORAGE_KEY changing.
 test('A34 tripwire: loadSettings\' literal theme key matches theme.js\'s THEME_STORAGE_KEY', () => {
   const themeSrc = readSrc('src/common/theme.js');
   const themeSandbox = makeSandbox({
@@ -629,10 +562,8 @@ test('A34: formatLabel maps each export format to its label', () => {
   assert.strictEqual(sandbox.formatLabel('nonsense'), 'HTML report');
 });
 
-// --- page-ui.js: fadeOutPage() / goToConfirmation() ---
-// Cosmetic fade before the page is replaced by the confirmation page.
-// Must be a safe no-op wherever animation isn't available, and must
-// never block the caller.
+// the fade is cosmetic: it has to be a no-op where animation isn't available
+// and never block the caller
 function makeFadeSandbox({ card, reducedMotion = false, replaceImpl } = {}) {
   const navigated = [];
   const sb = makeSandbox({
@@ -706,8 +637,6 @@ testAsync('goToConfirmation: if navigation throws, the card is brought back and 
   assert.strictEqual(card.cancelled, true, 'card must not stay invisible after a failed navigation');
 });
 
-// --- setFilterVisible / the search fade hooks ---
-
 test('setFilterVisible: hiding sets display:none and adds .is-filtered; showing clears both', () => {
   const el = { style: { display: '' }, classList: fakeClassList('x') };
   sandbox.setFilterVisible(el, false);
@@ -727,8 +656,7 @@ test('setFilterVisible: uses shownDisplay when visible, and tolerates an element
 });
 
 test('filterAddonRows: rows and groups that stop matching get .is-filtered, and lose it when they match again', () => {
-  // makeContainer(): Enabled group = uBlock Origin + Dark Reader,
-  // Disabled group = Old Extension.
+  // enabled group: uBlock Origin + Dark Reader, disabled group: Old Extension
   const { container, enabledBox, disabledBox, row1, row2, row3 } = makeContainer();
 
   filterAddonRows(container, 'dark');
@@ -744,8 +672,6 @@ test('filterAddonRows: rows and groups that stop matching get .is-filtered, and 
     assert.strictEqual(el.style.display, '');
   }
 });
-
-// --- replayEntrance ---
 
 test('replayEntrance: adds .replay-reset, forces a reflow, then removes it so the animation restarts', () => {
   const log = [];
@@ -769,8 +695,6 @@ test('replayEntrance: safe no-op without a document or .card', () => {
   const sb = makeSandbox({ URL, document: { querySelector: () => null } }, commonSrc);
   sb.replayEntrance();
 });
-
-// --- replayStagedReveal / scrollPageToTop ---
 
 test('replayStagedReveal: restarts the card, puts the row-cascade flag back, then takes it off after the last row', () => {
   const log = [];
@@ -844,8 +768,6 @@ test('scrollPageToTop: smooth normally, instant with reduced motion, and a no-op
   makeSandbox({ URL }, commonSrc).scrollPageToTop();
 });
 
-// --- Live settings: applyNameShortening / onShortenNamesChanged ---
-
 function makeNameEl(full, shown, { animate = true } = {}) {
   const el = { dataset: full === undefined ? {} : { fullName: full }, textContent: shown, animations: [] };
   if (animate) el.animate = (keyframes, options) => { el.animations.push({ keyframes, options }); return {}; };
@@ -915,13 +837,10 @@ test('onShortenNamesChanged: other settings, other storage areas, and pages with
   assert.deepStrictEqual(seen, []);
 
   const bare = makeSandbox({ URL, browser: { storage: {} } }, commonSrc);
-  bare.onShortenNamesChanged(() => {}); // must not throw
+  bare.onShortenNamesChanged(() => {});
 });
 
-// --- setSelectionCount: the "12 of 12 selected" badge rolls, pops and flashes when the number changes ---
-
-// A node with just enough of the DOM: text, children, attributes, and an
-// animate() whose animations finish only when the test says so.
+// animations finish only when the test says so
 class BadgeNode {
   constructor() { this.className = ''; this.children = []; this.attrs = {}; this.animations = []; this._text = ''; }
   get textContent() { return this.children.length ? this.children.map((c) => c.textContent).join('') : this._text; }
@@ -953,8 +872,8 @@ test('setSelectionCount: more selected - the badge pops, flashes green, and the 
   const { badge, set } = badgeEnv();
   set('3 of 12 selected');
   set('4 of 12 selected');
-  // While it rolls the slot holds the new number and the ghost of the old one (hidden from screen readers);
-  // the real text is tracked separately and comes back as plain text when the roll ends.
+  // mid-roll the slot holds the new number plus a ghost of the old one (aria-hidden),
+  // the real text is tracked separately and restored when the roll ends
   assert.strictEqual(badge.textContent, '43 of 12 selected');
 
   const pop = badge.animations.find((a) => a.keyframes[1].transform === 'scale(1.18)');
@@ -1020,7 +939,7 @@ test('setSelectionCount: a newer change during a roll takes over - the earlier r
   set('3 of 12 selected');
   set('4 of 12 selected');
   const firstRoll = badge.children[0].children;
-  set('5 of 12 selected'); // before the first roll has finished
+  set('5 of 12 selected');
   assert.strictEqual(badge.children[0].children[0].textContent, '5', 'a fresh roll for the new number');
   firstRoll[0].animations[0].finish();
   firstRoll[1].animations[0].finish();
@@ -1038,7 +957,7 @@ test('setSelectionCount: the roll compares against the real text, not the mid-ro
   set('3 of 12 selected');
   set('4 of 12 selected');
   const before = badge.animations.length;
-  set('4 of 12 selected'); // same again while the roll is on screen
+  set('4 of 12 selected');
   assert.strictEqual(badge.animations.length, before, 'no new animation for an unchanged number');
 });
 
@@ -1074,8 +993,6 @@ test('setSelectionCount: an element that cannot animate just gets its text', () 
   assert.strictEqual(plain.textContent, '4 of 12 selected');
 });
 
-// --- several export formats at once ---
-
 test('resolveExportFormats: a string, a list or a comma list becomes known formats in fixed order, never empty', () => {
   assert.deepStrictEqual(Array.from(sandbox.resolveExportFormats('json')), ['json']);
   assert.deepStrictEqual(Array.from(sandbox.resolveExportFormats(['txt', 'html'])), ['html', 'txt']);
@@ -1106,8 +1023,6 @@ test('loadSettings: exportFormats lists every stored format, in the fixed order,
   assert.ok(!('exportFormat' in s), 'only the list is returned');
 });
 
-// --- typeLabel() / parseType(): how an add-on's type is written for people and read back ---
-
 test('typeLabel: "theme" is Theme, anything else is Extension', () => {
   assert.strictEqual(sandbox.typeLabel('theme'), 'Theme');
   assert.strictEqual(sandbox.typeLabel('extension'), 'Extension');
@@ -1123,8 +1038,6 @@ test('parseType: reads exactly Theme and Extension back, anything else is null',
 test('typeLabel and parseType are inverses for both types', () => {
   for (const t of ['theme', 'extension']) assert.strictEqual(sandbox.parseType(sandbox.typeLabel(t)), t);
 });
-
-// --- Phase 2: format registry, settings schema, shared loader ---
 
 test('registry: every format has an id, label, title, extension, MIME type and description; ids are unique and in the fixed order', () => {
   const reg = Array.from(evalInContext(sandbox, 'EXPORT_FORMAT_REGISTRY'));
@@ -1181,10 +1094,8 @@ testAsync('onSettingsChanged: reports which settings changed with fresh values; 
   await new Promise((r) => setTimeout(r, 0));
   assert.deepStrictEqual(seen, [[['exportFormats'], ['html', 'csv']]]);
   const bare = makeSandbox({ browser: {} }, commonSrc);
-  bare.onSettingsChanged(() => {}); // must not throw
+  bare.onSettingsChanged(() => {});
 });
-
-// --- addon-list.js: the list shared by the Exporter and the Importer ---
 
 function loadAddonListSandbox() {
   const { document } = makeFakeDom();

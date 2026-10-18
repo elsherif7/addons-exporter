@@ -1,7 +1,3 @@
-// Tests for the pure functions in src/settings/settings.js:
-// buildSettingsExport() and parseSettingsFile(). Loads the real source
-// files via vm so these run against the actual code, not a copy.
-
 const assert = require('assert');
 const vm = require('vm');
 const { test, testAsync, readSrc, evalInContext, makeFakeDom, readCommon, readSettings, makeSandbox, waitFor, FIREFOX_SOURCE: SETTINGS_BROWSER } = require('./helpers');
@@ -10,8 +6,7 @@ const themeSrc = readSrc('src/common/theme.js');
 const commonSrc = readCommon();
 const settingsSrc = readSettings();
 
-// settings.js wires up DOM elements and event listeners at load time.
-// Provide a minimal stub document so it can load without throwing.
+// settings.js touches the DOM at load time, so it needs a stub document to load.
 function makeFakeElement() {
   return {
     style: {},
@@ -51,13 +46,11 @@ function makeSettingsSandbox() {
 const sandbox = makeSettingsSandbox();
 const { buildSettingsExport, parseSettingsFile, withSettingsDefaults } = sandbox;
 
-// Evaluate consts that live only in the vm's lexical scope.
+// consts that only live in the vm's lexical scope
 const SETTINGS_FILE_FORMAT_VERSION = evalInContext(sandbox, 'SETTINGS_FILE_FORMAT_VERSION');
 const THEME_STORAGE_KEY = evalInContext(sandbox, 'THEME_STORAGE_KEY');
 const EXPORT_FORMAT_STORAGE_KEY = evalInContext(sandbox, 'EXPORT_FORMAT_STORAGE_KEY');
 const SHORT_NAME_STORAGE_KEY = evalInContext(sandbox, 'SHORT_NAME_STORAGE_KEY');
-
-// --- buildSettingsExport ---
 
 test('buildSettingsExport: produces valid JSON with the source and settings', () => {
   const json = buildSettingsExport({ [THEME_STORAGE_KEY]: 'dark', [EXPORT_FORMAT_STORAGE_KEY]: 'json' }, SETTINGS_BROWSER);
@@ -86,10 +79,8 @@ test('buildSettingsExport: output is valid JSON', () => {
   assert.doesNotThrow(() => JSON.parse(buildSettingsExport({ [THEME_STORAGE_KEY]: 'light' })));
 });
 
-// --- parseSettingsFile ---
-
-// A valid source, as the exporter records it: the browser part
-// (background/browser-info.js) plus the file's own version and type.
+// a valid source as the exporter records it: browser part
+// (background/browser-info.js) plus the file's own version and type
 const SETTINGS_SOURCE = { formatVersion: SETTINGS_FILE_FORMAT_VERSION, fileType: 'settings', ...SETTINGS_BROWSER };
 function makeSettingsFile(settings, formatVersion = SETTINGS_FILE_FORMAT_VERSION, source = SETTINGS_SOURCE) {
   return JSON.stringify({ source: { ...source, formatVersion }, settings });
@@ -180,8 +171,6 @@ test('parseSettingsFile: round-trip through buildSettingsExport preserves values
   assert.deepStrictEqual(JSON.parse(JSON.stringify(result.settings)), ALL_SETTINGS);
 });
 
-// --- A7: a pristine (never-touched) profile's export can be re-imported ---
-
 test('withSettingsDefaults: fills in defaults for a pristine (empty) stored object', () => {
   const result = withSettingsDefaults({});
   assert.strictEqual(result[THEME_STORAGE_KEY], 'light');
@@ -208,22 +197,14 @@ test('A7 regression: a pristine export (nothing ever stored) can be re-imported 
   assert.strictEqual(Object.keys(result.settings).length, 3, 'all three defaults should be present, not an empty {}');
 });
 
-// --- Importing a settings file: the whole path, not just the parser ---
-// The A7 tests above check the file format on its own. This drives the row a
-// user actually uses: choose a file, and the settings in it are stored, applied
-// to the page's own controls, and reported - the half no pure function test
-// reaches.
-
 testAsync('import: choosing a settings file stores what is in it, applies it to the page, and says so', async () => {
   const { document, elements } = makeFakeDom([
     'importSettingsBtn', 'importSettingsDesc', 'importSettingsStatus', 'settingsFileInput',
   ]);
-  // The row feedback animates the status and the description.
   for (const el of [elements.importSettingsDesc, elements.importSettingsStatus]) {
     el.animate = () => ({ finished: Promise.resolve(), cancel() {} });
   }
-  // The controls the page reads back after an import, found the way the page
-  // finds them: three groups of radios.
+  // the controls the page reads back after an import, found the way the page finds them
   const radio = (name, value) => {
     const el = document.createElement('input');
     el.name = name;
@@ -251,8 +232,7 @@ testAsync('import: choosing a settings file stores what is in it, applies it to 
       storage: {
         local: {
           get: async () => ({ ...stored }),
-          // The page reads the settings back after storing them, so this keeps
-          // what was written, as the real storage does.
+          // the page reads settings back after storing them, so keep what was written like real storage
           set: async (values) => { Object.assign(stored, JSON.parse(JSON.stringify(values))); setCalls.push(values); },
           remove: async () => {},
         },
@@ -277,10 +257,8 @@ testAsync('import: choosing a settings file stores what is in it, applies it to 
   assert.strictEqual(off.checked, true, 'and name shortening');
 });
 
-// --- A33: a storage write failure reverts the radio and shows an error ---
-// Uses a dedicated sandbox with real radio elements, since the shared
-// `sandbox` above's querySelectorAll always returns [] (it only needs the
-// pure functions), so no change handler is ever attached there.
+// dedicated sandbox with real radios: the shared one's querySelectorAll always returns [],
+// so no change handler is ever attached there
 
 function makeRadioEl(value) {
   return { value, checked: false, _onChange: null, addEventListener(ev, fn) { if (ev === 'change') this._onChange = fn; } };
@@ -334,9 +312,8 @@ testAsync('theme radio: a storage write failure shows an error and reverts the r
 
   assert.match(statusEl.textContent, /Could not save the theme/);
   assert.strictEqual(statusEl.className, 'error');
-  // storage.local.get() in this sandbox always returns {} (the write
-  // never actually landed), so loadCurrentTheme() should revert back to
-  // the default: light checked, dark unchecked.
+  // storage.local.get() here always returns {} (the write never landed), so
+  // loadCurrentTheme() reverts to the default
   assert.strictEqual(themeRadioEls[0].checked, true, 'light should be re-checked as the actually-stored value');
   assert.strictEqual(themeRadioEls[1].checked, false, 'dark should be reverted since the write failed');
 });
@@ -375,15 +352,11 @@ testAsync('shortenNames radio: a storage write failure shows an error and revert
 });
 
 
-// --- A20: the Reset dialog's accessibility ---
-// Uses makeFakeDom (S1) rather than the ad hoc fixtures above - the
-// dialog is now built with createElement/append (not innerHTML), so it
-// needs a document that can actually hold and query real child elements.
+// the dialog is built with createElement/append, not innerHTML, so it needs a DOM that can hold real children
 
 function makeResetDialogSandbox() {
   const { document, elements } = makeFakeDom(['resetSettingsBtn', 'settingsStatus']);
-  // A stand-in for the rest of the page's content, to verify it gets
-  // inert-ed while the dialog is open and restored after.
+  // stands in for the rest of the page, which should go inert while the dialog is open
   const pageContent = document.createElement('div');
   pageContent.id = 'pageContent';
   document.body.appendChild(pageContent);
@@ -466,8 +439,6 @@ test('Reset dialog: mentions the display setting, which it actually resets', () 
   assert.match(message.textContent, /display/i, 'the dialog text should mention the display setting it also resets');
 });
 
-// --- 2.1: exportSettingsBtn ---
-
 function makeExportSettingsSandbox() {
   const exportBtnEl = { addEventListener(ev, fn) { if (ev === 'click') this._onClick = fn; } };
   const statusEl = { textContent: '', className: '' };
@@ -521,17 +492,12 @@ testAsync('exportSettingsBtn: uses downloads.download with saveAs and shows succ
   assert.strictEqual(statusEl.className, '');
 });
 
-// --- settings-init.js: localStorage startup cache ---
-// Loads the real settings-init.js via vm with a fake document and
-// localStorage, and verifies it pre-applies cached radio states before
-// the first paint (simulated by checking .checked immediately after the
-// script runs, with no async gap).
+// checks .checked right after the script runs, with no async gap, to mimic applying before first paint
 
 const settingsInitSrc = readSrc('src/settings/settings-init.js');
 
 function makeSettingsInitDom(cachedFormat, cachedShorten) {
-  // Minimal fake elements — only the six radio inputs settings-init.js
-  // touches, plus getElementById to resolve them.
+  // only the six radios settings-init.js touches, plus getElementById
   function makeRadio(id, value, defaultChecked) {
     return { id, value, checked: defaultChecked };
   }
@@ -552,7 +518,7 @@ function makeSettingsInitDom(cachedFormat, cachedShorten) {
   const localStorage = {
     getItem: (key) => Object.prototype.hasOwnProperty.call(cache, key) ? cache[key] : null,
   };
-  // settings.html loads core.js (the format registry) before settings-init.js.
+  // settings.html loads core.js (the format registry) before settings-init.js
   const sb = makeSandbox({ document, localStorage }, commonSrc, settingsInitSrc);
   return radios;
 }
@@ -579,7 +545,7 @@ test('settings-init: cache hit "html" keeps HTML checked (matches default)', () 
 });
 
 test('settings-init: cache miss applies defaults (html / on)', () => {
-  // No cache key set — should apply the hardcoded defaults.
+  // no cache key set, so the hardcoded defaults apply
   const radios = makeSettingsInitDom(undefined, undefined);
   assert.strictEqual(radios.formatHtml.checked, true,  'html default should be applied');
   assert.strictEqual(radios.formatJson.checked, false);
@@ -624,16 +590,13 @@ test('settings-init: localStorage throwing still applies defaults', () => {
 });
 
 test('settings-init: null getElementById (element not found) does not throw', () => {
-  // Simulates an element being absent from the DOM — should degrade gracefully.
+  // element missing from the DOM
   const sb = makeSandbox({
     document: { getElementById: () => null },
     localStorage: { getItem: () => 'json' },
   }, commonSrc);
   assert.doesNotThrow(() => vm.runInContext(settingsInitSrc, sb));
 });
-
-// Verify that settings.js writes the localStorage cache keys from the
-// batched init IIFE so the cache is ready for the next page open.
 
 testAsync('settings.js batched init writes exportFormat to the localStorage cache', async () => {
   const cacheStore = {};
@@ -668,7 +631,7 @@ testAsync('settings.js batched init writes exportFormat to the localStorage cach
     browser: {
       storage: {
         local: {
-          // loadSettings reads all three keys at once as an array.
+          // loadSettings reads all three keys at once
           get: async () => ({ theme: 'light', exportFormat: 'csv', shortenNames: 'on' }),
           set: async () => {}, remove: async () => {},
         },
@@ -726,8 +689,6 @@ testAsync('settings.js batched init writes shortenNames to the localStorage cach
     'the batched init should write the confirmed shortenNames to localStorage');
 });
 
-// --- Reset dialog: blurred backdrop, scrolling, closing animation, reset reveal ---
-
 test('Reset dialog: layout and look come from settings.css classes, not inline styles', () => {
   const { document, elements } = makeResetDialogSandbox();
   const dialog = openResetDialog(document, elements.resetSettingsBtn);
@@ -743,8 +704,7 @@ test('Reset dialog: layout and look come from settings.css classes, not inline s
   assert.match(overlayCss, /inset:\s*0/);
   assert.match(overlayCss, /align-items:\s*center/);
   assert.match(overlayCss, /justify-content:\s*center/);
-  // The tint and blur come from the same rule; an opaque background would
-  // bring back the see-nothing backdrop.
+  // tint and blur share one rule, an opaque background would bring back the see-nothing backdrop
   assert.match(overlayCss, /background:\s*rgba\(/);
   for (const cls of ['.s-dialog', '.s-dialog-title', '.s-dialog-message', '.s-dialog-buttons']) {
     assert.ok(rule(cls), `settings.css has a ${cls} rule`);
@@ -767,7 +727,7 @@ test('Reset dialog: the vanished scrollbar is replaced by padding so the page do
   const { document, elements } = makeResetDialogSandboxWithWindow({ scrollbarWidth: 15 });
   const root = document.documentElement;
   root.style.overflow = '';
-  root.style.paddingRight = ''; // a real element reports '' when nothing is set inline
+  root.style.paddingRight = ''; // // a real element reports '' when nothing is set inline
   openResetDialog(document, elements.resetSettingsBtn);
   assert.strictEqual(root.style.paddingRight, '15px');
   document.body.querySelector('#rsCancel').click();
@@ -848,9 +808,8 @@ test('Reset dialog: with animation available, it fades out first and is only rem
   assert.strictEqual(elements.resetSettingsBtn._focused, true);
 });
 
-// Like makeResetDialogSandbox, plus a window (scroll calls recorded), a
-// .card whose replayEntrance() steps are recorded, and - optionally -
-// element.animate() so the dialog's closing animation can be exercised.
+// like makeResetDialogSandbox plus a window (scroll calls recorded), a .card with recorded
+// replayEntrance() steps and, optionally, element.animate() for the closing animation
 function makeResetDialogSandboxWithWindow({ withAnimate = false, scrollbarWidth = 0 } = {}) {
   const { document, elements } = makeFakeDom(['resetSettingsBtn', 'settingsStatus']);
   const pageContent = document.createElement('div');
@@ -862,7 +821,7 @@ function makeResetDialogSandboxWithWindow({ withAnimate = false, scrollbarWidth 
   const replayLog = [];
   const pendingAnimations = [];
   const listeners = [];
-  document.documentElement.clientWidth = 1000; // window.innerWidth - this = the scrollbar's width
+  document.documentElement.clientWidth = 1000; // // window.innerWidth minus this = scrollbar width
 
   const cardStub = {
     classList: {
@@ -910,10 +869,7 @@ function makeResetDialogSandboxWithWindow({ withAnimate = false, scrollbarWidth 
   };
 }
 
-// --- Finished export / import / reset: the success celebration ---
-
-// A settings row (class settings-option-row) holding the given status
-// element, recording every element.animate() call made on it.
+// a settings-option-row holding the status element, recording element.animate() calls on it
 function makeSuccessRow(document, statusEl) {
   const row = document.createElement('div');
   row.className = 'settings-option-row';
@@ -987,7 +943,7 @@ testAsync('success: a failed action gets no green flash and is not marked as a s
 testAsync('success: the success style is cleared again when the row is restored (e.g. the next action starts)', async () => {
   const ctx = makeSuccessSandbox();
   await runReset(ctx);
-  vm.runInContext('resetRow.restore()', ctx.sb); // a top-level const, so not a property of the sandbox
+  vm.runInContext('resetRow.restore()', ctx.sb); // // top-level const, not on the sandbox
   assert.strictEqual(ctx.elements.resetSettingsStatus.classList.contains('is-success'), false);
 });
 
@@ -995,7 +951,6 @@ test('success: after an import, the selected option in each group flashes in tur
   const ctx = makeSuccessSandbox();
   const { document } = ctx;
   const rows = [];
-  // Two groups with a checked and an unchecked option each.
   for (const [checked, name] of [[true, 'light'], [false, 'dark'], [false, 'html'], [true, 'json']]) {
     const label = document.createElement('label');
     label.className = 'settings-option-row';
@@ -1022,10 +977,7 @@ testAsync('success: with reduced motion, nothing flashes (the message still show
   assert.strictEqual(ctx.elements.resetSettingsStatus.classList.contains('is-success'), true);
 });
 
-// --- Cancelling export / import / reset: the soft grey "backed out" feedback ---
-// Builds the three action rows (each a .settings-option-row holding its
-// description and message) so a cancel can be seen: the row flashes grey and
-// the description slides back in.
+// the three action rows, each a .settings-option-row with its description and message
 function makeCancelSandbox({ downloadError = null, reducedMotion = false } = {}) {
   const ids = ['resetSettingsBtn', 'settingsStatus', 'exportSettingsBtn', 'importSettingsBtn', 'settingsFileInput',
     'exportSettingsDesc', 'exportSettingsStatus', 'importSettingsDesc', 'importSettingsStatus',
@@ -1148,7 +1100,7 @@ testAsync('theme radio: the page switches the moment you click, before the save 
   const { themeRadioEls, sandbox } = makeSettingsSandboxWithRadios(
     () => new Promise((resolve) => { log.push('save started'); releaseSave = resolve; })
   );
-  await settleSettingsInit(); // the page's own start-up applyTheme() has to be out of the way
+  await settleSettingsInit(); // // let the page's own start-up applyTheme() finish first
   sandbox.applyTheme = (t) => log.push('apply:' + t);
   const darkRadio = themeRadioEls[1];
   darkRadio.checked = true;
@@ -1170,13 +1122,10 @@ testAsync('theme radio: if the save fails, the page goes back to the stored them
   assert.deepStrictEqual(applied, ['dark', 'light'], 'switched at once, then put back to the stored default');
 });
 
-// settings.js loads the stored settings (and applies the theme) as soon as it
-// starts; give that a few turns of the event loop to finish.
+// settings.js loads stored settings and applies the theme on start, give it a few event loop turns
 async function settleSettingsInit() {
   for (let i = 0; i < 6; i++) await new Promise((resolve) => setTimeout(resolve, 0));
 }
-
-// --- Live settings: this page's options follow the stored settings ---
 
 const ticked = (radios) => radios.filter((r) => r.checked).map((r) => r.value);
 
@@ -1185,7 +1134,6 @@ testAsync('live settings (Settings page): options changed elsewhere (another tab
   await settleSettingsInit();
   assert.deepStrictEqual([ticked(ctx.themeRadioEls), ticked(ctx.formatBoxEls), ticked(ctx.shortenRadioEls)], [['light'], ['html'], ['on']]);
 
-  // Another tab (or a settings import) saves new choices.
   Object.assign(ctx.stored, { theme: 'dark', exportFormat: 'json', shortenNames: 'off' });
   ctx.changeListeners.forEach((fn) => fn({
     theme: { newValue: 'dark' }, exportFormat: { newValue: 'json' }, shortenNames: { newValue: 'off' },
@@ -1193,7 +1141,6 @@ testAsync('live settings (Settings page): options changed elsewhere (another tab
   await settleSettingsInit();
   assert.deepStrictEqual([ticked(ctx.themeRadioEls), ticked(ctx.formatBoxEls), ticked(ctx.shortenRadioEls)], [['dark'], ['json'], ['off']]);
 
-  // A reset removes them: back to the defaults.
   delete ctx.stored.theme; delete ctx.stored.exportFormat; delete ctx.stored.shortenNames;
   ctx.changeListeners.forEach((fn) => fn({
     theme: { oldValue: 'dark' }, exportFormat: { oldValue: 'json' }, shortenNames: { oldValue: 'off' },
@@ -1205,15 +1152,13 @@ testAsync('live settings (Settings page): options changed elsewhere (another tab
 testAsync('live settings (Settings page): only the option that changed is reloaded, and other storage areas are ignored', async () => {
   const ctx = makeSettingsSandboxWithRadios(undefined, { stored: { theme: 'dark' } });
   await settleSettingsInit();
-  ctx.themeRadioEls[0].checked = true; // deliberately out of step, to see whether it gets touched
+  ctx.themeRadioEls[0].checked = true; // // out of step on purpose, to see if it gets touched
   ctx.themeRadioEls[1].checked = false;
   ctx.changeListeners.forEach((fn) => fn({ exportFormat: { newValue: 'csv' } }, 'local'));
   ctx.changeListeners.forEach((fn) => fn({ theme: { newValue: 'dark' } }, 'sync'));
   await settleSettingsInit();
   assert.deepStrictEqual(ticked(ctx.themeRadioEls), ['light'], 'the theme was not reloaded by an export-format change or a sync-area change');
 });
-
-// --- Messages that nobody touches go away after 7 seconds ---
 
 const autoHide = (ctx) => ctx.timers.filter((t) => t.ms === 7000);
 
@@ -1303,11 +1248,9 @@ test('withSettingsDefaults: a stored list of formats is kept, a bad one falls ba
   assert.strictEqual(withSettingsDefaults({ [EXPORT_FORMAT_STORAGE_KEY]: 'xml' })[EXPORT_FORMAT_STORAGE_KEY], 'html');
 });
 
-// --- The data contract of the settings file (see tests/format-contract.test.js
-// for the same idea for the add-on exports): the version and the layout change
-// together, on purpose. If this fails after you changed the settings file:
-// bump SETTINGS_FILE_FORMAT_VERSION in src/settings/settings.js, decide whether
-// old files must still be read, and update the numbers and keys here. ---
+// keep the version and the layout changing together (see format-contract.test.js).
+// if this fails: bump SETTINGS_FILE_FORMAT_VERSION in src/settings/settings.js, decide whether
+// old files must still be read, and update the numbers and keys here.
 test('contract: the settings file is the source, then settings: theme, exportFormat, shortenNames', () => {
   assert.strictEqual(SETTINGS_FILE_FORMAT_VERSION, 1, 'the settings format version and this contract must change together');
   const data = JSON.parse(buildSettingsExport(withSettingsDefaults({})));

@@ -1,9 +1,3 @@
-// Format 2 added the "source" to every export: the file's own format version
-// and type, then which browser (and version) and which Add-ons Hub version made
-// the file. Covers the shared helpers (core.js), the browser detection
-// (background/browser-info.js), what each builder writes, what the Importer
-// reads back (format 2, and format 1 files that have none).
-
 const assert = require('assert');
 const { test, testAsync, readSrcs, readReportBuilders, plain, htmlData, makeSandbox, FIREFOX_SOURCE: BROWSER } = require('./helpers');
 
@@ -17,14 +11,10 @@ function load(globals = {}) {
 }
 const sb = load();
 const UNKNOWN = { basedOn: 'Unknown', browser: 'Unknown', browserVersion: 'unknown', extensionVersion: 'unknown' };
-// The browser part of the source (BROWSER is FIREFOX_SOURCE from helpers: what
-// getExportSource returns), and a full source as a given file type writes it
-// (makeSource adds the version and type).
+// BROWSER is only the browser half (what getExportSource returns), source() adds version and type like makeSource
 const source = (fileType, formatVersion = 2, browser = BROWSER) => ({ formatVersion, fileType, ...browser });
 const addon = (o = {}) => ({ id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/a', linkType: 'amo-exact', ...o });
 const list = [addon(), addon({ id: 'b@x', name: 'Beta', enabled: false, type: 'theme', link: 'https://example.com/b', linkType: 'homepage' })];
-
-// --- the shared helpers ---
 
 test('source: cleanSourceText keeps plain text and falls back for anything unusable', () => {
   assert.strictEqual(sb.cleanSourceText('Firefox Developer Edition', 'x'), 'Firefox Developer Edition');
@@ -83,16 +73,14 @@ test('source: the comment lines round-trip, and anything else is not a source li
     ['# addons-hub-source: browser=Firefox; basedOn=Firefox; browserVersion=128.0; extensionVersion=1.2.0'],
     lines.slice(0, 5),
     [...lines, ''],
-    [lines[1], lines[0], lines[2], lines[3], lines[4], lines[5]], // wrong order
+    [lines[1], lines[0], lines[2], lines[3], lines[4], lines[5]],
     [lines[0], lines[1].replace('fileType', 'fileTypes'), lines[2], lines[3], lines[4], lines[5]],
     lines.map((l) => l.replace('Firefox', 'Fire=fox')),
     lines.map((l) => l.replace('# ', '#')),
-    [lines[0].replace(': 2', ': x'), ...lines.slice(1)], // a non-numeric format version
+    [lines[0].replace(': 2', ': x'), ...lines.slice(1)],
   ];
   for (const b of bad) assert.strictEqual(sb.parseSourceCommentLines(b), null, JSON.stringify(b));
 });
-
-// --- which browser is this ---
 
 test('browser-info: names the browser from its user-agent text, the specific ones before Chrome', () => {
   const cases = [
@@ -137,8 +125,6 @@ test('browser-info: says what each browser is built on', () => {
   assert.strictEqual(sb.browserBase('constructor'), 'constructor', 'a name that is also an object property is not looked up as one');
 });
 
-// --- what the builders write ---
-
 test('builders: every format records the source, and an export without one says Unknown', () => {
   const json = JSON.parse(sb.buildJsonExport(list, false, BROWSER));
   assert.deepStrictEqual(Object.keys(json), ['source', 'addons']);
@@ -159,8 +145,6 @@ test('builders: a hostile or odd source is cleaned, never written as it came', (
   assert.ok(sb.parseSourceCommentLines(csv.slice(0, 6)), 'the cleaned lines are still a valid source');
   assert.strictEqual(sb.parseCsvPayload(sb.buildCsvExport(list, false, evil)).ok, true);
 });
-
-// --- what the Importer reads ---
 
 const rejects = (result, pattern) => { assert.strictEqual(result.ok, false); assert.match(result.error, pattern); };
 
@@ -193,7 +177,6 @@ test('Importer: files from before the source (format 1) still read, with no sour
 test('Importer (JSON/HTML data): a format 2 file must have the source, and it must be exactly right', () => {
   const entry = { name: 'Alpha', version: '1.0', type: 'extension', enabled: true, link: 'https://example.com/a', linkType: 'amo-exact', id: 'a@x' };
   assert.strictEqual(sb.parseJsonPayload(JSON.stringify({ source: source('json'), addons: [entry] })).ok, true);
-  // No source at all: format 2 needs it, so the top level is not just source then addons.
   rejects(sb.parseJsonPayload(JSON.stringify({ formatVersion: 2, addons: [entry] })), /not exactly source, then addons/);
   const wrongOrder = JSON.stringify({ addons: [entry], source: source('json') });
   rejects(sb.parseJsonPayload(wrongOrder), /not exactly source, then addons/);
@@ -239,6 +222,6 @@ test('Importer (TXT): a format 2 file must start with the source comments, and h
   const hint = /the file must start with the source comments/;
   rejects(sb.parseTxtPayload(txt(...body)), /no format-version comment found/);
   rejects(sb.parseTxtPayload(txt(...lines.map((l) => l.replace('browser: Firefox', 'browser: ')), ...body)), hint);
-  // Six columns is a format 1 shape, so a format 2 file with six columns is rejected.
+  // six columns is the format 1 shape
   rejects(sb.parseTxtPayload(txt(...lines, '', 'Firefox Add-ons - 1 in total', '', 'Alpha | 1.0 | Extension | Enabled | https://example.com/a | a@x')), /columns instead of 7/);
 });

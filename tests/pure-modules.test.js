@@ -1,7 +1,6 @@
-// The Importer's readers (import/parsers.js), its matching (import/match.js)
-// and the settings file code (settings/settings-file.js) are pure: they are
-// loaded here into a sandbox with NO document and NO browser object at all, so
-// this fails if any of them ever starts touching the page.
+// parsers.js, match.js and settings-file.js must stay pure. They're loaded
+// into a sandbox with no document and no browser object, so this fails if one
+// starts touching the page.
 
 const assert = require('assert');
 const { test, readSrcs, makeSandbox } = require('./helpers');

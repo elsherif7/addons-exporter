@@ -1,19 +1,12 @@
-// The data contract of every file the Importer reads.
+// Data layout of every file the Importer reads. The look of the html report
+// can change, the data can't: the Importer (and the report already released on
+// AMO) depends on it.
 //
-// The look of the HTML report can change freely; the data inside every export
-// cannot, because the Importer (and, for the HTML report, the version already
-// released on addons.mozilla.org) depends on it. This file pins the data layout
-// of each format next to EXPORT_FORMAT_VERSION, so the two can only change
-// together and on purpose.
-//
-// If one of these tests fails after you changed an export:
-//   1. A file written by the previous layout may no longer be readable. Decide
-//      if the Importer must still read it (then keep a reader for it, in
-//      migrateAddonsData() and the parsers), or not.
-//   2. Bump EXPORT_FORMAT_VERSION in src/common/core.js (the settings file has
-//      its own SETTINGS_FILE_FORMAT_VERSION in src/settings/settings-file.js).
-//   3. Update CONTRACT below, with the new version number.
-// Changing only the page's look (HTML/CSS) must never need any of this.
+// If a test here fails after you changed an export: decide if old files must
+// still be readable (keep a reader in migrateAddonsData() and the parsers),
+// bump EXPORT_FORMAT_VERSION in src/common/core.js (the settings file has its
+// own SETTINGS_FILE_FORMAT_VERSION in src/settings/settings-file.js), then
+// update CONTRACT below.
 
 const assert = require('assert');
 const fs = require('fs');
@@ -22,25 +15,18 @@ const { test, evalInContext, readCommon, readReportBuilders, readImport, htmlDat
 
 const CONTRACT = {
   exportFormatVersion: 2,
-  // Format 2 added the source: the file's own format version and type, then
-  // where the export came from. (Format 1, which the release on AMO wrote, had
-  // none of it - the Importer still reads it.)
+  // format 1 (the AMO release) had no source block, the Importer still reads it
   sourceKeys: ['formatVersion', 'fileType', 'basedOn', 'browser', 'browserVersion', 'extensionVersion'],
   htmlTopV1: ['formatVersion', 'addons'],
-  // The HTML report's embedded data.
   htmlTop: ['source', 'addons'],
   htmlEntry: ['id', 'name', 'version', 'enabled', 'type', 'link', 'linkType'],
-  // The JSON file.
   jsonTop: ['source', 'addons'],
   jsonEntry: ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id'],
-  // The CSV header row.
   csvHeader: 'name,version,type,enabled,link,linkType,id',
-  // The TXT columns, in order, and its separator.
   txtColumns: 7,
   txtSeparator: ' | ',
 };
 
-// CSV and TXT carry the source as one comment line per field, at the very top.
 const sourceLines = (fileType, version) => [
   `# addons-hub-source-formatVersion: ${version}`,
   `# addons-hub-source-fileType: ${fileType}`,
@@ -54,8 +40,7 @@ const sandbox = makeSandbox({ URL }, readCommon(), readReportBuilders());
 const VERSION = evalInContext(sandbox, 'EXPORT_FORMAT_VERSION');
 
 const AMO = 'https://addons.mozilla.org/en-US/firefox/addon/';
-// Deliberately in a different field order from every format, to prove the
-// builders fix the order themselves.
+// field order differs from every format on purpose, builders must set it themselves
 const list = [
   { linkType: 'amo-exact', link: AMO + 'a/', type: 'extension', enabled: true, version: '1.0', name: 'Alpha - the first', id: 'a@x' },
   { linkType: 'homepage', link: 'https://example.com/n', type: 'theme', enabled: false, version: '2', name: 'Night', id: 'n@x' },
@@ -91,8 +76,7 @@ test('contract: the add-ons in the HTML report match the released AMO report (fo
   assert.deepStrictEqual(keys(released), CONTRACT.htmlTopV1);
   assert.strictEqual(released.formatVersion, 1);
   for (const a of released.addons) assert.deepStrictEqual(keys(a), CONTRACT.htmlEntry);
-  // Rebuilt by today's code from the released data, the add-ons are unchanged;
-  // only the format version and the source around them are new.
+  // only the version and source around the add-ons are new
   const rebuilt = htmlData(sandbox.buildHtmlReport(released.addons, 'light', false, SOURCE));
   assert.strictEqual(JSON.stringify(rebuilt.addons), JSON.stringify(released.addons), 'today\'s report writes the released add-ons exactly' + HINT);
 });

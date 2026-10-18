@@ -1,16 +1,12 @@
-  /* Vertical padding uses vmin (not vw) so it also scales down on
-     short landscape viewports, where vw alone would keep it large
-     even though height is what's actually constrained there. */
+  /* vmin, not vw, so the padding also shrinks on short landscape screens */
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg); margin: 0; padding: clamp(24px, 8vmin, 60px) clamp(14px, 5vw, 20px); color: var(--text); box-sizing: border-box; overflow-wrap: break-word; }
   .card { position: relative; max-width: 640px; margin: 0 auto; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; box-shadow: var(--card-shadow); padding: clamp(20px, 6vmin, 40px); text-align: center; box-sizing: border-box; }
   h1 { font-size: clamp(22px, 6vw, 28px); margin: 0 0 16px; }
   p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0 28px; }
-  /* Staged opening reveal - same as "staged" in shared.css, which a saved
-     report cannot load. First only the page background shows, then the
-     empty card UNFOLDS downward, then the title settles in as its letters
-     tighten up, then the intro, the search box and the list wipe in from
-     the left, one after another. backwards fill throughout: nothing shows
-     before its turn, and no held keyframe overrides :hover. */
+  /* Opening reveal, same as "staged" in shared.css (a saved report can't load
+     it): card unfolds, title settles in, then intro, search and list wipe in.
+     "backwards" fill so nothing shows before its turn and no held keyframe
+     overrides :hover. */
   @keyframes hub-unfold {
     from { opacity: 0; transform: translateY(20px); clip-path: inset(0 0 100% 0 round 12px); }
     to   { opacity: 1; transform: none; clip-path: inset(-60px round 12px); }
@@ -29,12 +25,10 @@
   }
   .card { animation: hub-unfold 0.8s var(--motion-ease) backwards; animation-delay: 0.15s; }
   .card > h1 { animation: hub-title-in 0.6s var(--motion-ease) backwards; animation-delay: 0.55s; }
-  /* The theme toggle is absolutely positioned inside the card; it just
-     fades in with the title. */
+  /* the toggle is absolutely positioned, so it just fades in with the title */
   .card > .theme-toggle { animation: hub-fade-in var(--motion-normal) ease backwards; animation-delay: 0.55s; }
-  /* The same reveal as the Settings page: the intro, the search box and the
-     list box wipe in under the title, one every 0.16s; the inline script sets
-     their start times in --d (the fallbacks are the same timings without it). */
+  /* The inline script sets each part's start time in --d; the fallbacks are
+     the same timings without it. */
   .card > .intro-text { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 0.82s); }
   .cta-link { color: var(--link-accent); font-weight: bold; text-decoration: none; }
   .cta-link:hover { text-decoration: underline; }
@@ -58,9 +52,8 @@
   }
   .theme-toggle:hover { background: var(--hover-bg); border-color: var(--border-hover); transform: scale(1.02); }
   .theme-toggle:active { transform: scale(0.9); }
-  /* Both icons live in the button and data-theme decides which one is shown,
-     so nothing has to swap them at runtime. Only the visible one is rendered,
-     which is also what replays its spin (below) each time it appears. */
+  /* data-theme decides which icon shows. Only the visible one is rendered,
+     which is also what replays its spin each time. */
   .theme-toggle .theme-icon { display: none; }
   [data-theme="light"] .theme-toggle .theme-icon-moon,
   [data-theme="dark"] .theme-toggle .theme-icon-sun { display: block; }
@@ -119,12 +112,10 @@
     border-bottom: 1px solid var(--divider);
     user-select: none;
     transition: background 0.12s, transform 0.1s;
-    /* Search fade (see .is-filtered below). The line above is the
-       fallback for Firefox versions that don't understand allow-discrete. */
+    /* the line above is the fallback for browsers without allow-discrete */
     transition: background 0.12s, transform 0.1s,
       opacity var(--motion-search) ease, display var(--motion-search) allow-discrete;
   }
-  /* Name, version, type (and any match note): one equal 10px gap between each. */
   .addon-row-info { flex: 1; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; }
   .addon-row:last-child { border-bottom: none; }
   .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
@@ -132,10 +123,8 @@
   :root[data-theme="dark"] .addon-row:hover { background: #2e3340; }
   .group-container { transition: opacity var(--motion-search) ease, display var(--motion-search) allow-discrete; }
   #addonList { transition: opacity var(--motion-search) ease, display var(--motion-search) allow-discrete; }
-  /* Search filtering: the inline script sets display:none AND .is-filtered
-     when a row or group stops matching (and removes both when it matches
-     again), which the transitions above turn into a fade out / fade in.
-     Where unsupported it is simply instant. */
+  /* The script sets display:none and .is-filtered together, which the
+     transitions above turn into a fade. Instant where unsupported. */
   .addon-row.is-filtered, .group-container.is-filtered, #addonList.is-filtered { opacity: 0; }
   @starting-style {
     .addon-row, .group-container, #addonList { opacity: 0; }
@@ -148,16 +137,14 @@
   .addon-row-info .addon-version, .addon-row-info .match-label { margin-left: 0; }
   .match-uncertain { color: var(--warn-color); font-weight: 600; }
 
-  /* The rest of the opening reveal (see the staged block near the top).
-     Kept down here, after the .search-input and .checklist-box rules they
-     extend, because the drift tests read the first rule of each selector. */
+  /* Rest of the opening reveal. Kept after the .search-input and
+     .checklist-box rules because the drift tests read the first rule of each
+     selector. */
   .card > .search-input { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 0.98s); }
   .card > .checklist-box { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 1.14s); }
-  /* The list rows and group headings cascade in one after another, top to
-     bottom, one every 0.08s - the headings slide in and the rows wipe in,
-     like the Settings page's. The inline script gives every row its start
-     time (--rd) and removes the "revealing" flag once the last row is in, so
-     searching never replays this. */
+  /* Rows and headings cascade in one by one. The script sets each row's
+     start in --rd and removes "revealing" afterwards, so searching doesn't
+     replay it. */
   @keyframes hub-slide-in {
     from { opacity: 0; transform: translateX(-18px); }
     to   { opacity: 1; transform: none; }
@@ -171,13 +158,9 @@
     animation-delay: var(--rd, 0s);
   }
 
-  /* Light/dark switch. Where the browser supports view transitions
-     (Firefox 144+), theme.js wraps the theme change in
-     document.startViewTransition(): the old page stays fully visible while
-     the new theme fades in on top of it - a plain, clean cross-fade, with no
-     blur or zoom. Everywhere else, theme.js adds .theme-switching to <html>
-     for a moment instead, and every color glides from one theme to the
-     other. Neither runs on first page load. */
+  /* Theme switch: where view transitions exist (Firefox 144+) the new theme
+     cross-fades over the old one, otherwise .theme-switching makes the colours
+     glide. Neither runs on first load. */
   ::view-transition-old(root),
   ::view-transition-new(root) {
     mix-blend-mode: normal;
@@ -199,15 +182,14 @@
       fill var(--motion-theme) ease-in-out, stroke var(--motion-theme) ease-in-out !important;
   }
 
-  /* The sun/moon icon spins and pops in each time it appears. */
+  /* the sun/moon icon spins in each time it appears */
   @keyframes hub-icon-spin {
     from { opacity: 0; transform: rotate(-200deg) scale(0.3); }
     to   { opacity: 1; transform: none; }
   }
   .theme-toggle svg { animation: hub-icon-spin 0.7s var(--motion-spring) backwards; }
 
-  /* Nothing should be caught mid-fade when the report is printed or saved
-     as a PDF. */
+  /* so nothing is caught mid-fade when printing or saving as PDF */
   @media print {
     *, *::before, *::after {
       animation: none !important;

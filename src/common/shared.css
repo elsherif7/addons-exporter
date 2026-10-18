@@ -1,11 +1,8 @@
-/* Shared base styles for the extension's full-page tabs. */
+/* Base styles for the full-page tabs. */
 
-/* Theme variables and motion timings live in tokens.css, loaded before this
-   file. src/common/theme.js sets document.documentElement's data-theme
-   attribute on load from the stored Settings value; tokens.css holds the values
-   themselves. */
+/* Colours and motion timings are in tokens.css, loaded before this file;
+   theme.js sets data-theme on load. */
 
-/* Custom scrollbar */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border-soft) transparent;
@@ -28,12 +25,8 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   background: var(--bg);
   margin: 0;
-  /* Fluid padding: scales down smoothly on narrow phones instead of a
-     fixed 60px eating into limited width, and back up toward the
-     original 60px/20px on wider screens. Vertical padding uses vmin
-     (not vw) so it also scales down on short landscape viewports,
-     where vw alone would keep it large even though height is what's
-     actually constrained there. */
+  /* Fluid padding so narrow phones don't lose 60px. Vertical uses vmin (not
+     vw) so it also shrinks on short landscape screens. */
   padding: clamp(24px, 8vmin, 60px) clamp(14px, 5vw, 20px);
   color: var(--text);
   box-sizing: border-box;
@@ -52,11 +45,9 @@ body {
   box-sizing: border-box;
 }
 
-/* Entrance animation keyframes (the pages' own opening is the staged reveal
-   below; the Settings page uses these same hub-* names).
-   IMPORTANT: these use backwards fill, never both/forwards. A held final
-   keyframe would override the :hover transform on buttons and inputs that
-   are direct children of the card. */
+/* Entrance keyframes (the Settings page uses the same hub-* names). They use
+   backwards fill, never both/forwards: a held last keyframe would override the
+   :hover transform on buttons and inputs directly inside the card. */
 @keyframes hub-card-in {
   from { opacity: 0; transform: translateY(44px) scale(0.92); }
   to   { opacity: 1; transform: none; }
@@ -73,18 +64,13 @@ body {
   from { transform: scale(0.4); }
   to   { transform: none; }
 }
-/* Staged opening reveal - add the class "staged" to a page's card (the
-   Exporter and Importer do). It is the SAME reveal the Settings page has,
-   with the same animations, durations and spacing: first only the page
-   background shows, then the empty card UNFOLDS downward, then the title
-   settles in as its letters tighten up, then each part of the page wipes in
-   from the left, top to bottom, one every 0.16s, and the add-on rows follow,
-   one every 0.08s (group headings slide in, rows wipe in). reveal.js sets the
-   start times: --d for a part, --rd for a list row. Anything revealed later
-   (the Importer's list, after a file is chosen) has no --d, so it wipes in
-   at once when shown. backwards fill throughout, so nothing shows before its
-   turn and no held keyframe overrides :hover. Reduced motion zeroes the
-   delays (below) and reveal.js does not run. */
+/* Opening reveal: add "staged" to a page's card (Exporter and Importer do).
+   Same as the Settings page: the card unfolds, the title settles in, each part
+   wipes in top to bottom (0.16s apart) and the rows follow (0.08s apart).
+   reveal.js sets the start times, --d per part and --rd per row. Anything shown
+   later (the Importer's list) has no --d and wipes in at once. "backwards" fill
+   so nothing shows early and no held keyframe overrides :hover. Reduced motion
+   zeroes the delays and reveal.js doesn't run. */
 @keyframes hub-unfold {
   from { opacity: 0; transform: translateY(20px); clip-path: inset(0 0 100% 0 round 12px); }
   to   { opacity: 1; transform: none; clip-path: inset(-60px round 12px); }
@@ -104,13 +90,9 @@ body {
 .card.staged { animation: hub-unfold 0.8s var(--motion-ease) backwards; animation-delay: 0.15s; }
 .card.staged > h1:first-child { animation: hub-title-in 0.6s var(--motion-ease) backwards; animation-delay: 0.55s; }
 .card.staged > :not(h1) { animation: hub-wipe-in 0.55s var(--motion-ease) backwards; animation-delay: var(--d, 0s); }
-/* A part with no --d (the Importer's list, search box and file name, revealed
-   only after a file is chosen) has nothing to wait for and wipes in at once. */
 /* replayEntrance() (page-ui.js) adds this for one frame to restart the
-   entrance animations (the card and everything inside it), e.g. when an
-   already-open Settings tab is opened again from the popup. */
+   entrance, e.g. when an open Settings tab is opened again from the popup. */
 .replay-reset, .replay-reset * { animation: none !important; }
-/* Status/notes fade in when they first get text. */
 #status:not(:empty), #compareNote:not(:empty) { animation: hub-fade-in var(--motion-normal) ease backwards; }
 h1 { font-size: clamp(22px, 6vw, 28px); margin: 0 0 16px; }
 p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0 28px; }
@@ -136,9 +118,8 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   border-color: var(--border-hover);
   transform: scale(1.01);
 }
-/* The row above the list: "Select all" / "Deselect all" as two small pill
-   buttons on the left (they look pressable, unlike bare blue links), and a
-   badge with how many are selected on the right. */
+/* Select all / Deselect all as small pill buttons on the left, selected count
+   badge on the right. */
 .list-controls {
   display: flex;
   flex-wrap: wrap;
@@ -160,13 +141,11 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   font-weight: 600;
   line-height: 1.2;
   cursor: pointer;
-  /* A fixed height shared with #selectionCount below, so the three
-     always match whatever font the browser picks for each. */
+  /* same fixed height as #selectionCount so they always match */
   box-sizing: border-box;
   height: 32px;
   padding: 0 14px;
   user-select: none;
-  /* Springy release, like .hub-btn. */
   transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.35s var(--motion-spring);
 }
 .list-controls button:hover {
@@ -180,7 +159,6 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   outline-offset: 2px;
 }
 #selectionCount {
-  /* Same size as the Select all / Deselect all buttons next to it. */
   font-size: 13px;
   font-weight: 600;
   line-height: 1.2;
@@ -197,13 +175,11 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   padding: 0 14px;
   white-space: nowrap;
 }
-/* Nothing to say yet (before the list loads): no empty badge. When it first
-   gets text it fades in. */
+/* no empty badge before the list loads; it fades in with its first text */
 #selectionCount:empty { display: none; }
-/* While the number in the badge changes, setSelectionCount() (page-ui.js)
-   builds a little slot around it: the new number slides in while the old one
-   slides out, both clipped to the slot, like a counter rolling over. The
-   slot only exists for the length of the animation. */
+/* While the number changes, setSelectionCount() (page-ui.js) builds a slot
+   around it: the new number slides in as the old one slides out, like a
+   counter. The slot only exists during the animation. */
 #selectionCount .count-roll { display: inline-block; position: relative; overflow: hidden; vertical-align: top; }
 #selectionCount .count-roll-now { display: inline-block; }
 #selectionCount .count-roll-old { position: absolute; left: 0; top: 0; }
@@ -225,7 +201,6 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   border: 1px solid var(--border);
   border-radius: 10px;
   text-align: center;
-  /* Plays each time the box is shown (display: none -> block). */
   animation: hub-fade-in var(--motion-normal) ease backwards;
 }
 .group-heading {
@@ -242,9 +217,8 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   margin-bottom: 16px;
   overflow: hidden;
 }
-/* The add-on list box appears once it's been rendered (export) or a file
-   has been chosen (import). Kept after the base rule above on purpose: the
-   report drift tests read the first .groups-outer-box block. */
+/* Kept after the base rule above because the report drift tests read the
+   first .groups-outer-box block. */
 .groups-outer-box { animation: hub-rise-in var(--motion-slow) var(--motion-spring) backwards; }
 .group-container {
   margin-bottom: 20px;
@@ -267,17 +241,13 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   cursor: pointer;
   user-select: none;
   transition: background 0.12s, border-color 0.12s, transform 0.1s;
-  /* Search fade. The line above is the fallback for Firefox versions
-     that don't understand `allow-discrete` (they drop this whole
-     declaration and keep the one above - rows just appear/disappear). */
+  /* the line above is the fallback for browsers without allow-discrete */
   transition: background 0.12s, border-color 0.12s, transform 0.1s,
     opacity var(--motion-search) ease, display var(--motion-search) allow-discrete;
 }
 .addon-row:last-child { border-bottom: none; }
 .addon-row:hover { background: var(--hover-bg); transform: scale(1.01); }
 .addon-row:active { transform: scale(0.985); }
-/* A checkbox pops when it becomes ticked (also plays when a list is first
-   drawn with rows already ticked, and on Select all). */
 .addon-row input[type="checkbox"]:checked { animation: hub-pop var(--motion-normal) var(--motion-spring); }
 :root[data-theme="dark"] .addon-row:hover { background: #2e3340; }
 .addon-name { font-size: 14px; font-weight: 600; color: var(--text); }
@@ -286,31 +256,24 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   text-align: left;
   font-size: 14px;
   cursor: pointer;
-  /* Name, version, type (and any match note) sit in a row with one equal
-     10px gap between each, the same as the gap after the checkbox - instead
-     of relying on typed spaces, which came out different sizes. */
+  /* One equal 10px gap between name, version, type and note, instead of typed
+     spaces, which came out different sizes. */
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   column-gap: 10px;
 }
-/* A warning under the name takes its own line. */
 .addon-row label .addon-link-preview { flex-basis: 100%; }
 .addon-row input[type="checkbox"] {
   margin-top: 3px;
 }
-/* Nothing extra after the tick box, so its gap to the name is the row's 10px. */
 .addon-row > input[type="checkbox"] { margin-right: 0; }
 .addon-version {
   color: var(--text-faint);
   font-size: 12px;
 }
-/* Base layout/typography for a link-preview note under an add-on's name.
-   Split from .unsafe below so a future non-error use (e.g. a neutral
-   "resolved via homepage" note) could reuse the same block/size/spacing
-   without also getting the red warning styling — import.js only ever
-   applies this alongside .unsafe today, but the two are kept separate
-   on purpose. */
+/* Base layout for the note under a name. Split from .unsafe on purpose, so a
+   neutral note could reuse it later. */
 .addon-link-preview {
   display: block;
   font-size: 12px;
@@ -321,10 +284,8 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   color: var(--danger-color);
   font-weight: 600;
 }
-/* Rows with an unsafe link are non-interactive — disable and grey them out.
-   A class set directly by the JS that disables the checkbox (rather than
-   the :has selector (with input:disabled), which needs Firefox 121 - newer
-   than some of the browsers this was first written for). */
+/* Unsafe-link rows are greyed out and not clickable. A class set by the JS
+   that disables the checkbox, because a selector-only version needs Firefox 121. */
 .addon-row.row-disabled {
   opacity: 0.5;
   cursor: default;
@@ -336,24 +297,18 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 .addon-row input[type="checkbox"]:disabled {
   cursor: not-allowed;
 }
-/* Search filtering. filterAddonRows() (page-ui.js) sets display:none AND
-   adds .is-filtered when a row or group stops matching, and removes both
-   when it matches again. The opacity change plus the display transition
-   above turn that into a fade out / fade in; where unsupported it is
-   simply instant. Placed after .row-disabled so it wins over its opacity. */
+/* filterAddonRows() (page-ui.js) sets display:none and .is-filtered together;
+   the transitions above turn that into a fade. Instant where unsupported.
+   After .row-disabled so it wins over its opacity. */
 .addon-row.is-filtered,
 .group-container.is-filtered,
 #addonList.is-filtered { opacity: 0; }
 #addonList { transition: opacity var(--motion-search) ease, display var(--motion-search) allow-discrete; }
-/* A row/group inserted into the page starts transparent and fades in. */
 @starting-style {
   .addon-row, .group-container, #addonList { opacity: 0; }
 }
-/* List rows and group headings appear one after another, top to bottom,
-   when a list is first drawn - the headings slide in and the rows wipe in,
-   exactly like Settings' headings and rows. reveal.js gives
-   every row its own start time (--rd), flags the list .revealing just long
-   enough, and removes the flag again so filtering never replays this. */
+/* Rows and headings cascade in on first draw. reveal.js gives each row a start
+   time (--rd) and removes .revealing afterwards, so filtering doesn't replay it. */
 #addonList.revealing .addon-row {
   animation: hub-wipe-in 0.55s var(--motion-ease) backwards;
   animation-delay: var(--rd, 0s);
@@ -374,18 +329,13 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   border-radius: 4px;
 }
 .match-label[href]:hover { text-decoration: underline; }
-/* Inside a row's label the flex gap spaces things, so no extra left margin. */
 .addon-row label .match-label { margin-left: 0; }
 .match-uncertain {
   color: var(--warn-color);
   font-weight: 600;
 }
-/* Canonical shared button base used by every action button in the
-   extension: primary-btn (Export/Open Selected), settings-btn
-   (Export/Import/Reset Settings), chooseFileBtn (Choose file), and
-   the modal buttons (Cancel/Reset dialog).
-   Per-button overrides (sizing, layout, danger color) live in their
-   own classes on top of this base. */
+/* Base for every action button. Per-button sizing and danger colours are
+   layered on top in their own classes. */
 .hub-btn {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -395,8 +345,7 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   font-weight: 600;
   cursor: pointer;
   user-select: none;
-  /* The transform part is a springy release: pressed in quickly (see
-     :active below), it bounces back out when let go. */
+  /* springy release: pressed in quickly, bounces back when let go */
   transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.35s var(--motion-spring);
 }
 .hub-btn:hover { background: var(--hover-bg); border-color: var(--border-hover); transform: scale(1.02); }
@@ -437,13 +386,11 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   padding: 0 10px;
   box-sizing: border-box;
 }
-/* Space only shows up when there's actually a note. */
 #compareNote:not(:empty) {
   margin-top: 12px;
 }
 
-/* About/info block — bordered container with labeled rows.
-   Used by settings.html and confirmation.html. */
+/* About/info block, used by settings.html and confirmation.html. */
 .about-block {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -468,13 +415,9 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
 .about-value a { display: inline-block; border-radius: 4px; color: var(--link-accent); text-decoration: none; font-weight: 600; }
 .about-value a:hover { text-decoration: underline; }
 
-/* Light/dark switch. Where the browser supports view transitions
-   (Firefox 144+), theme.js wraps the theme change in
-   document.startViewTransition(): the old page stays fully visible while
-   the new theme fades in on top of it - a plain, clean cross-fade, with no
-   blur or zoom. Everywhere else, theme.js adds .theme-switching to <html>
-   for a moment instead, and every color glides from one theme to the
-   other. Neither runs on first page load. */
+/* Theme switch: where view transitions exist (Firefox 144+) the new theme
+   cross-fades over the old one, otherwise .theme-switching makes the colours
+   glide. Neither runs on first load. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   mix-blend-mode: normal;
@@ -502,8 +445,7 @@ p { font-size: 16px; color: var(--text-secondary); line-height: 1.7; margin: 0 0
   *, *::before, *::after {
     transition-duration: 0.001ms !important;
     animation-duration: 0.001ms !important;
-    /* Staged reveals use long delays - with reduced motion everything
-       must simply be there, not wait hidden for its turn. */
+    /* staged reveals have long delays; with reduced motion everything must just be there */
     animation-delay: 0s !important;
   }
   .search-input:hover,

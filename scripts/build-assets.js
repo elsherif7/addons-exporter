@@ -1,17 +1,13 @@
-// Builds src/background/report-assets.generated.js - the three things the
-// exported HTML report carries inside it, because a saved report is a
-// standalone file that cannot load anything from the extension:
-//   REPORT_CSS            the report's stylesheet   (src/common/tokens.css + src/background/report.css)
-//   REPORT_INLINE_SCRIPT  the report's own script   (from src/background/report-inline.js)
-//   REPORT_ICON_DATA_URI  the favicon, as a data URI (from icons/icon32.png)
+// Builds src/background/report-assets.generated.js: what the exported HTML
+// report carries inside itself, since a saved report can't load anything from
+// the extension.
+//   REPORT_CSS            tokens.css + report.css
+//   REPORT_INLINE_SCRIPT  report-inline.js
+//   REPORT_ICON_DATA_URI  icons/icon32.png as a data URI
 //
-// Run with: npm run build
-//
-// When to run: after editing any of those source files (or tokens.css). `npm test` runs
-// this with --check first, which never writes: it just fails, naming what is out
-// of date, so a test run can never change the working tree.
-//
-// The generated file is never edited by hand. Edit the source files instead.
+// Run `npm run build` after editing any of those. `npm test` runs this with
+// --check first, which only fails (naming what's stale) and never writes.
+// Don't edit the generated file by hand.
 
 'use strict';
 
@@ -25,18 +21,15 @@ function read(...parts) {
   return fs.readFileSync(path.join(ROOT, ...parts), 'utf8');
 }
 
-// Text sources are read with line endings normalised to "\n", so the generated
-// file is byte-identical whether the working tree uses LF or CRLF. Without
-// this, a fresh Windows clone (core.autocrlf=true) would produce a "different"
-// file and fail `--check`. (.gitattributes also pins LF, as a second line of
-// defence.)
+// Line endings are normalised to "\n" so the output is the same with LF or
+// CRLF. Otherwise a Windows clone (core.autocrlf=true) would fail `--check`.
+// (.gitattributes pins LF as well.)
 function readText(...parts) {
   return read(...parts).replace(/\r\n/g, '\n');
 }
 
-// The text of the generated file, built from the current source files.
 function buildAssets() {
-  // The report's tokens (src/common/tokens.css) come first, then its own rules.
+  // tokens first, then the report's own rules
   const css = readText('src', 'common', 'tokens.css') + '\n' + readText('src', 'background', 'report.css');
   const script = readText('src', 'background', 'report-inline.js').replace(/\n$/, '');
   const icon = `data:image/png;base64,${fs.readFileSync(path.join(ROOT, 'icons', 'icon32.png')).toString('base64')}`;
@@ -60,7 +53,6 @@ if (require.main === module) {
   const wanted = buildAssets();
   const current = fs.existsSync(OUT_PATH) ? fs.readFileSync(OUT_PATH, 'utf8') : null;
 
-  // --check: report whether the file is up to date, but never write it.
   if (process.argv.includes('--check')) {
     if (current === wanted) {
       console.log('build-assets: report-assets.generated.js is up to date.');

@@ -1,15 +1,9 @@
-// Tests for src/import/import.js's file-parsing and validation pipeline.
-// Loads the real source files via vm so these run against the actual
-// files, not a copy.
-
 const assert = require('assert');
 const vm = require('vm');
 const { test, testAsync, evalInContext, makeFakeDom, readCommon, readReportBuilders, readImport, plain, stubDocument, makeSandbox, recordLoad, IMPORTER_ELEMENT_IDS, FIREFOX_SOURCE: SOURCE } = require('./helpers');
 
-// import.js wires up DOM elements and event listeners at load time.
-// stubDocument() exists purely to let the file load without throwing - none of
-// the tests below trigger DOM rendering, file reading, or messaging, so a
-// generic fake element for every id is enough.
+// import.js touches the DOM at load time, so a stub document is enough here.
+// none of these tests render anything.
 
 const commonSrc = readCommon();
 const reportTemplateSrc = readReportBuilders();
@@ -28,25 +22,17 @@ const {
   validateSelectedFile,
 } = sandbox;
 
-// EXPORT_FORMAT_VERSION is declared with top-level `const` in core.js,
-// so (unlike the function declarations above) it isn't copied onto the
-// sandbox object - it only exists in the context's own lexical scope.
-// Evaluate it there directly instead of destructuring it from sandbox.
+// top-level const, so it isn't on the sandbox object. read it from the context.
 const EXPORT_FORMAT_VERSION = evalInContext(sandbox, 'EXPORT_FORMAT_VERSION');
-// The hand-built files in most tests below are format 1 (the add-ons only, no
-// source): format 1 is still read, so its strict layout stays covered. Format 2,
-// which adds the source, has its own tests at the end of this file.
+// most hand-built files here are format 1 (still read, strict layout).
+// format 2 has its own tests at the end.
 const V1 = 1;
-
-// --- parseAddonsPayload ---
-// Validates the untrusted-file payload embedded in an exported report.
 
 function payload(addons, formatVersion = V1) {
   return JSON.stringify({ formatVersion, addons });
 }
-// A format 2 file: the source (whose own first two fields are the format
-// version and the file type), then the add-ons, with no top-level format
-// version. SOURCE is the browser part, as getExportSource() returns it.
+// format 2: source first (formatVersion, fileType), then addons, no top-level
+// formatVersion. SOURCE is what getExportSource() returns.
 function payloadV2(addons, source = { formatVersion: 2, fileType: 'html', ...SOURCE }) {
   return JSON.stringify({ source, addons });
 }
@@ -85,7 +71,7 @@ test('parseAddonsPayload: empty addons array', () => {
   assert.match(result.error, /No add-ons found/);
 });
 
-// A complete entry, exactly as the exporter writes it (HTML report and JSON).
+// a full entry, as the exporter writes it
 const entry = (o = {}) => ({ id: 'ext1@example.com', name: 'uBlock Origin', version: '1.58.0', enabled: true, type: 'extension', link: 'https://addons.mozilla.org/x', linkType: 'amo-exact', ...o });
 const entryRejects = (o, pattern) => {
   const result = parseAddonsPayload(payload([entry(), o]));
@@ -167,9 +153,7 @@ test('parseAddonsPayload: valid file succeeds and returns the parsed addons', ()
   assert.deepStrictEqual(plain(result.addons[0]), entry());
 });
 
-// The HTML report from the version released on addons.mozilla.org, saved
-// unchanged (tests/fixtures/amo-release.html). Its embedded data is read by
-// the same strict check as everything else.
+// real report from the AMO release, saved as-is in tests/fixtures/amo-release.html
 test('AMO release: the HTML report from the released version is read in full by the strict check', () => {
   const html = require('fs').readFileSync(require('path').join(__dirname, 'fixtures', 'amo-release.html'), 'utf8');
   const m = html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/);
@@ -183,20 +167,15 @@ test('AMO release: the HTML report from the released version is read in full by 
   assert.ok(result.addons.every((a) => a.id && a.link.startsWith('https://addons.mozilla.org/')));
 });
 
-// --- A6: a bare-array export (the shape that predates format 1) is turned away cleanly ---
-
 test('parseAddonsPayload: a bare array is rejected as a file with no format version, not "No add-ons found"', () => {
-  // A plain array with no formatVersion/addons wrapper at all. No released
-  // export ever wrote that shape, so it is turned away here by the same strict
-  // check as any other payload without a version.
+  // no released export wrote this shape, so it fails the same strict check as
+  // any payload without a version.
   const result = parseAddonsPayload(JSON.stringify([
     { name: 'uBlock Origin', version: '1.58.0', enabled: true },
   ]));
   assert.strictEqual(result.ok, false);
   assert.match(result.error, /missing its export format version/);
 });
-
-// --- A27: stricter formatVersion, type coercion, de-duplication ---
 
 test('parseAddonsPayload: a negative formatVersion is rejected', () => {
   const result = parseAddonsPayload(JSON.stringify({ formatVersion: -5, addons: [{ name: 'X' }] }));
@@ -222,22 +201,13 @@ test('parseAddonsPayload: two different add-ons are not treated as duplicates', 
   assert.strictEqual(result.addons.length, 2);
 });
 
-// --- migrateAddonsData ---
-
 test('migrateAddonsData: currently a no-op, returns the list unchanged', () => {
   const list = [{ name: 'X' }];
   assert.strictEqual(migrateAddonsData(list, EXPORT_FORMAT_VERSION), list);
 });
 
-// (Format 2 only added the source around the add-ons, so the add-on entries
-// still need no migration.)
-// Deliberately hardcodes today's version number and today's no-op
-// behavior, rather than reading EXPORT_FORMAT_VERSION dynamically like
-// the test above. The moment someone bumps EXPORT_FORMAT_VERSION, this
-// starts failing - that's the point. It's a tripwire: a format bump
-// can't ship without someone consciously updating migrateAddonsData for
-// the new shape and updating this test to match, instead of the bump
-// quietly going out with the old no-op still in place.
+// hardcoded on purpose: a format bump should fail here, so migrateAddonsData
+// gets looked at instead of keeping the old no-op by accident.
 test('migrateAddonsData: bumping the format version requires updating this test and migrateAddonsData', () => {
   assert.strictEqual(
     EXPORT_FORMAT_VERSION, 2,
@@ -249,8 +219,6 @@ test('migrateAddonsData: bumping the format version requires updating this test 
     'migrateAddonsData is expected to still be a no-op for format version 1'
   );
 });
-
-// --- buildInstalledIndex / findInstalledMatch ---
 
 test('findInstalledMatch: matches by id even when names differ', () => {
   const installed = [{ id: 'ext1@example.com', name: 'Renamed Locally' }];
@@ -280,13 +248,6 @@ test('findInstalledMatch: returns null when neither id nor name matches', () => 
   assert.strictEqual(match, null);
 });
 
-// --- selectAllBtn / deselectAllBtn click handlers ---
-// These load the real import.js via vm with a fake addon list (some rows
-// disabled the way createAddonRow disables them for unsafe links, some
-// hidden the way a search filter hides them) and invoke the actual
-// registered click handlers, the same approach export.test.js uses for
-// export.js's exportBtn handler.
-
 function makeCheckbox({ disabled = false, hidden = false } = {}) {
   return {
     checked: false,
@@ -303,7 +264,7 @@ function captureBulkSelectHandlers(checkboxList, { failNavigation = false, failS
   const createdTabUrls = [];
   const navigatedUrls = [];
   const sentMessages = [];
-  const order = []; // interleaved log of tab creation / message / navigation
+  const order = [];
   const addonListElStub = {
     querySelectorAll: (sel) => (sel.includes(':checked') ? checkboxList.filter((cb) => cb.checked) : checkboxList),
     addEventListener() {},
@@ -336,9 +297,8 @@ function captureBulkSelectHandlers(checkboxList, { failNavigation = false, failS
   };
   const sandbox = makeSandbox({
     URL,
-    setTimeout: (fn) => { setTimeoutCallCount++; fn(); return 0; }, // fires the stagger delay immediately - no reason for tests to actually wait
+    setTimeout: (fn) => { setTimeoutCallCount++; fn(); return 0; }, // // run the stagger delay right away
     document: { getElementById: (id) => elements[id], addEventListener() {} },
-    // import.js finishes by replacing its own page with confirmation.html
     location: {
       replace: (url) => {
         if (failNavigation) throw new Error('navigation failed');
@@ -349,7 +309,7 @@ function captureBulkSelectHandlers(checkboxList, { failNavigation = false, failS
     browser: {
       runtime: {
         getURL: (path) => `moz-extension://test-id/${path}`,
-        // The Importer hands every tab after the first to background.js.
+        // every tab after the first goes through background.js
         sendMessage: async (msg) => {
           if (failSendMessage) throw new Error('Could not establish connection');
           order.push('message');
@@ -414,11 +374,7 @@ test('deselectAllBtn: unchecks visible enabled rows, leaves disabled rows alone'
   assert.strictEqual(openSelectedBtnEl.disabled, true);
 });
 
-// --- openSelectedBtn click handler ---
-// displayItems is a module-level `let`, reassigned by loadFile() in real
-// use - it isn't a sandbox property (only var/function declarations are),
-// so it's set here via vm.runInContext() directly against the returned
-// sandbox, in the same lexical scope where it was declared.
+// displayItems is a module-level let, so it isn't on the sandbox. set it with runInContext.
 
 function selectItems(links) {
   const boxes = links.map((_, i) => {
@@ -445,7 +401,7 @@ testAsync('openSelectedBtn: opens only the FIRST add-on itself, hands the rest t
   assert.deepStrictEqual(ctx.navigatedUrls, [
     'moz-extension://test-id/src/confirmation/confirmation.html?from=import',
   ]);
-  // The confirmation page must not wait for the later add-ons.
+  // confirmation page must not wait for the later add-ons
   assert.deepStrictEqual(ctx.order, ['tab', 'message', 'navigate']);
   assert.strictEqual(ctx.getSetTimeoutCallCount(), 0, 'no stagger delay here - background.js does that');
   assert.strictEqual(ctx.statusEl.textContent, 'Opened 3 tabs');
@@ -467,8 +423,7 @@ testAsync('openSelectedBtn: a single selected add-on needs no hand-off at all', 
 testAsync('openSelectedBtn: stays on the page (no confirmation) if every selected link fails to open', async () => {
   const { boxes, itemsJs } = selectItems(['javascript:alert(1)']);
   const ctx = captureBulkSelectHandlers(boxes);
-  // Re-validated at open time regardless of how it got selected - see
-  // isSafeUrl's use in the real handler.
+  // re-validated at open time, however it got selected
   vm.runInContext(itemsJs, ctx.sandbox);
 
   await ctx.openSelectedHandler();
@@ -535,8 +490,6 @@ testAsync('openSelectedBtn: a failing navigation still leaves the add-on tabs op
   assert.strictEqual(ctx.statusEl.textContent, 'Opened 1 tab');
 });
 
-// --- parseJsonPayload ---
-
 function jsonFile(addons, formatVersion = V1) {
   return JSON.stringify({ formatVersion, addons });
 }
@@ -581,8 +534,6 @@ test('parseJsonPayload: rejects an empty addons array', () => {
   assert.match(result.error, /No add-ons found/);
 });
 
-// --- parseCsvRecords ---
-
 test('parseCsvRecords: plain, quoted (comma, doubled quote, line break) and empty fields', () => {
   const rows = parseCsvRecords('a,b,c\n"Hello, World","Say ""Hi""","two\nlines"\nx,,z');
   assert.deepStrictEqual(Array.from(rows, (r) => Array.from(r)), [
@@ -591,9 +542,6 @@ test('parseCsvRecords: plain, quoted (comma, doubled quote, line break) and empt
     ['x', '', 'z'],
   ]);
 });
-
-// --- parseCsvPayload ---
-// The importer accepts exactly what buildCsvExport() writes and nothing else.
 
 const CSV_HEAD = 'name,version,type,enabled,link,linkType,id';
 const csvLines = (rows, formatVersion = V1, header = CSV_HEAD) =>
@@ -641,8 +589,7 @@ test('parseCsvPayload: a format version below 1 is rejected as no usable version
     '# addons-hub-source-browserVersion: 128.0',
     '# addons-hub-source-extensionVersion: 1.2.0',
   ].join('\r\n');
-  // Not "the file must start with the source comments": the comments are there,
-  // the version in them is what cannot be used.
+  // the source comments are there, it's the version in them that's unusable
   csvRejects(`${zeroSource}\r\n${CSV_HEAD}\r\n${csvRow()}`, /missing its export format version/);
 });
 
@@ -685,8 +632,6 @@ test('parseCsvPayload: CRLF or LF line endings are both read (a checkout may con
   assert.strictEqual(result.addons.length, 1);
 });
 
-// --- whole-text CSV parsing (parseCsvRecords) ---
-
 test('parseCsvPayload: text a CSV writer never produces is rejected, not repaired', () => {
   csvRejects(csvLines([csvRow({ name: '"abc"def' })]), /unexpected text after a closing quote/);
   csvRejects(csvLines([csvRow({ name: 'ab"c' })]), /quote inside an unquoted value/);
@@ -700,12 +645,10 @@ test('parseCsvPayload: a quoted field containing a real newline stays one field,
   assert.strictEqual(result.addons[0].name, 'Line1\nLine2');
 });
 
-// --- stripping the formula-injection guard ---
-
 test('parseCsvPayload: strips the leading-apostrophe formula guard back off on import', () => {
   const csv = buildCsvExport([
     { id: 'x@e.com', name: '=HYPERLINK("https://evil.example","click")', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' },
-  ], false); // full names: this checks the guard round-trips, not shortening
+  ], false); // // full names, so only the guard round-trip is tested
   const result = parseCsvPayload(csv);
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.addons[0].name, '=HYPERLINK("https://evil.example","click")',
@@ -723,11 +666,9 @@ test('buildCsvExport + parseCsvPayload: names starting with an apostrophe then a
   const list = names.map((name, i) => ({ id: `n${i}@e.com`, name, version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'amo-exact' }));
   const result = parseCsvPayload(buildCsvExport(list, false));
   assert.strictEqual(result.ok, true);
-  // The export lists add-ons in reading order, so compare as sorted sets.
+  // export lists add-ons in reading order, so compare as sorted sets
   assert.deepStrictEqual(Array.from(result.addons, (a) => a.name).sort(), [...names].sort());
 });
-
-// --- de-duplication ---
 
 test('parseCsvPayload: an exact duplicate row is de-duplicated', () => {
   const row = csvRow({ name: 'Same', link: 'https://x.com/a' });
@@ -736,17 +677,10 @@ test('parseCsvPayload: an exact duplicate row is de-duplicated', () => {
   assert.strictEqual(result.addons.length, 1, 'the duplicate row should not produce a second entry');
 });
 
-// --- Real DOM: search and Select All against the actual rendered list ---
-// Mirrors the equivalent block in export.test.js: renders import.js's
-// real list (via setSelectedFile -> loadFile -> renderAddonList) against
-// a real element tree with makeFakeDom, then drives the real
-// searchInput/selectAllBtn handlers.
-
-// Test fixtures name only what a test cares about; the rest is filled in so
-// the file passes the importer's strict check, as a real export does.
+// fixtures name only what a test cares about, the rest is filled in to pass the strict check
 const completeAddon = (a, i) => {
   const full = { id: `fixture-${i}@example.com`, version: '1.0', enabled: true, type: 'extension', link: `https://example.com/${i}`, linkType: 'amo-exact', ...a };
-  // The JSON export's field order.
+  // JSON export's field order
   return { name: full.name, version: full.version, type: full.type, enabled: full.enabled, link: full.link, linkType: full.linkType, id: full.id };
 };
 function jsonAddonsFile(addons, formatVersion = V1) {
@@ -769,8 +703,7 @@ async function renderRealImportList(addons, installed = []) {
   }, commonSrc, importSrc);
   const settle = recordLoad(sandbox, 'loadFiles');
   sandbox.setSelectedFile(jsonAddonsFile(addons));
-  // Waits for the load itself rather than for the clock: a fixed sleep here
-  // raced a busy machine (see recordLoad in tests/helpers.js).
+  // wait for the load itself, a fixed sleep raced on a busy machine (see recordLoad in helpers.js)
   await settle();
   return elements;
 }
@@ -806,7 +739,7 @@ testAsync('import.js real DOM: Select All while a search is active only checks t
     { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
     { id: 'b@x', name: 'Beta', version: '2.0', link: 'https://example.com/b' },
   ]);
-  elements.deselectAllBtn.click(); // not-yet-installed rows are checked by default on render - start from a known state
+  elements.deselectAllBtn.click(); // // rows render checked by default, start from a known state
   elements.searchInput.value = 'alpha';
   elements.searchInput.dispatchEvent('input');
   elements.selectAllBtn.click();
@@ -816,11 +749,8 @@ testAsync('import.js real DOM: Select All while a search is active only checks t
   assert.strictEqual(elements.selectionCount.textContent, '1 of 2 selected');
 });
 
-// --- the row is the click target, not just its checkbox ---
-// The shared list delegates a click anywhere in a row to that row's checkbox
-// (addon-list.js), so the native toggle has to fire exactly once wherever the
-// click lands. The fake DOM's click() and its change bubbling are real, so a
-// second toggle shows up here as a box that ended where it started.
+// the shared list delegates row clicks to the checkbox (addon-list.js), so the toggle
+// must fire exactly once. a double toggle leaves the box where it started.
 testAsync('import.js real DOM: clicking the row ticks it, the checkbox once, and a link not at all', async () => {
   const elements = await renderRealImportList([
     { id: 'a@x', name: 'Alpha', version: '1.0', link: 'https://example.com/a' },
@@ -832,23 +762,20 @@ testAsync('import.js real DOM: clicking the row ticks it, the checkbox once, and
   elements.deselectAllBtn.click();
   assert.strictEqual(elements.selectionCount.textContent, '0 of 2 selected', 'start from nothing ticked');
 
-  rows()[0].querySelector('.addon-name').click(); // an ordinary element inside the row
+  rows()[0].querySelector('.addon-name').click();
   assert.strictEqual(box(0).checked, true, 'clicking the row ticks its checkbox');
   assert.strictEqual(box(1).checked, false, 'and only that row\'s');
   assert.strictEqual(elements.selectionCount.textContent, '1 of 2 selected', 'the count follows');
 
-  box(0).click(); // the checkbox itself: one toggle, not two
+  box(0).click();
   assert.strictEqual(box(0).checked, false, 'clicking the checkbox itself does not toggle it twice');
 
-  rows()[1].querySelector('a').click(); // the add-on's link
+  rows()[1].querySelector('a').click();
   assert.strictEqual(box(1).checked, false, 'a click on the link is left to the link');
 });
 
-// --- the real HTML report path ---
-// Node has no DOMParser, so the browser's is stood in for: what can be checked
-// without one is the Importer's half of the contract - that the whole file goes
-// to DOMParser as HTML (never scraped as text), that it asks for the report's
-// data element, and what it does with each answer.
+// no DOMParser in node, so it's stubbed. only the Importer's side is checked: the whole
+// file goes to DOMParser as HTML (never scraped as text) and it asks for the data element.
 function bootHtmlImporter(parseFromString) {
   const { document, elements } = makeFakeDom(IMPORTER_ELEMENT_IDS);
   const sandbox = makeSandbox({
@@ -865,17 +792,14 @@ function bootHtmlImporter(parseFromString) {
   return { sandbox, elements, settle };
 }
 
-// What a parsed report looks like from the Importer's side: the one element it
-// asks for, holding the export's JSON (or null when the report has no such
-// element at all).
+// a parsed report as the Importer sees it: the data element, or null if missing
 const reportDocument = (json) => ({
   getElementById: (id) => (id === 'addons-exporter-data' && json !== null ? { textContent: json } : null),
 });
 const htmlFile = (name, text) => ({ name, size: text.length, text: async () => text });
 
 testAsync('import.js: an .html report is read from the document DOMParser returns', async () => {
-  // The report's entry order, which is not the JSON export's (see
-  // HTML_ENTRY_KEYS in parsers.js) - the reader is strict about it.
+  // entry order differs from the JSON export (HTML_ENTRY_KEYS in parsers.js) and the reader is strict about it
   const json = JSON.stringify({
     formatVersion: V1,
     addons: [{ id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/a', linkType: 'amo-exact' }],
@@ -906,10 +830,7 @@ testAsync('import.js: an .html file with no data element says so, and an empty o
   assert.match(empty.elements.status.textContent, /No add-ons found in that file/);
 });
 
-// --- A2: stale-load races ---
-// Bootstraps the same real page as renderRealImportList(), but without
-// auto-driving setSelectedFile, so each test can control the timing of
-// the file read / listAddons / storage.get itself.
+// like renderRealImportList but without driving setSelectedFile, so tests control the timing
 function bootImportSandbox({ installed = [], storageGet } = {}) {
   const { document, elements } = makeFakeDom(IMPORTER_ELEMENT_IDS);
   const sandbox = makeSandbox({
@@ -936,9 +857,9 @@ testAsync('import.js: removing the file mid-load leaves the list empty once the 
   slowFile.text = async () => { await sleep(30); return realText(); };
 
   sandbox.setSelectedFile(slowFile);
-  await sleep(5); // load is in flight (past the start, not past the slow file.text())
-  sandbox.setSelectedFile(null); // user removes the file before it finishes loading
-  await sleep(50); // give the stale load plenty of time to (wrongly) finish and render
+  await sleep(5); // // in flight, still inside the slow file.text()
+  sandbox.setSelectedFile(null);
+  await sleep(50); // // long enough for the stale load to wrongly finish
 
   assert.strictEqual(elements.addonList.querySelectorAll('.addon-row').length, 0, 'the stale load should not have rendered anything');
   assert.strictEqual(elements.fileNameRow.style.display, 'none');
@@ -952,10 +873,10 @@ testAsync('import.js: a selection nothing can be read from cancels a load still 
   slowFile.text = async () => { await sleep(30); return realText(); };
 
   sandbox.setSelectedFile(slowFile);
-  await sleep(5); // in flight: past the start, not past the slow file.text()
-  sandbox.setSelectedFile({ name: 'notes.pdf', size: 10 }); // nothing readable in it
+  await sleep(5); // // in flight, still inside the slow file.text()
+  sandbox.setSelectedFile({ name: 'notes.pdf', size: 10 });
   assert.match(elements.status.textContent, /isn't a supported file type/, 'the reason is shown at once');
-  await sleep(50); // give the stale load plenty of time to (wrongly) finish
+  await sleep(50); // // long enough for the stale load to wrongly finish
 
   assert.match(elements.status.textContent, /isn't a supported file type/, 'and it is what stands, not the stale load\'s own result');
   assert.strictEqual(elements.addonList.querySelectorAll('.addon-row').length, 0, 'the stale load rendered nothing');
@@ -966,21 +887,19 @@ testAsync('import.js: a second file wins even if the first is still awaiting sto
   const { sandbox, elements } = bootImportSandbox({
     storageGet: async () => {
       storageCalls++;
-      if (storageCalls === 1) await sleep(40); // only the first (stale) load is slow here
+      if (storageCalls === 1) await sleep(40); // // only the first (stale) load is slow
       return {};
     },
   });
 
   sandbox.setSelectedFile(jsonAddonsFile([{ id: 'a@x', name: 'FirstFileAddon', version: '1', link: 'https://example.com/a' }]));
-  await sleep(10); // first load is now past listAddons and into the slow storage.get
+  await sleep(10); // // first load is in the slow storage.get
   sandbox.setSelectedFile(jsonAddonsFile([{ id: 'b@x', name: 'SecondFileAddon', version: '1', link: 'https://example.com/b' }]));
-  await sleep(80); // let both loads fully settle
+  await sleep(80);
 
   const names = elements.addonList.querySelectorAll('.addon-name').map((n) => n.textContent);
   assert.deepStrictEqual(names, ['SecondFileAddon'], 'the second, faster-to-select file should be what\'s shown, not the first');
 });
-
-// --- A35: unsafe-link rows get a class directly, not via :has() ---
 
 testAsync('import.js real DOM: a row with an unsafe link gets the row-disabled class', async () => {
   const elements = await renderRealImportList([
@@ -993,8 +912,6 @@ testAsync('import.js real DOM: a row with an unsafe link gets the row-disabled c
   assert.strictEqual(safeRow.classList.contains('row-disabled'), false);
   assert.strictEqual(unsafeRow.classList.contains('row-disabled'), true);
 });
-
-// --- A23: validateSelectedFile ---
 
 test('validateSelectedFile: accepts .html, .htm, .json, .csv, and .txt', () => {
   for (const name of ['export.html', 'export.htm', 'export.json', 'export.csv', 'export.txt']) {
@@ -1030,8 +947,6 @@ test('validateSelectedFile: a missing/undefined size is not treated as oversized
   assert.strictEqual(result.ok, true);
 });
 
-// --- A23: setSelectedFile rejects an invalid file before loading it ---
-
 testAsync('import.js: selecting an unsupported file type is rejected before any read is attempted', async () => {
   const { sandbox, elements } = bootImportSandbox();
   let readAttempted = false;
@@ -1052,16 +967,12 @@ testAsync('import.js: selecting an oversized file is rejected before any read is
   assert.match(elements.status.textContent, /too large/);
 });
 
-// --- A23: drag-drop is guarded at the document level too ---
-
 testAsync('import.js: a drop event on the document (outside the picker) is prevented by default', async () => {
   const { sandbox } = bootImportSandbox();
   const event = { type: 'drop', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
   sandbox.document.dispatchEvent(event);
   assert.strictEqual(event.defaultPrevented, true, 'a drop anywhere on the page should be prevented, not just inside the picker');
 });
-
-// --- 4.2: compareNote summary line ---
 
 testAsync('import.js real DOM: shows a count note when some are new and some are already installed', async () => {
   const installed = [{ id: 'b@x', name: 'Beta', version: '2.0', enabled: true, type: 'extension' }];
@@ -1104,8 +1015,6 @@ testAsync('import.js real DOM: no note shown when everything is new and nothing 
   assert.strictEqual(elements.compareNote.textContent, '', 'no note needed when all add-ons are new');
 });
 
-// --- Live "Shorten add-on names": an already-open Importer follows the setting ---
-
 async function renderRealImportListLive(addons, stored = {}) {
   const { document, elements } = makeFakeDom(IMPORTER_ELEMENT_IDS);
   const listeners = [];
@@ -1120,8 +1029,7 @@ async function renderRealImportListLive(addons, stored = {}) {
   }, commonSrc, importSrc);
   const settle = recordLoad(sandbox, 'loadFiles');
   sandbox.setSelectedFile(jsonAddonsFile(addons));
-  // Waits for the load itself rather than for the clock: a fixed sleep here
-  // raced a busy machine (see recordLoad in tests/helpers.js).
+  // wait for the load itself, a fixed sleep raced on a busy machine (see recordLoad in helpers.js)
   await settle();
   const fire = (changes, area = 'local') => listeners.forEach((fn) => fn(changes, area));
   const names = () => elements.addonList.querySelectorAll('.addon-name').map((n) => n.textContent);
@@ -1162,12 +1070,10 @@ testAsync('live names (Importer): a search in progress is applied again to the n
   assert.strictEqual(elements.addonList.querySelectorAll('input[type="checkbox"]:checked').length, checkedBefore, 'ticked boxes stay ticked');
 });
 
-// --- Removing the file (the x) plays the opening in reverse, then really removes it ---
-
 async function renderImportForRemoval(addons, { reducedMotion = false, slowFile = null } = {}) {
   const { document, elements } = makeFakeDom(IMPORTER_ELEMENT_IDS);
-  const log = [];     // every element.animate() call, in order
-  const pending = []; // controllable animations
+  const log = [];
+  const pending = [];
   const animatable = (el, name) => {
     el.animate = (keyframes, options) => {
       let resolve;
@@ -1191,12 +1097,10 @@ async function renderImportForRemoval(addons, { reducedMotion = false, slowFile 
   }, commonSrc, importSrc);
   const settle = recordLoad(sandbox, 'loadFiles');
   sandbox.setSelectedFile(slowFile || jsonAddonsFile(addons));
-  // Waits for the load itself rather than for the clock: a fixed sleep here
-  // raced a busy machine (see recordLoad in tests/helpers.js). A slowFile is
-  // deliberately still loading, and the test that passes one decides when it
-  // finishes, so this waits only for the ordinary file.
+  // wait for the load itself (fixed sleeps raced on a busy machine, see recordLoad in helpers.js).
+  // a slowFile stays loading on purpose and the test decides when it finishes.
   if (!slowFile) await settle();
-  log.length = 0; // forget animations from loading the file
+  log.length = 0; // // drop animations from loading the file
   pending.length = 0;
   const finishAll = async () => {
     pending.forEach((a) => a.resolve());
@@ -1297,8 +1201,6 @@ testAsync('remove file (x): with reduced motion, or when nothing can animate, th
   assert.strictEqual(reduced.elements.addonList.querySelectorAll('.addon-row').length, 0);
 });
 
-// --- Reopening from the popup: the .zip picker closes, nothing else moves ---
-
 testAsync('Importer: reopening from the popup closes the .zip picker and clears the search, keeping the file, the list and the ticks', async () => {
   const { document, elements } = makeFakeDom(IMPORTER_ELEMENT_IDS);
   const listeners = [];
@@ -1306,8 +1208,7 @@ testAsync('Importer: reopening from the popup closes the .zip picker and clears 
   const sandbox = makeSandbox({
     document,
     URL,
-    // replayStagedReveal clears the .revealing flag again on a timer; recording
-    // it instead of scheduling one keeps the test from leaving a timer behind.
+    // replayStagedReveal clears .revealing on a timer, record it instead of leaving a real timer behind
     setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
     browser: {
       runtime: {
@@ -1354,8 +1255,6 @@ testAsync('Importer: reopening from the popup closes the .zip picker and clears 
   assert.strictEqual(elements.addonList.classList.contains('revealing'), true, 'the rows are set to cascade again');
   assert.strictEqual(timers[0].ms, 850, 'and the flag comes off once the last row has wiped');
 });
-
-// --- the readable JSON / CSV / TXT exports still import back unchanged ---
 
 const readableSample = [
   { id: 'z@e.com', name: 'Zed Tool', version: '2.0', enabled: false, type: 'extension', link: 'https://example.com/z', linkType: 'amo-exact' },
@@ -1419,7 +1318,6 @@ test('TXT export: a title, Enabled and Disabled sections, and lined-up columns',
   assert.ok(lines.includes('Enabled (2)') && lines.includes('Disabled (2)'));
   const rows = lines.filter((l) => l.includes(' | '));
   assert.strictEqual(rows.length, 4);
-  // every column starts at the same place on every line
   const firstBar = rows.map((l) => l.indexOf(' | '));
   assert.strictEqual(new Set(firstBar).size, 1);
   assert.ok(!/\r\n$/.test(txt), 'no blank line left at the end');
@@ -1431,8 +1329,6 @@ test('CSV export: begins with a byte-order mark, which the importer ignores (the
   assert.strictEqual(sandbox.parseCsvPayload(csv).ok, true);
   assert.notStrictEqual(sandbox.buildTxtExport(readableSample, false).charCodeAt(0), 0xFEFF);
 });
-
-// --- shortened names and ids ---
 
 const longNameAddons = [
   { id: 'buster@x', name: 'Buster: Captcha Solver for Humans', version: '3.4.0', enabled: true, type: 'extension', link: 'https://example.com/buster', linkType: 'amo-exact' },
@@ -1547,8 +1443,6 @@ test('end to end: shortened exports in all three formats still match every insta
 });
 
 
-// --- TXT: names are restored exactly (escaping) ---
-
 const exactNames = [
   'Plain Name',
   'Foo | Bar',
@@ -1613,8 +1507,6 @@ test('TXT round trip: with Shorten names off, the exact name also matches by nam
   }
 });
 
-// --- TXT: only what buildTxtExport() writes is accepted ---
-
 const txtLines = (lines, formatVersion = V1) => [`# addons-hub-format-version: ${formatVersion}`, '', ...lines].join('\r\n');
 const txtLine = (o = {}) => {
   const a = { name: 'Dark Reader', version: '4.9', type: 'Extension', status: 'Enabled', link: 'https://example.com/d', id: 'dr@x', ...o };
@@ -1653,8 +1545,6 @@ test('TXT strict: a backslash that is not one of the exporter\'s escapes rejects
 });
 
 test('TXT strict: an unescaped pipe inside a column cannot be mistaken for a name; a bare pipe with no spaces stays text', () => {
-  // "A|B" has no " | ", so it is part of the name only if the exporter left it
-  // unescaped - it never does, but nothing here splits on it either.
   txtRejects(txtLines([txtLine({ name: 'A | B' })]), /7 columns/);
 });
 
@@ -1683,7 +1573,7 @@ testAsync('openSelectedBtn: uses the count background.js says it queued - tabs i
   const { boxes, itemsJs } = selectItems(['https://addons.mozilla.org/a/', 'https://addons.mozilla.org/b/', 'https://addons.mozilla.org/c/', 'https://addons.mozilla.org/d/']);
   const ctx = captureBulkSelectHandlers(boxes);
   vm.runInContext(itemsJs, ctx.sandbox);
-  ctx.sandbox.browser.runtime.sendMessage = async () => ({ queued: 1 }); // 3 handed over, 1 taken
+  ctx.sandbox.browser.runtime.sendMessage = async () => ({ queued: 1 }); // // 3 handed over, 1 taken
   await ctx.openSelectedHandler();
   assert.strictEqual(ctx.statusEl.textContent, 'Opened 2 tabs, 2 failed to open');
   assert.deepStrictEqual(ctx.navigatedUrls, ['moz-extension://test-id/src/confirmation/confirmation.html?from=import&failed=2']);

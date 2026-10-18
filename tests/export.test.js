@@ -1,7 +1,5 @@
-// Tests for src/export/export.js's click handler.
-// export.js's handler replaces its own page with confirmation.html (same tab,
-// no second tab). Loads the real export.js via vm with a mocked browser/DOM,
-// and invokes its actual exportBtn click handler.
+// drives the real export.js click handler via vm with a mocked browser/DOM.
+// the handler replaces its own page with confirmation.html (same tab, no second tab)
 
 const assert = require('assert');
 const { test, testAsync, readSrc, makeFakeDom, readCommon, makeSandbox, EXPORTER_ELEMENT_IDS } = require('./helpers');
@@ -38,7 +36,6 @@ async function captureExportClick({ selectedIds, exportResponse }) {
     URL: { createObjectURL: () => 'blob:fake-url', revokeObjectURL() {} },
     setTimeout: (fn) => { fn(); return 0; },
     clearTimeout() {},
-    // export.js finishes by replacing its own page with confirmation.html
     location: { replace: (url) => navigatedUrls.push(url) },
     document: {
       getElementById: (id) => elements[id],
@@ -60,8 +57,7 @@ async function captureExportClick({ selectedIds, exportResponse }) {
       storage: { local: { get: async () => ({}) } },
     },
   }, commonSrc, exportSrc);
-  // Let the top-level IIFE's listAddons call settle before the button
-  // even exists to be clicked.
+  // let the top-level IIFE's listAddons call settle before the button exists
   await new Promise((resolve) => setTimeout(resolve, 0));
   await exportClickHandler();
   return { sentMessages, createdTabUrls, navigatedUrls, statusEl: elements.status, exportBtnEl: elements.exportSelectedBtn };
@@ -103,8 +99,6 @@ testAsync('export.js click handler: several formats are saved as one .zip, and t
   assert.match(statusEl.textContent, /saved together in one \.zip file/);
 });
 
-// --- A14: desktop success re-enables the button and names the format ---
-
 testAsync('export.js click handler: re-enables Export Selected after a successful desktop export', async () => {
   const { exportBtnEl } = await captureExportClick({
     selectedIds: ['ext1@example.com'],
@@ -138,8 +132,6 @@ testAsync('export.js click handler: no lookup-failure mention when there weren\'
   assert.doesNotMatch(statusEl.textContent, /couldn't be looked up/);
 });
 
-// --- 4.3: stats breakdown in the success message ---
-
 testAsync('export.js success message: shows "all found on AMO" when all are exact/search matches', async () => {
   const { statusEl } = await captureExportClick({
     selectedIds: ['ext1@example.com', 'ext2@example.com'],
@@ -171,8 +163,6 @@ testAsync('export.js success message: shows skipped-lookups note when deadline w
   });
   assert.match(statusEl.textContent, /1 add\u2011on skipped AMO \(deadline reached\)/);
 });
-
-// --- A16: a non-array listAddons response shows a friendly message ---
 
 testAsync('export.js: a non-array listAddons response shows a friendly error, not a raw exception', async () => {
   const listElStub = { replaceChildren: (...nodes) => { listElStub.children = nodes; }, addEventListener() {} };
@@ -208,11 +198,8 @@ testAsync('export.js: a non-array listAddons response shows a friendly error, no
     'should be a plain, friendly message - not a raw JS TypeError');
 });
 
-// --- Real DOM: search and Select All against the actual rendered list ---
-// Runs export.js's real top-level bootstrap (listAddons -> renderList())
-// against a real element tree via makeFakeDom, then drives the real
-// searchInput/selectAllBtn handlers - the same regression the A1 fix
-// targets, but through actual rendering rather than a hand-built fixture.
+// real bootstrap against a real element tree (makeFakeDom), same A1 regression
+// but through actual rendering instead of a hand-built fixture
 
 async function renderRealExportList(addons) {
   const { document, elements } = makeFakeDom(EXPORTER_ELEMENT_IDS);
@@ -231,7 +218,6 @@ async function renderRealExportList(addons) {
       tabs: { getCurrent: async () => ({ id: 1, windowId: 1 }) },
     },
   }, commonSrc, exportSrc);
-  // Let the top-level IIFE's listAddons() message and renderList() settle.
   await new Promise((resolve) => setTimeout(resolve, 0));
   return { elements, listeners };
 }
@@ -267,7 +253,7 @@ testAsync('export.js real DOM: Select All while a search is active only checks t
     { id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension' },
     { id: 'b@x', name: 'Beta', version: '2.0', enabled: true, type: 'extension' },
   ]);
-  elements.deselectAllBtn.click(); // rows are checked by default on render - start from a known state
+  elements.deselectAllBtn.click();  // rows start checked, so reset first
   elements.searchInput.value = 'alpha';
   elements.searchInput.dispatchEvent('input');
   elements.selectAllBtn.click();
@@ -297,8 +283,6 @@ testAsync('export.js real DOM: reopening from the popup clears the search box an
     'and the ticks are untouched');
 });
 
-// --- A33: cross-tab export-format sync via storage.onChanged ---
-
 testAsync('storage.onChanged: an export-format change from another tab refreshes the description', async () => {
   const registeredListeners = [];
   let getCallCount = 0;
@@ -312,9 +296,8 @@ testAsync('storage.onChanged: an export-format change from another tab refreshes
         local: {
           get: async () => {
             getCallCount++;
-            // Simulates the value having actually changed in storage by
-            // the time the listener re-reads it - the first read (this
-            // page's own initial load) still sees the old default.
+            // pretend storage changed by the time the listener re-reads it; the first read
+            // (initial load) still sees the old default
             return getCallCount === 1 ? {} : { exportFormat: 'json' };
           },
         },
@@ -333,8 +316,6 @@ testAsync('storage.onChanged: an export-format change from another tab refreshes
   assert.match(elements.exportDesc.textContent, /JSON file/);
 });
 
-// --- A32/A21: the AMO link is a name search, and lives outside the label ---
-
 testAsync('export.js real DOM: the AMO link searches by name (not a guessed id URL) and sits outside the label', async () => {
   const { elements } = await renderRealExportList([
     { id: 'weird@id.example', name: 'Some Theme', version: '1.0', enabled: true, type: 'theme' },
@@ -349,8 +330,6 @@ testAsync('export.js real DOM: the AMO link searches by name (not a guessed id U
   const label = row.querySelector('label');
   assert.strictEqual(label.contains(link), false, 'the link must not be inside the label (it would be absorbed into the checkbox\'s accessible name)');
 });
-
-// --- Live "Shorten add-on names": an already-open Exporter follows the setting ---
 
 async function renderExportListWithLiveSettings(addons, stored = {}) {
   const { document, elements } = makeFakeDom(EXPORTER_ELEMENT_IDS);
@@ -386,7 +365,7 @@ testAsync('live names (Exporter): switching "Shorten add-on names" off shows the
 testAsync('live names (Exporter): a reset (the setting removed) goes back to the default, shortened', async () => {
   const { fire, names } = await renderExportListWithLiveSettings(LONG_NAMES, { shortenNames: 'off' });
   assert.deepStrictEqual(names(), ['Dark Reader: dark mode', 'uBlock Origin - free ad blocker'], 'starts with full names');
-  fire({ shortenNames: { oldValue: 'off' } }); // no newValue: removed
+  fire({ shortenNames: { oldValue: 'off' } });  // removed, so no newValue
   assert.deepStrictEqual(names(), ['Dark Reader', 'uBlock Origin']);
 });
 

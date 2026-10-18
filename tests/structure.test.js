@@ -1,6 +1,4 @@
-// Structural checks across the static HTML pages and the generated
-// report - things that are easy to add to one page and forget on
-// another, and that no other test file naturally covers.
+// static html page checks that are easy to add to one page and forget on another
 
 const assert = require('assert');
 const fs = require('fs');
@@ -15,22 +13,15 @@ const HTML_PAGES = [
   'src/confirmation/confirmation.html',
 ];
 
-// The Settings page is settings.html plus its stylesheet, settings.css; the
-// tests below look at both together (markup and rules).
+// markup and rules together
 function readSettingsPage() {
   return readSrc('src/settings/settings.html') + '\n' + readSrc('src/settings/settings.css');
 }
 
-// --- settings-option-row refactor ---
-// Every Settings option row (radio and tick-box rows, and action rows) must use the
-// shared settings-option-row class. These tests act as tripwires: they
-// catch regressions where someone adds a new row with a specialized
-// class instead of the canonical one, or accidentally reintroduces the
-// old class names.
+// tripwires: new rows must use the shared settings-option-row class, not a specialized one or the old names
 
 const settingsHtml = readSettingsPage();
 
-// Structural: all 8 option rows use settings-option-row.
 test('settings-option-row: all 8 option label rows (radios and tick boxes) use settings-option-row', () => {
   const matches = [...settingsHtml.matchAll(/<label[^>]+class="settings-option-row"[^>]*>/g)];
   assert.strictEqual(matches.length, 8,
@@ -42,17 +33,13 @@ test('settings-option-row: the Reset Settings action row uses settings-option-ro
     'Reset Settings row should be a <div class="settings-option-row"> containing resetSettingsBtn');
 });
 
-// Semantics: option rows use <label> (not <div>), Reset uses <div> (not <label>).
 test('settings-option-row: option rows are <label> elements (not <div>)', () => {
-  // A <div class="settings-option-row"> that contains a radio input would be wrong.
   assert.doesNotMatch(settingsHtml,
     /<div class="settings-option-row">[^<]*<input type="radio"/,
     'radio inputs must be inside <label class="settings-option-row">, not a <div>');
 });
 
 test('settings-option-row: Reset Settings uses a native <button> (not a radio input)', () => {
-  // The reset row must contain a <button>, never an <input type="radio">.
-  // Find the div.settings-option-row that contains resetSettingsBtn specifically.
   const resetRowMatch = settingsHtml.match(/<div class="settings-option-row">(?:(?!<div class="settings-option-row">)[\s\S])*?id="resetSettingsBtn"[\s\S]*?<\/div>/);
   assert.ok(resetRowMatch, 'could not find <div class="settings-option-row"> containing resetSettingsBtn');
   assert.match(resetRowMatch[0], /<button[^>]+id="resetSettingsBtn"/,
@@ -61,7 +48,6 @@ test('settings-option-row: Reset Settings uses a native <button> (not a radio in
     'Reset Settings row must not contain a radio input');
 });
 
-// Option input IDs, names, and values unchanged after the refactor.
 for (const [id, name, value] of [
   ['themeLight',      'theme',        'light'],
   ['themeDark',       'theme',        'dark'],
@@ -74,7 +60,7 @@ for (const [id, name, value] of [
 ]) {
   test(`settings-option-row: input #${id} has name="${name}" and value="${value}"`, () => {
     const re = new RegExp(`id="${id}"[^>]*name="${name}"[^>]*value="${value}"|id="${id}"[^>]*value="${value}"[^>]*name="${name}"`);
-    // The input tag itself carries id/name/value; order may vary.
+    // attribute order in the tag may vary
     const inputRe = new RegExp(`<input[^>]*\\bid="${id}"[^>]*>`);
     const inputMatch = settingsHtml.match(inputRe);
     assert.ok(inputMatch, `could not find <input id="${id}">`);
@@ -83,8 +69,6 @@ for (const [id, name, value] of [
   });
 }
 
-// label/input associations: every option <label> must have a for= that
-// matches its input's id.
 for (const [labelFor, radioId] of [
   ['themeLight',      'themeLight'],
   ['themeDark',       'themeDark'],
@@ -105,18 +89,9 @@ for (const [labelFor, radioId] of [
   });
 }
 
-// --- hub-btn refactor ---
-// Every visible action button must use the shared hub-btn class.
-// Tripwires catch regressions where someone adds a new button without
-// the shared base, or reintroduces a duplicated button implementation.
-
-// --- popup.html ---
-
 const popupHtml = readSrc('src/popup/popup.html');
 
-// --- Animations: shared rules every surface must keep ---
-// The popup and the report can't load shared.css, so each carries its own
-// copy of the motion rules. These pin the parts that are easy to lose.
+// the popup and the report can't load shared.css, so each carries its own copy of the motion rules
 
 const sharedCssForMotion = readSrc('src/common/shared.css');
 const reportCssForMotion = readSrc('src/background/report.css');
@@ -165,11 +140,9 @@ test('settings: pressing Settings again (popup message) scrolls to the top and r
   assert.ok(onMessage, 'message handler not found');
   assert.match(onMessage[1], /scrollPageToTop\(\)/);
   assert.match(onMessage[1], /replayEntranceIfIdle\(\)/);
-  // Nothing is left open on the page either: the reset confirmation goes, and
-  // any message sitting in the Export/Import rows is cleared.
   assert.match(onMessage[1], /dismissResetDialog\(true\)/);
   assert.match(onMessage[1], /clearAllRows\(\)/);
-  // Switching back to the tab must not replay the ~2s reveal or reset scroll.
+  // a plain tab switch must not replay the reveal or reset scroll
   assert.doesNotMatch(src, /addEventListener\('visibilitychange'/);
 });
 
@@ -180,25 +153,19 @@ test('export/import: opening the Exporter or Importer again replays its entrance
   assert.match(answer[1], /scrollPageToTop\(\)/);
   assert.match(answer[1], /resetToFresh\(\)/);
   assert.match(answer[1], /replayStagedReveal\(\)/);
-  // The rows only cascade while the list carries .revealing (reveal.js takes
-  // the flag off once they are in), so the replay puts it back and restarts the
-  // card and its parts too.
+  // rows only cascade while the list has .revealing (reveal.js removes it afterwards), so the replay puts it back
   const replay = pageUi.match(/function replayStagedReveal\(\) \{([\s\S]*?)\n\}/);
   assert.ok(replay, 'replayStagedReveal not found');
   assert.match(replay[1], /classList\.add\('revealing'\)/);
   assert.match(replay[1], /classList\.remove\('revealing'\)/);
   assert.match(replay[1], /replayEntrance\(\)/);
   assert.match(readSrc('src/export/export.js'), /answerWhereIsPage\('export', \(\) => list\.clearSearch\(\)\)/);
-  // The Importer has a popup of its own to close (the .zip export picker) and a
-  // search box to empty. Its file, list and ticks are left alone.
+  // the importer also has the .zip picker to close and a search box to empty
   assert.match(readSrc('src/import/import.js'), /answerWhereIsPage\('import', \(\) => \{[\s\S]*?closeExportPicker\(\);[\s\S]*?list\.clearSearch\(\);[\s\S]*?\}\);/);
-  // The shared list is where clearing the search lives (addon-list.js).
   const addonList = readSrc('src/common/addon-list.js');
   assert.match(addonList, /function clearSearch\(\) \{[\s\S]*?searchInput\.value = '';[\s\S]*?applySearch\(\);/);
   assert.match(addonList, /return \{ checkboxes, updateSelectionCount, render, clearSearch \};/);
 });
-
-// --- Press feedback (click/tap ring) ---
 
 test('press: every extension page loads press.js', () => {
   for (const page of ['src/popup/popup.html', 'src/export/export.html', 'src/import/import.html', 'src/settings/settings.html', 'src/confirmation/confirmation.html']) {
@@ -229,8 +196,6 @@ test('press: buttons press in fast and spring back out (a long transform transit
 
 
 
-// --- Staged opening reveal: Exporter, Importer and the HTML report ---
-
 test('staged reveal: the Exporter and Importer cards opt in with the "staged" class', () => {
   for (const page of ['src/export/export.html', 'src/import/import.html']) {
     assert.match(readSrc(page), /<div class="card staged">/, `${page} must use class="card staged"`);
@@ -241,7 +206,6 @@ test('staged reveal: the Exporter and Importer load reveal.js, which times every
   for (const page of ['src/export/export.html', 'src/import/import.html']) {
     const html = readSrc(page);
     assert.match(html, /<script src="\.\.\/common\/reveal\.js"><\/script>/, `${page} must load reveal.js`);
-    // The start times come from reveal.js now, not from hand-written --d rules.
     assert.doesNotMatch(html, /--d:/, `${page} must not hard-code --d any more`);
   }
 });
@@ -263,11 +227,11 @@ test('Importer: the file input takes more than one file, and the page says so', 
 
 test('staged reveal: the Exporter search box takes its place in the order even though it is shown later (data-stage)', () => {
   assert.match(readSrc('src/export/export.html'), /id="searchInput"[^>]*data-stage[^>]*style="display:none;"/);
-  // The Importer's search box is revealed whenever a file is chosen, so it must NOT hold a slot.
+  // the importer's search box shows whenever a file is chosen, so it must not hold a slot
   assert.doesNotMatch(readSrc('src/import/import.html'), /id="searchInput"[^>]*data-stage/);
 });
 
-// The Settings page is the reference: the other pages must animate exactly like it.
+// Settings is the reference, the other pages must animate exactly like it
 function keyframesBody(src, name) {
   const m = src.match(new RegExp(`@keyframes ${name} \\{([\\s\\S]*?)\\n\\s*\\}\\n`));
   assert.ok(m, `@keyframes ${name} not found`);
@@ -333,13 +297,10 @@ test('settings: the Light and Dark rows carry the report\'s sun and moon icons, 
   assert.match(dark, /<svg class="appearance-icon"[\s\S]*M21 12\.79A9 9 0 1 1 11\.21 3/, 'moon in the Dark row');
   assert.match(html, /\.settings-option-row input:checked ~ \.appearance-icon \{[^}]*animation: settings-icon-spin [^;]*backwards;/);
   assert.match(html, /@keyframes settings-icon-spin \{\s*from \{ opacity: 0; transform: rotate\(-200deg\) scale\(0\.3\); \}/, 'same spin as the report toggle');
-  // The icons must be the very same shapes the report uses.
   const report = readSrc('src/background/report-template.js');
   assert.ok(report.includes('M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z'), 'report moon path');
 });
 
-
-// --- Tab icons (favicons) ---
 
 test('favicon: every full page (the ones that open in a tab) links an icon, and that file really exists', () => {
   const fs = require('fs');
@@ -349,18 +310,16 @@ test('favicon: every full page (the ones that open in a tab) links an icon, and 
   for (const page of pages) {
     const m = readSrc(page).match(/<link rel="icon" href="([^"]+)">/);
     assert.ok(m, `${page} has no <link rel="icon">, so its tab would show no icon`);
-    // Relative links resolve from the page's own folder (src/<page>/), not the project root.
+    // relative links resolve from the page's own folder
     const resolved = path.resolve(root, path.dirname(page), m[1]);
     assert.ok(fs.existsSync(resolved), `${page}: icon link "${m[1]}" points at ${path.relative(root, resolved)}, which does not exist`);
   }
 });
 
-// --- Live settings: every open page follows a change made anywhere ---
-
 test('live settings: the theme, export format and name shortening each have a live listener on the pages that use them', () => {
   assert.match(readSrc('src/common/theme.js'), /changes\[THEME_STORAGE_KEY\][\s\S]*applyTheme\(/, 'every page follows the theme');
   assert.match(readSrc('src/export/export.js'), /onSettingsChanged\([\s\S]*'exportFormats'[\s\S]*updateExportDesc\(\)/, 'the Exporter follows the export format');
-  // Both pages get this from the shared list (addon-list.js).
+  // both pages get this from the shared list
   const list = readSrc('src/common/addon-list.js');
   assert.match(list, /onShortenNamesChanged\(\(shorten\) => \{/, 'the shared list follows "Shorten add-on names"');
   assert.match(list, /nameEl\.dataset\.fullName = a\.name/, 'rows remember their full name');
@@ -385,9 +344,9 @@ test('confirmation page: opens exactly like Settings (a staged card, timed by re
   const html = readSrc('src/confirmation/confirmation.html');
   assert.match(html, /<div class="card staged">/);
   assert.match(html, /<script src="\.\.\/common\/reveal\.js"><\/script>/);
-  // reveal.js must be there before the page script, which builds the message.
+  // reveal.js has to load before the page script that builds the message
   assert.ok(html.indexOf('reveal.js') < html.indexOf('confirmation.js'));
-  // The heading, the message and the links are the card's direct children - the parts that get their turn.
+  // direct children of the card are the parts that get a turn
   assert.match(html, /<h1 id="heading">/);
   assert.match(html, /<p id="message">/);
   assert.match(html, /<div class="about-block">/);
@@ -429,8 +388,6 @@ test('settings: the page keeps its styling in settings.css - only "display:none"
   }
 });
 
-// The one shared button class: every action button on every page carries it, so
-// they all press, hover and spring the same way.
 test('hub-btn: every action button on the popup, Exporter, Importer and Settings carries hub-btn', () => {
   const pages = {
     'src/popup/popup.html': ['exportBtn', 'importBtn', 'settingsBtn'],
@@ -451,8 +408,6 @@ test('hub-btn: every action button on the popup, Exporter, Importer and Settings
   assert.match(js, /rsConfirm[\s\S]{0,200}hub-btn|hub-btn[\s\S]{0,200}rsConfirm/, 'the Reset button in the reset dialog uses hub-btn');
 });
 
-// Screen readers: icon-only buttons need a name, search boxes need a label,
-// and the status messages must be announced when they change.
 test('a11y: the remove-file button has a name and the search boxes are labelled', () => {
   const imp = readSrc('src/import/import.html');
   assert.match(imp.match(/<button[^>]*id="removeFileBtn"[^>]*>/)[0], /aria-label="[^"]+"/, 'removeFileBtn needs an aria-label');
@@ -480,16 +435,11 @@ test('a11y: status messages are polite live regions', () => {
   }
 });
 
-// The minimum Firefox version has to cover what the code relies on:
-// - 127: MV3 host permissions are granted at install (the AMO lookups need them)
-// - 128: the first version that accepts data_collection_permissions without an error
-// - 112: element.inert (the reset dialog) and linear() easing
-//
-// web-ext warns twice about that floor, because the key it looks for,
-// data_collection_permissions, is only expected from Firefox 140 (142 on
-// Android). Both warnings are deliberate: a Firefox that does not know a key
-// ignores it, and 128 is what the rest of the extension needs, so neither
-// warning is a reason to raise the floor. The README explains both by name.
+// 127: MV3 host permissions are granted at install (the AMO lookups need them)
+// 128: first version that takes data_collection_permissions without an error
+// 112: element.inert (the reset dialog) and linear() easing
+// web-ext warns twice about the floor since it only expects data_collection_permissions from 140
+// (142 on Android). both warnings are deliberate and no reason to raise the floor, the README says why
 test('manifest: strict_min_version is at least 128 and the README states the same', () => {
   const manifest = JSON.parse(readSrc('manifest.json'));
   const min = manifest.browser_specific_settings.gecko.strict_min_version;
@@ -502,12 +452,8 @@ test('manifest: strict_min_version is at least 128 and the README states the sam
   }
 });
 
-// The rest of the manifest, pinned the same way: the id is the extension's
-// identity (Firefox treats a changed id as a different extension, so an update
-// would not reach anyone), the three permissions and the one host are what the
-// user is asked to trust, and the options page is where Settings opens. None of
-// these is the kind of thing to change by accident, so a change has to be made
-// here too, on purpose.
+// a changed id is a different extension to Firefox, so updates wouldn't reach anyone. the permissions
+// and host are what the user trusts. none of this should change by accident, so change it here too
 test('manifest: the id, the permissions (no more than these) and the options page are pinned', () => {
   const manifest = JSON.parse(readSrc('manifest.json'));
   assert.strictEqual(manifest.browser_specific_settings.gecko.id, 'addons-exporter@local',
@@ -520,42 +466,31 @@ test('manifest: the id, the permissions (no more than these) and the options pag
     'the options page is the Settings page, in a tab of its own');
 });
 
-// web-ext reads .web-ext-config.mjs for every command, so `web-ext lint` and
-// `web-ext build` behave the same whether they run through `npm run lint:ext`
-// or are typed by hand. This list is what keeps development-only files out of
-// the lint report and out of any package.
+// web-ext reads .web-ext-config.mjs for every command, so lint and build match whether they run
+// through npm or by hand. the list keeps dev-only files out of the lint report and any package
 test('web-ext config: development-only files are ignored, however web-ext is started', () => {
   const config = readSrc('.web-ext-config.mjs');
   for (const pattern of ['tests/**', 'scripts/**', 'package.json', 'package-lock.json', 'README.md', 'LICENSE', 'coverage/**']) {
     assert.ok(config.includes(`'${pattern}'`), `.web-ext-config.mjs does not ignore ${pattern}`);
   }
-  // The report's build input is a real script the linter should see, so it must
-  // not be in the list.
+  // report-inline.js is a real script the linter should see
   assert.ok(!config.includes('report-inline.js'), 'report-inline.js should be linted, not ignored');
   assert.match(readSrc('package.json'), /"lint:ext": "npx --yes web-ext@10\.8\.0 lint"/, 'lint:ext must rely on the config file, not a repeated ignore list');
 });
 
-// Node 20 reached end of life in April 2026, so the project asks for the
-// oldest Node that is still supported. The README states the same number, so a
-// reader is never told something the tooling does not ask for.
+// node 20 went end of life in April 2026, so engines asks for the oldest supported node.
+// the README has to say the same number
 test('tooling: package.json and the README agree on the Node version', () => {
   const { engines } = JSON.parse(readSrc('package.json'));
   const major = engines.node.replace(/[^0-9]/g, '');
   assert.match(readSrc('README.md'), new RegExp(`needs Node ${major} or newer`), 'README states the same Node version');
 });
 
-// --- The fake DOM's blind spot: the CSS half of a JS/CSS contract ---
-// The page scripts are tested against a fake DOM with no CSS engine (see the
-// "Minimal fake DOM" comment in tests/helpers.js for the full list of what it
-// cannot do). It can see that a script put a class on an element, but never
-// that anything styles that class - so a class whose rule was renamed,
-// deleted, or moved into a stylesheet the page never loads does nothing in
-// Firefox and nothing in the test suite either. These two tests read the
-// stylesheets as text instead, which is the only place that half of the
-// contract can be checked without a browser.
+// --- the fake DOM's blind spot: css ---
+// the fake DOM has no css engine (see "Minimal fake DOM" in helpers.js), so a class whose rule was
+// renamed, deleted or moved to a stylesheet the page never loads does nothing in Firefox and
+// nothing in the suite. these read the stylesheets as text instead
 
-// Every file under src/ with the given extension, as project-relative paths
-// with forward slashes, so a new file is picked up without touching these.
 function filesUnder(dir, extension) {
   const out = [];
   for (const entry of fs.readdirSync(path.join(__dirname, '..', dir), { withFileTypes: true })) {
@@ -566,18 +501,14 @@ function filesUnder(dir, extension) {
   return out;
 }
 
-// A page's own files, as project-relative paths with forward slashes: its
-// markup, every file it loads (scripts, stylesheets, icons), the scripts it
-// loads, and the stylesheets that can affect it (the .css files it links, plus
-// its own inline <style> blocks - where the Importer's drag highlight, the
-// .zip picker's options and the popup's whole look live). Refs resolve from the
-// page's own folder, the way the browser resolves them.
+// inline <style> blocks count as page styles too: the importer's drag highlight, the .zip picker
+// options and the popup's whole look live there
 function pageFiles(page) {
   const markup = readSrc(page);
   const resolveRef = (ref) => path.posix.normalize(path.posix.join(path.posix.dirname(page), ref));
   const refs = [...markup.matchAll(/<(?:script|link)[^>]*\b(?:src|href)="([^"]+)"/g)]
     .map((m) => m[1])
-    .filter((ref) => !/^(?:[a-z]+:|\/\/|#)/i.test(ref)); // external, or an in-page anchor
+    .filter((ref) => !/^(?:[a-z]+:|\/\/|#)/i.test(ref));
   return {
     page,
     markup,
@@ -590,17 +521,12 @@ function pageFiles(page) {
 
 const PAGES = HTML_PAGES.map(pageFiles);
 
-// Everything that can really style a page: its linked .css files, read here,
-// and its own inline <style> blocks.
 function stylesFor(page) {
   return [...page.linkedStyles.map(readSrc), ...page.inlineStyles].join('\n');
 }
 
-// Every class a page script puts on an element, by either route: classList
-// (toggled states such as .revealing or .dragover) or an assigned className
-// (the rows, labels and dialogs built by addon-list.js, page-ui.js and the
-// page scripts). The value maps a class to the file that sets it, for the
-// failure message.
+// every class a script puts on an element, via classList or an assigned className.
+// maps class -> file that sets it, for the failure message
 function classesSetByScripts() {
   const found = new Map();
   for (const file of filesUnder('src', '.js')) {
@@ -619,24 +545,18 @@ function classesSetByScripts() {
 
 test('fake DOM boundary: every class the page scripts set is styled by a page that loads that script', () => {
   const classes = classesSetByScripts();
-  // Guard the guard: if the scan or the file walk broke, this must not pass by
-  // finding almost nothing.
+  // guard: a broken scan must not pass by finding almost nothing
   assert.ok(classes.size >= 25, `only ${classes.size} classes found - did the scan break?`);
 
-  // Every stylesheet in the project, for the scripts no page loads (see below).
   const anyStylesheet = [
     ...filesUnder('src', '.css').map(readSrc),
     ...PAGES.flatMap((p) => p.inlineStyles),
   ].join('\n');
 
   for (const [cls, file] of classes) {
-    // The pages that load this script - the only ones it can be running on, so
-    // the only ones whose stylesheets can style what it sets. A rule moved into
-    // another page's stylesheet used to pass here, and does nothing in Firefox.
+    // only the pages that load the script can be running it. a rule moved into another page's stylesheet does nothing
     const hosts = PAGES.filter((p) => p.scripts.includes(file));
-    // A script no page loads is a background script, or the report's own script
-    // (the report carries it inside the saved file): those are checked against
-    // every stylesheet, which is what this did before.
+    // background scripts and the report's script (carried inside the saved file) aren't loaded by any page, so check them against every stylesheet
     const styles = hosts.length === 0 ? anyStylesheet : hosts.map(stylesFor).join('\n');
     const where = hosts.length === 0
       ? 'no stylesheet styles it'
@@ -646,27 +566,19 @@ test('fake DOM boundary: every class the page scripts set is styled by a page th
   }
 });
 
-// The fake DOM's other blind spot, from the same helpers.js comment:
-// getElementById never returns null - an id no test listed is created on the
-// spot - so a page script that asks for an element the real page does not have
-// passes every test and breaks only in Firefox. Each script's literal ids are
-// looked up in the markup of the pages that load it, which is where they have
-// to be.
+// same blind spot, other direction: getElementById never returns null in the fake DOM, so a script
+// asking for an id the real page lacks passes every test and breaks in Firefox
 test('fake DOM boundary: every id a page script asks for is in the markup of a page that loads it', () => {
-  // The report's own script is built into the saved file, so its markup is the
-  // template the report is made from, not one of the pages above.
+  // the report's script is built into the saved file, so its markup is the template
   const reportMarkup = readSrc('src/background/report-template.js');
   let checked = 0;
   for (const file of filesUnder('src', '.js')) {
-    // Only the page's own document: import.js also reads a parsed report
-    // (doc.getElementById('addons-exporter-data')), whose id belongs to the
-    // report's markup, not to a page that loads import.js.
+    // only the page's own document, import.js also reads a parsed report whose ids belong to the report markup
     const ids = [...readSrc(file).matchAll(/(?<![\w.])document\.getElementById\('([\w-]+)'\)/g)].map((m) => m[1]);
     if (ids.length === 0) continue;
     const isReport = file === 'src/background/report-inline.js';
     const hosts = PAGES.filter((p) => p.scripts.includes(file));
-    // Background scripts build markup rather than touch a live page (and they
-    // carry the report's script as a string), so they have no markup to check.
+    // background scripts build markup rather than touch a live page
     if (hosts.length === 0 && !isReport) continue;
 
     const markup = isReport ? reportMarkup : hosts.map((p) => p.markup).join('\n');
@@ -676,15 +588,11 @@ test('fake DOM boundary: every id a page script asks for is in the markup of a p
       checked++;
     }
   }
-  // Guard the guard, as above.
   assert.ok(checked >= 40, `only ${checked} ids checked - did the scan break?`);
 });
 
-// A page names the scripts, stylesheets and icons it loads by relative path, and
-// nothing but the browser follows those paths: a renamed or deleted file leaves
-// a page that quietly does nothing (a missing theme.js is "the theme stopped
-// following the setting", with no test failing). Each one is resolved here, from
-// the page's own folder, the way the browser resolves it.
+// nothing but the browser follows these paths, so a renamed or deleted file leaves a page that
+// quietly does nothing (a missing theme.js means the theme stops following the setting)
 test('pages: every file a page loads (scripts, stylesheets, icons) really exists', () => {
   const root = path.join(__dirname, '..');
   let checked = 0;
@@ -697,10 +605,8 @@ test('pages: every file a page loads (scripts, stylesheets, icons) really exists
   assert.ok(checked >= 25, `only ${checked} files referenced - did the scan break?`);
 });
 
-// The report is a standalone file: it carries its own copy of the CSS and
-// loads nothing else. A class its script toggles therefore has to be in
-// report.css itself - moving such a rule into shared.css would leave the
-// report silently unstyled, which is invisible to the fake DOM either way.
+// the report is standalone and loads nothing else, so a class its script toggles has to be in
+// report.css itself. moving the rule to shared.css would leave it unstyled
 test('fake DOM boundary: the report script only relies on classes report.css styles', () => {
   const toggled = new Set(
     [...readSrc('src/background/report-inline.js').matchAll(/classList\.(?:add|remove|toggle)\(\s*'([\w-]+)'/g)].map((m) => m[1])
@@ -714,24 +620,20 @@ test('fake DOM boundary: the report script only relies on classes report.css sty
   }
 });
 
-// --- Parity checks: report-inline.js and common/ modules must stay in sync ---
-// Because standalone reports cannot load common modules, logic is duplicated in
-// report-inline.js by design. These tripwire tests ensure neither side drifts.
+// standalone reports can't load common/ modules, so report-inline.js duplicates their logic on
+// purpose. these keep the two sides from drifting
 test('parity: search filter logic in report-inline.js matches page-ui.js', () => {
   const reportInline = readSrc('src/background/report-inline.js');
   const pageUi = readSrc('src/common/page-ui.js');
 
-  // Both must toggle .is-filtered and set display
   assert.match(reportInline, /el\.style\.display = visible \? '' : 'none';/);
   assert.match(reportInline, /el\.classList\.toggle\('is-filtered', !visible\);/);
   assert.match(pageUi, /el\.style\.display = visible \? shownDisplay : 'none';/);
   assert.match(pageUi, /el\.classList\.toggle\('is-filtered', !visible\);/);
 
-  // Both must search .group-container depth-independently
   assert.match(reportInline, /querySelectorAll\('\.group-container'\)/);
   assert.match(pageUi, /querySelectorAll\('\.group-container'\)/);
 
-  // Both must check .addon-name textContent case-insensitively
   assert.match(reportInline, /nameEl\.textContent\.toLowerCase\(\)\.indexOf\(q\) !== -1/);
   assert.match(pageUi, /nameEl\.textContent\.toLowerCase\(\)\.includes\(q\)/);
 });
@@ -757,12 +659,10 @@ test('parity: click feedback pulse animation in report-inline.js matches press.j
   const reportInline = readSrc('src/background/report-inline.js');
   const press = readSrc('src/common/press.js');
 
-  // Both use element.animate with 520ms duration and ease-out
   assert.match(reportInline, /duration: 520, easing: 'ease-out'/);
   assert.match(press, /DURATION_MS = 520/);
   assert.match(press, /easing: 'ease-out'/);
 
-  // Both use the same box-shadow pulse shapes
   assert.match(reportInline, /boxShadow:\s*'inset 0 0 0 999px '\s*\+\s*c/);
   assert.match(reportInline, /boxShadow:\s*'0 0 0 2px '\s*\+\s*c/);
   assert.match(press, /boxShadow:\s*'inset 0 0 0 999px '\s*\+\s*color/);

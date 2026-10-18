@@ -1,8 +1,6 @@
-// The popup's three buttons (src/popup/popup.js): Export and Import bring an
-// already-open Exporter / Importer tab to the front, or open a new one;
-// Settings opens the options page and asks an already-open Settings tab to
-// replay its entrance. Each closes the popup afterwards. Also the other half:
-// how those pages answer "are you open?" (answerWhereIsPage in page-ui.js).
+// The popup buttons (src/popup/popup.js), and the other half of the
+// exchange: how the pages answer "are you open?" (answerWhereIsPage in
+// page-ui.js). Each button closes the popup.
 
 const assert = require('assert');
 const { test, testAsync, readSrc, readSrcs, makeSandbox } = require('./helpers');
@@ -97,7 +95,7 @@ testAsync('popup: the popup closes even when the page cannot be opened at all', 
   assert.deepStrictEqual(calls, [['sendMessage', 'whereIsPage', 'export'], ['close']]);
 });
 
-// --- the page's side: answerWhereIsPage() ---
+// the page's side, answerWhereIsPage()
 
 function loadPage(browserStub) {
   const sb = makeSandbox({ browser: browserStub }, readSrcs('src/common/core.js', 'src/common/page-ui.js'));

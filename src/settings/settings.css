@@ -1,5 +1,5 @@
-/* Styles for the Settings page. The colour and motion variables are in
-   tokens.css and the shared parts of the page in shared.css. */
+/* Settings page styles. Colour and motion variables are in tokens.css, the
+   shared parts in shared.css. */
 
 .settings-group {
   text-align: left;
@@ -12,12 +12,8 @@
   color: var(--text-muted);
   margin: 0 0 10px;
 }
-/* Canonical shared row used by every Settings option:
-   option rows (Appearance and Display are radios, Export Format is
-   tick boxes) and action rows (Reset Settings).
-   The element type differs — option rows use <label> so the
-   click target covers the whole row; action rows use <div> —
-   but the border, spacing, hover, and transition are identical. */
+/* One row style for every Settings option. Option rows are <label> so the whole
+   row is clickable; action rows are <div>. Same border, spacing and hover. */
 .settings-option-row {
   display: flex;
   align-items: flex-start;
@@ -31,14 +27,10 @@
   transition: background 0.12s, border-color 0.12s, transform 0.1s;
 }
 .settings-option-row:last-child { margin-bottom: 0; }
-/* Radio rows are <label> elements — cursor pointer makes the whole
-   row feel clickable. Action rows are <div> — no pointer cursor
-   since the button inside is the interactive target. */
 label.settings-option-row { cursor: pointer; }
 label.settings-option-row input { margin: 0; margin-top: 3px; }
-/* Action rows use <div> — center button vertically, push it right,
-   and use slightly less padding since two-line content already makes
-   them taller than single-line radio rows. */
+/* action rows: button centred and pushed right, a bit less padding because
+   two-line content is already taller */
 div.settings-option-row { align-items: center; justify-content: space-between; padding: 8px 12px; margin-bottom: 0; }
 .settings-option-row:hover { background: var(--row-hover-bg); border-color: var(--border-hover); transform: scale(1.01); }
 label.settings-option-row:active { transform: scale(0.985); }
@@ -47,22 +39,17 @@ label.settings-option-row:active { transform: scale(0.985); }
   flex-direction: column;
   gap: 8px;
 }
-/* .settings-btn and .s-modal-btn extend hub-btn (shared.css).
-   Only layout/sizing/scale overrides live here. */
 .settings-btn {
   padding: 9px 14px;
   text-align: center;
 }
-/* Hover: a soft grey fill, like the pink one on Reset but neutral. */
 .settings-btn:hover { background: var(--hover-fill); border-color: var(--border-hover); transform: scale(1.01); }
 .settings-btn:active { transform: scale(0.95); transition-duration: 0.08s; }
-/* The red Reset buttons get a deeper red outline than their text. */
 .settings-btn-danger { border-color: var(--danger-border); color: var(--danger-color); }
 .settings-btn-danger:hover { background: var(--danger-hover-bg); border-color: var(--danger-border); }
 #resetSettingsBtn { --press-ring: rgba(192, 57, 43, 0.5); }
 :root[data-theme="dark"] #resetSettingsBtn { --press-ring: rgba(239, 106, 94, 0.5); }
 
-/* Modal buttons shared by reset dialogs */
 .s-modal-btn {
   padding: 7px 0;
   width: 96px;
@@ -88,15 +75,9 @@ label.settings-option-row:active { transform: scale(0.985); }
   margin-bottom: 2px;
 }
 #settingsStatus.error { color: var(--danger-color); }
-/* Opening reveal, top to bottom, one step after another: first only the
-   page background, then the card UNFOLDS downward (empty), then the
-   "Settings" title settles in as its letters tighten up, then each
-   section in turn - its heading slides in from the left and its rows
-   wipe in left to right, like being written. Everything starts hidden
-   (backwards fill) until its turn.
-   The keyframes themselves are shared.css's hub-unfold / hub-title-in /
-   hub-slide-in / hub-wipe-in - the very same ones the Exporter, Importer
-   and report use - so they are not repeated here. */
+/* Opening reveal: card unfolds, title settles in, then each section's heading
+   slides in and its rows wipe in. Hidden until their turn (backwards fill).
+   The keyframes are the shared hub-* ones in shared.css. */
 .card {
   animation-name: hub-unfold;
   animation-duration: 0.8s;
@@ -111,8 +92,7 @@ label.settings-option-row:active { transform: scale(0.985); }
   animation-fill-mode: backwards;
 }
 .card > h1:first-child { animation-delay: 0.55s; }
-/* The sections themselves don't animate; they only carry their start time,
-   --gd, which their heading and rows below count from. */
+/* sections only carry their start time (--gd) for their heading and rows */
 .card > .settings-group { --gd: 0s; animation: none; }
 .card > .settings-group:nth-of-type(1) { --gd: 0.7s; }
 .card > .settings-group:nth-of-type(2) { --gd: 0.86s; }
@@ -133,22 +113,19 @@ label.settings-option-row:active { transform: scale(0.985); }
 .settings-group > :nth-child(4) { --i: 3; }
 .settings-group > :nth-child(5) { --i: 4; }
 .settings-group > :nth-child(6) { --i: 5; }
-/* The short note under a section heading (Export Format). */
 .settings-hint { font-size: 12px; color: var(--text-muted); line-height: 1.4; margin: -4px 0 10px; }
-/* A finished export / import / reset: the message slides in (the row
-   also flashes green - see flashSuccess in settings.js). The descriptions
-   and messages are inline-block so they can slide: transforms don't apply
-   to plain inline text. */
+/* A finished export/import/reset: the message slides in and the row flashes
+   green (flashSuccess in settings.js). Inline-block, since transforms don't
+   apply to plain inline text. */
 #exportSettingsDesc, #importSettingsDesc, #resetSettingsDesc,
 #exportSettingsStatus, #importSettingsStatus, #resetSettingsStatus { display: inline-block; }
 #exportSettingsStatus.is-success, #importSettingsStatus.is-success, #resetSettingsStatus.is-success {
   font-weight: 600;
   animation: hub-slide-in var(--motion-slow) var(--motion-spring) backwards;
 }
-/* Light / Dark rows show the same sun and moon as the report's theme
-   button. The icon of the chosen theme darkens and spins and pops in each
-   time its option becomes selected (a CSS animation restarts whenever its
-   selector starts matching), just like the report's toggle. */
+/* The chosen theme's icon spins and pops in each time its option becomes
+   selected (a CSS animation restarts when its selector starts matching),
+   like the report's toggle. */
 @keyframes settings-icon-spin {
   from { opacity: 0; transform: rotate(-200deg) scale(0.3); }
   to   { opacity: 1; transform: none; }
@@ -164,20 +141,14 @@ label.settings-option-row:active { transform: scale(0.985); }
   color: var(--text);
   animation: settings-icon-spin 0.7s var(--motion-spring) backwards;
 }
-/* Small pop when a radio becomes selected. */
 .settings-option-row input[type="radio"]:checked,
 .settings-option-row input[type="checkbox"]:checked { animation: hub-pop var(--motion-normal) var(--motion-spring); }
-/* Inline row messages fade in each time they're shown (display toggles). */
 #exportSettingsDesc, #importSettingsDesc, #resetSettingsDesc,
 #exportSettingsStatus, #importSettingsStatus, #resetSettingsStatus,
 #settingsStatus:not(:empty) { animation: hub-fade-in var(--motion-normal) ease backwards; }
-/* Reset dialog: backdrop fades in, the dialog rises in. */
-/* The page behind the reset dialog stays visible, softly blurred and
-   slightly dimmed (so it reads as "behind"). The page is frozen while it is
-   open - settings.js locks scrolling. */
+/* The page behind the dialog stays visible, blurred and dimmed. It's frozen
+   while the dialog is open (settings.js locks scrolling). */
 .s-overlay {
-  /* Fills the whole viewport and centres the dialog in it, however far
-     down the page is scrolled. */
   position: fixed;
   inset: 0;
   display: flex;
@@ -205,9 +176,7 @@ label.settings-option-row:active { transform: scale(0.985); }
 .s-dialog-title { font-size: 18px; font-weight: 700; color: var(--text); text-align: center; margin-bottom: 16px; }
 .s-dialog-message { font-size: 14px; color: var(--text-secondary); margin: 0 0 18px; }
 .s-dialog-buttons { display: flex; justify-content: flex-end; gap: 10px; }
-/* .about-block, .about-row, .about-label, .about-value come from shared.css */
 
-/* Settings rows: titles, descriptions and the buttons on the right of a row. */
 .opt-title { font-weight: 600; color: var(--text); font-size: 14px; }
 .opt-title-block { display: block; margin-bottom: 2px; }
 .opt-desc { font-size: 12px; color: var(--text-muted); }

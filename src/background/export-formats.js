@@ -1,8 +1,9 @@
-// The plain-data export builders: JSON, CSV and TXT. Pure string building - nothing here touches browser.* APIs. Needs
-// core.js (groupForReading, shortName, typeLabel, EXPORT_FORMAT_VERSION...) loaded first.
+// JSON, CSV and TXT export builders. Pure string building, nothing here
+// touches browser.*. Needs core.js (groupForReading, shortName, typeLabel,
+// EXPORT_FORMAT_VERSION...).
 
-// Each add-on's fields in reading order (name first, the technical id last).
-// The importer finds fields by name, so the order is only for people.
+// Fields in reading order, name first and id last. The importer finds them by
+// name, so the order is only for people.
 function jsonAddon(a, shorten = true) {
   return {
     name: shorten ? shortName(a.name) : a.name,
@@ -15,14 +16,11 @@ function jsonAddon(a, shorten = true) {
   };
 }
 
-// Builds the JSON export: the same add-ons as the HTML report's embedded data,
-// saved as a standalone .json file the Importer reads the same way.
-// shorten (the Settings "Shorten add-on names" choice, on by default) cuts
-// each name at its first separator, exactly as the HTML report does. The
-// id is always included, and the Importer matches by id first, so a short
-// name never stops an add-on from being recognised.
-// `source` is the browser part of the source (core.js); the file's own format
-// version and file type are added here.
+// Same add-ons as the HTML report's embedded data, as a standalone .json.
+// `shorten` is the Settings choice. The id is always written and the
+// Importer matches on it first, so a shortened name never loses a match.
+// `source` is the browser part of the source block; the file type and format
+// version are added here.
 function buildJsonExport(list, shorten = true, source = UNKNOWN_BROWSER) {
   return JSON.stringify({
     source: makeSource('json', EXPORT_FORMAT_VERSION, source),
@@ -30,35 +28,24 @@ function buildJsonExport(list, shorten = true, source = UNKNOWN_BROWSER) {
   }, null, 2);
 }
 
-// Builds a CSV export. It starts with the source comments (the format version,
-// the file type and which browser made the file - one line per field), then the
-// header row, then one data row per add-on. Fields with commas or quotes are
-// quoted and internal quotes are doubled per RFC 4180.
+// CSV: source comment lines, a header row, then one row per add-on. Quoting
+// follows RFC 4180.
 function buildCsvExport(list, shorten = true, source = UNKNOWN_BROWSER) {
   const csvField = (val) => {
     let s = String(val == null ? '' : val);
-    // A cell starting with =, +, -, @, tab, or CR is read as a formula by
-    // Excel/Sheets/LibreOffice once this file is opened in a spreadsheet -
-    // and an add-on name is attacker-controlled. A leading apostrophe
-    // forces "read as text" in all of them, and disappears from the
-    // visible cell content once opened. parseCsvPayload()'s
-    // stripCsvFormulaGuard() strips exactly one back off on import. A name
-    // that itself starts with apostrophes followed by one of those
-    // characters gets the guard too, so the importer strips only the one
-    // we add and the original name comes back unchanged.
+    // Spreadsheets run a cell starting with = + - @ tab or CR as a formula,
+    // and add-on names are attacker-controlled. A leading apostrophe makes
+    // them read it as text. parseCsvPayload() strips exactly one back off.
+    // Names that start with apostrophes and then one of those characters get
+    // the guard too, so the importer returns the original name unchanged.
     if (/^'*[=+\-@\t\r]/.test(s)) {
       s = `'${s}`;
     }
-    // Quote the field if it contains a comma, double-quote, or newline.
     return /[,"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const row = (fields) => fields.map(csvField).join(',');
 
-  // Columns in reading order (name first, the technical id last); the
-  // importer finds them by the header names, so the order is only for
-  // people. A byte-order mark at the very start makes Excel read the file
-  // as UTF-8, so non-English add-on names show correctly; the importer
-  // ignores it.
+  // The BOM makes Excel read the file as UTF-8 (the importer ignores it).
   const lines = [
     ...sourceCommentLines(makeSource('csv', EXPORT_FORMAT_VERSION, source)),
     row(['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id']),
@@ -67,25 +54,18 @@ function buildCsvExport(list, shorten = true, source = UNKNOWN_BROWSER) {
   return '\uFEFF' + lines.join('\r\n');
 }
 
-// Builds a plain-text export, laid out to be read: a title, then an
-// "Enabled" and a "Disabled" section (each A-Z) with the columns lined up.
-// One add-on per line:
+// TXT is laid out to be read: a title, then Enabled and Disabled sections
+// (A-Z) with aligned columns, one add-on per line:
 //   Name | Version | Type | Status | Link | LinkType | Id
-// The Importer uses the id (last column) to match add-ons even though the name
-// may be shortened (shorten, the Settings choice, on by default).
-// First line is a format-version comment so the format is identifiable.
-// The importer ignores every line without " | " in it (the title, the
-// section headings and the underlines), so none of those may contain it.
+// The Importer ignores every line without " | " (title, headings,
+// underlines), so none of those may contain it.
 //
-// Text written into a column is escaped so one add-on always stays on one line
-// and a name can never be mistaken for a column separator, and so the Importer
-// can restore it exactly:
-//   \\  a backslash          \|  a pipe
-//   \n  a line break         \r  a carriage return
-//   \s  a space at the very start or end of the text (the columns are padded
-//       with spaces, so edge spaces would otherwise be lost)
-// Everything else is written as it is, so ordinary names look exactly as before.
-// import.js's txtUnescape() is the reverse of this.
+// Values are escaped so an add-on stays on one line and a name can't be
+// mistaken for a separator. import.js's txtUnescape() reverses this.
+//   \\  backslash        \|  pipe
+//   \n  line break       \r  carriage return
+//   \s  a space at the very start or end (the columns are padded with spaces,
+//       so edge spaces would be lost otherwise)
 function txtEscape(value) {
   return String(value == null ? '' : value)
     .replace(/\\/g, '\\\\')
@@ -99,8 +79,7 @@ function buildTxtExport(list, shorten = true, source = UNKNOWN_BROWSER) {
   const { enabled, disabled, all } = groupForReading(list);
   const nameOf = (a) => txtEscape(shorten ? shortName(a.name) : a.name);
 
-  // Column widths, so every line lines up. A very long name is allowed to
-  // push its own line out rather than widening every other line.
+  // A very long name pushes out its own line instead of widening all of them.
   const NAME_MAX = 40;
   const nameWidth = Math.min(NAME_MAX, Math.max(0, ...all.map((a) => nameOf(a).length)));
   const versionWidth = Math.max(0, ...all.map((a) => txtEscape(a.version).length));
@@ -134,7 +113,6 @@ function buildTxtExport(list, shorten = true, source = UNKNOWN_BROWSER) {
     ...section('Enabled', enabled),
     ...section('Disabled', disabled),
   ];
-  // No blank line left dangling at the end.
   while (lines.length && lines[lines.length - 1] === '') lines.pop();
   return lines.join('\r\n');
 }

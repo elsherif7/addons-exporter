@@ -1,7 +1,5 @@
-// Tests for src/background/background.js. Loads the real source via vm
-// with a mocked browser/fetch, so these run against the actual file and
-// exercise its real registered message listener (not internal functions
-// called directly in isolation).
+// loads the real background.js in vm and drives its registered message listener,
+// not the internal functions directly.
 
 const assert = require('assert');
 const { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, plain, makeSandbox } = require('./helpers');
@@ -9,10 +7,6 @@ const { test, testAsync, readSrc, readSrcs, readCommon, readReportBuilders, plai
 const commonSrc = readCommon();
 const reportTemplateSrc = readReportBuilders() + '\n' + readSrc('src/background/browser-info.js');
 const backgroundSrc = readSrc('src/background/background.js');
-
-// --- background.js: excludes Mozilla's own built-in components ---
-// IDs ending in @mozilla.org or @mozac.org are not add-ons the user
-// actually installed and are excluded from the exportable set.
 
 testAsync('listInstalledAddons: excludes both @mozilla.org and @mozac.org built-ins', async () => {
   const bgSandbox = makeSandbox({
@@ -34,11 +28,6 @@ testAsync('listInstalledAddons: excludes both @mozilla.org and @mozac.org built-
   assert.deepStrictEqual(Array.from(result, (a) => a.id), ['ublock@example.com']);
 });
 
-// --- background.js: export message handler ---
-// Loads the real background.js via vm with a mocked browser/fetch,
-// and invokes the actual registered message listener
-// (not doExport() directly) so this covers the export save path.
-
 async function captureExportMessageResult(storageLocalGetImpl) {
   const defaultStorage = async () => ({});
   const storageGet = storageLocalGetImpl || defaultStorage;
@@ -49,13 +38,11 @@ async function captureExportMessageResult(storageLocalGetImpl) {
     URL,
     Blob,
     AbortController,
-    // background.js schedules a 30s delay before revoking the blob URL -
-    // firing immediately here avoids the test run actually waiting that long.
+    // fire the 30s blob-revoke timer right away instead of waiting for it
     setTimeout: (fn) => { fn(); return 0; },
     clearTimeout() {},
     console: { warn() {}, debug() {}, log() {}, error() {} },
     fetch: async (url) => {
-      // Exact-id lookup: pretend it's not on AMO. Name search: no results.
       if (url.includes('/addons/addon/')) return { ok: false, status: 404, json: async () => ({}) };
       return { ok: true, status: 200, json: async () => ({ results: [] }) };
     },
@@ -93,21 +80,15 @@ testAsync('export message: downloads with saveAs, opens no tab itself, and retur
   const { downloadOptions, createdTabUrls, result } = await captureExportMessageResult();
   assert.strictEqual(downloadOptions.saveAs, true);
   assert.match(downloadOptions.url, /^blob:/);
-  // export.js replaces its own page with the confirmation page instead.
+  // export.js swaps its own page for the confirmation page instead
   assert.strictEqual(createdTabUrls.length, 0);
   assert.deepStrictEqual(Array.from(result.formats), ['html']);
   assert.strictEqual(result.zipped, false);
   assert.strictEqual(result.stats.total, 1);
 });
 
-// --- background.js: doExport()'s link-resolution branching ---
-// findAmoPage() tries an exact AMO lookup first, then a fuzzy name
-// search; doExport() then falls back to the add-on's own homepage, and
-// finally to a raw AMO search-results URL, if neither AMO path found
-// anything. Calls doExport() directly (same pattern as
-// listInstalledAddons() above) since the branching under test lives
-// there and in findAmoPage() itself, not in the message listener's
-// platform switch that the tests above already cover.
+// calls doExport() directly: the fallback order (exact AMO, name search, homepage,
+// raw AMO search url) lives there and in findAmoPage()
 
 const baseAddon = { id: 'ext1@example.com', name: 'Test Addon', version: '1.0', enabled: true, type: 'extension' };
 
@@ -212,9 +193,7 @@ testAsync('doExport: past its lookup deadline, stops trying AMO and falls back f
     { id: 'a@x', name: 'Addon A', version: '1', enabled: true, type: 'extension' },
     { id: 'b@x', name: 'Addon B', version: '1', enabled: true, type: 'extension' },
   ];
-  // deadlineMs: -1 means "already past the deadline" from the very first
-  // item - simulates a big export that's been running a while, without
-  // an actual 90-second wait in the test.
+  // -1 = already past the deadline from the first item, so no real 90s wait
   const result = await runDoExportWithOptions(addons, fetchImpl, { deadlineMs: -1 });
   assert.strictEqual(fetchCallCount, 0, 'no AMO lookups should have been attempted at all');
   assert.strictEqual(result.stats.lookupsSkipped, 2);
@@ -229,15 +208,14 @@ testAsync('doExport: stops attempting AMO lookups after enough consecutive failu
   ));
   const result = await runDoExportWithOptions(addons, fetchImpl, { maxConsecutiveFailures: 2 });
   assert.ok(result.stats.lookupsSkipped > 0, 'later add-ons should have skipped the lookup once the breaker tripped');
-  // Each attempted lookup makes up to 2 fetch calls (exact + search); with
-  // the breaker capped at 2 consecutive failures out of 6 add-ons, far
-  // fewer than 12 calls should have actually gone out.
+  // up to 2 fetches per lookup, and the breaker trips after 2 failures in a row,
+  // so well under 12 calls should go out
   assert.ok(fetchCallCount < 12, `expected the breaker to cut lookups short, got ${fetchCallCount} fetch calls`);
 });
 
 testAsync('doExport: a lookup failure the name search rescues is not reported as a lost link', async () => {
   const fetchImpl = async (url) => {
-    if (url.includes('/addons/addon/')) throw new Error('network down'); // the exact lookup fails outright
+    if (url.includes('/addons/addon/')) throw new Error('network down');
     return {
       ok: true,
       status: 200,
@@ -277,12 +255,7 @@ testAsync('doExport: stats reflect a mix of exact, homepage, and fallback outcom
   assert.strictEqual(result.stats.lookupFailures, 0);
 });
 
-// --- doExport()'s theme-reading behavior ---
-// The report should start in whatever theme is currently stored, so a
-// dark-mode user gets a dark-mode report by default. Separate harness
-// from runDoExportWithFetch above since its return shape (the parsed
-// addon data) is already relied on by every test above this point -
-// this one needs the raw html string instead, to check <html data-theme>.
+// own harness, this one needs the raw html string to check <html data-theme>
 
 async function runDoExportForTheme(storageLocalGetImpl) {
   const fetchImpl = async (url) => {
@@ -321,12 +294,8 @@ testAsync('doExport: falls back to light if storage.local.get throws', async () 
   assert.match(html, /<html lang="en" data-theme="light">/);
 });
 
-// --- background.js: mapWithConcurrency()'s concurrency cap ---
-// AMO_LOOKUP_CONCURRENCY caps how many lookups run at once so a big
-// add-on collection doesn't trip AMO's rate limiting. Calls
-// mapWithConcurrency() directly with a tracking fn instead of going
-// through findAmoPage()/fetch, since the cap itself is what's under test
-// here, not the AMO lookup logic already covered above.
+// AMO_LOOKUP_CONCURRENCY keeps a big collection from tripping AMO's rate limiting.
+// calls mapWithConcurrency() directly, the cap is all that's under test
 
 testAsync('mapWithConcurrency: never runs more than `limit` calls at once', async () => {
   const bgSandbox = makeSandbox({
@@ -352,11 +321,7 @@ testAsync('mapWithConcurrency: never runs more than `limit` calls at once', asyn
   assert.strictEqual(maxConcurrent, 5, 'expected concurrency to actually reach the cap with 12 items and a limit of 5');
 });
 
-// --- doExport()'s export-format dispatch ---
-// doExport() reads EXPORT_FORMAT_STORAGE_KEY from storage and calls the
-// matching builder. Separate harness from runDoExportWithFetch/
-// runDoExportForTheme since those already rely on their specific return
-// shapes - this one just needs the raw content string and filename.
+// own harness again, this one only needs the raw content and filename
 
 async function runDoExportForFormat(storageLocalGetImpl) {
   const fetchImpl = async (url) => {
@@ -417,8 +382,6 @@ testAsync('doExport: defaults to .html when storage.local.get throws for exportF
   assert.match(content, /<!DOCTYPE html>/);
 });
 
-// --- background.js: the result reports the format export.js puts in the confirmation URL ---
-
 testAsync('export message: on desktop with JSON format, the result reports format=json', async () => {
   const { result } = await captureExportMessageResult(async () => ({ exportFormat: 'json' }));
   assert.deepStrictEqual(Array.from(result.formats), ['json']);
@@ -428,8 +391,6 @@ testAsync('export message: on desktop with CSV format, the result reports format
   const { result } = await captureExportMessageResult(async () => ({ exportFormat: 'csv' }));
   assert.deepStrictEqual(Array.from(result.formats), ['csv']);
 });
-
-// --- listInstalledAddons: includes optionsUrl ---
 
 testAsync('listInstalledAddons: includes optionsUrl when present, null when absent', async () => {
   const bgSandbox = makeSandbox({
@@ -450,12 +411,8 @@ testAsync('listInstalledAddons: includes optionsUrl when present, null when abse
   assert.strictEqual(result[1].optionsUrl, null);
 });
 
-// --- background.js: loads and registers its message listener ---
-// Firefox does not expose browser.management.uninstall() to regular
-// extensions - the Remove button opens about:addons instead - so there is no
-// uninstall path to test. What matters is that background.js loads in a
-// sandbox that has only the management API, and registers the
-// runtime.onMessage listener every page's message goes through.
+// no uninstall test: Firefox doesn't expose management.uninstall() to regular
+// extensions (Remove opens about:addons), so just check it loads and registers onMessage
 
 testAsync('background.js: loads with only the management API and registers its message listener', async () => {
   let listener = null;
@@ -472,7 +429,7 @@ testAsync('background.js: loads with only the management API and registers its m
   assert.strictEqual(typeof listener, 'function', 'background.js must register a runtime.onMessage listener');
 });
 
-// --- background.js: openTabs (the Importer hands every tab after the first to us) ---
+// the Importer hands every tab after the first to the background
 
 function loadBackgroundForOpenTabs({ failUrls = [] } = {}) {
   let messageListener = null;
@@ -501,7 +458,7 @@ function loadBackgroundForOpenTabs({ failUrls = [] } = {}) {
   return { send: (msg) => messageListener(msg), created, getTimeoutCalls: () => timeoutCalls };
 }
 
-// The queue runs in the background after the reply; let it drain.
+// the queue keeps running after the reply, let it drain
 const settleQueue = () => new Promise((resolve) => setImmediate(resolve));
 
 testAsync('openTabs: replies at once with how many are queued, then opens each as a background tab', async () => {
@@ -572,8 +529,6 @@ testAsync('doExport: with several formats ticked it builds one file per format, 
   assert.deepStrictEqual(Array.from(Object.keys(result.files[0])).sort(), ['content', 'filename', 'format'], 'each file is { content, filename, format }');
 });
 
-// --- several formats are saved as ONE zip (one Save dialog) ---
-
 function readZip(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const eocd = bytes.length - 22;
@@ -609,7 +564,7 @@ test('zip.js: buildZip stores every file intact, with correct names and CRCs (in
     assert.strictEqual(e.name, files[i].name);
     assert.strictEqual(e.text, files[i].content);
   });
-  // CRC-32 of "123456789" is the well-known check value 0xCBF43926.
+  // crc-32 of "123456789" is the known check value 0xCBF43926
   const check = readZip(sb.buildZip([{ name: 'c.txt', content: '123456789' }]));
   assert.strictEqual(check[0].crc, 0xCBF43926);
 });
@@ -637,8 +592,6 @@ testAsync('export message: several formats are downloaded as one .zip with a sin
   assert.strictEqual(result.zipped, true);
   assert.deepStrictEqual(Array.from(result.formats), ['html', 'json']);
 });
-
-// --- the Shorten add-on names setting reaches every export format ---
 
 const longNameAddon = { id: 'buster@x', name: 'Buster: Captcha Solver for Humans', version: '3.4.0', enabled: true, type: 'extension' };
 

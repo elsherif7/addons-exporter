@@ -1,22 +1,13 @@
-// web-ext's own settings, read by every `web-ext` command - the pinned one
-// behind `npm run lint:ext` and any `web-ext` you run yourself. Keeping them
-// here means `web-ext lint` and `web-ext build` behave the same however they
-// are started, instead of only when the ignore list is repeated on the command
-// line.
-//
-// Only the files that make up the extension itself are linted or packaged.
-// Everything listed below is development-only:
+// web-ext settings, read by every `web-ext` command, so lint and build behave
+// the same however they're started. Only the extension's own files are linted
+// or packaged; everything ignored below is development-only.
 export default {
   sourceDir: '.',
   ignoreFiles: [
-    // Tests, fixtures and the golden reports. The goldens and the AMO fixture
-    // hold inline <script> blocks on purpose - that is what a saved report is.
+    // the goldens and the AMO fixture hold inline <script> blocks on purpose
     'tests/**',
-    // Build and maintenance tooling: build-assets.js, check-syntax.js,
-    // set-version.js, clean.js.
     'scripts/**',
-    // Project files that are not part of the extension. (Dotfiles such as
-    // .gitignore and .c8rc.json are already ignored by web-ext itself.)
+    // web-ext already ignores dotfiles
     'package.json',
     'package-lock.json',
     'README.md',

@@ -1,18 +1,11 @@
-/* The extension's design tokens: colours for both themes, and the motion
-   timings. THE ONE PLACE they are defined. Loaded before shared.css by the
-   full pages (export, import, settings, confirmation) and built into the
-   exported report by scripts/build-assets.js (the popup keeps its own, smaller
-   set on purpose - it has its own look). */
+/* Design tokens: colours for both themes and the motion timings. The one place
+   they're defined. Loaded before shared.css by the full pages and built into
+   the report by scripts/build-assets.js. The popup keeps its own smaller set
+   on purpose. */
 
-/* Theme variables. Light values here are :root's defaults (used when no
-   data-theme attribute is set, and by [data-theme="light"] explicitly);
-   dark values override under [data-theme="dark"]. src/common/theme.js
-   sets document.documentElement's data-theme attribute on load, based
-   on the stored setting from the Settings page - this file only holds
-   the color values themselves, not the logic that picks between them.
-   Accent colors (link/warning/danger) get their own, lighter dark-mode
-   values rather than reusing the light-mode ones as-is, since several
-   of the light values are too low-contrast against a dark background. */
+/* Light values are the defaults; dark ones override under [data-theme="dark"]
+   (theme.js sets it). The dark accent colours are lighter than the light ones
+   because several of those have too little contrast on a dark background. */
 :root {
   --bg: #f4f5f7;
   --card-bg: #fff;
@@ -23,10 +16,8 @@
   --text-muted: #666;
   --text-faint: #707070;
   --border: #747b87;
-  /* The outline colour every button, box and field changes to on hover or focus. */
   --border-hover: #1f2937;
   --border-soft: #e2e4e8;
-  /* Lines between rows: between --border-soft and --border. */
   --divider: #c3c7ce;
   --hover-bg: #fafbfc;
   --btn-disabled-bg: #9ca3af;
@@ -35,19 +26,15 @@
   --danger-color: #c0392b;
   --danger-border: #9b1c1c;
   --success-color: #1a7f37;
-  /* Hover fills used by the Settings rows and buttons. */
   --row-hover-bg: #fafbfc;
   --hover-fill: #e9ebee;
   --danger-hover-bg: #fef2f2;
-  /* Click/tap feedback ring (press.js). */
   --press-ring: rgba(0, 96, 223, 0.4);
 
-  /* Motion: clearly visible, springy entrances. Everything below uses
-     these so the whole extension moves the same way - change them here to
-     make it faster or slower everywhere. --motion-search is kept shorter
-     because it replays on every keystroke. --motion-spring overshoots and
-     settles (a real spring curve where linear() is supported, a plain
-     overshoot curve otherwise). */
+  /* Motion timings, used everywhere so the whole extension moves the same way.
+     --motion-search is shorter because it replays on every keystroke.
+     --motion-spring overshoots and settles (a real spring curve where linear()
+     is supported, a plain overshoot otherwise). */
   --motion-normal: 0.4s;
   --motion-slow: 0.6s;
   --motion-search: 0.3s;

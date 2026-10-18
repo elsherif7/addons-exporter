@@ -1,22 +1,14 @@
-// Golden-file tests: the exact text of every export format, for a fixed set of
-// add-ons that includes the awkward cases (quotes, commas, a newline, a name a
-// spreadsheet would read as a formula, non-Latin text, a very long name, markup
-// in a name, a theme, disabled add-ons).
+// Exact text of every export format for a fixed list of add-ons, including the
+// awkward cases. A refactor must not change what users get in their saved files.
 //
-// Why they exist: a refactor of the builders, the shared helpers or the report
-// must not change what users get in their saved files. These compare the whole
-// output, byte for byte, against files in tests/golden/.
-//
-// If an output is MEANT to change, regenerate the files and review the diff:
+// If an output is meant to change, regenerate and review the diff:
 //     UPDATE_GOLDEN=1 node --test tests/golden.test.js
 //
-// Line endings are compared after normalising \r\n to \n, so a checkout that
-// converts line endings (git on Windows) does not fail these; a separate test
-// still checks that the CSV and TXT files really use \r\n.
+// \r\n is normalised before comparing so a checkout that converts line endings
+// (git on Windows) doesn't fail. A separate test checks CSV/TXT really use \r\n.
 //
-// The HTML report's stylesheet and icon are replaced by placeholders before
-// comparing: they are covered by the report.css and icon sync tests, and keeping
-// them out of the golden file means a colour change does not touch it.
+// The stylesheet and icon are masked out: they have their own sync tests and a
+// colour change shouldn't touch the golden files.
 
 const assert = require('assert');
 const fs = require('fs');
@@ -25,8 +17,7 @@ const { test, readCommon, readReportBuilders, makeSandbox, FIREFOX_SOURCE: SOURC
 
 const sandbox = makeSandbox({ URL }, readCommon(), readReportBuilders());
 const { buildHtmlReport, buildJsonExport, buildCsvExport, buildTxtExport } = sandbox;
-// SOURCE is a fixed browser (FIREFOX_SOURCE from helpers), so the golden files
-// do not change with whoever regenerates them.
+// fixed source, so the golden files don't depend on who regenerates them
 
 const GOLDEN_DIR = path.join(__dirname, 'golden');
 const UPDATE = process.env.UPDATE_GOLDEN === '1';
@@ -41,7 +32,7 @@ const fixture = [
   { id: 'plus@example.com', name: '+Plus Notes', version: '3', enabled: false, type: 'extension', link: AMO + 'plus-notes/', linkType: 'amo-exact' },
   { id: 'jp@example.com', name: '広告ブロッカー - 日本語版', version: '2.5', enabled: true, type: 'extension', link: AMO + 'jp-blocker/', linkType: 'amo-exact' },
   { id: 'cafe@example.com', name: 'Café Tab Manager: Pro', version: '5.1.2', enabled: true, type: 'extension', link: AMO + 'cafe-tab-manager/', linkType: 'amo-exact' },
-  // A name with a line break: CSV quotes it, TXT writes it as \n.
+  // CSV quotes the newline, TXT writes it as \n
   { id: 'newline@example.com', name: 'Line\nBreak Tool', version: '1.1', enabled: false, type: 'extension', link: 'https://example.com/line-break', linkType: 'homepage' },
   { id: 'markup@example.com', name: '<script>alert(1)</script> & "friends"', version: '9.9', enabled: true, type: 'extension', link: 'https://example.com/?q=search&lang=en', linkType: 'amo-search-fallback' },
   { id: 'long@example.com', name: 'An Extremely Long Add-on Name That Goes Well Past Forty Characters Without Any Separator', version: '10.20.30', enabled: true, type: 'extension', link: AMO + 'long-name/', linkType: 'amo-exact' },
@@ -51,7 +42,6 @@ const fixture = [
 
 const norm = (s) => s.replace(/\r\n/g, '\n');
 
-// The stylesheet and icon are checked by their own sync tests.
 function maskHtml(html) {
   return html
     .replace(/<style>[\s\S]*?<\/style>/, '<style>/* report.css (checked by its own sync test) */</style>')
@@ -101,9 +91,7 @@ test('golden: an empty list gives the same (valid) output in every format', () =
   check('empty.html', maskHtml(buildHtmlReport([], 'light', true, SOURCE)));
 });
 
-// Line endings are part of the format, not just of the golden files. The one
-// lone \n allowed in CSV is inside the quoted name that contains a newline; a
-// TXT file never has one (its lines are one add-on each).
+// the only lone \n allowed in CSV is inside the quoted name with a newline
 test('golden: CSV and TXT exports separate lines with \\r\\n, JSON with \\n', () => {
   const lone = (text) => (text.match(/(?<!\r)\n/g) || []).length;
   assert.ok(buildCsvExport(fixture, true, SOURCE).includes('\r\n'));
@@ -113,8 +101,7 @@ test('golden: CSV and TXT exports separate lines with \\r\\n, JSON with \\n', ()
   assert.ok(!buildJsonExport(fixture, true, SOURCE).includes('\r'), 'JSON has no \\r');
 });
 
-// A quick guard that the fixture really covers what the header comment claims,
-// so someone trimming it later does not silently weaken these tests.
+// so trimming the fixture can't silently weaken the tests above
 test('golden: the fixture still contains each awkward case', () => {
   const names = fixture.map((a) => a.name).join('\n');
   assert.ok(/"/.test(names) && /,/.test(names), 'quotes and commas');
@@ -127,7 +114,6 @@ test('golden: the fixture still contains each awkward case', () => {
   assert.ok(fixture.some((a) => !a.enabled), 'a disabled add-on');
 });
 
-// TXT escaping, for names that would otherwise break a line or a column.
 test('golden: TXT escaping is unchanged', () => {
   const escapes = [
     { id: 'a@example.com', name: 'Pipe | Name', version: '1.0', enabled: true, type: 'extension', link: 'https://example.com/a', linkType: 'homepage' },

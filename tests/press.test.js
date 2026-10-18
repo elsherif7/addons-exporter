@@ -1,10 +1,10 @@
-// Tests for src/common/press.js - the click/tap feedback ring.
+// src/common/press.js
 const assert = require('assert');
 const { test, readSrc, makeSandbox } = require('./helpers');
 
 const pressSrc = readSrc('src/common/press.js');
 
-// A fake element that knows which selectors it "matches" and records animate().
+// fake element that matches given selectors and records animate()
 function makeEl({ rowLike = false, matchesTarget = true, disabled = false, ariaDisabled = false, classes = [] } = {}) {
   const el = {
     animations: [],
@@ -64,8 +64,7 @@ test('press: list rows flash from the inside instead (their container clips outs
 test('press: pressing something inside a row pulses the whole row (rows are matched first)', () => {
   const { listeners } = loadPress();
   const row = makeEl({ rowLike: true });
-  // The checkbox itself is a valid target, but the row around it wins. It is
-  // not inside a link, so the link lookup (which comes first) finds nothing.
+  // the row wins over the checkbox inside it
   const checkbox = { closest: (sel) => (sel === 'a[href]' ? null : /addon-row|settings-option-row/.test(sel) ? row : checkbox) };
   listeners.pointerdown.fn({ target: checkbox, pointerType: 'touch', button: 0 });
   assert.strictEqual(row.animations.length, 1);

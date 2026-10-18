@@ -1,34 +1,21 @@
-// Pre-applies the saved option states (radios and tick boxes) from the localStorage cache before the
-// browser paints the Settings page for the first time.
+// Sets the saved radios and tick boxes from the localStorage cache before the
+// first paint of the Settings page.
 //
-// PLACEMENT: This script is loaded via a parser-blocking <script src> tag
-// placed immediately after the three option groups in settings.html. At that
-// parse position, all the inputs exist in the DOM but the browser has not
-// yet painted — a parser-blocking external script halts parsing, runs
-// synchronously, then resumes. The browser can only paint after the parser
-// yields the call stack, so correcting .checked here is guaranteed to happen
-// before the first visible frame.
+// It's a parser-blocking <script src> placed right after the option groups in
+// settings.html. At that point the inputs exist but nothing has been painted,
+// and the parser waits for the script, so setting .checked here happens
+// before the first frame. The Export Format boxes and the Display radios have
+// no hardcoded `checked` in the HTML; with no cache yet (fresh install) the
+// defaults are applied here.
 //
-// The Export Format tick boxes and the Display radio group have no hardcoded `checked`
-// attribute in the HTML — this script sets the correct one synchronously
-// before any paint, so the user never sees an unselected or wrong state.
-// On a fresh install (no cache yet), the defaults (html / on) are applied
-// here so the page still shows a selection immediately.
-//
-// Theme is excluded because theme.js already handles it with its own
-// localStorage cache key (addons-hub-theme-cache).
-//
-// The cache keys themselves live in core.js (SETTINGS_CACHE_KEYS), shared
-// with settings.js, so the two can never drift apart.
-//
-// Wrapped in try/catch so any localStorage error degrades silently — the
-// defaults are still applied from the explicit fallback paths below.
+// Theme is left to theme.js (its own cache key). The cache keys are in core.js
+// (SETTINGS_CACHE_KEYS), shared with settings.js. A localStorage error just
+// falls back to the defaults.
 
 (function () {
   var DEFAULT_FORMAT  = EXPORT_FORMAT_DEFAULT;
   var DEFAULT_SHORTEN = SHORT_NAME_DEFAULT;
-  // The format list comes from the registry in core.js (loaded before this
-  // script), so a new format needs no change here.
+  // from the registry in core.js, so a new format needs no change here
   var VALID_FORMATS   = EXPORT_FORMATS;
 
   var fmt     = null;
@@ -38,23 +25,21 @@
     fmt     = localStorage.getItem(SETTINGS_CACHE_KEYS.exportFormat);
     shorten = localStorage.getItem(SETTINGS_CACHE_KEYS.shortenNames);
   } catch (e) {
-    // localStorage unavailable — fall through to apply defaults below.
+    // no localStorage: defaults below
   }
 
-  // The cached export format is one format or several joined by commas
-  // (e.g. 'html,json'). Keep only the known ones; none left means the default.
+  // cached as one format or several joined by commas ('html,json'); unknown
+  // ones are dropped, none left means the default
   var fmtList = [];
   if (typeof fmt === 'string') {
     fmtList = fmt.split(',').filter(function (f) { return VALID_FORMATS.indexOf(f) !== -1; });
   }
   if (fmtList.length === 0) fmtList = [DEFAULT_FORMAT];
 
-  // Validate; fall back to defaults for missing or invalid cache values.
   if (!isValidShortenNames(shorten)) shorten = DEFAULT_SHORTEN;
 
-  // One tick box per registry format, id "format" + the id with a capital
-  // first letter (html -> formatHtml). settings.html has to match the
-  // registry; a test checks it.
+  // one tick box per registry format, id "format" + capitalised id
+  // (html -> formatHtml); settings.html must match, a test checks it
   VALID_FORMATS.forEach(function (id) {
     var box = document.getElementById('format' + id.charAt(0).toUpperCase() + id.slice(1));
     if (box) box.checked = (fmtList.indexOf(id) !== -1);

@@ -1,9 +1,6 @@
 // Runs `node --check` on every .js file under src/ to catch syntax errors
-// before they reach Firefox. Called by `npm test` via the pretest hook.
-//
-// node --check parses the file and reports any syntax errors without
-// executing it - safe to run on browser extension source that uses
-// browser.* APIs not available in Node.
+// before Firefox does. It's the pretest hook for `npm test`. --check parses
+// without executing, so browser.* APIs aren't a problem.
 
 'use strict';
 

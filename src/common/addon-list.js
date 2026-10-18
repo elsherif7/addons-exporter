@@ -1,21 +1,15 @@
-// The add-on list shared by the Exporter and the Importer: the same rows,
-// groups, Select all / Deselect all, search box, "3 of 12 selected" badge,
-// click-anywhere-on-the-row and live name shortening. Each page passes its
-// elements and keeps only what is its own (the Exporter's export call, the
-// Importer's matching, notes and tab opening). Loaded by those two pages after
-// core.js and page-ui.js.
+// The add-on list the Exporter and Importer share: rows, groups, Select all,
+// search, the "3 of 12 selected" badge, click-anywhere-on-a-row and live name
+// shortening. Each page passes in its elements and keeps only what is its own.
+// Loaded after core.js and page-ui.js.
 
-// Builds one add-on row's common parts - the checkbox, the name (which follows
-// the Shorten setting), the version and the type - and returns { row,
-// checkbox, label }, with the checkbox and label already in the row. The page
-// adds what is its own: extra things in the label or after it (a match label, a
-// warning, the AMO link).
-//   idPrefix  the checkbox id is `${idPrefix}-${index}` (unique per page)
-//   dataset   data-* values for the checkbox (what the page reads back)
-//   checked   the checkbox starts ticked
-//   disabled  the row is skipped (unsafe link): disabled checkbox, "row-disabled"
-// Built with DOM APIs, never innerHTML, so names and versions never pass
-// through HTML parsing.
+// Builds the common parts of a row (checkbox, name, version, type) and returns
+// { row, checkbox, label }. The page adds its own extras (match label, warning,
+// link).
+//   idPrefix  checkbox id is `${idPrefix}-${index}`
+//   dataset   data-* values on the checkbox, for the page to read back
+//   disabled  unsafe link: disabled checkbox and "row-disabled"
+// Built with DOM APIs, never innerHTML, so names never go through HTML parsing.
 function createAddonRowBase(a, index, { idPrefix, dataset = {}, checked = true, disabled = false, shorten = true }) {
   const row = document.createElement('div');
   row.className = 'addon-row';
@@ -31,7 +25,7 @@ function createAddonRowBase(a, index, { idPrefix, dataset = {}, checked = true, 
   const nameEl = document.createElement('span');
   nameEl.className = 'addon-name';
   nameEl.textContent = shorten ? shortName(a.name) : a.name;
-  nameEl.dataset.fullName = a.name; // so the name can follow the Shorten setting live
+  nameEl.dataset.fullName = a.name; // lets the name follow the Shorten setting live
 
   const versionEl = document.createElement('span');
   versionEl.className = 'addon-version';
@@ -49,9 +43,9 @@ function createAddonRowBase(a, index, { idPrefix, dataset = {}, checked = true, 
   return { row, checkbox, label };
 }
 
-// Builds the outer box with one group (heading + box of rows) per non-empty
-// entry of `groups` ([{ title, items }]), numbering the rows 0, 1, 2... across
-// all the groups. makeRow(item, index, group) returns each row's element.
+// Builds the outer box with one group (heading + rows) per non-empty entry of
+// `groups` ([{ title, items }]), numbering rows 0, 1, 2... across all groups.
+// makeRow(item, index, group) returns each row's element.
 function createAddonGroups(groups, makeRow) {
   const outerBox = document.createElement('div');
   outerBox.className = 'groups-outer-box';
@@ -78,14 +72,11 @@ function createAddonGroups(groups, makeRow) {
   return outerBox;
 }
 
-// Wires up one page's list and returns its controls:
-//   listEl, countEl, actionBtn (Export / Open: off while nothing is ticked),
-//   selectAllBtn, deselectAllBtn, searchInput, noMatchesEl
-//   shownDisplay  what display the list gets when a search shows it again
-//                 ('' = stylesheet default)
+// Wires up one page's list. actionBtn is Export / Open (off while nothing is
+// ticked). shownDisplay is the display a search gives the list when it shows
+// it again ('' = stylesheet default).
 // Returns { checkboxes, updateSelectionCount, render, clearSearch }.
-// Select all / Deselect all only touch rows the search still shows, and never a
-// disabled one.
+// Select all / Deselect all skip rows the search hides and disabled rows.
 function createAddonList({ listEl, countEl, actionBtn, selectAllBtn, deselectAllBtn, searchInput, noMatchesEl, shownDisplay = '' }) {
   const checkboxes = () => listEl.querySelectorAll('input[type="checkbox"]');
 
@@ -96,11 +87,9 @@ function createAddonList({ listEl, countEl, actionBtn, selectAllBtn, deselectAll
     actionBtn.disabled = checked === 0;
   }
 
-  // Shows the groups built by createAddonGroups() and makes every checkbox
-  // update the count. The page updates the count itself once it has finished
-  // its own bits of rendering. Redrawing an already-searched list (the
-  // Importer, when another export is chosen) applies the query again, so the
-  // search box and the rows can never end up disagreeing.
+  // Shows the groups from createAddonGroups(). A search already in the box is
+  // applied again, so the box and the rows never disagree (the Importer
+  // redraws when another export is picked).
   function render(outerBox) {
     const fragment = document.createDocumentFragment();
     fragment.appendChild(outerBox);
@@ -117,12 +106,9 @@ function createAddonList({ listEl, countEl, actionBtn, selectAllBtn, deselectAll
     noMatchesEl.style.display = anyMatch ? 'none' : 'block';
   }
 
-  // Empties the search box and shows the whole list again - the unfiltered
-  // list a freshly opened page has. Used when an already-open page is brought
-  // back to the front from the popup (see answerWhereIsPage), which opens it
-  // exactly like a fresh one. A no-op when there is nothing typed, so it can
-  // never un-hide a list that is hidden for another reason (the Importer with
-  // no file chosen yet).
+  // Empties the search box and shows the whole list, like a freshly opened
+  // page (see answerWhereIsPage). Does nothing when the box is already empty,
+  // so it can't un-hide a list that is hidden for another reason.
   function clearSearch() {
     if (!searchInput.value) return;
     searchInput.value = '';
@@ -140,19 +126,16 @@ function createAddonList({ listEl, countEl, actionBtn, selectAllBtn, deselectAll
 
   searchInput.addEventListener('input', applySearch);
 
-  // "Shorten add-on names" changed (Settings page, a settings import, a reset):
-  // the names on this already-open page change at once. What the search box
-  // matches changes with them, so a search in progress is applied again.
+  // The names follow the Shorten setting live. What a search matches changes
+  // with them, so a search in progress is applied again.
   onShortenNamesChanged((shorten) => {
     if (applyNameShortening(listEl, shorten) > 0 && searchInput.value) applySearch();
   });
 
-  // Makes the whole row clickable, not just the checkbox/label text.
-  // Clicking the checkbox itself is left alone - its own native click
-  // already toggles it. Anything else in the row calls cb.click(), which
-  // fires the checkbox's own native toggle and change event. The
-  // preventDefault stops a label click's own default forwarding to the
-  // checkbox, so that path doesn't also fire and double the toggle.
+  // Makes the whole row clickable. A click on the checkbox itself is left alone
+  // (it toggles natively). Anything else in the row calls cb.click(), and the
+  // preventDefault stops the label forwarding its own click so it doesn't
+  // toggle twice.
   listEl.addEventListener('click', (e) => {
     if (e.target.matches('input[type="checkbox"]')) return;
     if (e.target.closest('a')) return;

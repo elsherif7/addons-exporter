@@ -1,17 +1,12 @@
-// Property-style round trips: many generated add-on lists with awkward names
-// (commas, quotes, newlines, pipes, backslashes, leading = + - @, non-Latin
-// text, emoji, long names) are written in every format and read back by the
-// Importer's own parsers. Whatever the name, what comes out is what went in.
-//
-// The generator is seeded, so a failure is the same every run and the message
-// names the exact add-on that broke.
+// Generated lists with awkward names are written in every format and read back
+// by the Importer's own parsers. The generator is seeded so a failure repeats.
 
 const assert = require('assert');
 const { test, readCommon, readReportBuilders, readImport, htmlData, stubDocument, makeSandbox } = require('./helpers');
 
 const sb = makeSandbox({ URL, document: stubDocument() }, readCommon(), readReportBuilders(), readImport());
 
-// A small seeded generator (mulberry32).
+// mulberry32
 function rng(seed) {
   let a = seed >>> 0;
   return () => {
@@ -53,10 +48,8 @@ function makeList(seed, size) {
   return list;
 }
 
-// The fields every format carries, in a comparable form.
-// (The TXT file has no link-type column, so that field is left out for it.)
-// (The CSV reader treats every line ending in the file, including one inside a
-// quoted name, as a plain line break - so a CR/LF inside a name reads back as LF.)
+// txt has no linkType column. csv reader turns every line ending, even inside a
+// quoted name, into a plain break, so CRLF in a name comes back as LF.
 const plain = (a, format) => {
   const o = { id: a.id, name: format === 'csv' ? a.name.replace(/\r\n?/g, '\n') : a.name, version: a.version, enabled: a.enabled, type: a.type, link: a.link };
   if (format !== 'txt') o.linkType = a.linkType;

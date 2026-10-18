@@ -1,17 +1,11 @@
-// Builds the HTML report returned by doExport() in background.js:
-// buildHtmlReport(). Pure string templating only - nothing here touches
-// browser.* APIs, so it can be loaded and tested on its own. Needs core.js
-// (escapeHtml, linkLabel, byName, LINK_TYPE_LABELS, UNCERTAIN_LINK_TYPES,
-// EXPORT_FORMAT_VERSION, groupForReading) and report-assets.generated.js
-// (REPORT_CSS, REPORT_INLINE_SCRIPT, REPORT_ICON_DATA_URI) loaded before it -
-// see manifest.json's background.scripts order. The JSON, CSV and TXT builders are
-// in export-formats.js.
+// Builds the standalone HTML report. Pure string templating, no browser.*.
+// Needs core.js and report-assets.generated.js (REPORT_CSS,
+// REPORT_INLINE_SCRIPT, REPORT_ICON_DATA_URI) loaded first. The JSON, CSV and
+// TXT builders are in export-formats.js.
 
-// An add-on name (attacker-controlled) containing "</script>" would
-// close this tag early when the report is opened directly. Escaping
-// "</" as "<\/" stops that. Escaping U+2028 and U+2029 guards older JS
-// parsers against unexpected script-break syntax errors.
-// JSON.parse reads it back the same either way.
+// Add-on names are attacker-controlled, so a "</script>" in one must not
+// close the data tag early. "</" becomes "<\/", and U+2028/2029 are escaped
+// for older parsers. JSON.parse reads it back the same.
 function safeJsonForScriptTag(value) {
   return JSON.stringify(value)
     .replace(/<\//g, '<\\/')
@@ -19,18 +13,16 @@ function safeJsonForScriptTag(value) {
     .replace(/\u2029/g, '\\u2029');
 }
 
-// THE DATA CONTRACT OF THE HTML REPORT. The page around it (layout, colours,
-// the theme button, animation) can change freely, but the data block that
-// goes into #addons-exporter-data is what the Importer reads, and its add-ons
-// must stay exactly what the version released on addons.mozilla.org wrote:
+// The data block in #addons-exporter-data is what the Importer reads, and it
+// has to stay exactly what the release on addons.mozilla.org wrote:
 //   { "source": { formatVersion, fileType, basedOn, browser, browserVersion, extensionVersion },
 //     "addons": [ { id, name, version, enabled, type, link, linkType }, ... ] }
-// in that order, with full (never shortened) names. (Format version 1, which
-// the release on addons.mozilla.org wrote, had no "source" and carried the
-// format version at the top level; the Importer still reads it.) Writing the
-// fields out one by one here keeps the order fixed whatever the caller's
-// objects look like. Changing any of this means bumping EXPORT_FORMAT_VERSION
-// (see tests/format-contract.test.js, which fails until it is deliberate).
+// in that order, with full names (never shortened). The page around it can
+// change freely. Format version 1 had no "source" and kept the version at the
+// top level; the Importer still reads that. Fields are written one by one so
+// the order doesn't depend on the caller's objects. Changing any of this
+// means bumping EXPORT_FORMAT_VERSION (tests/format-contract.test.js fails
+// until you do).
 function htmlDataAddon(a) {
   return {
     id: a.id,
@@ -43,8 +35,8 @@ function htmlDataAddon(a) {
   };
 }
 
-// The report's own script (report-inline.js, built into REPORT_INLINE_SCRIPT),
-// with the starting theme filled in, indented to sit inside the <script> tag.
+// The report's script (report-inline.js) with the starting theme filled in,
+// indented to sit inside the <script> tag.
 function reportInlineScript(theme) {
   return REPORT_INLINE_SCRIPT
     .replace('__BAKED_THEME__', theme)
@@ -53,12 +45,8 @@ function reportInlineScript(theme) {
     .join('\n');
 }
 
-// theme is 'light' or 'dark' - the report's starting appearance,
-// baked in from whatever the exporter's own Settings said at export
-// time (see doExport()'s call site). The toggle button lets anyone
-// viewing the report flip it, and the choice is persisted in
-// localStorage so it survives between opens of the same file.
-// Falls back to the baked-in value if localStorage is unavailable.
+// `theme` is the starting appearance, taken from Settings at export time. The
+// toggle in the report overrides it and remembers the choice in localStorage.
 function buildHtmlReport(list, theme, shorten = true, source = UNKNOWN_BROWSER) {
   const startingTheme = theme === 'dark' ? 'dark' : 'light';
   const grouped = groupForReading(list);

@@ -1,5 +1,4 @@
-// scripts/set-version.js: sets the version in package.json and manifest.json
-// together, changing nothing else in either file.
+// scripts/set-version.js changes the version in both files and nothing else.
 
 const assert = require('assert');
 const fs = require('fs');

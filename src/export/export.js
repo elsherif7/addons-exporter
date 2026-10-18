@@ -8,14 +8,11 @@ const searchInput = document.getElementById('searchInput');
 const noSearchMatchesEl = document.getElementById('noSearchMatches');
 const exportDescEl = document.getElementById('exportDesc');
 
-// Builds the status shown once a desktop export has actually finished.
-// Mentions the AMO lookup breakdown so the user knows how many links are
-// confirmed exact matches vs fallbacks, and flags lookup failures
-// separately (see doExport()'s stats in background.js) so a real AMO
-// outage doesn't look identical to a completely normal export.
+// The status after a finished export. It says how many links are exact AMO
+// matches and how many are fallbacks, and reports lookup failures separately
+// (doExport()'s stats), so an AMO outage doesn't read like a normal export.
 function buildExportSuccessStatus(fmt, stats) {
-  // fmt is one format or a list of them (several can be ticked in Settings;
-  // several are saved together in one .zip).
+  // one format or several (several are saved together in one .zip)
   const formats = resolveExportFormats(fmt);
   let msg = formats.length === 1
     ? `Export complete. Your ${formatLabelsText(formats)} has been saved to the folder you picked.`
@@ -50,7 +47,6 @@ function buildExportSuccessStatus(fmt, stats) {
   return msg;
 }
 
-// Updates the description paragraph to reflect the currently stored format.
 async function updateExportDesc() {
   const { exportFormats: formats } = await loadSettings();
   const article = indefiniteArticleFor(formatLabel(formats[0]));
@@ -72,8 +68,7 @@ async function updateExportDesc() {
 
 updateExportDesc();
 
-// Keep the description in sync if the export format is changed from
-// another tab (e.g. the settings page) while this one is still open.
+// the format can be changed from Settings in another tab
 onSettingsChanged((changed) => {
   if (changed.includes('exportFormats')) updateExportDesc();
 });
@@ -87,9 +82,9 @@ const list = createAddonList({
   selectAllBtn, deselectAllBtn, searchInput, noMatchesEl: noSearchMatchesEl,
 });
 
-// The Exporter's row: the shared parts, plus a link that searches AMO for the
-// add-on (a guessed exact-id URL could 404 for a non-AMO add-on or a theme - a
-// name search always lands somewhere useful instead).
+// The shared row plus an AMO search link. A name search always lands
+// somewhere useful, while a guessed exact-id URL would 404 for themes and
+// add-ons that aren't on AMO.
 function createAddonRow(a, index, shorten) {
   const { row, label } = createAddonRowBase(a, index, {
     idPrefix: 'cb', dataset: { id: a.id }, shorten,
@@ -102,21 +97,14 @@ function createAddonRow(a, index, shorten) {
   amoLink.rel = 'noopener';
   amoLink.textContent = 'AMO';
 
-  // Kept out of the label, as a sibling rather than a child - inside it, a
-  // <label for> makes the checkbox's accessible name absorb the link text
-  // too (e.g. "uBlock Origin 1.0 Extension Search AMO"). Native
-  // target=_blank/rel=noopener already opens it in a new tab, the row's
-  // own click handler already skips anchor clicks, and
-  // .match-label[href]:hover in shared.css already underlines on hover -
-  // none of that needed its own JS here.
+  // A sibling of the label, not a child: inside a <label for> the checkbox's
+  // accessible name would swallow the link text.
   row.append(amoLink);
   return row;
 }
 
 function renderList(addons, shorten) {
   if (addons.length === 0) {
-    // Built with DOM APIs, never innerHTML (see addon-list.js), so the
-    // placeholder is a real element in every context, tests included.
     const placeholder = document.createElement('p');
     placeholder.className = 'placeholder-text';
     placeholder.textContent = 'No add-ons found to export.';
@@ -171,12 +159,10 @@ exportBtn.addEventListener('click', async () => {
   }
 });
 
-// The popup brings this tab to the front - and replays its opening - instead
-// of opening a second Exporter. A search left in the box goes with it, so the
-// page shows the whole list again, exactly like a fresh one.
+// The popup brings this tab to the front instead of opening a second one. A
+// leftover search is cleared so the page looks freshly opened.
 answerWhereIsPage('export', () => list.clearSearch());
 
-// background.js broadcasts progress as each link is resolved.
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'exportProgress') {
     setStatus(`Resolved ${message.done} of ${message.total} add-ons...`);

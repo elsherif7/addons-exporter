@@ -6,23 +6,19 @@ browser.runtime.onMessage.addListener((message) => {
     return Promise.resolve(queueTabOpens(message.urls));
   }
   if (message.type === 'getExportSource') {
-    // The Settings page asks for this so its exported file records the same
-    // source the add-on exports do (browser-info.js lives here).
+    // Settings asks for this so its file records the same source as the exports.
     return getExportSource();
   }
   if (message.type === 'export') {
     return doExport(message.ids).then(async ({ files, formats, stats }) => {
       await saveExport(files);
-      // No tab is opened from here: export.js replaces its own page with
-      // the confirmation page once it gets this result back.
+      // export.js swaps its own page for the confirmation page when this returns.
       return { formats, zipped: files.length > 1, stats };
     });
   }
 });
 
-// Saves the exported files through ONE Save dialog. One format: that file.
-// Several: they are bundled into one zip, so there is a single dialog instead
-// of one per file. The single file's MIME type comes from the format registry.
+// Several files go into one zip so there is a single Save dialog.
 async function saveExport(files) {
   let blob;
   let saveName;
@@ -42,15 +38,12 @@ async function saveExport(files) {
   }
 }
 
-// The Importer opens the first add-on's page itself, then hands the rest
-// here and immediately replaces its own page with the confirmation page -
-// a page that has navigated away can't keep a loop running, this script
-// can. Opens each as a background tab, one after another with the shared
-// stagger, starting right away. Returns at once ({ queued }) rather than
-// waiting for them all, so the page isn't held up; each tabs.create call
-// is also activity that keeps this event page alive until the queue is
-// done. Re-validates every URL (this message could come from anywhere in
-// the extension) and caps the batch.
+// The Importer opens the first add-on itself and hands the rest here, because
+// once it navigates to the confirmation page it can't keep a loop running and
+// this script can. Tabs open in the background, staggered. It returns
+// straight away ({ queued }); the tabs.create calls keep this event page
+// alive until the queue is done. URLs are checked again here and the batch is
+// capped.
 const MAX_QUEUED_TABS = 500;
 
 function queueTabOpens(urls) {
@@ -63,23 +56,14 @@ function queueTabOpens(urls) {
       try {
         await browser.tabs.create({ url: safe[i], active: false });
       } catch {
-        /* one tab failing shouldn't stop the rest */
+        /* one failing tab shouldn't stop the rest */
       }
     }
   })();
   return { queued: safe.length };
 }
 
-// buildHtmlReport(), buildJsonExport(), buildCsvExport(), buildTxtExport() -
-// all export format builders - live in
-// export-formats.js (buildHtmlReport() in report-template.js), loaded before
-// this file (see manifest.json). They're
-// pure string templating with no browser.* dependency, split out so they
-// can be read/tested on their own, separate from this file's messaging
-// and AMO-lookup concerns.
-
-// Caps how many AMO lookups run at once, so a big add-on collection
-// doesn't trip AMO's rate limiting.
+// Keeps a big collection from tripping AMO's rate limit.
 const AMO_LOOKUP_CONCURRENCY = 5;
 
 async function mapWithConcurrency(items, limit, fn) {
@@ -98,8 +82,8 @@ async function mapWithConcurrency(items, limit, fn) {
   return results;
 }
 
-// Shared by listInstalledAddons() and doExport() so both always agree on
-// which add-ons are eligible.
+// Used by both listInstalledAddons() and doExport() so they agree on what is
+// eligible.
 async function getExportableAddons() {
   let all;
   try {
@@ -108,11 +92,9 @@ async function getExportableAddons() {
     throw new Error('Could not read your installed add-ons. Try reloading the extension, or check that it still has permission to manage add-ons.');
   }
 
-  // Excludes dictionaries, language packs, and anything else that isn't
-  // a plain extension or theme — the report only has Enabled/Disabled
-  // sections, and those types have no matching store listing. Also
-  // excludes Mozilla's own built-in components: ids ending in @mozilla.org
-  // or @mozac.org are not add-ons the user actually chose to install.
+  // Only extensions and themes (dictionaries and language packs have no store
+  // listing), and not Mozilla's built-in components (@mozilla.org, @mozac.org),
+  // which the user never chose to install.
   return all.filter(a =>
     (a.type === 'extension' || a.type === 'theme') &&
     !a.id.endsWith('@mozilla.org') &&
@@ -128,37 +110,19 @@ async function listInstalledAddons() {
   }));
 }
 
-// Background worker suspension note:
-//
-// Firefox MV3 uses an event page (not a service worker), and kills it after
-// ~30 seconds of inactivity. Two mechanisms already keep it alive during an
-// export:
-//   1. export.js's sendMessage() call stays open for the duration of the
-//      export, and Firefox resets the idle timer while a message port is
-//      held open (bug 1851373).
-//   2. The fetch calls inside mapWithConcurrency() count as ongoing network
-//      activity, each resetting the timer on their own.
-//
-// A plain setInterval() keep-alive was tried in an earlier version but the
-// background page was still killed despite it - a bare timer with no
-// browser.* API call inside doesn't count as "activity" to the event page
-// lifetime tracker.
-//
-// A known workaround (confirmed working as of 2025) is to call any
-// browser.* API on a short interval. doExport() below does exactly that:
-//   setInterval(() => browser.runtime.getPlatformInfo(), 20000)
-// scoped to the duration of the export only (cleared in its finally block), so
-// Firefox can still reclaim the background page's memory between exports.
+// Firefox kills the MV3 event page after about 30s idle. During an export two
+// things keep it up: export.js's open sendMessage() port (bug 1851373) and the
+// AMO fetches. A bare setInterval did not help, because a timer with no
+// browser.* call isn't counted as activity, so doExport() also calls a
+// browser.* API every 20s. It's cleared when the export ends, so Firefox can
+// still reclaim the page afterwards.
 
-// After this much wall time spent on AMO lookups, stop attempting them
-// and fall back to a homepage/search link for whatever's left - large
-// lists could otherwise take a very long time (up to two 15s lookups per
-// add-on, 5 at a time) with no way to know the export is still moving.
+// After this long, stop looking things up on AMO and use a homepage/search
+// link for the rest. Big lists could otherwise take very long (two 15s
+// lookups per add-on, 5 at a time) with no sign of progress.
 const AMO_LOOKUP_DEADLINE_MS = 90000;
-// After this many AMO failures in a row (network error, timeout, or a
-// 429 that didn't clear on retry - never a clean "not found"), treat it
-// the same as hitting the deadline: AMO is clearly having a bad time, and
-// hammering it further for every remaining add-on isn't worth it.
+// Same idea for a run of failures (network error, timeout, a 429 that
+// didn't clear; never a clean "not found"): AMO is struggling, so stop.
 const AMO_LOOKUP_MAX_CONSECUTIVE_FAILURES = 5;
 
 async function doExport(ids, {
@@ -180,7 +144,7 @@ async function doExport(ids, {
   let done = 0;
   const reportProgress = () => {
     done++;
-    // Silenced — export.html may already be closed; that's expected.
+    // The export page may already be closed, so ignore errors.
     browser.runtime.sendMessage({ type: 'exportProgress', done, total }).catch(() => {});
   };
 
@@ -191,9 +155,7 @@ async function doExport(ids, {
     lookupFailures: 0, lookupsSkipped: 0,
   };
 
-  // Keep-alive timer scoped strictly to doExport: calls getPlatformInfo periodically
-  // so Firefox's event-page idle timer does not suspend the background script while
-  // resolving a large add-on list on a slow connection. Cleared in the finally block below.
+  // the keep-alive described above
   const keepAliveTimer = (typeof browser !== 'undefined' && browser.runtime && browser.runtime.getPlatformInfo)
     ? setInterval(() => { browser.runtime.getPlatformInfo().catch(() => {}); }, 20000)
     : null;
@@ -202,10 +164,8 @@ async function doExport(ids, {
   try {
     list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
       let amoMatch = null;
-      // Whether this add-on's own lookup requests failed (network error,
-      // timeout, non-2xx). Kept per add-on and counted only if no AMO link came
-      // back in the end, so a failure the name search then rescued is not
-      // reported as a missing link while its link is a perfectly good AMO one.
+      // Per add-on, and only counted if no AMO link ends up found, so a
+      // failure the name search recovered from isn't reported as a missing link.
       let lookupFailed = false;
       if (Date.now() < deadlineAt && consecutiveFailures < maxConsecutiveFailures) {
         amoMatch = await findAmoPage(a.id, a.name, () => { lookupFailed = true; });
@@ -225,10 +185,9 @@ async function doExport(ids, {
         linkType = amoMatch.matchType;
         if (linkType === 'amo-exact') stats.amoExact++; else stats.amoSearch++;
       } else {
-        // No AMO link for this add-on. Only a lookup that actually failed counts
-        // as a failure here: a clean "not on AMO" answer, an implausible name
-        // match, or a lookup skipped for the deadline simply gets a fallback
-        // link, and the success message words the two cases differently.
+        // Only a lookup that really failed counts as a failure. "Not on AMO",
+        // a poor name match or a skipped lookup just get a fallback link, and
+        // the success message words those differently.
         if (lookupFailed) stats.lookupFailures++;
         if (a.homepageUrl && isSafeUrl(a.homepageUrl)) {
           link = a.homepageUrl;
@@ -247,24 +206,19 @@ async function doExport(ids, {
     if (keepAliveTimer) clearInterval(keepAliveTimer);
   }
 
-  // Sort A→Z by name so every export format (HTML, JSON, CSV, TXT) comes
-  // out in the same consistent alphabetical order, regardless of the order
-  // browser.management.getAll() happened to return them in.
+  // A-Z, so every format comes out in the same order whatever order
+  // management.getAll() returned.
   list.sort(byName);
 
-  // background.js has no document to apply a theme to, so it doesn't
-  // load theme.js - it only needs the resolved value here, to bake into
-  // the report's starting state (see report-template.js's
-  // buildHtmlReport). loadSettings() (core.js) falls back to every
-  // default if storage is ever unavailable.
+  // No document here, so theme.js isn't loaded; only the resolved theme is
+  // needed, for the report's starting state. loadSettings() falls back to the
+  // defaults if storage is unavailable.
   const { theme, exportFormats, shortenNames } = await loadSettings();
   const shorten = shortenNames !== 'off';
-  // Which browser and extension version made these files; written into each one.
   const source = await getExportSource();
 
-  // One file per chosen format, all named with the same timestamp. They are
-  // built from the one list, so the (slow) AMO lookups above run only once
-  // however many formats are ticked.
+  // One file per chosen format, all from the same list, so the slow AMO
+  // lookups run once however many formats are ticked.
   const timestamp = formatFilenameTimestamp(new Date());
   const files = exportFormats.map((fmt) => {
     let content;
@@ -275,7 +229,6 @@ async function doExport(ids, {
     return { content, filename: `Firefox Add-ons (${timestamp}).${getExportFormat(fmt).extension}`, format: fmt };
   });
 
-  // files carries each exported file ({ content, filename, format }).
   return {
     files,
     formats: files.map((f) => f.format),

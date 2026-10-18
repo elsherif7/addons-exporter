@@ -1,15 +1,8 @@
-// Checks the .zip that buildZip() (src/background/zip.js) produces with tools
-// that are NOT written by this project.
-//
-// Why: the first version of the zip writer passed its own unit test (which reads
-// the archive with a reader written to match the writer) yet produced an archive
-// that real tools rejected - a size field in the end-of-central-directory record
-// was wrong. A reader written by the same hand cannot catch that kind of mistake;
-// Info-ZIP's `unzip`, Python's `zipfile` and bsdtar can.
-//
-// Each tool is used only if it exists on the machine running the tests. If none is
-// found, one test says so and passes, so the suite still runs on a bare machine;
-// at least one tool is normally available (Python or tar on Windows/macOS/Linux).
+// builds zips with buildZip() (src/background/zip.js) and checks them with tools not written here.
+// the first writer passed its own unit test (its reader was written to match it) but real tools
+// rejected the archive: a size field in the end-of-central-directory record was wrong. only an
+// outside reader catches that, so: Info-ZIP unzip, Python zipfile, bsdtar. each is skipped if
+// missing; if none exists one test says so and passes.
 
 const assert = require('assert');
 const fs = require('fs');
@@ -20,7 +13,7 @@ const { test, readSrcs, makeSandbox } = require('./helpers');
 
 const sandbox = makeSandbox({ TextEncoder, Uint8Array, Uint32Array, DataView }, readSrcs('src/common/crc32.js', 'src/background/zip.js'));
 
-// Names and contents like a real multi-format export, including non-ASCII.
+// realistic multi-format export, non-ascii included
 const files = [
   { name: 'Firefox Add-ons (2026-10-12_13-47-00).html', content: '<!DOCTYPE html><title>Add-ons Exporter</title>\n<p>café 広告</p>' },
   { name: 'Firefox Add-ons (2026-10-12_13-47-00).json', content: JSON.stringify({ formatVersion: 1, addons: [{ name: 'uBlock Origin', id: 'uBlock0@raymondhill.net' }] }, null, 2) },
@@ -82,7 +75,7 @@ if (python) {
   });
 }
 
-// Only bsdtar (the `tar` on Windows 10+ and macOS) reads zip files; GNU tar does not.
+// only bsdtar (`tar` on Windows 10+ and macOS) reads zips, GNU tar doesn't
 const tarVersion = run('tar', ['--version']);
 if (!tarVersion.error && /bsdtar|libarchive/i.test(tarVersion.stdout)) {
   toolsFound++;

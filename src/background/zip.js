@@ -1,15 +1,10 @@
-// A minimal ZIP writer, used when several export formats are ticked so they
-// can be saved as ONE file - Firefox only lets an extension pick a save
-// location once per downloaded file, so several files would mean several
-// Save dialogs. Files are stored uncompressed (the exports are small text),
-// which keeps this short and dependable. Plain classic script, like the rest
-// of the background scripts: buildZip() is a global.
+// Minimal ZIP writer. When several formats are ticked they go out as one
+// file, because Firefox asks for a save location once per downloaded file.
+// Entries are stored uncompressed (the exports are small text files).
+// The CRC comes from common/crc32.js, shared with the reader.
 
-// ZIP_CRC_TABLE and zipCrc32() come from src/common/crc32.js, shared with the
-// reader so both agree on what a correct entry's checksum is.
-
-// files: [{ name: 'a.json', content: '...text...' }]. Returns a Uint8Array
-// holding the whole .zip. `date` stamps every entry (ZIP stores local time).
+// files: [{ name, content }]. Returns the whole .zip as a Uint8Array. `date`
+// stamps every entry (ZIP uses local time).
 function buildZip(files, date = new Date()) {
   const encoder = new TextEncoder();
   const dosTime = (date.getHours() << 11) | (date.getMinutes() << 5) | (date.getSeconds() >> 1);
@@ -33,7 +28,7 @@ function buildZip(files, date = new Date()) {
   const u16 = (v) => { view.setUint16(pos, v, true); pos += 2; };
   const u32 = (v) => { view.setUint32(pos, v, true); pos += 4; };
 
-  // Local file headers + data.
+  // local headers + data
   for (const e of entries) {
     e.offset = pos;
     u32(0x04034b50); u16(20); u16(0x0800); u16(0); u16(dosTime); u16(dosDate);
@@ -41,7 +36,7 @@ function buildZip(files, date = new Date()) {
     out.set(e.nameBytes, pos); pos += e.nameBytes.length;
     out.set(e.data, pos); pos += e.data.length;
   }
-  // Central directory.
+  // central directory
   const centralStart = pos;
   for (const e of entries) {
     u32(0x02014b50); u16(20); u16(20); u16(0x0800); u16(0); u16(dosTime); u16(dosDate);
@@ -49,7 +44,7 @@ function buildZip(files, date = new Date()) {
     u16(0); u16(0); u16(0); u16(0); u32(0); u32(e.offset);
     out.set(e.nameBytes, pos); pos += e.nameBytes.length;
   }
-  // End of central directory (its size is taken first: pos moves as it is written).
+  // end record (size taken first, pos moves as it's written)
   const centralBytes = pos - centralStart;
   u32(0x06054b50); u16(0); u16(0); u16(entries.length); u16(entries.length);
   u32(centralBytes); u32(centralStart); u16(0);

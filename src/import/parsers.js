@@ -1,40 +1,30 @@
-// The Importer's file readers: the pure code that turns the text of an export
-// file (HTML report data, JSON, CSV, TXT) into a list of add-ons, or a reason
-// the file was rejected. Strict: a file must be exactly what the exporter
-// writes. Nothing here touches the page, so it can be tested without a DOM.
-// Needs core.js (EXPORT_FORMAT_VERSION, parseType) loaded first.
+// The Importer's file readers: turn the text of an export file (HTML report
+// data, JSON, CSV, TXT) into a list of add-ons, or a reason it was rejected.
+// Strict: a file must be exactly what the exporter writes. No page code.
+// Needs core.js (EXPORT_FORMAT_VERSION, parseType).
 
-// SUPPORTED_FORMAT_VERSION tracks EXPORT_FORMAT_VERSION. Format 1 files (the
-// add-ons only, with the format version at the top level) and format 2 files
-// (also a "source" carrying the format version, the file type and where the
-// export came from) are both read; each is checked against its own exact
-// layout. migrateAddonsData() below is what's supposed to handle any shape
-// change in the add-ons themselves between versions. These two are coupled: bumping the format
-// version without also updating migrateAddonsData means old-format
-// files get passed straight through unmigrated. A tripwire test in
-// tests/import.test.js hardcodes today's version number specifically
-// to fail when that happens - see "migrateAddonsData: bumping the
-// format version requires updating this test and migrateAddonsData".
+// Format 1 files (add-ons only, version at the top level) and format 2 files
+// (with a "source") are both read, each against its own exact layout.
+// migrateAddonsData() handles any change in the add-ons themselves between
+// versions, so the two go together: bumping the format version without
+// updating it would pass old files through unmigrated. A tripwire test in
+// tests/import.test.js hardcodes today's version to fail when that happens.
 const SUPPORTED_FORMAT_VERSION = EXPORT_FORMAT_VERSION;
 
-// The two ways a format version can be unusable, one message each: no usable
-// version at all (missing, non-numeric, or a "0" in a hand-edited comment), and
-// a version newer than this Importer understands. Every reader uses these two,
-// so a file gets the same wording whichever format it is in.
+// The two ways a format version can be unusable: none at all (missing,
+// non-numeric, or a hand-edited "0"), or newer than this Importer knows. Every
+// reader uses these, so the wording is the same whatever the format.
 const NO_VERSION_ERROR = 'This file is missing its export format version and can\'t be imported.';
 const NEWER_VERSION_ERROR = 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.';
 
-// No-op for format versions 1 and 2 (the add-on entries did not change; version
-// 2 only added the source). Update this (and the tripwire test above) before
-// bumping EXPORT_FORMAT_VERSION again.
+// No-op for versions 1 and 2 (version 2 only added the source). Update this
+// and the tripwire test before bumping EXPORT_FORMAT_VERSION again.
 function migrateAddonsData(addons, formatVersion) {
   return addons;
 }
 
-// De-duplicates by id+link (or, lacking an id, name+link) - an exact
-// repeat entry would otherwise show up as two rows, and if both got
-// selected in the Importer, open the same add-on's page twice. Shared by
-// parseAddonsPayload() and parseCsvPayload() below.
+// De-duplicates by id+link (name+link without an id). An exact repeat would
+// show as two rows, and selecting both would open the same page twice.
 function dedupeAddonKey(a) {
   return `${a.id || (a.name || '').toLowerCase()}\u0000${a.link || ''}`;
 }
@@ -50,34 +40,25 @@ function dedupeAddons(list) {
   return out;
 }
 
-// Validates the add-ons payload of an export: the JSON file, and the data
-// embedded in an HTML report (the script tag #addons-exporter-data). Takes the
-// raw text (or null if that tag wasn't found in the HTML file) and returns
-// either the ready-to-render list or a user-facing reason the file was
-// rejected.
+// Validates the add-ons payload of an export (the JSON file, or the data in an
+// HTML report's #addons-exporter-data tag). Takes the raw text, or null if the
+// tag wasn't found, and returns the list or a user-facing reason.
 //
-// The check is strict: the file must be exactly what the exporter writes,
-// including the HTML report from the version released on addons.mozilla.org
-// (the same payload):
+// Strict: exactly what the exporter writes, HTML reports from the release on
+// addons.mozilla.org included:
 //   format 2: { "source": { formatVersion, fileType, basedOn, browser, browserVersion, extensionVersion },
 //               "addons": [ { id, name, version, enabled, type, link, linkType }, ... ] }
-//   format 1: { "formatVersion": 1, "addons": [ ... ] } (what the release on addons.mozilla.org wrote)
-// Anything else - another key, a missing field, a field of the wrong type - is
-// rejected as a whole, naming the first problem, rather than guessed at.
-// Pulled out of parseChosenFile() as a pure function so it can be unit tested without
-// a DOM. Throws if jsonText is present but isn't valid JSON - the caller's
-// try/catch (parseChosenFile() in import.js) handles that.
-// The field order of an entry in each file: the HTML report's embedded data
-// (also what the AMO release wrote) starts with the id; the JSON export lists
-// the name first and the id last. A file must use its own format's order.
+//   format 1: { "formatVersion": 1, "addons": [ ... ] }
+// Anything else (another key, a missing field, a wrong type) rejects the whole
+// file and names the first problem. Throws if jsonText isn't valid JSON, so
+// the caller (parseChosenFile() in import.js) needs a try/catch.
+// Entry field order differs per file: the HTML data (and the AMO release)
+// starts with the id, the JSON export has the name first and the id last.
 const HTML_ENTRY_KEYS = ['id', 'name', 'version', 'enabled', 'type', 'link', 'linkType'];
 const JSON_ENTRY_KEYS = ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id'];
 const payloadError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter format (${detail}).` });
-// "Exactly these keys, in exactly this order" is hasExactKeys() in core.js -
-// the same check sourceProblem() uses on a source block.
 
-// Returns null when the entry is exactly what the exporter writes, otherwise a
-// short reason.
+// null if the entry is exactly what the exporter writes, else a short reason
 function addonEntryProblem(a, keys) {
   if (!a || typeof a !== 'object' || Array.isArray(a)) return 'it is not an object';
   if (!hasExactKeys(a, keys)) return 'its fields are not exactly ' + keys.join(', ') + ', in that order';
@@ -91,17 +72,14 @@ function addonEntryProblem(a, keys) {
   return null;
 }
 
-// Checks an already-parsed export payload (the HTML report's embedded data, or
-// a JSON file's contents) and returns its add-ons, or a reason it was rejected.
 function validateAddonsPayload(parsed, entryKeys, fileType) {
   if (!parsed || typeof parsed !== 'object') {
     return payloadError('the data is not an object');
   }
 
-  // Format 2+: the format version, the file type and where the export came from
-  // are all inside the "source". Format 1 had no source and carried the format
-  // version at the top level. The version is found and checked before anything
-  // about the add-ons, so an incompatible file gets a version-specific message.
+  // Format 2+ keeps the version inside "source"; format 1 had it at the top
+  // level. It's checked before anything else so an incompatible file gets a
+  // version-specific message.
   const hasSource = parsed.source !== undefined;
   let source = null;
   let formatVersion;
@@ -137,53 +115,41 @@ function validateAddonsPayload(parsed, entryKeys, fileType) {
   return { ok: true, addons: migrateAddonsData(dedupeAddons(list), formatVersion), source };
 }
 
-// Reads the embedded data out of an HTML report's text (the data element's
-// content) and validates it. Same return shape as validateAddonsPayload().
+// Validates the HTML report's embedded data text. Same result as validateAddonsPayload().
 function parseAddonsPayload(jsonText, entryKeys = HTML_ENTRY_KEYS, fileType = 'html') {
   if (jsonText == null) {
     return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no embedded data found)' };
   }
-  // An empty data element (a report with its data stripped, say) is not JSON at
-  // all, and "Unexpected end of JSON input" would be the only thing the user
-  // saw. It holds no add-ons, which is what this says.
+  // empty isn't JSON, and "Unexpected end of JSON input" would be all the user saw
   if (jsonText.trim() === '') return { ok: false, error: 'No add-ons found in that file' };
   return validateAddonsPayload(JSON.parse(jsonText), entryKeys, fileType);
 }
 
-// Validates and parses a JSON export file's text content. Same return
-// shape as validateAddonsPayload(): { ok, addons, source } or { ok: false, error }.
-// Throws on malformed JSON - the caller's try/catch handles it.
+// Same result as validateAddonsPayload(). Throws on malformed JSON.
 function parseJsonPayload(text) {
   return validateAddonsPayload(JSON.parse(text), JSON_ENTRY_KEYS, 'json');
 }
 
-// Undoes the leading-apostrophe formula-injection guard buildCsvExport()
-// (export-formats.js) adds to a field that would otherwise be read as a
-// formula by a spreadsheet app (one starting with =, +, -, @, tab, or
-// CR). Only strips it when what follows the leading apostrophe(s) is one of
-// those - a value that genuinely starts with an apostrophe followed by
-// something else is left alone. The exporter guards every value that starts
-// with any number of apostrophes then one of those characters, so exactly
-// one apostrophe is removed here and the original value comes back.
+// Undoes the leading apostrophe buildCsvExport() adds to values a spreadsheet
+// would read as formulas. The exporter guards any run of apostrophes followed
+// by one of = + - @ tab CR, so removing exactly one gives the original back.
+// An apostrophe followed by anything else is left alone.
 function stripCsvFormulaGuard(s) {
   return /^'+[=+\-@\t\r]/.test(s) ? s.slice(1) : s;
 }
 
-// The one header row buildCsvExport() (export-formats.js) writes.
 const CSV_HEADER = ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id'];
 
-// Reads the header a CSV or TXT export starts with: the format-2 source
-// comments (whose first line carries the format version) or the format-1 plain
-// format-version comment. `formatError` is the format's own error builder
-// (csvError/txtError). Returns { ok: true, formatVersion, source, start } -
-// `start` is the index of the first body line - or { ok: false, error }.
+// Reads the header of a CSV or TXT export: the format-2 source comments or
+// the format-1 version comment. `formatError` is the format's own error
+// builder. Returns { ok: true, formatVersion, source, start } (`start` is the
+// first body line) or { ok: false, error }.
 function readFormatHeader(lines, fileType, formatError) {
   const first = (lines && lines[0]) || '';
   const sourceVersion = first.match(/^# addons-hub-source-formatVersion: (\d+)$/);
   if (sourceVersion) {
     const formatVersion = parseInt(sourceVersion[1], 10);
-    // Below 1 and above the supported version are both refused before the rest
-    // of the source is read, so a "0" is not blamed on the source comments.
+    // refused before the rest of the source is read, so a "0" isn't blamed on the comments
     if (formatVersion < 1) return { ok: false, error: NO_VERSION_ERROR };
     if (formatVersion > SUPPORTED_FORMAT_VERSION) return { ok: false, error: NEWER_VERSION_ERROR };
     const source = parseSourceCommentLines(lines.slice(0, SOURCE_KEYS.length), fileType);
@@ -200,30 +166,25 @@ function readFormatHeader(lines, fileType, formatError) {
 
 const csvError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter CSV format (${detail}).` });
 
-// Validates and parses a CSV export file's text content. Accepts only what
-// buildCsvExport() writes:
+// Accepts only what buildCsvExport() writes:
 //   line 1 (format 2): # addons-hub-source-formatVersion: <n>
-//   lines 2-6 (format 2): the rest of the source, one comment line per field
-//   line 1 (format 1):  # addons-hub-format-version: <n>, no source
-//   next:   name,version,type,enabled,link,linkType,id (this exact header)
-//   then:   one row per add-on, exactly seven fields, no blank lines
-// Anything else is rejected, with the first problem found named.
-// Returns { ok, addons, source } (source is null for format 1) or { ok: false, error }.
+//   lines 2-6 (format 2): the rest of the source, one comment per field
+//   line 1 (format 1): # addons-hub-format-version: <n>, no source
+//   next: name,version,type,enabled,link,linkType,id (this exact header)
+//   then: one row per add-on, exactly seven fields, no blank lines
+// Anything else is rejected and the first problem named. Returns { ok, addons,
+// source } (source is null for format 1) or { ok: false, error }.
 function parseCsvPayload(text) {
-  // The export starts with a byte-order mark (so Excel reads UTF-8); it is not part of the text.
+  // drop the BOM the export starts with
   const normalized = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const lines = normalized.split('\n');
 
-  // Format 2 starts with the source comments, whose first line carries the
-  // format version. Format 1 (what the releases wrote) has no source: it starts
-  // with a plain format-version comment and its version is only there.
   const header = readFormatHeader(lines, 'csv', csvError);
   if (!header.ok) return header;
   const { formatVersion, source } = header;
   const body = lines.slice(header.start).join('\n');
 
-  // The rest is parsed as a whole, not line by line, so a quoted name that
-  // contains a line break stays one field.
+  // parsed as a whole so a quoted name with a line break stays one field
   let records;
   try {
     records = parseCsvRecords(body);
@@ -256,13 +217,12 @@ function parseCsvPayload(text) {
   return { ok: true, addons: migrateAddonsData(dedupeAddons(addons), formatVersion), source };
 }
 
-// Parses an entire CSV text (RFC 4180) into an array of records, each an
-// array of field strings. It walks the whole text in one pass, so a quoted
-// field containing a literal newline stays part of that one field. Throws an
-// Error (with a short reason) for text buildCsvExport() never writes: a quote
-// inside an unquoted field, an unclosed quote, or anything between a closing
-// quote and the next comma or line end. A blank line is a record with one
-// empty field, which the caller rejects as having the wrong field count.
+// Parses a whole CSV text (RFC 4180) into records of field strings, in one
+// pass so a quoted field with a newline stays one field. Throws a short reason
+// for text the exporter never writes: a quote inside an unquoted field, an
+// unclosed quote, or anything between a closing quote and the next comma or
+// line end. A blank line is a record with one empty field, which the caller
+// rejects for the wrong field count.
 function parseCsvRecords(text) {
   const records = [];
   let fields = [];
@@ -299,7 +259,6 @@ function parseCsvRecords(text) {
     return field;
   }
 
-  // No text at all is no records.
   if (n === 0) return records;
   while (i <= n) {
     fields.push(readField());
@@ -318,53 +277,43 @@ function parseCsvRecords(text) {
   return records;
 }
 
-
-// Reverses the escaping buildTxtExport() (export-formats.js) applies to every
-// column: \\ is a backslash, \| a pipe, \n a line break, \r a carriage
-// return, \s a space (used for a space at the very start or end of a value).
-// Returns null for a backslash followed by anything else, which the exporter
-// never writes.
+// Reverses buildTxtExport()'s escaping: \\ backslash, \| pipe, \n line break,
+// \r carriage return, \s a space at the start or end of a value. Returns null
+// for a backslash followed by anything else, which the exporter never writes.
 function txtUnescape(text) {
-  // Take the valid escapes out first; any backslash left over is not one.
+  // after removing the valid escapes, any backslash left is invalid
   if (text.replace(/\\[\\|nrs]/g, '').includes('\\')) return null;
   return text.replace(/\\([\\|nrs])/g, (m, c) => ({ '\\': '\\', '|': '|', n: '\n', r: '\r', s: ' ' }[c]));
 }
 
-// A column's text with only the padding spaces removed (not tabs or other
-// whitespace, which belong to the value), then unescaped. null if invalid.
+// Strips only the padding spaces (tabs and other whitespace belong to the
+// value), then unescapes. null if invalid.
 function readTxtCell(text) {
   return txtUnescape(text.replace(/^ +| +$/g, ''));
 }
 
 const txtError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter TXT format (${detail}).` });
 
-// Validates and parses a TXT export file's text content. Accepts only what
-// buildTxtExport() writes:
+// Accepts only what buildTxtExport() writes:
 //   line 1 (format 2): # addons-hub-source-formatVersion: <n>
-//   lines 2-6 (format 2): the rest of the source, one comment line per field
-//   line 1 (format 1):  # addons-hub-format-version: <n>, no source
-//   then the title, the section headings and their underlines (any line with
-//   no " | " in it is skipped)
-//   then one add-on per line, exactly seven columns - six in a format 1 file,
-//   which predates the link type:
+//   lines 2-6 (format 2): the rest of the source, one comment per field
+//   line 1 (format 1): # addons-hub-format-version: <n>, no source
+//   then the title, section headings and underlines (any line without " | "
+//   is skipped)
+//   then one add-on per line: seven columns, six in format 1 (no link type)
 //     Name | Version | Type | Status | Link | LinkType | Id
-// A line with " | " in it that is not a valid add-on line rejects the whole
-// file, with its line number. Returns { ok, addons, source } (source is null for
+// A line with " | " that isn't a valid add-on line rejects the whole file,
+// with its line number. Returns { ok, addons, source } (source is null for
 // format 1) or { ok: false, error }.
 function parseTxtPayload(text) {
   const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
-  // Format 2 starts with the source comments, whose first line carries the
-  // format version. Format 1 (what the releases wrote) has no source: it starts
-  // with a plain format-version comment and its version is only there.
   const header = readFormatHeader(lines, 'txt', txtError);
   if (!header.ok) return header;
   const { formatVersion, source } = header;
   const start = header.start;
 
-  // Format 2 added the link-type column (before the id); format 1 files, which
-  // predate it, have one column fewer. Both are read, each against its own
-  // exact layout.
+  // format 2 added the link-type column before the id
   const columnCount = formatVersion >= 2 ? 7 : 6;
   const addons = [];
   for (let n = start; n < lines.length; n++) {

@@ -1,9 +1,5 @@
-// Settings page logic. theme.js (loaded in <head>) already applied the
-// stored theme before this runs, using its own THEME_STORAGE_KEY,
-// resolveTheme(), and applyTheme() - this just wires the radio buttons
-// up to reflect and change that same stored value.
-
-// --- DOM wiring ---
+// Settings page logic. theme.js has already applied the stored theme before
+// this runs; this wires the controls to the stored values.
 
 const themeRadios = document.querySelectorAll('input[name="theme"]');
 const formatBoxes = document.querySelectorAll('input[name="exportFormat"]');
@@ -13,22 +9,17 @@ const importSettingsBtn = document.getElementById('importSettingsBtn');
 const settingsFileInput = document.getElementById('settingsFileInput');
 const settingsStatusEl = document.getElementById('settingsStatus');
 
-// ---------------------------------------------------------------------------
-// ActionRow — shared system for the three action rows (Export / Import / Reset).
-// Each row has a description <span> and an inline status <span>. Activating a
-// row hides its description and shows a status message in its place. Calling
-// restore() on any row (or clearAllRows()) brings the description back.
-// ---------------------------------------------------------------------------
-// Row feedback, all done with element.animate() so the row's own CSS
-// animations are left alone, and all skipped for reduced motion:
-//  - a finished export / import / reset flashes its row green and slides the
-//    message in (see .is-success in settings.css);
-//  - a cancelled one (dismissed file dialog, cancelled save dialog, Cancel in
-//    the reset dialog) flashes the row soft grey and slides its description
-//    back in from the left.
-// A message in the Export / Import / Reset rows stays for this long if nobody
-// touches anything, then goes away by itself and the row's description comes
-// back. (Touching anything clears it sooner - see the click handler below.)
+// ActionRow: the Export / Import / Reset rows each have a description and an
+// inline status. Activating a row swaps the description for the status;
+// restore() brings it back.
+//
+// Row feedback uses element.animate() (the row's own CSS animations are left
+// alone) and is skipped for reduced motion. A finished export/import/reset
+// flashes the row green and slides the message in. A cancelled one (file
+// dialog dismissed, save cancelled, Cancel in the reset dialog) flashes it
+// grey and slides the description back in.
+// A message goes away by itself after this long and the description returns.
+// Touching anything clears it sooner (see the click handler at the bottom).
 const STATUS_AUTO_HIDE_MS = 7000;
 
 const SUCCESS_FLASH = 'rgba(46, 160, 67, 0.32)';
@@ -58,9 +49,8 @@ function slideBackIn(el) {
   );
 }
 
-// After an import, flashes the selected option in each group (appearance,
-// export format, display) one after another, top to bottom, so you can see
-// what the imported file just set.
+// After an import, flashes the selected option of each group in turn so you
+// can see what the file set.
 function flashSelectedOptions() {
   const rows = Array.from(document.querySelectorAll('label.settings-option-row'))
     .filter((row) => typeof row.querySelector === 'function' && row.querySelector('input:checked'));
@@ -82,8 +72,7 @@ function ActionRow(descId, statusId) {
     statusEl.style.color   = isError ? 'var(--danger-color)' : 'var(--success-color, var(--text-muted))';
     statusEl.style.display = msg ? '' : 'none';
     if (statusEl.classList) statusEl.classList.toggle('is-success', !!msg && !isError);
-    // A message that nobody touches goes away by itself: the description
-    // comes back (sliding in, like after a cancel - but without the grey flash).
+    // an untouched message fades away and the description slides back in
     cancelAutoHide();
     if (msg && typeof setTimeout === 'function') {
       hideTimer = setTimeout(() => {
@@ -94,7 +83,6 @@ function ActionRow(descId, statusId) {
     }
   }
 
-  // Restore description, clear status.
   function restore() {
     cancelAutoHide();
     if (statusEl) {
@@ -106,12 +94,12 @@ function ActionRow(descId, statusId) {
   }
 
   return {
-    // Hide description, show msg in its place (empty msg = just hide desc).
+    // empty msg just hides the description
     activate(msg, isError) {
       if (descEl)   descEl.style.display = 'none';
       if (statusEl) show(msg, isError);
     },
-    // Show msg, keeping description hidden (used after async work completes).
+    // for after async work finishes
     setMsg(msg, isError) {
       if (!statusEl) return;
       show(msg, isError);
@@ -120,7 +108,6 @@ function ActionRow(descId, statusId) {
       }
     },
     restore,
-    // The user backed out: restore the description, with the cancel feedback.
     cancelled() {
       restore();
       if (descEl) {
@@ -151,10 +138,9 @@ function setSettingsStatus(msg, isError = false) {
   settingsStatusEl.className   = isError ? 'error' : '';
 }
 
-// Each of these re-reads ALL settings through the shared loader (one storage
-// read) and ticks its own controls. They also keep the localStorage cache in
-// step, so settings-init.js can apply the right values before the first paint
-// on the next open.
+// These re-read all settings in one storage read and tick their own controls.
+// They also update the localStorage cache so settings-init.js can set the
+// right values before the first paint next time.
 async function loadCurrentTheme() {
   const { theme } = await loadSettings();
   for (const radio of themeRadios) {
@@ -173,21 +159,20 @@ async function loadCurrentExportFormat() {
 for (const radio of themeRadios) {
   radio.addEventListener('change', async () => {
     if (!radio.checked) return;
-    // Switch the page at once, exactly like the report's toggle does - the
-    // animation starts the moment you click, not after the save has finished.
+    // apply at once, like the report's toggle, not after the save
     applyTheme(radio.value);
     try {
       await browser.storage.local.set({ [THEME_STORAGE_KEY]: radio.value });
     } catch (err) {
       setSettingsStatus('Could not save the theme: ' + err.message, true);
-      // The write failed - put the radio AND the page back to what's actually stored.
+      // put the radio and the page back to what's stored
       applyTheme(await loadCurrentTheme());
     }
   });
 }
 
-// The export formats are tick boxes: any number can be on, but never none -
-// unticking the last one just puts it back (there must be something to export).
+// Any number of formats can be on, but never none: unticking the last one
+// puts it back.
 for (const box of formatBoxes) {
   box.addEventListener('change', async () => {
     const ticked = Array.from(formatBoxes).filter((b) => b.checked).map((b) => b.value);
@@ -225,10 +210,9 @@ for (const radio of shortenRadios) {
   });
 }
 
-// The source the settings file records (which browser and extension version
-// made it) - the same one the add-on exports carry. browser-info.js lives in
-// the background, so ask it; if that call ever fails, the file falls back to
-// the same "Unknown" the exporter uses.
+// The settings file records the same source as the exports. browser-info.js is
+// in the background, so ask it; on failure the file gets the exporter's
+// "Unknown".
 async function getSettingsSource() {
   try {
     return await browser.runtime.sendMessage({ type: 'getExportSource' });
@@ -256,8 +240,7 @@ exportSettingsBtn.addEventListener('click', async () => {
 
     exportRow.setMsg('Settings exported.');
   } catch (err) {
-    // Dismissing the save dialog makes downloads.download reject with a
-    // "canceled" error - that's the user backing out, not a failure.
+    // dismissing the save dialog rejects with "canceled", which isn't a failure
     if (/cancel/i.test(err && err.message ? err.message : '')) {
       exportRow.cancelled();
       return;
@@ -272,8 +255,7 @@ importSettingsBtn.addEventListener('click', () => {
   settingsFileInput.click();
 });
 
-// `cancel` fires when the user dismisses the file dialog without choosing
-// a file — restore the Import row description in that case.
+// fires when the file dialog is dismissed without choosing
 settingsFileInput.addEventListener('cancel', () => {
   importRow.cancelled();
 });
@@ -282,7 +264,7 @@ settingsFileInput.addEventListener('change', async () => {
   const file = settingsFileInput.files[0];
   settingsFileInput.value = '';
   if (!file) {
-    // Fallback for browsers that don't fire `cancel`.
+    // for browsers that don't fire `cancel`
     importRow.cancelled();
     return;
   }
@@ -305,9 +287,8 @@ settingsFileInput.addEventListener('change', async () => {
   }
 });
 
-// Load all three settings in a single storage read so they're all
-// applied at once — one round-trip instead of three sequential ones,
-// which reduces the window where the hardcoded HTML defaults are visible.
+// One storage read for all three, so they apply together and the hardcoded
+// HTML defaults are visible for as short a time as possible.
 (async () => {
   const { theme, exportFormats, shortenNames } = await loadSettings();
   for (const radio of themeRadios) {
@@ -320,29 +301,21 @@ settingsFileInput.addEventListener('change', async () => {
   for (const radio of shortenRadios) {
     radio.checked = radio.value === shortenNames;
   }
-  // Write the confirmed values to the localStorage cache so settings-init.js
-  // can pre-apply them synchronously before the first paint on the next open.
+  // cache for settings-init.js
   try { localStorage.setItem(SETTINGS_CACHE_KEYS.exportFormat, exportFormats.join(',')); } catch (e) {}
   try { localStorage.setItem(SETTINGS_CACHE_KEYS.shortenNames, shortenNames); } catch (e) {}
 })();
 
-// --- Check for updates ---
-
 const CURRENT_VERSION = browser.runtime.getManifest().version;
 
-// Update the version link in the About section to match the manifest version.
 const versionLink = document.getElementById('versionLink');
 if (versionLink) {
   versionLink.textContent = CURRENT_VERSION;
   versionLink.href = `https://github.com/elsherif7/addons-hub/releases/tag/v${CURRENT_VERSION}`;
 }
 
-// --- Reset Settings ---
-
-// Set while the reset confirmation is on screen, so the page can be put back to
-// its freshly-opened look (see the replaySettingsEntrance handler below) by
-// dismissing it the same way Cancel does - but quietly, since the reveal is
-// playing again at that moment.
+// Set while the reset dialog is open, so reopening the page can dismiss it
+// like Cancel but quietly (the reveal is replaying at that moment).
 let dismissResetDialog = null;
 
 document.getElementById('resetSettingsBtn').addEventListener('click', function () {
@@ -352,8 +325,6 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
 
   const overlay = document.createElement('div');
   overlay.className = 's-overlay';
-  // Layout, tint and blur all live in settings.css (.s-overlay): the dialog
-  // fills the viewport and the page behind stays visible, just softened.
 
   const dialog = document.createElement('div');
   dialog.className = 's-dialog';
@@ -390,19 +361,16 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);
 
-  // Makes the rest of the page unreachable by keyboard while the dialog
-  // is open, so Tab can't escape it.
+  // so Tab can't leave the dialog
   const others = Array.from(document.body.children).filter((el) => el !== overlay);
   others.forEach((el) => { el.inert = true; });
 
   cancelBtn.focus();
 
-  // The page behind stays visible (blurred) but is frozen while the dialog is
-  // open: no scrolling by wheel, touch, keyboard or scrollbar. Hiding the
-  // root's overflow covers all of those at once; the padding stands in for
-  // the scrollbar that disappears, so the page doesn't jump sideways. Both
-  // are put back exactly as they were when the dialog closes. (Scrolling by
-  // code, like the scroll to the top after a reset, still works.)
+  // The page behind is frozen while the dialog is open (no wheel, touch,
+  // keyboard or scrollbar scrolling). Hiding the root's overflow covers all of
+  // them; the padding replaces the vanished scrollbar so the page doesn't jump.
+  // Both are restored on close. Scrolling from code still works.
   const root = document.documentElement;
   const savedOverflow = root.style.overflow;
   const savedPaddingRight = root.style.paddingRight;
@@ -411,15 +379,14 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
     : 0;
   root.style.overflow = 'hidden';
   if (scrollbarWidth > 0) root.style.paddingRight = scrollbarWidth + 'px';
-  // Belt and braces for wheel and touch drags that start over the backdrop.
+  // wheel and touch drags that start over the backdrop
   overlay.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
   overlay.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
   new Promise((resolve) => {
     let closed = false;
-    // `silent` is for a dismissal that is not the user's own answer to the
-    // dialog (the page being reopened from the popup): the Reset row is left
-    // alone rather than flashing "cancelled" under the replaying reveal.
+    // `silent`: dismissed by the page being reopened, not by the user, so the
+    // Reset row doesn't flash "cancelled" under the replaying reveal
     function close(result, silent) {
       if (closed) return;
       closed = true;
@@ -429,13 +396,10 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
         others.forEach((el) => { el.inert = false; });
         overlay.remove();
         dismissResetDialog = null;
-        // Return focus to what opened the dialog, without scrolling back to
-        // it - after a reset the page has just been taken to the top.
+        // no scrolling back: after a reset the page was just taken to the top
         resetBtn.focus({ preventScroll: true });
       };
-      // The dialog leaves the way it came in: it shrinks and fades while the
-      // blurred backdrop clears. Skipped (removed at once) when animation is
-      // unavailable or reduced motion is on.
+      // shrinks and fades out; removed at once without animation or with reduced motion
       const reduced = typeof matchMedia === 'function' &&
         matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (!reduced && typeof overlay.animate === 'function' && typeof dialog.animate === 'function') {
@@ -450,7 +414,6 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
       }
       resolve({ confirmed: result, silent: !!silent });
     }
-    // How the page puts itself back to a freshly-opened look while this is up.
     dismissResetDialog = (silent) => close(false, silent);
     cancelBtn.addEventListener('click', () => close(false));
     confirmBtn.addEventListener('click', () => close(true));
@@ -460,13 +423,11 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
     });
   }).then(({ confirmed, silent }) => {
     if (!confirmed) {
-      // Dismissed quietly by the page being reopened: leave the Reset row
-      // alone (the caller has already put every row back).
+      // dismissed by a reopen, the caller already reset every row
       if (silent) resetRow.restore();
       else resetRow.cancelled();
       return;
     }
-    // Take the user back to the top right away while the dialog fades out.
     scrollPageToTop();
     return browser.storage.local.remove([THEME_STORAGE_KEY, EXPORT_FORMAT_STORAGE_KEY, SHORT_NAME_STORAGE_KEY])
       .then(() => {
@@ -477,8 +438,7 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
       .then(() => loadCurrentShortenNames())
       .then(() => {
         resetRow.setMsg('Settings reset to defaults.');
-        // Play the whole opening reveal again from the top, now showing the
-        // defaults, so the reset feels like the page being set up afresh.
+        // replay the reveal, now showing the defaults
         lastEntranceAt = Date.now();
         replayEntrance();
       })
@@ -486,16 +446,13 @@ document.getElementById('resetSettingsBtn').addEventListener('click', function (
   });
 });
 
-// Firefox reuses an already-open Settings tab (runtime.openOptionsPage just
-// switches to it), so the page never reloads and its opening animation would
-// not play again. The popup's Settings button sends a message after opening
-// it, and this plays the whole reveal again and scrolls back to the top
-// (smoothly, or instantly with reduced motion). Anything the page had left open
-// goes with it - the reset confirmation, a message in the Export/Import rows -
-// so it ends up looking exactly like a freshly opened page. Deliberately NOT
-// triggered by merely switching back to the tab: the reveal takes about two
-// seconds, and replaying it every time would hide the page and lose your scroll
-// position. The time check keeps a brand-new tab, which is already playing
+// Firefox reuses an open Settings tab (openOptionsPage just switches to it),
+// so the page doesn't reload and its opening wouldn't play again. The popup's
+// Settings button sends a message after opening it; this scrolls to the top,
+// closes anything left open (the reset dialog, a row message) and replays the
+// reveal, so it looks freshly opened. Switching back to the tab doesn't
+// count: the reveal takes about two seconds and would hide the page and lose
+// your scroll position. The time check stops a brand-new tab, already playing
 // its own reveal, from restarting it.
 let lastEntranceAt = Date.now();
 
@@ -509,9 +466,6 @@ function replayEntranceIfIdle() {
 if (browser.runtime.onMessage) {
   browser.runtime.onMessage.addListener((message) => {
     if (message && message.type === 'replaySettingsEntrance') {
-      // As if the page had just been opened: back to the top, nothing left
-      // open on it - the reset confirmation, a message sitting in the Export or
-      // Import row - and the reveal playing again.
       scrollPageToTop();
       if (dismissResetDialog) dismissResetDialog(true);
       clearAllRows();
@@ -520,22 +474,18 @@ if (browser.runtime.onMessage) {
   });
 }
 
-// Keep this page's options in step with the stored settings when they change
-// from somewhere else: another Settings tab, a settings import, a reset. (The
-// theme itself is applied by theme.js; this keeps the radio buttons honest.)
-// Programmatically ticking a radio or box does not fire its change event, so this
-// cannot loop back into saving.
+// Keeps the options in step when settings change elsewhere (another Settings
+// tab, an import, a reset). theme.js applies the theme itself. Ticking a
+// radio from code doesn't fire its change event, so this can't loop back into
+// saving.
 onSettingsChanged((changed) => {
   if (changed.includes('theme')) loadCurrentTheme();
   if (changed.includes('exportFormats')) loadCurrentExportFormat();
   if (changed.includes('shortenNames')) loadCurrentShortenNames();
 });
 
-// Clear the settings status message whenever the user interacts with
-// anything on the page — radio change, button click, file input — so it
-// doesn't linger after they've moved on to something else.
-// The export/import handlers already call setSettingsStatus('') at the
-// start of each action, so this is just a safety net for everything else.
+// Any interaction clears lingering status messages. The export/import
+// handlers already clear them at the start; this covers everything else.
 if (document.addEventListener) {
   document.addEventListener('click', (e) => {
     if (e.target === exportSettingsBtn || e.target === importSettingsBtn) return;

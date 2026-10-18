@@ -1,18 +1,12 @@
-// Applies the stored theme (light/dark) to the current page on load.
-// Shared by every full-page tab (export, import, settings, confirmation)
-// and the popup, so the extension's look stays consistent across all of
-// them.
+// Applies the saved light/dark theme to a page. Used by every page and the popup.
 //
-// Uses a two-step approach to avoid flash of wrong theme (FOWT):
-// 1. Synchronously reads a localStorage cache key written on the
-//    previous apply, so the theme is applied before any paint.
-// 2. Reads browser.storage.local asynchronously to get the authoritative
-//    value and corrects if needed.
+// To avoid a flash of the wrong theme it first applies the value cached in
+// localStorage (sync, before paint), then reads the real one from
+// storage.local and corrects it if needed.
 
 const THEME_STORAGE_KEY = 'theme';
 const THEME_CACHE_KEY = 'addons-hub-theme-cache';
 
-// Synchronous fast path — apply cached theme immediately before paint.
 (function() {
   try {
     const cached = localStorage.getItem(THEME_CACHE_KEY);
@@ -26,27 +20,22 @@ function resolveTheme(stored) {
   return stored && stored[THEME_STORAGE_KEY] === 'dark' ? 'dark' : 'light';
 }
 
-// The switch is animated, but only for changes made after the page has
-// finished its first apply - never on page load, so there's no animated
-// flash of the wrong theme. With view transitions (Firefox 144+) the old
-// look drifts away and the new one fades in over it (see the
-// ::view-transition rules in shared.css); without them, .theme-switching
-// makes every color glide instead. Skipped for reduced motion.
+// Theme changes are animated, but never on first load. With view transitions
+// (Firefox 144+) the new theme fades in over the old one (see shared.css),
+// otherwise .theme-switching makes the colors glide. Skipped for reduced motion.
 let themeReady = false;
 let themeSwitchTimer = null;
-// The theme a view transition (below) is on its way to, or null. The page
-// only flips inside the transition's callback, a moment after it is
-// requested - so a second applyTheme() in that gap (storage.onChanged fires
-// right after the Settings page's own call) must not start a second
-// transition on top, which would cancel the first one halfway. It just
-// retargets the transition already under way.
+// The theme a view transition is heading to, or null. The page only flips
+// inside the transition callback, a moment after it is requested, so a second
+// applyTheme() in that gap (storage.onChanged fires right after the Settings
+// page's own call) must retarget it instead of starting another transition,
+// which would cancel the first halfway.
 let pendingTheme = null;
 
 function applyTheme(theme) {
   const t = theme === 'dark' ? 'dark' : 'light';
   const root = document.documentElement;
-  // Keep localStorage cache in sync so the next page load can apply
-  // the theme synchronously before the async storage read resolves.
+  // Keep the cache in step for the next page load.
   try { localStorage.setItem(THEME_CACHE_KEY, t); } catch (e) {}
 
   if (pendingTheme !== null) {
@@ -69,7 +58,7 @@ function applyTheme(theme) {
         setTheme(final);
       });
     } catch (e) {
-      pendingTheme = null; // never leave the page unable to change theme
+      pendingTheme = null; // never leave the page stuck
       setTheme(t);
     }
   } else {

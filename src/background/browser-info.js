@@ -1,18 +1,14 @@
-// Which browser is running this extension, for the browser part of the
-// "source" every export file records (see SOURCE_KEYS in core.js). Plain
-// classic script like the rest of the background:
-// detectBrowserFromUserAgent() and getExportSource() are globals.
+// Works out which browser is running, for the browser part of the "source"
+// block in every export (see SOURCE_KEYS in core.js).
 //
-// Firefox (and the forks built on it) can say what they are through
-// browser.runtime.getBrowserInfo(), which gives the name the browser reports for
-// itself ("Firefox", "Waterfox", "Floorp", ...) and its real version. A fork that
-// reports itself as "Firefox" is recorded as Firefox - there is nothing more to
-// go on. A browser without that call (Chrome and the other Chromium browsers,
-// Ladybird, ...) is recognised from its user-agent text instead, which is why a
-// Chromium browser that hides itself (Brave, for example) shows as Chrome.
+// Firefox and its forks report their own name and version through
+// browser.runtime.getBrowserInfo(). A fork that calls itself "Firefox" is
+// recorded as Firefox, there is nothing else to go on. Browsers without that
+// call (Chromium ones, Ladybird...) are recognised from the user agent, so a
+// Chromium browser that hides itself (Brave) shows up as Chrome.
 
-// Ordered: the first token found wins, so the more specific names come before
-// the engine names they also contain (Edge's user agent also says "Chrome").
+// First match wins, so specific names come before the engines they also
+// contain (Edge's user agent says "Chrome" too).
 const BROWSER_USER_AGENT_TOKENS = [
   ['Edg', 'Edge'],
   ['Edge', 'Edge'],
@@ -27,10 +23,8 @@ const BROWSER_USER_AGENT_TOKENS = [
   ['Safari', 'Safari'],
 ];
 
-// What each known browser is built on (its "base"). A browser not listed here
-// is recorded as built on itself, except that Firefox's own call (below) always
-// means a Gecko-based browser. Firefox and the forks built on it all use the
-// engine's name, Gecko, so they read the same as each other.
+// What each browser is built on. Unlisted ones count as built on themselves,
+// except when getBrowserInfo() exists, which always means Gecko.
 const BROWSER_BASES = {
   Edge: 'Chromium', Opera: 'Chromium', Vivaldi: 'Chromium', Chrome: 'Chromium', Brave: 'Chromium',
   LibreWolf: 'Gecko', Waterfox: 'Gecko', Floorp: 'Gecko', Firefox: 'Gecko',
@@ -40,22 +34,21 @@ function browserBase(name) {
   return Object.prototype.hasOwnProperty.call(BROWSER_BASES, name) ? BROWSER_BASES[name] : name;
 }
 
-// { name, version } for a user-agent string, or null when it names no known browser.
+// { name, version } for a user-agent string, or null if it names no known browser.
 function detectBrowserFromUserAgent(userAgent) {
   const ua = typeof userAgent === 'string' ? userAgent : '';
   for (const [token, name] of BROWSER_USER_AGENT_TOKENS) {
     const m = ua.match(new RegExp(`(?:^|[ (/])${token}/([0-9][0-9A-Za-z.]*)`));
     if (!m) continue;
-    // Safari's own number is after "Version/"; the one after "Safari/" is WebKit's.
+    // Safari's real version is after "Version/"; "Safari/" is WebKit's.
     const own = name === 'Safari' ? ua.match(/Version\/([0-9][0-9A-Za-z.]*)/) : null;
     return { name, version: own ? own[1] : m[1] };
   }
   return null;
 }
 
-// The browser part of the source to write into an export: always four clean
-// values, "Unknown" / "unknown" for anything that cannot be found. Never
-// throws. (The format version and file type are added by makeSource().)
+// The browser part of the export source. Anything it can't find becomes
+// "Unknown" / "unknown", and it never throws.
 async function getExportSource() {
   let name = '';
   let version = '';
@@ -65,9 +58,9 @@ async function getExportSource() {
       const info = await browser.runtime.getBrowserInfo();
       name = info && info.name;
       version = info && info.version;
-      basedOn = 'Gecko'; // only Firefox and the browsers built on it have this call
+      basedOn = 'Gecko';
     }
-  } catch { /* fall back to the user agent below */ }
+  } catch { /* fall back to the user agent */ }
   if (!name && typeof navigator !== 'undefined') {
     const found = detectBrowserFromUserAgent(navigator.userAgent);
     if (found) {

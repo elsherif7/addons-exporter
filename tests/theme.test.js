@@ -1,6 +1,3 @@
-// Tests for src/common/theme.js. Loads the real source via vm with a
-// fake document/browser.storage, same pattern as the other test files.
-
 const assert = require('assert');
 const { test, testAsync, readSrc, makeSandbox } = require('./helpers');
 
@@ -61,8 +58,6 @@ testAsync('initTheme: falls back to light if storage.local.get throws', async ()
   assert.deepStrictEqual(setAttributeCalls[setAttributeCalls.length - 1], ['data-theme', 'light']);
 });
 
-// --- A33: cross-tab theme sync via storage.onChanged ---
-
 test('storage.onChanged: a theme change from another tab is applied here too', () => {
   let registeredListener = null;
   const { setAttributeCalls } = loadThemeInSandbox(undefined, {
@@ -97,8 +92,6 @@ test('loading theme.js with no storage.onChanged at all does not throw', () => {
   assert.doesNotThrow(() => loadThemeInSandbox());
 });
 
-// --- view-transition switch (with the color glide as the fallback) ---
-
 function loadThemeForSwitch({ reducedMotion = false, withViewTransitions = true } = {}) {
   const transitions = [];
   const classes = new Set();
@@ -112,7 +105,7 @@ function loadThemeForSwitch({ reducedMotion = false, withViewTransitions = true 
     },
   };
   if (withViewTransitions) {
-    // Real browsers call the update callback for us once the old frame is captured.
+    // browsers call the update callback once the old frame is captured
     document.startViewTransition = (cb) => { transitions.push(cb); };
   }
   const sandbox = makeSandbox({
@@ -128,7 +121,7 @@ function loadThemeForSwitch({ reducedMotion = false, withViewTransitions = true 
 
 testAsync('theme: with view transitions, a real change is wrapped in startViewTransition (and the attribute set inside it)', async () => {
   const ctx = loadThemeForSwitch();
-  await ctx.sandbox.initTheme(); // settles on light
+  await ctx.sandbox.initTheme();
   ctx.sandbox.applyTheme('dark');
   assert.strictEqual(ctx.transitions.length, 1);
   assert.strictEqual(ctx.getAttr(), 'light', 'the theme must only flip inside the transition callback');
@@ -139,7 +132,7 @@ testAsync('theme: with view transitions, a real change is wrapped in startViewTr
 
 testAsync('theme: the first apply on page load never animates', async () => {
   const ctx = loadThemeForSwitch();
-  ctx.sandbox.applyTheme('dark'); // before initTheme finishes
+  ctx.sandbox.applyTheme('dark');  // before initTheme finishes
   assert.strictEqual(ctx.transitions.length, 0);
   assert.strictEqual(ctx.getAttr(), 'dark', 'applied immediately');
   assert.strictEqual(ctx.classes.has('theme-switching'), false);
@@ -170,13 +163,11 @@ testAsync('theme: no animation when the theme does not change, or when reduced m
   assert.strictEqual(reduced.getAttr(), 'dark', 'still switches, just instantly');
 });
 
-// --- one transition at a time (Settings: its own call + storage.onChanged) ---
-
 testAsync('theme: a second applyTheme() before the transition runs does not start another transition', async () => {
   const ctx = loadThemeForSwitch();
   await ctx.sandbox.initTheme();
   ctx.sandbox.applyTheme('dark');
-  ctx.sandbox.applyTheme('dark'); // e.g. storage.onChanged right after the page's own call
+  ctx.sandbox.applyTheme('dark');  // e.g. storage.onChanged right after the page's own call
   assert.strictEqual(ctx.transitions.length, 1, 'a second transition would cancel the first halfway');
   ctx.transitions[0]();
   assert.strictEqual(ctx.getAttr(), 'dark');

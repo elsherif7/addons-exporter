@@ -1,19 +1,14 @@
-// Click / tap feedback shared by every extension page: whatever you press
-// gives a quick ring (or, for list rows, a tinted flash) that bursts out of
-// it and fades. Works for mouse, touch, pen, and for keyboard activation
-// (Enter / Space on a focused button).
+// Click/tap feedback for every extension page: a ring bursts out of whatever
+// you press (rows get an inward flash instead). Works for mouse, touch, pen
+// and keyboard (Enter/Space on a button).
 //
-// Uses the Web Animations API on purpose instead of toggling a CSS class:
-// an element's own CSS animations (e.g. the page's opening reveal) must not
-// be restarted just because it was pressed, and element.animate() leaves
-// them alone. The report (report-inline.js) carries its own small copy of
-// this, since a saved report can't load this file.
+// Uses element.animate() instead of a CSS class so the element's own
+// animations (like the page reveal) don't restart when it is pressed. The
+// report has its own copy in report-inline.js since it can't load this file.
 (function () {
-  // List rows (export/import add-on rows, settings option rows, the Importer's
-  // export-picker rows) are matched first, so pressing the radio/checkbox
-  // inside one pulses the whole row - and so a row inside a box that clips
-  // overflow (the picker's list) flashes from the inside instead of sending a
-  // ring that gets clipped away.
+  // Rows are matched first so pressing the checkbox inside one flashes the
+  // whole row, and so rows inside a box that clips overflow flash from the
+  // inside instead of sending a ring that gets clipped.
   const ROW_SELECTOR = '.addon-row, label.settings-option-row, .export-pick-option';
   const TARGET_SELECTOR =
     'button, .hub-btn, label, .picker, .theme-toggle, a[href], input[type="checkbox"], input[type="radio"]';
@@ -44,8 +39,6 @@
   function pulse(el) {
     if (!el || typeof el.animate !== 'function' || isDisabled(el) || prefersReducedMotion()) return;
     const color = ringColor(el);
-    // Rows sit inside a box that clips overflow, so they flash from the
-    // inside; everything else sends a ring outward.
     const keyframes = el.matches(ROW_SELECTOR)
       ? [{ boxShadow: 'inset 0 0 0 999px ' + color }, { boxShadow: 'inset 0 0 0 999px transparent' }]
       : [{ boxShadow: '0 0 0 2px ' + color }, { boxShadow: '0 0 0 10px transparent' }];
@@ -54,8 +47,7 @@
 
   function findTarget(node) {
     if (!node || typeof node.closest !== 'function') return null;
-    // If the click is on (or inside) a link, pulse only the link — never
-    // the whole row — so the AMO link gets its own ring, not a row flash.
+    // A click on a link pulses only the link, never the whole row.
     const link = node.closest('a[href]');
     if (link) return link;
     return node.closest(ROW_SELECTOR) || node.closest(TARGET_SELECTOR);
@@ -63,7 +55,7 @@
 
   if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
 
-  // Capture phase, so it still fires if a page handler stops propagation.
+  // Capture phase, so it still fires if a handler stops propagation.
   document.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     pulse(findTarget(e.target));

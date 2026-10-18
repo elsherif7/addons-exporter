@@ -1,18 +1,15 @@
-// Deletes this project's throwaway folders and files - everything a tool made
-// and can make again: node_modules comes back with `npm ci`, coverage with
-// `npm run test:coverage`, web-ext-artifacts with a web-ext build. Nothing
-// else is ever touched.
+// Deletes the project's throwaway folders and files, everything a tool made
+// and can make again: node_modules (npm ci), coverage (npm run test:coverage),
+// web-ext-artifacts (a web-ext build). Nothing else is touched.
 //
 //   npm run clean                     # delete everything it lists
 //   npm run clean -- --dry-run        # only show what would go
 //   npm run clean -- --path DIR       # clean DIR instead of the project root
 //
-// To keep it useful as the project grows, add a folder name to DIRS_ANYWHERE
-// (matched anywhere in the tree) or DIRS_AT_ROOT (matched only at the root,
-// for names generic enough that real source could share one), or a file name
-// or extension to FILE_NAMES / FILE_SUFFIXES / ROOT_FILE_SUFFIXES. Folders
-// named in NEVER_ENTER are never opened and never deleted - they hold input,
-// not output.
+// To extend it, add a folder name to DIRS_ANYWHERE or DIRS_AT_ROOT (for names
+// generic enough that real source could share one), or a file name or
+// extension to FILE_NAMES / FILE_SUFFIXES / ROOT_FILE_SUFFIXES. Folders in
+// NEVER_ENTER are never opened or deleted; they hold input, not output.
 
 'use strict';
 
@@ -21,8 +18,7 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 
-// Folders to remove wherever they turn up: these names are specific enough
-// that nothing else is ever called this.
+// removed wherever they turn up, the names are specific enough
 const DIRS_ANYWHERE = new Set([
   'node_modules',      // npm
   'coverage',          // test and lint reports
@@ -32,9 +28,7 @@ const DIRS_ANYWHERE = new Set([
   'venv',
 ]);
 
-// Folders to remove only at the project root. These names are generic enough
-// that a real source folder deeper in the tree could share one, and that is
-// not ours to delete.
+// removed only at the root: generic names a real source folder could share
 const DIRS_AT_ROOT = new Set([
   'build',
   'dist',
@@ -49,7 +43,6 @@ const DIRS_AT_ROOT = new Set([
   '.ruff_cache',
 ]);
 
-// Single files to remove, by exact name, wherever they turn up.
 const FILE_NAMES = new Set([
   '.DS_Store',       // macOS folder metadata
   'Thumbs.db',       // Windows thumbnail cache
@@ -59,25 +52,21 @@ const FILE_NAMES = new Set([
   '.coverage',       // pytest-cov's data file (its report folder is "coverage")
 ]);
 
-// Single files to remove, by lower-case extension, wherever they turn up.
 const FILE_SUFFIXES = new Set([
   '.pyc',
   '.pyo',
 ]);
 
-// Single files to remove, by lower-case extension, only at the project root:
-// an export (.zip) or a build (.xpi) parked in a subfolder is kept.
+// root only: a .zip or .xpi parked in a subfolder is kept
 const ROOT_FILE_SUFFIXES = new Set([
   '.zip',
   '.xpi',
 ]);
 
-// Never opened, never removed: version control, the tests, and anything called
-// "fixtures" - input data that can look just like output (tests/fixtures is
-// compared byte-for-byte, so it has to survive a clean).
+// Never opened or removed. "fixtures" is input data that can look like output
+// (tests/fixtures is compared byte for byte).
 const NEVER_ENTER = new Set(['.git', 'tests', 'fixtures']);
 
-// A byte count as something readable, e.g. "5.8 MB".
 function human(bytes) {
   let value = bytes;
   for (const unit of ['B', 'KB', 'MB', 'GB']) {
@@ -89,8 +78,7 @@ function human(bytes) {
   return `${value.toFixed(1)} GB`;
 }
 
-// Bytes held by a file, or by everything under a folder. Anything unreadable
-// counts as zero rather than stopping the clean.
+// anything unreadable counts as zero instead of stopping the clean
 function sizeOf(target) {
   let stats;
   try {
@@ -124,7 +112,6 @@ function sizeOf(target) {
   return total;
 }
 
-// Every artefact under root, in a stable order.
 function find(root) {
   const found = [];
 
@@ -138,14 +125,12 @@ function find(root) {
 
     for (const entry of entries) {
       const full = path.join(dir, entry.name);
-      // A symlink to a folder is treated as a folder: a linked node_modules is
-      // still a node_modules. Removing one unlinks it, never what it points at.
+      // a symlinked node_modules is still a node_modules; removing it unlinks it
       const folderish = entry.isDirectory() || entry.isSymbolicLink();
 
       if (folderish) {
         if (NEVER_ENTER.has(entry.name)) continue;
-        // Taken whole and not descended into, so nothing inside one is listed
-        // as well.
+        // taken whole, not descended into
         if (DIRS_ANYWHERE.has(entry.name) || (atRoot && DIRS_AT_ROOT.has(entry.name))) {
           found.push(full);
           continue;
@@ -166,9 +151,7 @@ function find(root) {
   return found.sort();
 }
 
-// Delete a file, a symlink, or a whole folder - read-only files included:
-// fs.rm's recursive mode clears Windows' read-only flag on its own, which is
-// most of what npm writes.
+// recursive rm also clears Windows' read-only flag, which is most of what npm writes
 function remove(target) {
   fs.rmSync(target, { recursive: true, force: true });
 }

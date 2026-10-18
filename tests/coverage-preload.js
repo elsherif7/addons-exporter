@@ -1,11 +1,7 @@
-// Only used by `npm run test:coverage` (node --require tests/coverage-preload.js).
-//
-// The tests run the extension's scripts inside vm sandboxes, which a coverage
-// tool cannot attribute to a file on its own. This hook gives each script a
-// file name when it is run, so the coverage of src/ is counted for real.
-// Where a test runs several source files joined into one script, each file is
-// run as its own script in the same sandbox - the same way a page loads them.
-// It changes nothing about what the tests check.
+// only used by `npm run test:coverage` (node --require tests/coverage-preload.js).
+// the tests run scripts in vm sandboxes, which coverage can't attribute to a file, so this
+// gives each script its file name. when a test joins several source files into one script,
+// each is run separately in the same sandbox, like a page loading them.
 
 const vm = require('vm');
 const fs = require('fs');

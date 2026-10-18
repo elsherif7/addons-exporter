@@ -1,7 +1,5 @@
-// Runs the exported report's own script (src/background/report-inline.js) -
-// the real file, in a sandbox with a small fake page - and checks what it DOES:
-// the theme button, the saved theme, the search box. (The same file is also
-// built into every report by scripts/build-assets.js.)
+// runs the real report-inline.js (also built into every report by scripts/build-assets.js)
+// in a sandbox with a small fake page
 
 const assert = require('assert');
 const { test, readSrc, makeSandbox } = require('./helpers');
@@ -30,7 +28,6 @@ function el(extra = {}) {
   return node;
 }
 
-// A report page with the given add-on names, in one group.
 function makePage(names) {
   const rows = names.map((name) => {
     const nameEl = el({ textContent: name });
@@ -80,7 +77,7 @@ test('report script: junk in storage is ignored, blocked storage still works', (
   const blocked = makePage(['A']);
   run(blocked, { baked: 'dark', storageThrows: true });
   assert.strictEqual(blocked.root.getAttribute('data-theme'), 'dark');
-  blocked.ids.themeToggle.fire('click'); // must not throw, even though saving fails
+  blocked.ids.themeToggle.fire('click');  // must not throw even though saving fails
   assert.strictEqual(blocked.root.getAttribute('data-theme'), 'light');
 });
 

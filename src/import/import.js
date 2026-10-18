@@ -1,16 +1,11 @@
-// TAB_OPEN_DELAY_MS (the stagger between opened tabs) lives in core.js.
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// A file name's extension, lower-case and without the dot ("a.JSON" -> "json").
-// Used wherever a name has to be turned into a reader (validateSelectedFile,
-// the .zip entries and loadFile).
+// lower-case extension without the dot ("a.JSON" -> "json")
 function extensionOf(name) {
   return (name.split('.').pop() || '').toLowerCase();
 }
 
-// A file name without its last extension ("a.json" -> "a"; a name with no dot,
-// or one that starts with it, is left alone). Lets an export be named after the
-// file it came from without spelling out every format it was written in.
+// "a.json" -> "a". A name with no dot, or starting with one, is left alone.
 function baseNameOf(name) {
   const dot = name.lastIndexOf('.');
   return dot > 0 ? name.slice(0, dot) : name;
@@ -37,24 +32,22 @@ const exportPickRowEl = document.getElementById('exportPickRow');
 const exportPickEl = document.getElementById('exportPick');
 const exportPickListEl = document.getElementById('exportPickList');
 
-// Rendered order (Not Installed Yet, then Already Installed) - each
-// checkbox's data-idx indexes into this array to find the right item.
+// Rendered order (Not Installed Yet, then Already Installed). Each checkbox's
+// data-idx indexes into it.
 let displayItems = [];
 
-// What the chosen files held: one entry per distinct export (a plain file is
-// one; a .zip can hold several, and so can a selection of several files), plus
-// what the list needs to redraw when the picker's choice changes.
+// One entry per distinct export in the chosen files, plus what the list needs
+// to redraw when the picker's choice changes.
 let loadedExports = [];
 let loadedInstalled = [];
 let loadedShorten = true;
 
-// One line per file a load had to leave out, so a file the user picked never
-// disappears without a word. Shown with the count notes under the list.
+// One line per file a load left out, shown under the list, so a picked file
+// never disappears silently.
 let loadWarnings = [];
 
-// Which picker entry the list is showing: 'all', or an export's index. The
-// rendered labels live here so the closed box can echo the choice without
-// re-reading the DOM.
+// Which picker entry the list shows: 'all' or an export's index. The labels
+// are kept so the closed box can echo the choice without reading the DOM.
 let exportSelection = 0;
 let exportPickLabels = new Map();
 
@@ -62,9 +55,8 @@ function setStatus(msg) {
   statusEl.textContent = msg;
 }
 
-// The shared add-on list (rows, Select all, search, count, click-a-row, live
-// name shortening) - addon-list.js. Select all skips disabled (unsafe-link)
-// rows, and a search shows the list again as display: block.
+// The shared add-on list (addon-list.js). Select all skips disabled
+// (unsafe-link) rows, and a search shows the list again as display: block.
 const list = createAddonList({
   listEl: addonListEl, countEl: selectionCountEl, actionBtn: openSelectedBtn,
   selectAllBtn, deselectAllBtn, searchInput, noMatchesEl: noSearchMatchesEl,
@@ -92,9 +84,8 @@ function clearAddonList() {
   noSearchMatchesEl.style.display = 'none';
 }
 
-// The Importer's row: the shared parts, plus what only an import has - the link
-// to the add-on's page, the match label, and a warning for an unsafe link (its
-// row is disabled and skipped).
+// The shared row plus the import-only parts: the page link, the match label and
+// a warning for an unsafe link (that row is disabled and skipped).
 function createAddonRow(a, i, isInstalled, shorten) {
   const safe = isSafeUrl(a.link);
   const matchLabel = LINK_TYPE_LABELS[a.linkType] || '';
@@ -148,9 +139,8 @@ function renderAddonList(addons, installed, shorten) {
   alreadyInstalled.sort(byName);
   displayItems = [...notInstalled, ...alreadyInstalled];
 
-  // Every container is shown first, then the rows are drawn: render() applies
-  // an active search itself, so it has to come last or its filtering (and the
-  // "no matches" note) would be undone here.
+  // The containers have to be shown before render(), which applies an active
+  // search itself. Doing it after would undo the filtering.
   addonListEl.style.display = 'block';
   checklistBoxEl.style.display = 'block';
   listControls.style.display = 'flex';
@@ -186,25 +176,19 @@ function renderAddonList(addons, installed, shorten) {
   list.updateSelectionCount();
 }
 
-// Bumped each time a new file load starts, so an older load in flight
-// can tell it's stale and not overwrite a newer one.
+// Bumped when a load starts, so an older load still running knows it's stale.
 let loadGeneration = 0;
 
 const MAX_IMPORT_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
-// The formats the Exporter writes; a .zip of them (the Exporter's own when
-// several formats are ticked) is accepted too and its files read the same way.
+// The formats the Exporter writes. A .zip of them is accepted too.
 const IMPORT_TEXT_EXTENSIONS = new Set(['html', 'htm', 'json', 'csv', 'txt']);
 const ACCEPTED_IMPORT_EXTENSIONS = new Set([...IMPORT_TEXT_EXTENSIONS, 'zip']);
-// The formats a selection can hold, most exact first. Files that describe the
-// same export are grouped, and the group takes its data from the first of them
-// in this order (see groupExports).
+// Most exact first. Files describing the same export are grouped and the group
+// takes its data from the first of them (see groupExports).
 const ZIP_READ_ORDER = ['json', 'html', 'htm', 'csv', 'txt'];
 
-// Checked before a file is ever read - lets a wrong-typed or oversized
-// file get a clear, immediate reason instead of failing deep inside
-// parsing (any unrecognised extension used to be silently parsed as
-// HTML), or, for a very large file, reading the whole thing into memory
-// for no reason.
+// Checked before reading, so a wrong-typed or oversized file gets a clear
+// reason up front instead of failing inside parsing or filling memory.
 function validateSelectedFile(file) {
   const ext = extensionOf(file.name);
   if (!ACCEPTED_IMPORT_EXTENSIONS.has(ext)) {
@@ -216,33 +200,28 @@ function validateSelectedFile(file) {
   return { ok: true };
 }
 
-// Reads one export's text by its file extension. Throws on text a reader
-// cannot make sense of at all (e.g. malformed JSON) - callers catch that.
+// Throws on text a reader can't parse at all (e.g. malformed JSON).
 function parseImportText(ext, text) {
   if (ext === 'json') return parseJsonPayload(text);
   if (ext === 'csv') return parseCsvPayload(text);
   if (ext === 'txt') return parseTxtPayload(text);
-  // Default to HTML (also handles .html and any unrecognised extension).
-  // DOMParser never executes scripts in the parsed document, so this is
-  // safe even for an untrusted file.
+  // HTML is the default. DOMParser never runs scripts, so an untrusted file is safe.
   const doc = new DOMParser().parseFromString(text, 'text/html');
   const dataEl = doc.getElementById('addons-exporter-data');
   return parseAddonsPayload(dataEl ? dataEl.textContent : null);
 }
 
-// The distinct exports a selection holds, in the order to offer them. What
-// counts as one export depends on where the files came from:
-//   - a file chosen on its own, by its name without the extension, so the
-//     formats of one export - a ticked .json and .csv, say - read as one entry.
-//     Two files picked separately stay two even when they hold the same
-//     add-ons: you may well have kept two snapshots of the same set, and the
-//     merged "All add-ons" entry is there for the union.
-//   - the files inside a .zip, by the set of add-on ids they list, since the
-//     Exporter writes one export's formats into one .zip (see describeExport
-//     for how the entry is then named).
-// A file's own add-on ids are part of its key either way, so two files of the
-// same name holding different add-ons never collapse into one and lose the
-// other's. Data comes from the first entry in ZIP_READ_ORDER.
+// The distinct exports a selection holds. What counts as one depends on the
+// source:
+//   - A file chosen on its own: its name without the extension, so a ticked
+//     .json and .csv of one export read as one entry. Two files picked
+//     separately stay two even with the same add-ons (they may be two
+//     snapshots; the "All add-ons" entry covers the union).
+//   - Files inside a .zip: the set of add-on ids, since the Exporter writes
+//     one export's formats into one .zip (describeExport names the entry).
+// The ids are part of the key either way, so two same-named files with
+// different add-ons never collapse. Data comes from the first entry in
+// ZIP_READ_ORDER.
 function groupExports(parsed) {
   const groups = new Map();
   for (const p of parsed) {
@@ -256,10 +235,8 @@ function groupExports(parsed) {
   }
   const list = [...groups.values()];
 
-  // How many distinct exports each chosen file turned out to describe. A .zip
-  // that describes exactly one is named by the .zip itself, however many
-  // formats it holds; a .zip holding several names each export after its own
-  // files, since the .zip alone could not tell them apart.
+  // How many exports each file describes. A .zip with exactly one is named
+  // after itself; one with several names each after its own files.
   const exportsPerFile = new Map();
   for (const group of list) {
     for (const file of new Set(group.entries.map((e) => e.file))) {
@@ -269,15 +246,13 @@ function groupExports(parsed) {
   return list.map((group) => ({ names: describeExport(group.entries, exportsPerFile), addons: group.addons }));
 }
 
-// What to call one export in the picker: where it came from. A file chosen on
-// its own keeps its whole name. Files sharing a name but not a format - the
-// ticked .json and .csv of one export, say - become one label with their
-// extensions in brackets after it ("Add-ons (.json, .csv)"). A .zip holding
-// just this one export is named by the .zip itself, however many formats are
-// inside it; a .zip holding several names each export after the file inside it.
+// What to call one export in the picker. A file chosen on its own keeps its
+// name. Files sharing a name but not a format become one label with the
+// extensions in brackets ("Add-ons (.json, .csv)"). A .zip holding just one
+// export is named by the .zip; one holding several names each after its file.
 function describeExport(entries, exportsPerFile) {
-  // Keyed by the name without its extension, so the formats of one export
-  // share a label. A .zip that stands for the export keeps an empty list.
+  // keyed by name without extension so one export's formats share a label;
+  // a .zip that stands for the export keeps an empty list
   const labels = new Map();
   for (const entry of entries) {
     const container = entry.file;
@@ -297,8 +272,8 @@ function describeExport(entries, exportsPerFile) {
   });
 }
 
-// Every add-on from every export, once per id - what the picker's "All" entry
-// shows. The first export to name an id decides its row.
+// Every add-on once per id, for the picker's "All" entry. The first export to
+// name an id decides its row.
 function mergeExports(exports) {
   const seen = new Set();
   const merged = [];
@@ -312,10 +287,9 @@ function mergeExports(exports) {
   return merged;
 }
 
-// The closed box echoes the choice; the open panel is a real list of rows (no
-// native <select>, whose popup can't take the add-on list's hover), one row per
-// entry. "All add-ons" comes first and is the default, then each distinct
-// export, the one holding the most add-ons first.
+// The open panel is a list of rows, not a native <select>, whose popup can't
+// take the add-on list's hover. "All add-ons" is first and the default, then
+// the exports, biggest first.
 function setUpExportPicker(exports) {
   if (exports.length < 2) {
     exportPickRowEl.style.display = 'none';
@@ -348,7 +322,7 @@ function setUpExportPicker(exports) {
   exportPickRowEl.style.display = 'block';
 }
 
-// Paints the closed box and marks the chosen row, without touching the list.
+// doesn't touch the list
 function setExportSelection(selection) {
   exportSelection = selection;
   exportPickEl.textContent = exportPickLabels.get(String(selection)) || '';
@@ -357,7 +331,6 @@ function setExportSelection(selection) {
   }
 }
 
-// A picked row: remember the choice, close the panel, redraw the list.
 function chooseExport(value) {
   setExportSelection(value === 'all' ? 'all' : Number(value));
   closeExportPicker();
@@ -375,22 +348,18 @@ function closeExportPicker() {
   exportPickEl.setAttribute('aria-expanded', 'false');
 }
 
-// Draws the list for one picker entry: an export's index, or 'all'. With the
-// picker hidden (a single export) the selection is 0.
+// `selection` is an export's index or 'all'; 0 when the picker is hidden.
 function renderExports(selection) {
   const addons = selection === 'all' ? mergeExports(loadedExports) : loadedExports[selection].addons;
   renderAddonList(addons, loadedInstalled, loadedShorten);
 }
 
-// That .zip held nothing the Importer can read.
 const noExportInZip = () => ({ ok: false, error: "That .zip doesn't contain an Add-ons Exporter file (.html, .json, .csv, or .txt)." });
 
-// Reads the exports out of one chosen file: a plain export file is one of
-// them, a .zip is every export file inside it. Files inside a .zip that are not
-// Add-ons Exporter exports are ignored silently. A .zip that holds nothing the
-// Importer can read reports that, rather than one entry's own error - which is
-// what a single chosen .zip has always said. Each entry remembers the file it
-// came from, which is what names its export in the picker (describeExport).
+// Reads the exports out of one chosen file: a plain file is one, a .zip is
+// every export file inside it. Other files in a .zip are ignored silently. A
+// .zip with nothing readable says so, rather than showing one entry's own
+// error. Each entry remembers its file, which names it in the picker.
 async function parseChosenFile(file) {
   const ext = extensionOf(file.name);
   if (ext !== 'zip') {
@@ -420,12 +389,10 @@ async function parseChosenFile(file) {
   return { ok: true, parsed };
 }
 
-// Reads one or more chosen files into the exports they hold together. Files
-// listing the same set of add-on ids describe the same export whichever file
-// (or .zip entry) they came from, so a loose file and a .zip's contents combine
-// just as two loose files do. `skipped` is what had to be left out before
-// reading (the wrong type, or oversized); anything that fails later is added to
-// it, so the page can name every file it could not use.
+// Loads one or more files. Files listing the same add-on ids are one export
+// whichever file or .zip entry they came from. `skipped` is what was left out
+// before reading (wrong type, too big); later failures are added to it, so the
+// page can name every file it couldn't use.
 async function loadFiles(files, skipped) {
   const myGeneration = ++loadGeneration;
   clearAddonList();
@@ -448,20 +415,17 @@ async function loadFiles(files, skipped) {
       parsed.push(...result.parsed);
     }
 
-    // Nothing readable at all: the first reason stands alone, exactly as it
-    // would if that file had been the only one chosen.
+    // nothing readable: the first reason stands alone
     if (parsed.length === 0) {
       setStatus(skippedFiles.length > 0 ? skippedFiles[0].error : 'Nothing to import from those files.');
       return;
     }
 
-    // The most exact format supplies each export's data (see groupExports), so
-    // order every entry by format before grouping, whichever file it came from.
-    // The sort is stable, so entries of one format keep the order they arrived.
+    // the most exact format supplies each export's data (see groupExports);
+    // the sort is stable
     parsed.sort((a, b) => ZIP_READ_ORDER.indexOf(a.ext) - ZIP_READ_ORDER.indexOf(b.ext));
 
-    // If this fails, degrade gracefully instead of blocking the import -
-    // treat everything as not-installed.
+    // if this fails, treat everything as not installed rather than block
     let installed = [];
     try {
       installed = await browser.runtime.sendMessage({ type: 'listAddons' });
@@ -488,15 +452,11 @@ async function loadFiles(files, skipped) {
   }
 }
 
-// The files a picker or a drop handed over. Everything readable is loaded
-// together, and a file that cannot be read at all is named under the list
-// rather than silently dropped - one bad file never hides the good ones.
+// Everything readable is loaded together; a file that can't be read is named
+// under the list, so one bad file never hides the good ones.
 function setSelectedFiles(files) {
   if (files.length === 0) {
-    // Invalidates any load already in flight - without this, removing
-    // the file while a read/listAddons/storage.get was still pending
-    // let that stale load render its results anyway, right after this
-    // branch had just cleared the list.
+    // invalidate a load in flight, or it would draw right after the clear
     loadGeneration++;
     fileInput.value = '';
     fileNameRow.style.display = 'none';
@@ -514,20 +474,15 @@ function setSelectedFiles(files) {
     else rejected.push({ name: file.name, error: validation.error });
   }
 
-  // Not one readable file was chosen: say why, the way a single rejected file
-  // always has, and leave the page exactly as it was. Any load already in
-  // flight is invalidated with it, so an earlier file cannot finish and render
-  // over the message (the same reason the removal branch above bumps this).
+  // nothing readable: say why and leave the page as it was (invalidating a
+  // load in flight, as above)
   if (accepted.length === 0) {
     loadGeneration++;
     setStatus(rejected[0].error);
     return;
   }
 
-  // The chip describes what is loading: a single file by name, and the count
-  // alone once several were chosen - the picker below already names every
-  // export those files hold, and a file that had to be left out is named under
-  // the list, so the chip only ever covers files the list does.
+  // one file by name, just the count for several (the picker names the exports)
   fileNameEl.textContent = accepted.length === 1
     ? accepted[0].name
     : `${accepted.length} files`;
@@ -539,18 +494,15 @@ function setSelectedFiles(files) {
   loadFiles(accepted, rejected);
 }
 
-// One file, or none (a removal) - the single-file form of setSelectedFiles.
 function setSelectedFile(file) {
   setSelectedFiles(file ? [file] : []);
 }
 
-// Removing the file plays out the page's opening in reverse: what is lowest
-// goes first (the list, the Select all row, the search box, the export picker,
-// the note, the file name), each sliding left and fading, one after another -
-// then the file is really removed and "Choose file" pops back in. Until it has
-// finished the page keeps its state, but a load still in flight is cancelled at
-// once so it cannot draw anything in the middle of the exit. Without animation
-// support, or for reduced motion, the file is simply removed at once.
+// Removing the file plays the opening in reverse: the lowest part goes first,
+// each sliding left and fading, then the file is really removed and "Choose
+// file" pops back in. The page keeps its state until it's done, but a load in
+// flight is cancelled at once so it can't draw mid-exit. Without animation
+// support, or for reduced motion, it's removed immediately.
 let removingFile = false;
 
 function removalTargets() {
@@ -577,18 +529,18 @@ async function removeFileAnimated() {
   }
 
   removingFile = true;
-  const myGeneration = ++loadGeneration; // a load still in flight is stale from now on
+  const myGeneration = ++loadGeneration; // cancels a load in flight
   const animations = targets.map((el, i) => animateOut(el, i * 80));
   try {
     await Promise.all(animations.map((a) => a.finished));
   } catch {
-    /* an animation was cancelled - carry on and remove the file anyway */
+    /* cancelled: remove the file anyway */
   }
   removingFile = false;
-  const replaced = myGeneration !== loadGeneration; // another file was chosen meanwhile: keep it
+  const replaced = myGeneration !== loadGeneration; // another file was chosen meanwhile, keep it
 
-  if (!replaced) setSelectedFile(null); // hides everything for real...
-  // ...so the held end frames can go (they must never linger on a new file's list).
+  if (!replaced) setSelectedFile(null);
+  // the held end frames must never linger on a new file's list
   animations.forEach((a) => { try { a.cancel(); } catch { /* already gone */ } });
   if (replaced) return;
   if (typeof chooseFileBtn.animate === 'function') {
@@ -609,9 +561,6 @@ fileInput.addEventListener('change', () => {
   setSelectedFiles(Array.from(fileInput.files || []));
 });
 
-// A .zip can hold more than one distinct export; this picker chooses which one
-// (or all of them) the list shows. The closed box opens the row panel; picking
-// a row is what redraws the list (see chooseExport).
 exportPickEl.addEventListener('click', () => {
   if (exportPickListEl.style.display === 'block') closeExportPicker();
   else openExportPicker();
@@ -624,14 +573,13 @@ exportPickRowEl.addEventListener('keydown', (e) => {
   }
 });
 
-// A click anywhere outside the picker closes the panel.
 document.addEventListener('click', (e) => {
   const target = e.target;
   if (target && typeof target.closest === 'function' && target.closest('#exportPickRow')) return;
   closeExportPicker();
 });
 
-// Dropping one or more files onto the picker works the same as "Choose file".
+// dropping files on the picker works like "Choose file"
 ['dragenter', 'dragover'].forEach((eventName) => {
   picker.addEventListener(eventName, (e) => {
     e.preventDefault();
@@ -647,15 +595,12 @@ document.addEventListener('click', (e) => {
 });
 
 picker.addEventListener('drop', (e) => {
-  // A drop carrying no files (dragged text, say) leaves the current selection
-  // alone rather than clearing it.
+  // a drop with no files (dragged text) leaves the selection alone
   const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
   if (files.length > 0) setSelectedFiles(files);
 });
 
-// Without this, dropping a file anywhere else on the page (outside the
-// picker) falls through to the browser's default behavior - navigating
-// to and displaying the file directly instead of importing it.
+// otherwise a file dropped outside the picker makes the browser navigate to it
 document.addEventListener('dragover', (e) => { e.preventDefault(); });
 document.addEventListener('drop', (e) => { e.preventDefault(); });
 
@@ -677,14 +622,12 @@ openSelectedBtn.addEventListener('click', async () => {
   setStatus(`Opening ${pluralTabs(selected.length)}...`);
 
   try {
-    // Only http/https links ever reach browser.tabs.create. Re-checked here
-    // regardless of checkbox state - this is the real gate.
+    // the real gate: only http(s) links reach tabs.create, whatever the checkbox says
     const links = selected.map((item) => item.link);
     const safeLinks = links.filter((link) => isSafeUrl(link));
     let failed = links.length - safeLinks.length;
 
-    // Open the first add-on's page right here, as a background tab (the
-    // first one that actually opens - a failure just moves on to the next).
+    // open the first one here (the first that actually opens)
     let firstIdx = -1;
     for (let i = 0; i < safeLinks.length; i++) {
       try {
@@ -696,30 +639,25 @@ openSelectedBtn.addEventListener('click', async () => {
       }
     }
 
-    // Nothing opened means there's nothing to confirm - stay here so the
-    // status (all failed) is what the user sees.
+    // nothing opened: stay here so the user sees the failure
     if (firstIdx === -1) {
       setStatus(`Opened ${pluralTabs(0)}, ${failed} failed to open`);
       return;
     }
 
-    // The confirmation page replaces this page right after the first tab
-    // opens, and a page that has navigated away can't keep running a loop.
-    // So the remaining add-ons are handed to background.js, which opens
-    // them one after another (starting at once) while the confirmation
-    // page is already on screen.
+    // This page is replaced by the confirmation page and can't keep a loop
+    // running, so the rest go to background.js, which opens them in turn.
     const rest = safeLinks.slice(firstIdx + 1);
     let opened = 1;
     if (rest.length > 0) {
       try {
         const reply = await browser.runtime.sendMessage({ type: 'openTabs', urls: rest });
-        // background.js says how many it queued (it caps a batch); anything it
-        // did not take is counted as not opened, not as opened.
+        // background.js caps a batch; what it didn't take counts as failed
         const queued = reply && Number.isInteger(reply.queued) ? Math.min(reply.queued, rest.length) : rest.length;
         opened += queued;
         failed += rest.length - queued;
       } catch {
-        // Background unreachable: open them from here instead, then go on.
+        // background unreachable: open them from here
         for (let i = 0; i < rest.length; i++) {
           await delay(TAB_OPEN_DELAY_MS);
           try {
@@ -741,10 +679,9 @@ openSelectedBtn.addEventListener('click', async () => {
   }
 });
 
-// The popup brings this tab to the front - and replays its opening - instead
-// of opening a second Importer. The .zip export picker closes and any search
-// left in the box is cleared with it, but the chosen file, the list it drew and
-// everything ticked in that list are left exactly as they were.
+// The popup focuses this tab instead of opening a second one. The picker
+// closes and a leftover search is cleared, but the chosen file, the list and
+// the ticked add-ons stay as they were.
 answerWhereIsPage('import', () => {
   closeExportPicker();
   list.clearSearch();

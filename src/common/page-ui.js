@@ -1,10 +1,8 @@
-// Page-only helpers: everything that touches the document - the fade to the
-// confirmation page, search filtering, the selection count, live name
-// shortening. Loaded by the extension's pages after core.js, never by the
-// background (it has no document).
+// Page-only helpers (fade to the confirmation page, search filtering, the
+// selection count, live name shortening). Loaded by pages after core.js, never
+// by the background.
 
-// Same list as formatLabelsText, but appended to `container` with each label
-// in <strong>, for the messages that bold them.
+// Same as formatLabelsText, but appended to `container` with each label in <strong>.
 function appendFormatLabels(container, fmts) {
   const labels = resolveExportFormats(fmts).map(formatLabel);
   labels.forEach((label, i) => {
@@ -15,40 +13,31 @@ function appendFormatLabels(container, fmts) {
   });
 }
 
-// Select all/Deselect all only touch what the current search still shows -
-// a checked box that gets filtered out of view stays checked.
+// Select all / Deselect all only touch what the search still shows.
 function visibleCheckboxes(allCheckboxes) {
   return Array.from(allCheckboxes).filter((cb) => cb.closest('.addon-row').style.display !== 'none');
 }
 
-// Filters .addon-row elements by search query (matched against each row's
-// .addon-name only, not version numbers or match-type labels), hiding a
-// .group-box if none of its rows still match. Returns true if
-// anything's visible.
-//
-// Shows or hides `el` the way search filtering does: display plus an
-// .is-filtered class, which shared.css turns into a fade out / fade in
-// (and which is simply instant where that CSS isn't supported).
-// `shownDisplay` is what display becomes when visible ('' = stylesheet
-// default).
+// Shows or hides `el` the way search does: display plus an .is-filtered class,
+// which shared.css turns into a fade. `shownDisplay` is the display when
+// visible ('' = stylesheet default).
 function setFilterVisible(el, visible, shownDisplay = '') {
   el.style.display = visible ? shownDisplay : 'none';
   if (el.classList) el.classList.toggle('is-filtered', !visible);
 }
 
-// NOTE: report-template.js's buildHtmlReport() has its own copy of this
-// (and of setFilterVisible above) inlined into the exported report (it
-// can't load page-ui.js once saved elsewhere). Keep both copies in sync if
-// you change this.
+// Filters rows by the search query, matched against the name only (not the
+// version or labels), and hides a group when none of its rows match. Returns
+// true if anything is visible.
+//
+// NOTE: report-inline.js has its own copy of this and of setFilterVisible()
+// (a saved report can't load this file). Keep them in sync.
 function filterAddonRows(container, query) {
   const q = query.trim().toLowerCase();
   let anyMatch = false;
 
-  // Group containers can sit at any depth - export.js/import.js/the report
-  // all wrap them in an outer .groups-outer-box (see appendGroup()/
-  // renderList()/renderAddonList()), so they're no longer necessarily
-  // direct children of `container`. querySelectorAll finds them
-  // regardless of nesting.
+  // Groups can sit at any depth (they're inside .groups-outer-box), hence
+  // querySelectorAll.
   for (const el of container.querySelectorAll('.group-container')) {
     const box = el.querySelector('.group-box');
     let groupHasMatch = false;
@@ -68,15 +57,13 @@ function filterAddonRows(container, query) {
   return anyMatch;
 }
 
-// Used by export.js and import.js when they finish: the page fades out
-// and is replaced, in the same tab, by the confirmation page (instead of
-// opening a second tab next to it). The fade uses the Web Animations API
-// on the page's .card and is skipped when that isn't available or the
-// user has asked for reduced motion, so callers can always just await it.
+// When the Exporter or Importer finishes, the page fades out and the
+// confirmation page replaces it in the same tab. Skipped for reduced motion,
+// so callers can always just await it.
 const PAGE_FADE_MS = 380;
 
-// Resolves once the card has faded out, with the animation (held at its
-// final frame) so the caller can undo it, or null if nothing was animated.
+// Resolves once the card has faded out, with the animation (held at its last
+// frame) so the caller can undo it, or null if nothing was animated.
 async function fadeOutPage() {
   if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return null;
   if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return null;
@@ -93,13 +80,12 @@ async function fadeOutPage() {
     await anim.finished;
     return anim;
   } catch {
-    return null; // cosmetic only - never block the hand-off
+    return null; // cosmetic only, never block the hand-off
   }
 }
 
 // `query` is the confirmation page's query string, e.g. 'from=export&format=csv'.
-// location.replace (not assign) so the back button doesn't return to a
-// finished export/import page.
+// location.replace so the back button doesn't return to a finished page.
 async function goToConfirmation(query) {
   const anim = await fadeOutPage();
   try {
@@ -110,12 +96,10 @@ async function goToConfirmation(query) {
   }
 }
 
-// Restarts the page's entrance animation (the .card and its children
-// spring in again). Used when an already-open tab is brought back to the
-// front - e.g. Settings, which Firefox reuses instead of reopening - so it
-// gets the same entrance as a freshly opened page. shared.css's
-// .replay-reset switches the animations off for one frame; forcing a
-// reflow in between makes them start over.
+// Restarts the page's entrance animation, for an already-open tab that gets
+// brought back to the front (Settings, for example). shared.css's
+// .replay-reset switches the animations off for one frame and the forced
+// reflow makes them start over.
 function replayEntrance() {
   if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
   const card = document.querySelector('.card');
@@ -125,22 +109,17 @@ function replayEntrance() {
   card.classList.remove('replay-reset');
 }
 
-// Smoothly back to the top of the page - what a freshly opened page shows.
-// Instantly with reduced motion. Used when an already-open Settings, Exporter
-// or Importer page is opened again from the popup.
+// Smooth scroll back to the top (instant with reduced motion).
 function scrollPageToTop() {
   if (typeof window === 'undefined' || typeof window.scrollTo !== 'function') return;
   const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   window.scrollTo({ top: 0, left: 0, behavior: reduced ? 'auto' : 'smooth' });
 }
 
-// Replays the whole staged reveal (reveal.js) on a page that has one - the
-// Exporter and the Importer - so an already-open tab brought back to the front
-// opens exactly like a fresh one. This only runs the animations again: what the
-// page itself has on it is the caller's business (see answerWhereIsPage). The
-// rows animate only while their list carries .revealing (and reveal.js takes
-// that flag off once they are all in), so this puts it back and takes it off
-// again once the last row - its --rd delay plus its own wipe - has finished.
+// Replays the staged reveal (reveal.js) on the Exporter and Importer. Rows only
+// animate while their list has .revealing, so this puts the flag back and
+// removes it once the last row (its --rd delay plus its own wipe) is done.
+// What is on the page is left alone (see answerWhereIsPage).
 function replayStagedReveal() {
   if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
   const list = document.getElementById('addonList');
@@ -152,24 +131,20 @@ function replayStagedReveal() {
       if (delay > longest) longest = delay;
     }
     list.classList.add('revealing');
-    // The row's own 0.55s wipe plus a margin - ROW_DURATION in reveal.js.
+    // A row's own wipe takes 0.55s (ROW_DURATION in reveal.js), plus a margin.
     setTimeout(() => list.classList.remove('revealing'), Math.ceil((longest + 0.85) * 1000));
   }
   replayEntrance();
 }
 
-// --- Live settings ------------------------------------------------------------
-// Settings changed anywhere (the Settings page, a settings import, a reset)
-// reach every other open extension page through storage.onChanged. The theme
-// (theme.js), the export format (export.js) and the Settings page's own
-// options already follow it; these two make "Shorten add-on names" follow it
-// too, so the names on an already-open Exporter or Importer change the moment
-// the setting does.
+// --- Live settings ---
+// Settings changes reach every open page through storage.onChanged. The theme,
+// the export format and the Settings options already follow it. These two make
+// "Shorten add-on names" follow it too.
 
-// Switches every row's name between its short and its full form, in place.
-// Rows remember their full name (data-full-name); anything without one is
-// left alone. Returns how many names changed, and gives each a quick fade so
-// the change is noticed (skipped for reduced motion).
+// Switches every row's name between its short and full form, using the
+// data-full-name it remembers (anything without one is left alone). Returns how
+// many names changed, and gives each a quick fade (skipped for reduced motion).
 function applyNameShortening(root, shorten) {
   const reduced = typeof matchMedia === 'function' &&
     matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -188,9 +163,8 @@ function applyNameShortening(root, shorten) {
   return changed;
 }
 
-// Calls handler(shorten) - true or false - whenever the "Shorten add-on
-// names" setting changes in storage, including when a reset removes it (which
-// means back to the default).
+// Calls handler(true or false) when the "Shorten add-on names" setting changes,
+// including when a reset removes it (back to the default).
 function onShortenNamesChanged(handler) {
   if (typeof browser === 'undefined' || !browser.storage || !browser.storage.onChanged) return;
   browser.storage.onChanged.addListener((changes, area) => {
@@ -199,26 +173,20 @@ function onShortenNamesChanged(handler) {
   });
 }
 
-// Sets the "12 of 12 selected" badge's text. When the number CHANGES it plays
-// a clear animation, in three parts at once:
-//  1. the number ROLLS over like a counter - the new one slides in while the
-//     old one slides out (upwards when more are selected, downwards when
-//     fewer), clipped to a little slot around the number;
-//  2. the whole badge POPS up in size and settles;
-//  3. it FLASHES a tint that shows the direction: green for more, amber for
-//     fewer (no tint when only the total changed).
-// The first time the badge gets text, or when it is cleared, nothing extra
-// plays (the badge's own fade-in covers that). Skipped for reduced motion.
-// textContent is always the plain text again once the animation is over.
+// Sets the "12 of 12 selected" badge. When the number changes it plays three
+// things at once: the number rolls like a counter (up for more, down for
+// fewer), the badge pops, and it flashes green for more or amber for fewer.
+// Nothing extra plays the first time it gets text or when it is cleared, or
+// with reduced motion. textContent is plain text again once it's over.
 const COUNT_ROLL_MS = 380;
 const COUNT_UP_TINT = 'rgba(46, 160, 67, 0.4)';
 const COUNT_DOWN_TINT = 'rgba(217, 119, 6, 0.35)';
-const countText = new WeakMap(); // the badge's real text, even while a roll is on screen
+const countText = new WeakMap(); // the badge's real text, even mid-roll
 
 function setSelectionCount(el, text) {
   const before = countText.has(el) ? countText.get(el) : el.textContent;
   countText.set(el, text);
-  el.textContent = text; // also ends any roll that is still on screen
+  el.textContent = text; // also ends a roll still on screen
   if (text === before || before === '' || text === '') return;
   if (typeof el.animate !== 'function') return;
   if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -228,12 +196,12 @@ function setSelectionCount(el, text) {
   const direction = Number.isFinite(prev) && Number.isFinite(next) ? Math.sign(next - prev) : 0;
   const ease = 'cubic-bezier(0.34, 1.3, 0.64, 1)';
 
-  // 2. the pop
+  // the pop
   el.animate(
     [{ transform: 'scale(1)' }, { transform: 'scale(1.18)', offset: 0.35 }, { transform: 'scale(1)' }],
     { duration: 460, easing: ease }
   );
-  // 3. the tint
+  // the tint
   if (direction !== 0) {
     const tint = direction > 0 ? COUNT_UP_TINT : COUNT_DOWN_TINT;
     el.animate(
@@ -241,7 +209,7 @@ function setSelectionCount(el, text) {
       { duration: 700, easing: 'ease-out' }
     );
   }
-  // 1. the roll
+  // the roll
   const oldNumber = /^(\d+)/.exec(before);
   const parts = /^(\d+)([\s\S]*)$/.exec(text);
   if (!oldNumber || !parts || oldNumber[1] === parts[1] ||
@@ -275,27 +243,19 @@ function setSelectionCount(el, text) {
       { duration: COUNT_ROLL_MS, easing: ease, fill: 'forwards' }
     ),
   ];
-  // Back to plain text once it is over - unless a newer update already took over.
+  // Back to plain text once it's over, unless a newer update took over.
   Promise.all(rolls.map((a) => a.finished)).then(() => {
     if (countText.get(el) === text) el.textContent = text;
   }, () => {});
 }
 
 // The popup asks "is the Exporter (or Importer) already open?" before opening
-// another one: it broadcasts { type: 'whereIsPage', page } and the page with
-// that name answers with its own tab, so the popup can bring that tab to the
-// front instead of opening a second copy. (The extension's own pages can read
-// their own tab without any extra permission.) Safe to call anywhere: a page
-// without runtime messaging just never answers.
-//
-// The only thing that ever asks is the popup's own Exporter/Importer button, so
-// answering also means "bring this page back to the front": it goes back to the
-// top, plays its opening reveal again, and leaves nothing open on it - exactly
-// as if the tab had just been opened. `resetToFresh` (optional) is a page's own
-// extra step for that last part: closing the popup the page itself has open (the
-// Importer's .zip export picker) and clearing the search box. It must never
-// touch the user's work - a chosen file, the list it drew and every ticked
-// add-on all stay.
+// another: it broadcasts { type: 'whereIsPage', page } and the page with that
+// name answers with its own tab so the popup can focus it. Answering also
+// means "act like freshly opened": back to the top, reveal replayed, nothing
+// left open. `resetToFresh` (optional) is the page's own extra step for that
+// (closing its picker, clearing the search). It must never touch the user's
+// work: a chosen file, the list and every ticked add-on stay.
 function answerWhereIsPage(page, resetToFresh) {
   if (typeof browser === 'undefined' || !browser.runtime || !browser.runtime.onMessage || !browser.tabs || !browser.tabs.getCurrent) return;
   browser.runtime.onMessage.addListener((message) => {
