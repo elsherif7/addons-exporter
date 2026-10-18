@@ -2,7 +2,7 @@
 
 **Add-ons Hub** is a Firefox WebExtension for managing your installed add-ons. It currently has two tools, **Add-ons Exporter** and **Add-ons Importer**: export your add-ons to a file (HTML, JSON, CSV or TXT) and reinstall them on another Gecko-based browser (Firefox, Zen, LibreWolf, Waterfox...) instead of hunting them down one by one. More tools may come later.
 
-**🦊 Get it on Firefox Add-ons:** [Add-ons Hub on AMO](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/)
+**🦊 Get it on Firefox Add-ons:** [Add-ons Hub on AMO](https://addons.mozilla.org/en-US/firefox/addon/addons-hub/)
 
 ---
 
@@ -31,7 +31,7 @@ Every file is described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Installation
 
-**From Firefox Add-ons (recommended):** install it from the [Firefox Add-ons page](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/), the official signed version.
+**From Firefox Add-ons (recommended):** install it from the [Firefox Add-ons page](https://addons.mozilla.org/en-US/firefox/addon/addons-hub/), the official signed version.
 
 > Requires Firefox 128 or newer.
 

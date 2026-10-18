@@ -88,7 +88,7 @@ ${REPORT_CSS}
     <span class="theme-icon theme-icon-moon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path transform="scale(-1,1) translate(-24,0)" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
   </button>
   <h1>Add-ons Hub</h1>
-  <p class="intro-text"><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/" target="_blank" rel="noopener">Add-ons Hub</a> installed, click its toolbar icon, choose <strong>Add-ons Importer</strong>, and select this file - any add-ons you don't already have will be pre-selected to open.</p>
+  <p class="intro-text"><strong>Tip:</strong> on another browser with <a class="cta-link" href="https://addons.mozilla.org/en-US/firefox/addon/addons-hub/" target="_blank" rel="noopener">Add-ons Hub</a> installed, click its toolbar icon, choose <strong>Add-ons Importer</strong>, and select this file - any add-ons you don't already have will be pre-selected to open.</p>
 
   <input type="search" id="searchInput" class="search-input" placeholder="Search add-ons..." aria-label="Search add-ons">
 
