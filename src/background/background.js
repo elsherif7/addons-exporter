@@ -118,7 +118,7 @@ async function listInstalledAddons() {
 // still reclaim the page afterwards.
 
 // After this long, stop looking things up on AMO and use a homepage/search
-// link for the rest. Big lists could otherwise take very long (two 15s
+// link for the rest. Big lists could otherwise take very long (up to three 15s
 // lookups per add-on, 5 at a time) with no sign of progress.
 const AMO_LOOKUP_DEADLINE_MS = 90000;
 // Same idea for a run of failures (network error, timeout, a 429 that

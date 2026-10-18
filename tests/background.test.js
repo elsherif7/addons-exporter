@@ -208,9 +208,9 @@ testAsync('doExport: stops attempting AMO lookups after enough consecutive failu
   ));
   const result = await runDoExportWithOptions(addons, fetchImpl, { maxConsecutiveFailures: 2 });
   assert.ok(result.stats.lookupsSkipped > 0, 'later add-ons should have skipped the lookup once the breaker tripped');
-  // up to 2 fetches per lookup, and the breaker trips after 2 failures in a row,
-  // so well under 12 calls should go out
-  assert.ok(fetchCallCount < 12, `expected the breaker to cut lookups short, got ${fetchCallCount} fetch calls`);
+  // up to 3 fetches per lookup (the exact one is retried), and the breaker trips
+  // after 2 failures in a row, so fewer than all 6 lookups should go out
+  assert.ok(fetchCallCount < 18, `expected the breaker to cut lookups short, got ${fetchCallCount} fetch calls`);
 });
 
 testAsync('doExport: a lookup failure the name search rescues is not reported as a lost link', async () => {
@@ -234,6 +234,50 @@ testAsync('doExport: a lookup that fails outright is reported as a lost link', a
   const result = await runDoExportWithOptions([baseAddon], fetchImpl, {});
   assert.strictEqual(result.stats.lookupFailures, 1);
   assert.strictEqual(result.stats.searchFallback, 1);
+});
+
+testAsync('doExport: an exact lookup that fails once is retried, so the link stays exact', async () => {
+  let exactCalls = 0;
+  const fetchImpl = async (url) => {
+    if (url.includes('/addons/addon/')) {
+      exactCalls++;
+      if (exactCalls === 1) throw new Error('network is slow');
+      return { ok: true, status: 200, json: async () => ({ url: 'https://addons.mozilla.org/en-US/firefox/addon/exact-match/' }) };
+    }
+    throw new Error('should not reach name search when the retry succeeded');
+  };
+  const result = await runDoExportWithOptions([baseAddon], fetchImpl, {});
+  assert.strictEqual(exactCalls, 2);
+  assert.strictEqual(result.stats.amoExact, 1);
+  assert.strictEqual(result.stats.lookupFailures, 0);
+});
+
+testAsync('doExport: a server error on the exact lookup is retried once too', async () => {
+  let exactCalls = 0;
+  const fetchImpl = async (url) => {
+    if (url.includes('/addons/addon/')) {
+      exactCalls++;
+      if (exactCalls === 1) return { ok: false, status: 503, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => ({ url: 'https://addons.mozilla.org/en-US/firefox/addon/exact-match/' }) };
+    }
+    throw new Error('should not reach name search');
+  };
+  const result = await runDoExportWithOptions([baseAddon], fetchImpl, {});
+  assert.strictEqual(exactCalls, 2);
+  assert.strictEqual(result.stats.amoExact, 1);
+});
+
+testAsync('doExport: a 404 on the exact lookup is not retried', async () => {
+  let exactCalls = 0;
+  const fetchImpl = async (url) => {
+    if (url.includes('/addons/addon/')) {
+      exactCalls++;
+      return { ok: false, status: 404, json: async () => ({}) };
+    }
+    return { ok: true, status: 200, json: async () => ({ results: [] }) };
+  };
+  await runDoExportWithOptions([baseAddon], fetchImpl, {});
+  assert.strictEqual(exactCalls, 1);
 });
 
 testAsync('doExport: stats reflect a mix of exact, homepage, and fallback outcomes', async () => {

@@ -137,7 +137,7 @@ Then run `npm run build`. It regenerates `src/background/report-assets.generated
 
 - When an export finishes, the Exporter page fades out and is replaced by the confirmation page in the same tab. The background script saves the file (or the one `.zip`) through the downloads API.
 - The Importer opens the first add-on as a background tab, then switches to the confirmation page right away. The background script keeps opening the rest, one after another. Links that can't be opened are skipped and the confirmation page says how many. If none open, the Importer stays and shows the error.
-- AMO lookups are capped at 15 seconds each and 5 at once. A 429 is retried once after a short wait. After repeated failures, or 90 seconds in, the remaining add-ons skip straight to a fallback link.
+- AMO lookups are capped at 15 seconds each and 5 at once. A 429 is retried once after a short wait, and the exact lookup by ID is retried once after a network error, a timeout or a server error (never after a 404). After repeated failures, or 90 seconds in, the remaining add-ons skip straight to a fallback link.
 - Mozilla's built-ins (`@mozilla.org`, `@mozac.org`), dictionaries and language packs are excluded: they aren't real installed add-ons and have no store listing.
 - The Importer only opens `http`/`https` links.
 - If every add-on in the file is already installed, the Importer shows a short note, since there's nothing to open.

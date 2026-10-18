@@ -113,10 +113,15 @@ const AMO_FETCH_TIMEOUT_MS = 15000;
 // null. onFailure() is called once per real failure (network error, timeout,
 // non-2xx/404), not for a 404 or an empty search.
 async function findAmoPage(id, name, onFailure) {
-  const exact = await fetchJsonWithTimeout(
-    `${AMO_API_BASE}/addons/addon/${encodeURIComponent(id)}/`,
-    AMO_FETCH_TIMEOUT_MS
-  );
+  // On a weak connection the exact lookup often fails once and works the
+  // second time. Without the retry the add-on would fall through to the name
+  // search and come out as a "Possible match". A 404 is a real answer, so it
+  // is never retried (a 429 already got its own retry).
+  const exactUrl = `${AMO_API_BASE}/addons/addon/${encodeURIComponent(id)}/`;
+  let exact = await fetchJsonWithTimeout(exactUrl, AMO_FETCH_TIMEOUT_MS);
+  if (!exact.ok && (exact.status === null || exact.status >= 500)) {
+    exact = await fetchJsonWithTimeout(exactUrl, AMO_FETCH_TIMEOUT_MS);
+  }
   if (exact.ok) {
     if (exact.status !== 404) {
       if (exact.data && exact.data.url) return { url: exact.data.url, matchType: 'amo-exact' };
