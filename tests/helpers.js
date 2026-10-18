@@ -127,7 +127,7 @@ async function waitFor(condition, what, timeoutMs = 2000) {
 // - focus, keyboard, input: focus() only records the call, only click (and a checkbox's change) is
 //   really dispatched
 // - timers, rAF, observers, getComputedStyle: pass them in as sandbox globals
-// paint-dependent things (animations, fades) are a manual check, see "Checking a change by eye" in the README
+// paint-dependent things (animations, fades) are a manual check, see "Checking a change by eye" in docs/DEVELOPMENT.md
 
 function parseSelector(selector) {
   const parsed = { tag: null, id: null, classes: [], attrs: {}, pseudos: [] };

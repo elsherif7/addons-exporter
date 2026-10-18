@@ -11,6 +11,7 @@ export default {
     'package.json',
     'package-lock.json',
     'README.md',
+    'docs/**',
     'LICENSE',
     'coverage/**',
   ],

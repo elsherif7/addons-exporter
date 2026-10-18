@@ -1,6 +1,6 @@
 # addons-hub
 
-**Add-ons Hub** is a Firefox WebExtension for managing your installed add-ons. It currently includes **Add-ons Exporter** and **Add-ons Importer**, which let you export your add-ons to a file (HTML, JSON, CSV, or TXT) and reinstall them all on another Gecko-based browser (Firefox, Zen, LibreWolf, Waterfox, etc.) instead of hunting them down one by one. More tools may be added over time.
+**Add-ons Hub** is a Firefox WebExtension for managing your installed add-ons. It currently has two tools, **Add-ons Exporter** and **Add-ons Importer**: export your add-ons to a file (HTML, JSON, CSV or TXT) and reinstall them on another Gecko-based browser (Firefox, Zen, LibreWolf, Waterfox...) instead of hunting them down one by one. More tools may come later.
 
 **🦊 Get it on Firefox Add-ons:** [Add-ons Hub on AMO](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/)
 
@@ -10,158 +10,85 @@
 
 ```
 addons-hub/
-├── manifest.json         # Extension manifest: config, permissions, and background script list
-├── icons/                 # Toolbar and extension icons in several standard sizes
-├── scripts/               # Build helpers: generate the report's embedded assets, syntax-check every source file, set the version, delete throwaway output
-├── tests/                 # Test suite on Node's built-in runner (node:test), run via `npm test`
-│   ├── golden/                  # Expected output files used by golden.test.js
-│   ├── fixtures/                # amo-release.html: a real HTML report from the version released on addons.mozilla.org (import.test.js reads it)
-│   ├── helpers.js               # test()/testAsync() (thin wrappers over node:test) plus vm-loading helpers and a small fake DOM
-│   ├── common.test.js           # Unit tests covering the shared helpers (core.js, page-ui.js and amo.js)
-│   ├── pure-modules.test.js     # Loads the Importer's readers and matching and the settings-file code with no page and no browser object, to keep them pure
-│   ├── script-order.test.js     # Reads manifest.json and every page's <script> tags and checks each script only uses shared names loaded before it in that context
-│   ├── theme.test.js            # Tests for the shared light/dark theme logic
-│   ├── import.test.js           # Tests covering the import page's parsing and UI logic
-│   ├── report-template.test.js  # Tests for all export format builders (HTML, JSON, CSV, TXT) in export-formats.js and report-template.js
-│   ├── background.test.js       # Tests covering messaging, AMO lookups, and export logic
-│   ├── export.test.js           # Tests covering the export page's picker and click logic
-│   ├── golden.test.js           # Compares the exact text of every export format with the files in tests/golden/ (`UPDATE_GOLDEN=1 node --test tests/golden.test.js` regenerates them)
-│   ├── format-contract.test.js  # Pins the data layout of every export next to the format version, so a data change cannot happen without bumping it (a change to only the page's look never needs that)
-│   ├── clean.test.js            # Tests for scripts/clean.js (what it deletes, and what it refuses to touch)
-│   ├── set-version.test.js      # Tests for scripts/set-version.js (the version is changed in package.json and manifest.json together)
-│   ├── round-trip.test.js       # Generated lists with awkward names (commas, quotes, newlines, non-Latin text, leading =) written in all four formats and read back by the Importer
-│   ├── report-script.test.js    # Runs the report's own script in a fake page: theme button, saved theme, search box
-│   ├── zip-external.test.js     # Checks the .zip with unzip, Python and bsdtar (whichever are installed), not just with this project's own reader
-│   ├── press.test.js            # Tests for the click/tap press-ring feedback in press.js
-│   ├── reveal.test.js           # Tests for the opening-reveal timing in reveal.js (including the Export button waiting for the last add-on)
-│   ├── settings.test.js         # Tests for the settings page: backup/restore, reset, live updates
-│   ├── confirmation.test.js     # Tests for the confirmation page's heading/message logic
-│   ├── popup.test.js            # Tests for the popup's three buttons (Export, Import, Settings)
-│   ├── source.test.js           # Tests for the export's source (format version, file type, browser, browser version, extension version): detection, writing in every format, reading back, format 1 files
-│   ├── zip-reader.test.js       # Tests for the Importer reading a .zip or several chosen files at once (hand-built, Python-made and the Exporter's own zips, damaged and oversized ones)
-│   ├── coverage-preload.js      # Used only by `npm run test:coverage`: lets the coverage tool see the scripts the tests run in sandboxes
-│   └── structure.test.js        # Invariants users can see: every page loads press.js and has a real favicon, reduced motion is honoured, every button uses the shared class
+├── manifest.json     # extension manifest: permissions, background scripts
+├── icons/            # toolbar and extension icons
+├── docs/             # file formats and development notes
+├── scripts/          # build and maintenance helpers
+├── tests/            # test suite, run with `npm test`
 └── src/
-    ├── common/
-    │   ├── core.js     # Pure shared code, loaded everywhere: the export format registry, the settings schema and loadSettings(), text helpers, display labels, groupForReading()
-    │   ├── addon-list.js  # The add-on list shared by the Exporter and Importer: rows, groups, Select all, search, selection count, click-a-row, live name shortening
-    │   ├── page-ui.js  # Shared code that touches the page (fade to the confirmation page, search filtering, selection count, live name shortening); pages only
-    │   ├── theme.js    # Applies the stored light/dark theme on page load
-    │   ├── press.js    # Click/tap feedback: a ring bursts out of links/buttons; rows get an inward flash instead
-    │   ├── reveal.js   # Opening of the Exporter and Importer pages, timed like the Settings page (parts top to bottom, add-ons cascading in, the Exporter's Export button last)
-    │   ├── tokens.css  # The colour and motion variables - the one place they are defined (also built into the report)
-    │   └── shared.css  # Shared styles used by export, import, settings, and confirmation pages
-    ├── background/
-    │   ├── background.js       # Handles messaging, export orchestration, and saveExport() (the file, or the zip)
-    │   ├── amo.js              # AMO lookups: fetch with retry, name matching, findAmoPage()
-    │   ├── browser-info.js     # Works out which browser (and version) is running, for the export's source
-    │   ├── export-formats.js   # Builds the JSON, CSV and TXT exports
-    │   ├── report-template.js  # Builds the self-contained HTML report
-    │   ├── report.css          # Source CSS for the report's inline <style> block
-    │   ├── report-inline.js    # Source of the report's inline script
-    │   ├── report-assets.generated.js  # GENERATED by `npm run build` from report.css, report-inline.js and the icon - do not edit
-    │   └── zip.js              # Tiny ZIP writer: several export formats are saved together as one .zip
-    ├── popup/
-    │   ├── popup.html  # Markup for the small toolbar popup interface
-    │   └── popup.js    # Handles clicks on the popup's export, import, and settings buttons (reusing an already-open Exporter or Importer tab)
-    ├── export/
-    │   ├── export.html  # Page for choosing which installed add-ons to export
-    │   └── export.js    # Loads the add-on list and sends the export selection
-    ├── import/
-    │   ├── import.html  # Page for picking an exported file and add-ons to open
-    │   ├── parsers.js   # Strict readers for the HTML, JSON, CSV and TXT exports (pure, no page code)
-    │   ├── match.js     # Which add-ons in a file are already installed (pure)
-    │   ├── zip-reader.js  # Reads the export files out of a .zip (stored or deflated, CRC and size checked; pure)
-    │   └── import.js    # The page: shows the list and opens the selected tabs
-    ├── settings/
-    │   ├── settings.html      # Settings page, opened from the popup or the browser's own menu
-    │   ├── settings.css       # The Settings page's styles
-    │   ├── settings-init.js   # Parser-blocking sync script: pre-applies the saved option states before first paint
-    │   ├── settings-file.js   # Builds and strictly reads the settings file (pure, no page code)
-    │   └── settings.js        # Settings page logic
-    ├── confirmation/
-    │   ├── confirmation.html  # Page shown after Add-ons Exporter or Add-ons Importer finishes
-    │   └── confirmation.js    # Sets the heading/message based on which tool sent you here
+    ├── common/       # shared code and styles
+    ├── background/   # export, AMO lookups, report and zip builders
+    ├── popup/        # the toolbar popup
+    ├── export/       # Add-ons Exporter page
+    ├── import/       # Add-ons Importer page and file readers
+    ├── settings/     # Settings page
+    └── confirmation/ # page shown after an export or import
 ```
 
-> **Note:** `manifest.json`'s `browser_specific_settings.gecko.id` is
-> `addons-exporter@local` — a legacy id left over from this project's
-> previous "Add-ons Exporter" name, before it was renamed to "Add-ons
-> Hub". It can't be documented with an inline comment since
-> `manifest.json` is parsed as strict JSON (no comments allowed), hence
-> the note here instead. Don't change it casually: Firefox uses this id
-> to match an installed copy to its future updates, so changing it would
-> break update continuity for anyone who already has the extension
-> installed.
+Every file is described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ---
 
 ## Installation
 
+**From Firefox Add-ons (recommended):** install it from the [Firefox Add-ons page](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/), the official signed version.
+
 > Requires Firefox 128 or newer.
 
-**1. Install from Firefox Add-ons (recommended)**
-
-> Install directly from the [Firefox Add-ons page](https://addons.mozilla.org/en-US/firefox/addon/add-ons-hub/) — the official signed version.
-
-**2. Or load a local copy for development**
+**A local copy for development:**
 
 1. Clone the repo:
    ```
    git clone https://github.com/elsherif7/addons-hub
    ```
-2. Go to `about:debugging#/runtime/this-firefox` and click **"Load Temporary Add-on"**.
+2. Go to `about:debugging#/runtime/this-firefox` and click **Load Temporary Add-on**.
 3. Select `manifest.json` from the cloned folder.
 
-> A temporarily-loaded add-on is removed when the browser restarts — use the AMO install above for a permanent copy.
+A temporary add-on is removed when the browser restarts, so use the AMO install for a permanent copy.
 
 ---
 
-## Tools
+## How to use it
 
-Both are opened from the toolbar icon's popup. If one is already open, the popup brings that tab to the front and plays its opening animation again, exactly as if it had just been opened: back at the top, with the search box emptied and showing the whole list again, and with the page's own popup dismissed — the Settings reset confirmation and any message sitting in its Import/Export rows, or the Importer's open `.zip` export picker. Nothing else is touched: a chosen file, the list it drew and every ticked add-on all stay as they were.
+Click the toolbar icon and pick a tool. If it's already open, the popup brings that tab to the front instead of opening a second one.
 
 ### Add-ons Exporter
 
-Creates a checklist of every installed extension and theme, split into Enabled/Disabled groups with a search box to filter by name. Add-ons are listed in alphabetical order within each group. Each selected add-on's real store page is looked up on `addons.mozilla.org` (by exact ID first, then a fuzzy name search, then its own homepage, and finally a plain AMO search link if none of those find anything), and the result is saved in whichever format(s) you've ticked in Settings — **HTML** (default, human-readable with the data embedded for re-import), **JSON**, **CSV**, or **TXT**. Tick several and they are saved together in one `.zip` (a single Save dialog), all built from the same set of AMO lookups. A row only gets a small label — Possible match, Homepage, or Search results — when the link isn't a confirmed exact match, since a fuzzy match can occasionally point to the wrong add-on. If AMO itself seems to be having trouble (repeated failures, or the lookups are taking a long time), the remaining add-ons get a fallback link instead of hanging indefinitely, and the final status says how many, if any, couldn't be looked up. The HTML report opens in whichever theme Settings is currently set to, and has its own light/dark toggle in the corner — the toggle choice is remembered in `localStorage` so it persists across opens of the same file.
+Lists every installed extension and theme (Enabled and Disabled, A→Z) with a search box. Tick the ones you want and click **Export Selected**.
 
-All export formats list enabled add-ons first and disabled ones after, each group sorted A→Z by name. The HTML report and the TXT file show them as Enabled and Disabled sections; JSON and CSV keep one list in that order. With **Shorten add-on names** on (the default), every format uses the short name, and every format also carries each add-on's id.
+- Each add-on's store page is looked up on `addons.mozilla.org` (exact ID, then a name search, then its homepage, then a plain AMO search link). A small label shows when a link isn't a confirmed exact match.
+- The file is saved in the format(s) you ticked in Settings. Tick several and they're saved together in one `.zip`.
+- If AMO is slow or failing, the remaining add-ons get a fallback link instead of hanging, and the final message says how many couldn't be looked up.
+- The HTML report has its own light/dark toggle and works on any browser.
 
 ### Add-ons Importer
 
-Reads one or more previously exported files (`.html`/`.htm`, `.json`, `.csv`, `.txt`, or the `.zip` the Exporter makes when several formats are ticked, up to 10 MB each, 64 MB for the export files of one `.zip` together), chosen or dragged in together. Every export file a selection holds is read — a loose file as itself, a `.zip` as every export file inside it — ignoring anything that isn't an Add-ons Hub export; files that list the same set of add-on ids count as the same export, wherever they came from (the most exact format supplies its data), and when a selection holds more than one distinct export a picker offers **All add-ons** (the default, which merges every export into one list with each id kept once) followed by each export, the one with the most add-ons first. Each is named after the file it came from: a file you chose on its own is an entry of its own, so two files dropped together stay two even when they hold the same add-ons; one name in several formats is one entry that shows those formats, `Add-ons (.json, .csv)`, while a `.zip`'s contents are one entry per set of add-on ids — and a `.zip` holding just one is named after the `.zip` itself, however many formats are inside it. A file that cannot be read at all is named under the list and the rest still load; when nothing chosen can be read, the first reason is shown and nothing loads. A `.zip` is checked as a whole, so an encrypted, damaged or oversized one is refused with a plain message. Each file is validated before anything is read from it: an unrecognised extension or an oversized file is rejected immediately with a plain explanation, and a file with a missing, non-numeric, or unsupported format version is rejected the same way. Every reader is strict: it accepts only a file laid out exactly as this extension writes it — the HTML report (including the one from the version released on addons.mozilla.org) must hold, for every add-on, exactly the fields `id`, `name`, `version`, `enabled`, `type`, `link` and `linkType`, in that order, and the JSON file exactly `name`, `version`, `type`, `enabled`, `link`, `linkType` and `id`, in that order; the CSV must have the exact header, and the TXT exactly seven columns per line (six in a format 1 file), with the id always present; `true`/`false`, `Extension`/`Theme` and `Enabled`/`Disabled` are spelled as written. Anything else is rejected with the first problem named, rather than guessed at.  A duplicate entry in the file (the same add-on listed twice) is merged into one row. It compares each add-on against what's currently installed, matching by add-on ID when it has one, and falling back to matching by name otherwise (or when the id doesn't match anything installed). The name match tries the exact name first, then the shortened form, so an export made with **Shorten add-on names** on still finds its add-on even when it has no id; a short name shared by two installed add-ons is never guessed at. The checklist is split into **Not Installed Yet** (pre-selected) and **Already Installed** (shown for reference), so you never need to reopen things you already have. It opens each pick as a tab rather than installing it directly, which is the workaround for a real limitation: Firefox doesn't allow any extension to install other extensions automatically — a deliberate security restriction, not a limitation of these tools.
+Pick one or more exported files (HTML, JSON, CSV, TXT, or the `.zip` the Exporter makes), or drag them in. The add-ons you don't have yet are pre-selected, and the ones you already have are listed too, for reference. Click **Open Selected** and each one opens in its own tab, where you click **Add to Firefox**.
+
+Firefox doesn't let extensions install other extensions automatically, so opening the tabs is as far as any extension can go.
+
+How files are read, and what gets rejected, is in [docs/FORMATS.md](docs/FORMATS.md).
 
 ### Settings
 
-The Settings page controls **Appearance** (light/dark theme), **Export Format** (HTML/JSON/CSV/TXT — tick one or more; at least one always stays ticked; with one format you get that file, with several they are bundled into a single `.zip`), and **Display** (whether long add-on names are shortened — it applies to the HTML report and to the JSON, CSV and TXT exports alike), plus a few other things below.
-
-**Export Settings** and **Import Settings**, at the bottom of the page, back up and restore all three of the settings above. Export saves them to a small JSON file (the export format is a single value, or a list when several are ticked) named `Add-ons Hub Settings (<timestamp>).json`, which records the same `source` the add-on exports do (which browser and version made it) and which you can use to carry your preferences to another browser or device. Import reads a previously exported settings file and applies it immediately. It is strict: the file must hold exactly the three settings an export writes, in the order it writes them, each with a valid value, otherwise it is rejected with the problem named and nothing is changed.
-
-**Reset** clears all three settings back to their defaults, after a confirmation dialog.
-
-#### A few other things worth knowing
-
-- When the export finishes, the Exporter page fades out and is replaced by the confirmation page in the same tab, rather than opening a second tab. The background script saves the file (or the one `.zip`, when several formats are ticked) directly via the downloads API.
-- Add-ons Importer opens the first selected add-on's page as a background tab, then fades out and is replaced by the confirmation page in the same tab right away. The background script keeps opening the remaining add-ons' pages, one after another, while the confirmation page is already showing. Links that can't be opened (not http/https) are skipped and the confirmation page says how many; if none open, the Importer stays put and shows the error.
-- AMO lookups are capped at 15 seconds each and 5 in flight at once, so a single slow response can't stall an export. If AMO responds with a rate-limit (429), that one lookup is retried once after a short wait. If lookups keep failing, or the export has been running for 90 seconds, the remaining add-ons skip straight to a fallback link instead of continuing to retry against a struggling API.
-- Firefox's own bundled built-ins (New Tab page, default themes) and spell-check dictionaries/language packs are excluded, since they aren't real installed add-ons and have no matching store listing.
-- Add-ons Importer only ever opens http/https links; anything else is flagged and left unselected, since an export file's data isn't inherently trusted.
-- A CSV export guards against formula injection: an add-on name starting with a character a spreadsheet would read as a formula (`=`, `+`, `-`, `@`) gets a leading apostrophe added so it's treated as plain text instead. Add-ons Importer strips that apostrophe back off, so the name round-trips correctly.
-- If every add-on in the file is already installed, Add-ons Importer shows a short note about it — informational only, since there's nothing to open.
-- Clicking a link — the **AMO** link on a row, or the links in the About box and on the confirmation page — gives that link its own press ring animation. Clicking elsewhere on a row gives the row a flash instead.
+- **Appearance:** light or dark theme.
+- **Export Format:** HTML, JSON, CSV or TXT. Tick one or more, at least one always stays ticked.
+- **Display:** whether long add-on names are shortened (HTML report, JSON, CSV and TXT alike).
+- **Export Settings / Import Settings:** back up your settings to a small JSON file and restore them, on this or another browser.
+- **Reset:** back to the defaults, after a confirmation.
 
 ---
 
 ## Export formats
 
-| Format | Extension | Re-importable | Description |
+| Format | Extension | Re‑importable | Description |
 |--------|-----------|---------------|-------------|
-| HTML | `.html` | ✅ | Human-readable report with embedded data. Opens in any browser. Has a light/dark toggle. |
-| JSON | `.json` | ✅ | Machine-readable. Same data shape as the HTML report's embedded payload, with each add-on's name first and its id last. Names are shortened when the setting is on. |
-| CSV | `.csv` | ✅ | For spreadsheets. One row per add-on (names shortened when the setting is on), name first and id last, RFC 4180-compliant, formula-injection guarded. Starts with a byte-order mark so Excel reads non-English names correctly. |
-| TXT | `.txt` | ✅ | Plain text list for reading: a title, then Enabled and Disabled sections with the columns lined up. One add-on per line: `Name \| Version \| Type \| Status \| Link \| LinkType \| Id`. A backslash, a pipe or a line break in a name is escaped with a backslash (a line break is written as `\n`, and a space at the very start or end as `\s`), so every add-on stays on one line and the Importer restores the name exactly. |
+| HTML | `.html` | Yes | Readable report with the data embedded. Opens in any browser, light/dark toggle. |
+| JSON | `.json` | Yes | Machine-readable, same data as the HTML report's embedded payload. |
+| CSV | `.csv` | Yes | For spreadsheets. One row per add-on. Guarded against formula injection. |
+| TXT | `.txt` | Yes | Plain text, with Enabled and Disabled sections and aligned columns. |
 
-**Format version 2 and the source.** Every export starts with a `source`: the file's own format version and type, then where it came from — what the browser is based on, the browser name, the browser version and the Add-ons Hub version (for example LibreWolf 128.0, based on Gecko, with Add-ons Hub 1.2.0). JSON and the HTML report's data hold it as a `source` object before `addons`, with `fileType` `json` or `html`; CSV and TXT hold it as one comment line per field at the very top, in `SOURCE_KEYS` order (`# addons-hub-source-formatVersion: ...`, `# addons-hub-source-fileType: ...`, `# addons-hub-source-basedOn: ...`, `# addons-hub-source-browser: ...`, `# addons-hub-source-browserVersion: ...`, `# addons-hub-source-extensionVersion: ...`), with `fileType` `csv` or `txt`; the Settings file records the same source with `fileType` `settings`. The browser name comes from Firefox itself, so forks such as LibreWolf or Waterfox are named as they report themselves, and anything with that call is recorded as based on Gecko (a fork that reports itself as Firefox shows as Firefox); where Firefox's own call does not exist (a future Chrome or Ladybird build) the user agent is used (Edge, Opera, Vivaldi and Chrome are based on Chromium, Safari on WebKit), and anything unknown is written as `Unknown`. The Importer still reads format 1 files (which have no source); every other layout rule stays strict.
+Every format carries each add-on's id, and uses the short name when **Shorten add-on names** is on (the default). The exact layouts are in [docs/FORMATS.md](docs/FORMATS.md).
 
 ---
 
@@ -178,69 +105,13 @@ The Settings page controls **Appearance** (light/dark theme), **Export Format** 
 
 ## Privacy
 
-This extension does not collect, store, or transmit any personal data. Your theme, export format, and display preferences are saved locally in your browser profile (never sent anywhere) so they persist between sessions. The only network requests it makes are to `addons.mozilla.org`'s public API: to look up each installed add-on's official listing page during an export. Nothing else is sent anywhere: files you import are read on your computer only.
+This extension does not collect, store or transmit any personal data. Your theme, export format and display preferences are saved locally in your browser profile and never sent anywhere. The only network requests it makes go to `addons.mozilla.org`'s public API, to look up each add-on's listing page during an export. Files you import are read on your computer only.
 
 ---
 
 ## Contributing
 
-Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/elsherif7/addons-hub/issues).
-
-**Running the tests**
-
-```
-npm test                                   # everything (needs Node 22 or newer)
-node --test tests/import.test.js           # one file
-node --test --test-name-pattern="zip"      # tests whose name contains "zip"
-npm run test:coverage                      # coverage of src/ (needs `npm ci` once; also writes coverage/index.html)
-npm run lint:ext                           # Mozilla's web-ext lint
-npm run clean                              # delete throwaway output (node_modules, coverage, web-ext-artifacts, stray exports)
-```
-
-Both `npm run lint:ext` and a `web-ext` you run yourself read their ignore list from `.web-ext-config.mjs`, so the tests, the tooling and the other files that are not part of the extension stay out of the lint report and out of any package.
-
-`npm run lint:ext` finishes with 0 errors, 0 notices and 2 warnings. Both say the same thing, once for desktop and once for Android: `data_collection_permissions` is a key web-ext only expects from Firefox 140 (`KEY_FIREFOX_UNSUPPORTED_BY_MIN_VERSION`) and Firefox for Android 142 (`KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION`), while `strict_min_version` is 128. The 128 floor is deliberate: it is the first version that accepts that key without an error, and a Firefox that does not know a key ignores it, so raising the floor to 140 would only drop support for Firefox 128–139. The two warnings are expected, not something to fix.
-
-`npm run clean` deletes only output this project's tools made and can make again: `node_modules`, `coverage`, `web-ext-artifacts`, Python caches, and stray `*.zip`/`*.xpi` exports at the project root. It never opens `.git`, `tests`, or any `fixtures` folder, and it leaves an archive parked in a subfolder alone. `npm run clean -- --dry-run` lists what it would delete without deleting anything.
-
-**What the tests can and cannot see**
-
-The page scripts run against a small fake DOM in `tests/helpers.js`, not a real browser, so the suite needs no dependencies. It has no CSS engine and no layout: a test can prove that a script added a class or set a style property, never that anything is styled, positioned or visible. The CSS half of those contracts is checked as source text instead — every class the page scripts set has to be styled by some stylesheet, and the standalone report has to find the classes its own script toggles in `report.css` (both in `tests/structure.test.js`). The comment above the fake DOM lists the rest of what it cannot do.
-
-**Checking a change by eye**
-
-Anything that needs a real paint — an animation replaying, a colour gliding, a row fading out on search — has to be looked at once in a browser:
-
-1. Load the add-on as in [Installation](#installation) (`about:debugging#/runtime/this-firefox`, then **Load Temporary Add-on** → `manifest.json`) and use the page you changed.
-2. For the exported report: export an HTML report, open the downloaded file in a new tab, and try its search box and its light/dark toggle.
-
-Worth doing whenever a change touches a stylesheet, `tokens.css`, or a page script's visual states.
-
-**Changing the version**
-
-The version is written in two files, `package.json` and `manifest.json`, and a test fails if they differ. To change both at once:
-
-```
-npm run set-version -- 1.3.0
-```
-
-Only the `"version"` line of each file changes.
-
-**Editing the report's CSS, script or icon**
-
-The exported HTML report is a standalone file, so its CSS, script and icon are built into it. Edit the sources, never the generated file:
-
-- CSS: `src/background/report.css` (the colour and motion variables come from `src/common/tokens.css`)
-- Script: `src/background/report-inline.js`
-- Icon: `icons/icon32.png`
-
-Then run:
-
-```
-npm run build
-```
-
-This regenerates `src/background/report-assets.generated.js` (via `scripts/build-assets.js`). The test suite fails with a sync error until you do.
+Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/elsherif7/addons-hub/issues). To work on the code, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ---
 
@@ -252,4 +123,4 @@ This regenerates `src/background/report-assets.generated.js` (via `scripts/build
 
 ## License
 
-GNU General Public License v3.0 — see the [LICENSE](./LICENSE) file for details.
+GNU General Public License v3.0, see the [LICENSE](./LICENSE) file for details.

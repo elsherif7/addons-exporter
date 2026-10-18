@@ -439,16 +439,17 @@ test('a11y: status messages are polite live regions', () => {
 // 128: first version that takes data_collection_permissions without an error
 // 112: element.inert (the reset dialog) and linear() easing
 // web-ext warns twice about the floor since it only expects data_collection_permissions from 140
-// (142 on Android). both warnings are deliberate and no reason to raise the floor, the README says why
-test('manifest: strict_min_version is at least 128 and the README states the same', () => {
+// (142 on Android). both warnings are deliberate and no reason to raise the floor, docs/DEVELOPMENT.md says why
+test('manifest: strict_min_version is at least 128, the README states the same and DEVELOPMENT.md explains the warnings', () => {
   const manifest = JSON.parse(readSrc('manifest.json'));
   const min = manifest.browser_specific_settings.gecko.strict_min_version;
   assert.ok(parseInt(min, 10) >= 128, `strict_min_version ${min} is below 128`);
   assert.ok(manifest.browser_specific_settings.gecko.data_collection_permissions, 'data_collection_permissions is declared');
   const readme = readSrc('README.md');
   assert.match(readme, new RegExp(`Requires Firefox ${parseInt(min, 10)} or newer`), 'README states the same minimum version');
+  const dev = readSrc('docs/DEVELOPMENT.md');
   for (const code of ['KEY_FIREFOX_UNSUPPORTED_BY_MIN_VERSION', 'KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION']) {
-    assert.ok(readme.includes(code), `README explains the ${code} warning instead of leaving it unexplained`);
+    assert.ok(dev.includes(code), `docs/DEVELOPMENT.md explains the ${code} warning instead of leaving it unexplained`);
   }
 });
 
@@ -470,7 +471,7 @@ test('manifest: the id, the permissions (no more than these) and the options pag
 // through npm or by hand. the list keeps dev-only files out of the lint report and any package
 test('web-ext config: development-only files are ignored, however web-ext is started', () => {
   const config = readSrc('.web-ext-config.mjs');
-  for (const pattern of ['tests/**', 'scripts/**', 'package.json', 'package-lock.json', 'README.md', 'LICENSE', 'coverage/**']) {
+  for (const pattern of ['tests/**', 'scripts/**', 'package.json', 'package-lock.json', 'README.md', 'docs/**', 'LICENSE', 'coverage/**']) {
     assert.ok(config.includes(`'${pattern}'`), `.web-ext-config.mjs does not ignore ${pattern}`);
   }
   // report-inline.js is a real script the linter should see
@@ -479,11 +480,11 @@ test('web-ext config: development-only files are ignored, however web-ext is sta
 });
 
 // node 20 went end of life in April 2026, so engines asks for the oldest supported node.
-// the README has to say the same number
-test('tooling: package.json and the README agree on the Node version', () => {
+// docs/DEVELOPMENT.md has to say the same number
+test('tooling: package.json and docs/DEVELOPMENT.md agree on the Node version', () => {
   const { engines } = JSON.parse(readSrc('package.json'));
   const major = engines.node.replace(/[^0-9]/g, '');
-  assert.match(readSrc('README.md'), new RegExp(`needs Node ${major} or newer`), 'README states the same Node version');
+  assert.match(readSrc('docs/DEVELOPMENT.md'), new RegExp(`needs Node ${major} or newer`), 'DEVELOPMENT.md states the same Node version');
 });
 
 // --- the fake DOM's blind spot: css ---
