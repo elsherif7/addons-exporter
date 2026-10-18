@@ -100,7 +100,7 @@ function validateAddonsPayload(parsed, entryKeys, fileType) {
 
   const list = Array.isArray(parsed.addons) ? parsed.addons : null;
   if (!list || list.length === 0) {
-    return { ok: false, error: 'No add-ons found in that file' };
+    return { ok: false, error: 'No add-ons found in that file.' };
   }
   const topKeys = formatVersion >= 2 ? ['source', 'addons'] : ['formatVersion', 'addons'];
   if (!hasExactKeys(parsed, topKeys)) {
@@ -121,7 +121,7 @@ function parseAddonsPayload(jsonText, entryKeys = HTML_ENTRY_KEYS, fileType = 'h
     return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no embedded data found)' };
   }
   // empty isn't JSON, and "Unexpected end of JSON input" would be all the user saw
-  if (jsonText.trim() === '') return { ok: false, error: 'No add-ons found in that file' };
+  if (jsonText.trim() === '') return { ok: false, error: 'No add-ons found in that file.' };
   return validateAddonsPayload(JSON.parse(jsonText), entryKeys, fileType);
 }
 
@@ -196,7 +196,7 @@ function parseCsvPayload(text) {
     return csvError('the header row must be: ' + CSV_HEADER.join(','));
   }
   if (records.length === 1) {
-    return { ok: false, error: 'No add-ons found in that file' };
+    return { ok: false, error: 'No add-ons found in that file.' };
   }
 
   const addons = [];
@@ -341,7 +341,7 @@ function parseTxtPayload(text) {
   }
 
   if (addons.length === 0) {
-    return { ok: false, error: 'No add-ons found in that file' };
+    return { ok: false, error: 'No add-ons found in that file.' };
   }
 
   return { ok: true, addons: migrateAddonsData(dedupeAddons(addons), formatVersion), source };

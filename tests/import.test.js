@@ -404,7 +404,7 @@ testAsync('openSelectedBtn: opens only the FIRST add-on itself, hands the rest t
   // confirmation page must not wait for the later add-ons
   assert.deepStrictEqual(ctx.order, ['tab', 'message', 'navigate']);
   assert.strictEqual(ctx.getSetTimeoutCallCount(), 0, 'no stagger delay here - background.js does that');
-  assert.strictEqual(ctx.statusEl.textContent, 'Opened 3 tabs');
+  assert.strictEqual(ctx.statusEl.textContent, 'Opened 3 tabs.');
 });
 
 testAsync('openSelectedBtn: a single selected add-on needs no hand-off at all', async () => {
@@ -417,7 +417,7 @@ testAsync('openSelectedBtn: a single selected add-on needs no hand-off at all', 
   assert.deepStrictEqual(ctx.createdTabUrls, ['https://addons.mozilla.org/a/']);
   assert.deepStrictEqual(plain(ctx.sentMessages), []);
   assert.deepStrictEqual(ctx.order, ['tab', 'navigate']);
-  assert.strictEqual(ctx.statusEl.textContent, 'Opened 1 tab', 'not "Opened 1 tabs"');
+  assert.strictEqual(ctx.statusEl.textContent, 'Opened 1 tab.', 'not "Opened 1 tabs"');
 });
 
 testAsync('openSelectedBtn: stays on the page (no confirmation) if every selected link fails to open', async () => {
@@ -487,7 +487,7 @@ testAsync('openSelectedBtn: a failing navigation still leaves the add-on tabs op
   assert.deepStrictEqual(ctx.createdTabUrls, ['https://addons.mozilla.org/a/']);
   assert.strictEqual(ctx.openSelectedBtnEl.disabled, false,
     'the button must not stay stuck disabled just because the page could not be replaced');
-  assert.strictEqual(ctx.statusEl.textContent, 'Opened 1 tab');
+  assert.strictEqual(ctx.statusEl.textContent, 'Opened 1 tab.');
 });
 
 function jsonFile(addons, formatVersion = V1) {
@@ -1575,7 +1575,7 @@ testAsync('openSelectedBtn: uses the count background.js says it queued - tabs i
   vm.runInContext(itemsJs, ctx.sandbox);
   ctx.sandbox.browser.runtime.sendMessage = async () => ({ queued: 1 }); // // 3 handed over, 1 taken
   await ctx.openSelectedHandler();
-  assert.strictEqual(ctx.statusEl.textContent, 'Opened 2 tabs, 2 failed to open');
+  assert.strictEqual(ctx.statusEl.textContent, 'Opened 2 tabs, 2 failed to open.');
   assert.deepStrictEqual(ctx.navigatedUrls, ['moz-extension://test-id/src/confirmation/confirmation.html?from=import&failed=2']);
 });
 
@@ -1585,5 +1585,5 @@ testAsync('openSelectedBtn: a reply without a count (older background) is treate
   vm.runInContext(itemsJs, ctx.sandbox);
   ctx.sandbox.browser.runtime.sendMessage = async () => undefined;
   await ctx.openSelectedHandler();
-  assert.strictEqual(ctx.statusEl.textContent, 'Opened 3 tabs');
+  assert.strictEqual(ctx.statusEl.textContent, 'Opened 3 tabs.');
 });

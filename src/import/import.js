@@ -614,7 +614,7 @@ openSelectedBtn.addEventListener('click', async () => {
     .map((cb) => displayItems[Number(cb.dataset.idx)]);
 
   if (selected.length === 0) {
-    setStatus('Select at least one add-on to open');
+    setStatus('Select at least one add-on to open.');
     return;
   }
 
@@ -641,7 +641,7 @@ openSelectedBtn.addEventListener('click', async () => {
 
     // nothing opened: stay here so the user sees the failure
     if (firstIdx === -1) {
-      setStatus(`Opened ${pluralTabs(0)}, ${failed} failed to open`);
+      setStatus(`Opened 0 tabs, ${failed} failed to open.`);
       return;
     }
 
@@ -671,8 +671,8 @@ openSelectedBtn.addEventListener('click', async () => {
     }
 
     setStatus(failed > 0
-      ? `Opened ${pluralTabs(opened)}, ${failed} failed to open`
-      : `Opened ${pluralTabs(opened)}`);
+      ? `Opened ${pluralTabs(opened)}, ${failed} failed to open.`
+      : `Opened ${pluralTabs(opened)}.`);
     await goToConfirmation(failed > 0 ? `from=import&failed=${failed}` : 'from=import');
   } finally {
     openSelectedBtn.disabled = false;
