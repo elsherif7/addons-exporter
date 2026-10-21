@@ -159,7 +159,7 @@ test('export/import: opening the Exporter or Importer again replays its entrance
   assert.match(replay[1], /classList\.add\('revealing'\)/);
   assert.match(replay[1], /classList\.remove\('revealing'\)/);
   assert.match(replay[1], /replayEntrance\(\)/);
-  assert.match(readSrc('src/export/export.js'), /answerWhereIsPage\('export', \(\) => list\.clearSearch\(\)\)/);
+  assert.match(readSrc('src/export/export.js'), /answerWhereIsPage\('export', \(\) => \{[\s\S]*?list\.clearSearch\(\);[\s\S]*?refreshAddons\(\);[\s\S]*?\}\);/);
   // the importer also has the .zip picker to close and a search box to empty
   assert.match(readSrc('src/import/import.js'), /answerWhereIsPage\('import', \(\) => \{[\s\S]*?closeExportPicker\(\);[\s\S]*?list\.clearSearch\(\);[\s\S]*?\}\);/);
   const addonList = readSrc('src/common/addon-list.js');

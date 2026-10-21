@@ -201,18 +201,27 @@ testAsync('export.js: a non-array listAddons response shows a friendly error, no
 // real bootstrap against a real element tree (makeFakeDom), same A1 regression
 // but through actual rendering instead of a hand-built fixture
 
-async function renderRealExportList(addons, { resolveLinks } = {}) {
+async function renderRealExportList(addons, { resolveLinks, exportResult } = {}) {
   const { document, elements } = makeFakeDom(EXPORTER_ELEMENT_IDS);
   const listeners = [];
+  const managementEvents = {
+    onInstalled: [], onUninstalled: [], onEnabled: [], onDisabled: [],
+  };
+  const management = {};
+  for (const name of Object.keys(managementEvents)) {
+    management[name] = { addListener: (fn) => managementEvents[name].push(fn) };
+  }
   const sandbox = makeSandbox({
     document,
     URL,
     setTimeout,
+    location: { replace() {} },
     browser: {
       runtime: {
         sendMessage: async (msg) => {
           if (msg.type === 'listAddons') return addons;
           if (msg.type === 'resolveAddonLinks' && resolveLinks) return resolveLinks(msg);
+          if (msg.type === 'export' && exportResult !== undefined) return exportResult;
           return undefined;
         },
         onMessage: { addListener: (fn) => listeners.push(fn) },
@@ -220,10 +229,11 @@ async function renderRealExportList(addons, { resolveLinks } = {}) {
       },
       storage: { local: { get: async () => ({}) } },
       tabs: { getCurrent: async () => ({ id: 1, windowId: 1 }) },
+      management,
     },
   }, commonSrc, exportSrc);
   await new Promise((resolve) => setTimeout(resolve, 0));
-  return { elements, listeners };
+  return { elements, listeners, managementEvents, document };
 }
 
 testAsync('export.js real DOM: search hides non-matching rows and their group', async () => {
@@ -285,6 +295,92 @@ testAsync('export.js real DOM: reopening from the popup clears the search box an
     'every row is showing again');
   assert.ok(elements.addonList.querySelectorAll('input[type="checkbox"]:checked').length > 0,
     'and the ticks are untouched');
+});
+
+testAsync('export.js real DOM: installing, disabling and enabling add-ons refreshes the open list', async () => {
+  const addons = [
+    { id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension' },
+    { id: 'b@x', name: 'Beta', version: '2.0', enabled: true, type: 'extension' },
+  ];
+  const { elements, managementEvents } = await renderRealExportList(addons);
+  const rowFor = (name) => elements.addonList.querySelectorAll('.addon-row')
+    .find((row) => row.querySelector('.addon-name').textContent === name);
+  const headings = () => elements.addonList.querySelectorAll('.group-heading').map((h) => h.textContent);
+
+  // Leave Beta unticked, then change the browser's add-ons while the page stays open.
+  const betaBox = rowFor('Beta').querySelector('input[type="checkbox"]');
+  betaBox.checked = false;
+  betaBox.dispatchEvent('change');
+  assert.strictEqual(elements.selectionCount.textContent, '1 of 2 selected');
+
+  addons[1].enabled = false;
+  addons.push({ id: 'c@x', name: 'Gamma', version: '3.0', enabled: true, type: 'extension' });
+  managementEvents.onDisabled.forEach((fn) => fn({ id: 'b@x' }));
+  managementEvents.onInstalled.forEach((fn) => fn({ id: 'c@x' }));
+
+  await waitFor(() => headings().includes('Disabled (1)'), 'the disabled group after refreshing');
+  assert.deepStrictEqual(headings(), ['Enabled (2)', 'Disabled (1)']);
+  assert.strictEqual(rowFor('Beta').querySelector('input[type="checkbox"]').checked, false,
+    'the unticked add-on stays unticked across the refresh');
+  assert.strictEqual(rowFor('Alpha').querySelector('input[type="checkbox"]').checked, true);
+  assert.strictEqual(rowFor('Gamma').querySelector('input[type="checkbox"]').checked, true,
+    'a newly installed add-on starts ticked');
+  assert.strictEqual(elements.selectionCount.textContent, '2 of 3 selected');
+
+  // Enabling it again moves it back without losing its unticked state.
+  addons[1].enabled = true;
+  managementEvents.onEnabled.forEach((fn) => fn({ id: 'b@x' }));
+
+  await waitFor(() => headings().length === 1, 'the disabled group to disappear');
+  assert.deepStrictEqual(headings(), ['Enabled (3)']);
+  assert.strictEqual(rowFor('Beta').querySelector('input[type="checkbox"]').checked, false);
+});
+
+testAsync('export.js real DOM: a refresh during an export does not re-enable the button', async () => {
+  const addons = [{ id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension' }];
+  let finishExport;
+  const exportResult = new Promise((resolve) => { finishExport = resolve; });
+  const { elements, managementEvents } = await renderRealExportList(addons, { exportResult });
+
+  elements.exportSelectedBtn.click();
+  await waitFor(() => elements.status.textContent.startsWith('Exporting'), 'the export to start');
+  assert.strictEqual(elements.exportSelectedBtn.disabled, true);
+
+  addons.push({ id: 'b@x', name: 'Beta', version: '2.0', enabled: true, type: 'extension' });
+  managementEvents.onInstalled.forEach((fn) => fn({ id: 'b@x' }));
+  await waitFor(() => elements.addonList.querySelectorAll('.addon-row').length === 2, 'the refreshed list');
+
+  assert.strictEqual(elements.exportSelectedBtn.disabled, true,
+    'the button stays disabled until the export really finishes');
+
+  finishExport({ formats: ['html'], stats: { total: 1, lookupFailures: 0 } });
+  await waitFor(() => !elements.exportSelectedBtn.disabled, 'the export to finish');
+});
+
+testAsync('export.js real DOM: reopening from the popup re-reads the add-on list', async () => {
+  const addons = [{ id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension' }];
+  const { elements, listeners } = await renderRealExportList(addons);
+
+  addons[0].enabled = false;
+  addons.push({ id: 'b@x', name: 'Beta', version: '2.0', enabled: true, type: 'extension' });
+  listeners.forEach((fn) => fn({ type: 'whereIsPage', page: 'export' }));
+
+  await waitFor(() => elements.addonList.querySelectorAll('.addon-row').length === 2,
+    'the second add-on to appear after reopening');
+  const headings = elements.addonList.querySelectorAll('.group-heading').map((h) => h.textContent);
+  assert.deepStrictEqual(headings, ['Enabled (1)', 'Disabled (1)']);
+});
+
+testAsync('export.js real DOM: coming back to the tab refreshes the list without the popup', async () => {
+  const addons = [{ id: 'a@x', name: 'Alpha', version: '1.0', enabled: true, type: 'extension' }];
+  const { elements, document } = await renderRealExportList(addons);
+
+  addons[0].enabled = false;
+  document.dispatchEvent('visibilitychange');
+
+  await waitFor(() => elements.addonList.querySelectorAll('.group-heading')[0].textContent === 'Disabled (1)',
+    'the add-on to move to the disabled group');
+  assert.strictEqual(elements.addonList.querySelectorAll('.addon-row').length, 1);
 });
 
 testAsync('storage.onChanged: an export-format change from another tab refreshes the description', async () => {

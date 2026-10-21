@@ -13,6 +13,13 @@ const exportDescEl = document.getElementById('exportDesc');
 const addonRows = new Map();
 const addonLinkResults = new Map();
 let addonLinksPromise = null;
+// A refresh replaces every row. These tokens make sure a slow, older response
+// can't paint over the newer list (or a removed add-on's link come back).
+let addonLinksGeneration = 0;
+let refreshGeneration = 0;
+let hasLoadedAddons = false;
+let lastListSignature = null;
+let exportInProgress = false;
 
 // The status after a finished export. It says how many links are exact AMO
 // matches and how many are fallbacks, and reports lookup failures separately
@@ -126,9 +133,9 @@ function setAddonLink(row, a, link, linkType) {
 // The shared row plus the page link. The row starts with a name-search
 // fallback so the list is usable at once; loadAddonLinks() replaces it with
 // the same resolved AMO page the report and Importer use.
-function createAddonRow(a, index, shorten) {
+function createAddonRow(a, index, shorten, checked = true) {
   const { row, label } = createAddonRowBase(a, index, {
-    idPrefix: 'cb', dataset: { id: a.id }, shorten,
+    idPrefix: 'cb', dataset: { id: a.id }, checked, shorten,
   });
   row.dataset.addonId = a.id;
 
@@ -199,11 +206,12 @@ async function openPendingAddonLink(a, anchor) {
 // keeps its search fallback, so the page never looks stuck on a slow network.
 function loadAddonLinks(addons) {
   if (addons.length === 0) return;
+  const generation = ++addonLinksGeneration;
   addonLinksPromise = browser.runtime.sendMessage({
     type: 'resolveAddonLinks',
     ids: addons.map((a) => a.id),
   }).then((links) => {
-    if (!Array.isArray(links)) return;
+    if (generation !== addonLinksGeneration || !Array.isArray(links)) return;
     const addonsById = new Map(addons.map((a) => [a.id, a]));
     for (const entry of links) {
       if (!entry) continue;
@@ -216,15 +224,29 @@ function loadAddonLinks(addons) {
   });
 }
 
-function renderList(addons, shorten) {
+// A refresh redraws the list. Add-ons that were unticked stay unticked (by
+// id); an add-on that has just appeared starts ticked, like a fresh page.
+function renderList(addons, shorten, { preserveSelection = false } = {}) {
+  const previouslyUnchecked = new Set();
+  if (preserveSelection) {
+    for (const cb of listEl.querySelectorAll('input[type="checkbox"]')) {
+      if (!cb.checked) previouslyUnchecked.add(cb.dataset.id);
+    }
+  }
+
   addonRows.clear();
   addonLinkResults.clear();
   addonLinksPromise = null;
+  addonLinksGeneration++;
+
   if (addons.length === 0) {
     const placeholder = document.createElement('p');
     placeholder.className = 'placeholder-text';
     placeholder.textContent = 'No add-ons found to export.';
     listEl.replaceChildren(placeholder);
+    searchInput.value = '';
+    searchInput.style.display = 'none';
+    noSearchMatchesEl.style.display = 'none';
     list.updateSelectionCount();
     return;
   }
@@ -232,37 +254,86 @@ function renderList(addons, shorten) {
   const { enabled, disabled } = groupForReading(addons);
   list.render(createAddonGroups(
     [{ title: 'Enabled', items: enabled }, { title: 'Disabled', items: disabled }],
-    (a, index) => createAddonRow(a, index, shorten)
+    (a, index) => createAddonRow(a, index, shorten, !previouslyUnchecked.has(a.id))
   ));
   searchInput.style.display = 'block';
   list.updateSelectionCount();
 }
 
-(async () => {
+// Lets a refresh leave an unchanged list (and the scroll position, focus and
+// ticks in it) alone. Only what a row shows is compared.
+function addonListSignature(addons, shorten) {
+  return JSON.stringify([
+    shorten,
+    addons.map((a) => [a.id, a.name, a.version, a.enabled, a.type]),
+  ]);
+}
+
+// Re-reads installed add-ons and settings. The Exporter stays open while the
+// user installs, removes, enables or disables add-ons, so the list has to
+// follow those changes instead of keeping the snapshot it started with.
+async function refreshAddons({ preserveSelection = true } = {}) {
+  const generation = ++refreshGeneration;
+  let addons;
+  let settings;
   try {
-    const [addons, settings] = await Promise.all([
+    [addons, settings] = await Promise.all([
       browser.runtime.sendMessage({ type: 'listAddons' }),
       loadSettings(),
     ]);
     if (!Array.isArray(addons)) {
       throw new Error('unexpected response from the extension');
     }
-    const shorten = settings.shortenNames !== 'off';
-    renderList(addons, shorten);
-    loadAddonLinks(addons);
   } catch (e) {
+    if (generation !== refreshGeneration || hasLoadedAddons) return;
     const p = document.createElement('p');
     p.className = 'placeholder-text error';
     p.textContent = `Could not load add-ons: ${e.message}`;
     listEl.replaceChildren(p);
+    return;
   }
-})();
+  if (generation !== refreshGeneration) return;
+
+  const shorten = settings.shortenNames !== 'off';
+  const signature = addonListSignature(addons, shorten);
+  if (hasLoadedAddons && signature === lastListSignature) return;
+
+  hasLoadedAddons = true;
+  lastListSignature = signature;
+  renderList(addons, shorten, { preserveSelection });
+  // updateSelectionCount() inside renderList enables the button when rows are
+  // ticked. Don't let a refresh in the middle of an export unlock it.
+  if (exportInProgress) exportBtn.disabled = true;
+  loadAddonLinks(addons);
+}
+
+// The page itself can listen for changes, so an already-open Exporter updates
+// at once. visibilitychange is the fallback for a tab that was frozen while
+// hidden; it also covers switching back without using the popup.
+function watchAddonChanges() {
+  if (typeof browser !== 'undefined' && browser.management) {
+    const refresh = () => { refreshAddons(); };
+    for (const name of ['onInstalled', 'onUninstalled', 'onEnabled', 'onDisabled']) {
+      const event = browser.management[name];
+      if (event && typeof event.addListener === 'function') event.addListener(refresh);
+    }
+  }
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) refreshAddons();
+    });
+  }
+}
+
+watchAddonChanges();
+refreshAddons({ preserveSelection: false });
 
 exportBtn.addEventListener('click', async () => {
   const ids = Array.from(listEl.querySelectorAll('input[type="checkbox"]:checked'))
     .map((cb) => cb.dataset.id);
 
   exportBtn.disabled = true;
+  exportInProgress = true;
   setStatus('Exporting your add-ons, please wait...');
   try {
     const result = await browser.runtime.sendMessage({ type: 'export', ids });
@@ -272,13 +343,18 @@ exportBtn.addEventListener('click', async () => {
   } catch (e) {
     setStatus('Error: ' + e.message);
   } finally {
+    exportInProgress = false;
     exportBtn.disabled = false;
   }
 });
 
 // The popup brings this tab to the front instead of opening a second one. A
-// leftover search is cleared so the page looks freshly opened.
-answerWhereIsPage('export', () => list.clearSearch());
+// leftover search is cleared and the add-ons are re-read so the page looks and
+// behaves like a freshly opened one.
+answerWhereIsPage('export', () => {
+  list.clearSearch();
+  refreshAddons();
+});
 
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'exportProgress') {
