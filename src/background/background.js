@@ -2,6 +2,9 @@ browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'listAddons') {
     return listInstalledAddons();
   }
+  if (message.type === 'resolveAddonLinks') {
+    return resolveInstalledAddonLinks(message.ids);
+  }
   if (message.type === 'openTabs') {
     return Promise.resolve(queueTabOpens(message.urls));
   }
@@ -125,6 +128,111 @@ const AMO_LOOKUP_DEADLINE_MS = 90000;
 // didn't clear; never a clean "not found"): AMO is struggling, so stop.
 const AMO_LOOKUP_MAX_CONSECUTIVE_FAILURES = 5;
 
+// The Exporter page resolves every link on load and an export resolves them
+// again. Remember AMO hits (and homepages) for the life of the event page so
+// opening the page first doesn't double the requests. The version is part of
+// the key, so an updated add-on is looked up again. Fallback search links are
+// not cached: a later attempt may be the one that reaches AMO.
+const addonLinkCache = new Map();
+
+function addonLinkCacheKey(a) {
+  return `${a.id}\u0000${a.version}`;
+}
+
+function countAddonLink(stats, linkType) {
+  if (!stats) return;
+  if (linkType === 'amo-exact') stats.amoExact++;
+  else if (linkType === 'amo-search') stats.amoSearch++;
+  else if (linkType === 'homepage') stats.homepage++;
+}
+
+// Resolves one add-on's link, in the same fallback order the export and the
+// report use: exact AMO page, plausible AMO search result, homepage, then an
+// AMO name search. doExport() passes stats so the success message can count
+// each outcome; the Exporter page only needs the links.
+function createAddonLinkResolver({
+  deadlineAt = Date.now() + AMO_LOOKUP_DEADLINE_MS,
+  maxConsecutiveFailures = AMO_LOOKUP_MAX_CONSECUTIVE_FAILURES,
+  stats = null,
+} = {}) {
+  let consecutiveFailures = 0;
+
+  return async (a) => {
+    const cached = addonLinkCache.get(addonLinkCacheKey(a));
+    if (cached) {
+      countAddonLink(stats, cached.linkType);
+      return {
+        id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type,
+        link: cached.link, linkType: cached.linkType,
+      };
+    }
+
+    let amoMatch = null;
+    // Per add-on, and only counted if no AMO link ends up found, so a
+    // failure the name search recovered from isn't reported as a missing link.
+    let lookupFailed = false;
+    if (Date.now() < deadlineAt && consecutiveFailures < maxConsecutiveFailures) {
+      amoMatch = await findAmoPage(a.id, a.name, () => { lookupFailed = true; });
+      if (lookupFailed) {
+        consecutiveFailures++;
+      } else {
+        consecutiveFailures = 0;
+      }
+    } else if (stats) {
+      stats.lookupsSkipped++;
+    }
+
+    let link;
+    let linkType;
+    if (amoMatch && isSafeUrl(amoMatch.url)) {
+      link = amoMatch.url;
+      linkType = amoMatch.matchType;
+      if (stats) {
+        if (linkType === 'amo-exact') stats.amoExact++;
+        else stats.amoSearch++;
+      }
+    } else {
+      // Only a lookup that really failed counts as a failure. "Not on AMO",
+      // a poor name match or a skipped lookup just get a fallback link, and
+      // the success message words those differently.
+      if (stats && lookupFailed) stats.lookupFailures++;
+      if (a.homepageUrl && isSafeUrl(a.homepageUrl)) {
+        link = a.homepageUrl;
+        linkType = 'homepage';
+        if (stats) stats.homepage++;
+      } else {
+        link = amoSearchUrl(a.name);
+        linkType = 'amo-search-fallback';
+        if (stats) stats.searchFallback++;
+      }
+    }
+    // Don't cache a homepage that only won because AMO was unreachable; the
+    // next attempt may still find the add-on's AMO page. A clean "not on AMO"
+    // homepage is stable enough to keep.
+    const cacheable = linkType !== 'amo-search-fallback' &&
+      !(linkType === 'homepage' && lookupFailed);
+    if (cacheable) {
+      addonLinkCache.set(addonLinkCacheKey(a), { link, linkType });
+    }
+    return { id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
+  };
+}
+
+// Used by the Exporter page so its row links match the report and Importer:
+// they get the same resolved AMO page, with the same homepage/search fallback.
+async function resolveInstalledAddonLinks(ids) {
+  let extensions = await getExportableAddons();
+
+  if (Array.isArray(ids)) {
+    const idSet = new Set(ids);
+    extensions = extensions.filter(a => idSet.has(a.id));
+  }
+
+  const resolveLink = createAddonLinkResolver();
+  const list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, resolveLink);
+  return list.map(({ id, link, linkType }) => ({ id, link, linkType }));
+}
+
 async function doExport(ids, {
   deadlineMs = AMO_LOOKUP_DEADLINE_MS,
   maxConsecutiveFailures = AMO_LOOKUP_MAX_CONSECUTIVE_FAILURES,
@@ -148,12 +256,15 @@ async function doExport(ids, {
     browser.runtime.sendMessage({ type: 'exportProgress', done, total }).catch(() => {});
   };
 
-  const deadlineAt = Date.now() + deadlineMs;
-  let consecutiveFailures = 0;
   const stats = {
     total, amoExact: 0, amoSearch: 0, homepage: 0, searchFallback: 0,
     lookupFailures: 0, lookupsSkipped: 0,
   };
+  const resolveLink = createAddonLinkResolver({
+    deadlineAt: Date.now() + deadlineMs,
+    maxConsecutiveFailures,
+    stats,
+  });
 
   // the keep-alive described above
   const keepAliveTimer = (typeof browser !== 'undefined' && browser.runtime && browser.runtime.getPlatformInfo)
@@ -163,44 +274,9 @@ async function doExport(ids, {
   let list;
   try {
     list = await mapWithConcurrency(extensions, AMO_LOOKUP_CONCURRENCY, async (a) => {
-      let amoMatch = null;
-      // Per add-on, and only counted if no AMO link ends up found, so a
-      // failure the name search recovered from isn't reported as a missing link.
-      let lookupFailed = false;
-      if (Date.now() < deadlineAt && consecutiveFailures < maxConsecutiveFailures) {
-        amoMatch = await findAmoPage(a.id, a.name, () => { lookupFailed = true; });
-        if (lookupFailed) {
-          consecutiveFailures++;
-        } else {
-          consecutiveFailures = 0;
-        }
-      } else {
-        stats.lookupsSkipped++;
-      }
-
-      let link;
-      let linkType;
-      if (amoMatch && isSafeUrl(amoMatch.url)) {
-        link = amoMatch.url;
-        linkType = amoMatch.matchType;
-        if (linkType === 'amo-exact') stats.amoExact++; else stats.amoSearch++;
-      } else {
-        // Only a lookup that really failed counts as a failure. "Not on AMO",
-        // a poor name match or a skipped lookup just get a fallback link, and
-        // the success message words those differently.
-        if (lookupFailed) stats.lookupFailures++;
-        if (a.homepageUrl && isSafeUrl(a.homepageUrl)) {
-          link = a.homepageUrl;
-          linkType = 'homepage';
-          stats.homepage++;
-        } else {
-          link = amoSearchUrl(a.name);
-          linkType = 'amo-search-fallback';
-          stats.searchFallback++;
-        }
-      }
+      const resolved = await resolveLink(a);
       reportProgress();
-      return { id: a.id, name: a.name, version: a.version, enabled: a.enabled, type: a.type, link, linkType };
+      return resolved;
     });
   } finally {
     if (keepAliveTimer) clearInterval(keepAliveTimer);

@@ -461,6 +461,86 @@ testAsync('export message: on desktop with CSV format, the result reports format
   assert.deepStrictEqual(Array.from(result.formats), ['csv']);
 });
 
+testAsync('resolveInstalledAddonLinks: returns the same exact AMO page the export stores', async () => {
+  const bgSandbox = makeSandbox({
+    URL,
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    fetch: async (url) => {
+      if (url.includes('/addons/addon/')) {
+        return { ok: true, status: 200, json: async () => ({ url: 'https://addons.mozilla.org/en-US/firefox/addon/exact-match/' }) };
+      }
+      throw new Error('should not reach the name search');
+    },
+    browser: {
+      runtime: { onMessage: { addListener() {} } },
+      management: { getAll: async () => [baseAddon] },
+    },
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
+
+  const result = await bgSandbox.resolveInstalledAddonLinks([baseAddon.id]);
+  assert.deepStrictEqual(plain(result), [{
+    id: baseAddon.id,
+    link: 'https://addons.mozilla.org/en-US/firefox/addon/exact-match/',
+    linkType: 'amo-exact',
+  }]);
+});
+
+testAsync('resolveInstalledAddonLinks: keeps the homepage and search fallbacks for add-ons not on AMO', async () => {
+  const homeAddon = { ...baseAddon, id: 'home@x', name: 'Home Addon', homepageUrl: 'https://example.com/home' };
+  const otherAddon = { ...baseAddon, id: 'other@x', name: 'Other Addon' };
+  const bgSandbox = makeSandbox({
+    URL,
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    fetch: async (url) => {
+      if (url.includes('/addons/addon/')) return { ok: false, status: 404, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => ({ results: [] }) };
+    },
+    browser: {
+      runtime: { onMessage: { addListener() {} } },
+      management: { getAll: async () => [homeAddon, otherAddon] },
+    },
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
+
+  const result = await bgSandbox.resolveInstalledAddonLinks([homeAddon.id, otherAddon.id]);
+  assert.deepStrictEqual(plain(result), [
+    { id: 'home@x', link: 'https://example.com/home', linkType: 'homepage' },
+    { id: 'other@x', link: `https://addons.mozilla.org/en-US/firefox/search/?q=${encodeURIComponent(otherAddon.name)}`, linkType: 'amo-search-fallback' },
+  ]);
+});
+
+testAsync('resolveInstalledAddonLinks: an export after the page load reuses the resolved links', async () => {
+  let exactCalls = 0;
+  const bgSandbox = makeSandbox({
+    URL,
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    fetch: async (url) => {
+      if (url.includes('/addons/addon/')) {
+        exactCalls++;
+        return { ok: true, status: 200, json: async () => ({ url: 'https://addons.mozilla.org/en-US/firefox/addon/exact-match/' }) };
+      }
+      throw new Error('should not reach the name search');
+    },
+    browser: {
+      runtime: { onMessage: { addListener() {} }, sendMessage: async () => {} },
+      management: { getAll: async () => [baseAddon] },
+    },
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
+
+  await bgSandbox.resolveInstalledAddonLinks([baseAddon.id]);
+  const result = await bgSandbox.doExport([baseAddon.id]);
+  assert.strictEqual(exactCalls, 1, 'the page lookup should not be repeated by the export');
+  assert.strictEqual(result.stats.amoExact, 1);
+});
+
 testAsync('listInstalledAddons: includes optionsUrl when present, null when absent', async () => {
   const bgSandbox = makeSandbox({
     URL,

@@ -8,6 +8,12 @@ const searchInput = document.getElementById('searchInput');
 const noSearchMatchesEl = document.getElementById('noSearchMatches');
 const exportDescEl = document.getElementById('exportDesc');
 
+// Filled by renderList(), so asynchronous AMO link lookups can find the row
+// they belong to without a selector built from an add-on id.
+const addonRows = new Map();
+const addonLinkResults = new Map();
+let addonLinksPromise = null;
+
 // The status after a finished export. It says how many links are exact AMO
 // matches and how many are fallbacks, and reports lookup failures separately
 // (doExport()'s stats), so an AMO outage doesn't read like a normal export.
@@ -82,28 +88,138 @@ const list = createAddonList({
   selectAllBtn, deselectAllBtn, searchInput, noMatchesEl: noSearchMatchesEl,
 });
 
-// The shared row plus an AMO search link. A name search always lands
-// somewhere useful, while a guessed exact-id URL would 404 for themes and
-// add-ons that aren't on AMO.
+function addonLinkTarget(a, link) {
+  return typeof link === 'string' && isSafeUrl(link) ? link : amoSearchUrl(a.name);
+}
+
+// Puts a resolved link and its match label on an existing row. The report and
+// Importer show the same pair, so an exact AMO page gets no label while a
+// homepage or a search result says which one it is.
+function setAddonLink(row, a, link, linkType) {
+  const anchor = row.querySelector('a.match-label');
+  if (!anchor) return;
+
+  const target = addonLinkTarget(a, link);
+  anchor.href = target;
+  anchor.textContent = linkLabel(target);
+  delete anchor.dataset.pending;
+  addonLinkResults.set(a.id, { link: target, linkType });
+
+  const label = row.querySelector('label');
+  if (!label) return;
+  const text = LINK_TYPE_LABELS[linkType] || '';
+  let kind = Array.from(label.querySelectorAll('span'))
+    .find((span) => span.dataset.linkKind === '1');
+  if (!text) {
+    if (kind) kind.remove();
+    return;
+  }
+  if (!kind) {
+    kind = document.createElement('span');
+    kind.dataset.linkKind = '1';
+    label.append(' ', kind);
+  }
+  kind.className = `match-label${UNCERTAIN_LINK_TYPES.has(linkType) ? ' match-uncertain' : ''}`;
+  kind.textContent = text;
+}
+
+// The shared row plus the page link. The row starts with a name-search
+// fallback so the list is usable at once; loadAddonLinks() replaces it with
+// the same resolved AMO page the report and Importer use.
 function createAddonRow(a, index, shorten) {
   const { row, label } = createAddonRowBase(a, index, {
     idPrefix: 'cb', dataset: { id: a.id }, shorten,
   });
+  row.dataset.addonId = a.id;
 
+  const resolved = typeof a.link === 'string' && isSafeUrl(a.link);
   const amoLink = document.createElement('a');
   amoLink.className = 'match-label';
-  amoLink.href = amoSearchUrl(a.name);
+  amoLink.href = addonLinkTarget(a, a.link);
   amoLink.target = '_blank';
   amoLink.rel = 'noopener';
-  amoLink.textContent = 'AMO';
+  amoLink.textContent = linkLabel(amoLink.href);
+  if (!resolved) {
+    amoLink.dataset.pending = '1';
+    amoLink.addEventListener('click', (e) => {
+      // Leave middle-click, modified clicks and "Open link in new tab" alone.
+      // A plain click waits briefly for the lookup already in flight, so an
+      // immediate click opens the add-on page rather than a search.
+      if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      openPendingAddonLink(a, amoLink);
+    });
+  }
 
   // A sibling of the label, not a child: inside a <label for> the checkbox's
   // accessible name would swallow the link text.
   row.append(amoLink);
+  addonRows.set(a.id, row);
+
+  if (resolved) setAddonLink(row, a, a.link, a.linkType);
   return row;
 }
 
+function settleAfter(ms, promise) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(null);
+    }, ms);
+    promise.then((value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    }, () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(null);
+    });
+  });
+}
+
+async function openPendingAddonLink(a, anchor) {
+  const result = addonLinksPromise
+    ? await settleAfter(4000, addonLinksPromise.then(() => addonLinkResults.get(a.id) || null))
+    : null;
+  const row = addonRows.get(a.id);
+  if (result && row) setAddonLink(row, a, result.link, result.linkType);
+  try {
+    await browser.tabs.create({ url: result ? result.link : anchor.href });
+  } catch {
+    /* the row's link still works if opening the tab fails */
+  }
+}
+
+// Resolves every row's link in the background. Until this finishes each row
+// keeps its search fallback, so the page never looks stuck on a slow network.
+function loadAddonLinks(addons) {
+  if (addons.length === 0) return;
+  addonLinksPromise = browser.runtime.sendMessage({
+    type: 'resolveAddonLinks',
+    ids: addons.map((a) => a.id),
+  }).then((links) => {
+    if (!Array.isArray(links)) return;
+    const addonsById = new Map(addons.map((a) => [a.id, a]));
+    for (const entry of links) {
+      if (!entry) continue;
+      const addon = addonsById.get(entry.id);
+      const row = addonRows.get(entry.id);
+      if (addon && row) setAddonLink(row, addon, entry.link, entry.linkType);
+    }
+  }).catch(() => {
+    // Keep the name-search fallbacks already in the rows.
+  });
+}
+
 function renderList(addons, shorten) {
+  addonRows.clear();
+  addonLinkResults.clear();
+  addonLinksPromise = null;
   if (addons.length === 0) {
     const placeholder = document.createElement('p');
     placeholder.className = 'placeholder-text';
@@ -133,6 +249,7 @@ function renderList(addons, shorten) {
     }
     const shorten = settings.shortenNames !== 'off';
     renderList(addons, shorten);
+    loadAddonLinks(addons);
   } catch (e) {
     const p = document.createElement('p');
     p.className = 'placeholder-text error';

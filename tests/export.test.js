@@ -2,7 +2,7 @@
 // the handler replaces its own page with confirmation.html (same tab, no second tab)
 
 const assert = require('assert');
-const { test, testAsync, readSrc, makeFakeDom, readCommon, makeSandbox, EXPORTER_ELEMENT_IDS } = require('./helpers');
+const { test, testAsync, readSrc, makeFakeDom, readCommon, makeSandbox, waitFor, EXPORTER_ELEMENT_IDS } = require('./helpers');
 
 const commonSrc = readCommon();
 const exportSrc = readSrc('src/export/export.js');
@@ -201,7 +201,7 @@ testAsync('export.js: a non-array listAddons response shows a friendly error, no
 // real bootstrap against a real element tree (makeFakeDom), same A1 regression
 // but through actual rendering instead of a hand-built fixture
 
-async function renderRealExportList(addons) {
+async function renderRealExportList(addons, { resolveLinks } = {}) {
   const { document, elements } = makeFakeDom(EXPORTER_ELEMENT_IDS);
   const listeners = [];
   const sandbox = makeSandbox({
@@ -210,7 +210,11 @@ async function renderRealExportList(addons) {
     setTimeout,
     browser: {
       runtime: {
-        sendMessage: async (msg) => (msg.type === 'listAddons' ? addons : undefined),
+        sendMessage: async (msg) => {
+          if (msg.type === 'listAddons') return addons;
+          if (msg.type === 'resolveAddonLinks' && resolveLinks) return resolveLinks(msg);
+          return undefined;
+        },
         onMessage: { addListener: (fn) => listeners.push(fn) },
         getURL: (p) => p,
       },
@@ -316,19 +320,43 @@ testAsync('storage.onChanged: an export-format change from another tab refreshes
   assert.match(elements.exportDesc.textContent, /JSON file/);
 });
 
-testAsync('export.js real DOM: the AMO link searches by name (not a guessed id URL) and sits outside the label', async () => {
+testAsync('export.js real DOM: the AMO link uses the resolved add-on page and sits outside the label', async () => {
+  const exact = 'https://addons.mozilla.org/en-US/firefox/addon/some-theme/';
   const { elements } = await renderRealExportList([
     { id: 'weird@id.example', name: 'Some Theme', version: '1.0', enabled: true, type: 'theme' },
-  ]);
+  ], {
+    resolveLinks: () => [{ id: 'weird@id.example', link: exact, linkType: 'amo-exact' }],
+  });
   const row = elements.addonList.querySelector('.addon-row');
   const link = row.querySelector('a.match-label');
+  await waitFor(() => link.href === exact, 'the resolved AMO page on the row link');
+
   assert.ok(link, 'the row should have a match-label link');
   assert.strictEqual(link.textContent, 'AMO');
-  assert.match(link.href, /\/search\/\?q=Some(%20|\+)Theme/, 'should search by name, not guess an exact-id URL');
-  assert.doesNotMatch(link.href, /weird%40id\.example/, 'should not use the add-on id as a guessed URL');
+  assert.strictEqual(link.href, exact, 'should use the resolved AMO page, not a name search');
+  assert.strictEqual(link.dataset.pending, undefined, 'the link is no longer pending');
 
   const label = row.querySelector('label');
   assert.strictEqual(label.contains(link), false, 'the link must not be inside the label (it would be absorbed into the checkbox\'s accessible name)');
+});
+
+testAsync('export.js real DOM: a fallback link keeps its match label and uncertain styling', async () => {
+  const { elements } = await renderRealExportList([
+    { id: 'no-match@example.com', name: 'No Match', version: '1.0', enabled: true, type: 'extension' },
+  ], {
+    resolveLinks: () => [{
+      id: 'no-match@example.com',
+      link: 'https://addons.mozilla.org/en-US/firefox/search/?q=No%20Match',
+      linkType: 'amo-search-fallback',
+    }],
+  });
+  const row = elements.addonList.querySelector('.addon-row');
+  const label = row.querySelector('label');
+  await waitFor(() => label.textContent.includes('Search results'), 'the fallback match label');
+
+  const kind = Array.from(label.querySelectorAll('span')).find((span) => span.dataset.linkKind === '1');
+  assert.strictEqual(kind.textContent, 'Search results');
+  assert.ok(kind.classList.contains('match-uncertain'));
 });
 
 async function renderExportListWithLiveSettings(addons, stored = {}) {
