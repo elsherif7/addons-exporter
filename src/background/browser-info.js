@@ -4,9 +4,11 @@
 //
 // Firefox and its forks report their own name and version through
 // browser.runtime.getBrowserInfo(). A fork that calls itself "Firefox" is
-// recorded as Firefox, there is nothing else to go on. Browsers without that
-// call (Chromium ones, Ladybird...) are recognised from the user agent, so a
-// Chromium browser that hides itself (Brave) shows up as Chrome.
+// recorded as Firefox: there is no API that gives the real fork name. LibreWolf
+// users can set librewolf.getBrowserInfo.setToFirefoxDefaults to false to make
+// it report LibreWolf. Browsers without that call (Chromium ones, Ladybird...)
+// are recognised from the user agent, so a Chromium browser that hides itself
+// (Brave) shows up as Chrome.
 //
 // browser.runtime.getPlatformInfo().os is "android" for Firefox for Android;
 // every other value is a desktop computer. The user agent answers when that

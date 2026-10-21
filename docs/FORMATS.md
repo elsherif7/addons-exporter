@@ -13,7 +13,7 @@ How the Exporter writes files and how the Importer reads them. Every export list
 
 Names are shortened when **Shorten add-on names** is on (the default). The id is always written.
 
-Export files are named after the browser that made them, for example `Zen Add-ons (2026-10-21_14-05-09).html` or `LibreWolf Add-ons (...).csv`. When the browser cannot be identified, the prefix is left off: `Add-ons (...).html`. A download with several formats keeps that same base name for its `.zip`.
+Export files are named after the browser that made them, for example `Zen Add-ons (2026-10-21_14-05-09).html` or `LibreWolf Add-ons (...).csv`. If a Firefox fork reports itself as Firefox, the prefix says `Firefox` instead. When the browser cannot be identified, the prefix is left off: `Add-ons (...).html`. A download with several formats keeps that same base name for its `.zip`. The file name is only a label; renaming the downloaded file does not affect the Importer.
 
 **CSV formula guard.** A name starting with `=`, `+`, `-` or `@` would be read as a formula by a spreadsheet, so it gets a leading apostrophe. The Importer strips exactly one back off, so the name round-trips unchanged.
 
@@ -38,7 +38,9 @@ Every export starts with a `source`: the file's own format version and type, whe
   ```
 - The Settings file records the format 1 source shape (no `device`) with `fileType` `settings`, because settings files still use their own format version 1.
 
-The browser name comes from Firefox itself, so forks such as LibreWolf or Waterfox are named as they report themselves, and anything with that call is recorded as based on Gecko (a fork that reports itself as Firefox shows as Firefox). Where that call doesn't exist (a future Chrome or Ladybird build) the user agent is used: Edge, Opera, Vivaldi and Chrome are based on Chromium, Safari on WebKit. Anything unknown is written as `Unknown`.
+The browser name comes from Firefox itself, so forks such as LibreWolf or Waterfox are named as they report themselves, and anything with that call is recorded as based on Gecko. A fork that reports itself as Firefox shows as Firefox in both the file name and the source; for example, LibreWolf can report itself as Firefox, so its export may be named `Firefox Add-ons (...)` and record `browser: Firefox`. Where that call doesn't exist (a future Chrome or Ladybird build) the user agent is used: Edge, Opera, Vivaldi and Chrome are based on Chromium, Safari on WebKit. Anything unknown is written as `Unknown`.
+
+The browser name is informational and does not change how the add-ons are read. In LibreWolf, open `about:config`, set `librewolf.getBrowserInfo.setToFirefoxDefaults` to `false`, and export again; the file name and source should then say `LibreWolf`. Setting it back to `true` restores LibreWolf's Firefox-style report. This pref is specific to LibreWolf; other forks may not offer it. If you prefer not to change it, rename the downloaded file; do not edit the export by hand, because a small mistake in the JSON, the HTML data or the CSV/TXT comment lines makes the whole file invalid.
 
 The device comes from `runtime.getPlatformInfo()` (`os` is `android` for a phone, anything else is a computer), falling back to the user agent when that call isn't available.
 

@@ -4,15 +4,21 @@
 export default {
   sourceDir: '.',
   ignoreFiles: [
-    // the goldens and the AMO fixture hold inline <script> blocks on purpose
+    // the goldens and the AMO fixture hold inline <script> blocks on purpose.
+    // each folder is listed twice: once for the folder entry in the zip and
+    // once for the files inside it, which lint checks one by one.
+    'tests',
     'tests/**',
+    'scripts',
     'scripts/**',
     // web-ext already ignores dotfiles
     'package.json',
     'package-lock.json',
     'README.md',
+    'docs',
     'docs/**',
     'LICENSE',
+    'coverage',
     'coverage/**',
   ],
 };

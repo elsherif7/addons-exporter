@@ -471,8 +471,13 @@ test('manifest: the id, the permissions (no more than these) and the options pag
 // through npm or by hand. the list keeps dev-only files out of the lint report and any package
 test('web-ext config: development-only files are ignored, however web-ext is started', () => {
   const config = readSrc('.web-ext-config.mjs');
-  for (const pattern of ['tests/**', 'scripts/**', 'package.json', 'package-lock.json', 'README.md', 'docs/**', 'LICENSE', 'coverage/**']) {
-    assert.ok(config.includes(`'${pattern}'`), `.web-ext-config.mjs does not ignore ${pattern}`);
+  // the folder itself keeps an empty folder out of the zip, the /** pattern keeps its files out of lint
+  for (const dir of ['tests', 'scripts', 'docs', 'coverage']) {
+    assert.ok(config.includes(`'${dir}'`), `.web-ext-config.mjs does not ignore the ${dir} folder`);
+    assert.ok(config.includes(`'${dir}/**'`), `.web-ext-config.mjs does not ignore files inside ${dir}`);
+  }
+  for (const file of ['package.json', 'package-lock.json', 'README.md', 'LICENSE']) {
+    assert.ok(config.includes(`'${file}'`), `.web-ext-config.mjs does not ignore ${file}`);
   }
   // report-inline.js is a real script the linter should see
   assert.ok(!config.includes('report-inline.js'), 'report-inline.js should be linted, not ignored');

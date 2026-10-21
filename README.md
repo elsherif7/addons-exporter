@@ -8,24 +8,7 @@
 
 ## Structure
 
-```
-addons-hub/
-├── manifest.json     # extension manifest: permissions, background scripts
-├── icons/            # toolbar and extension icons
-├── docs/             # file formats and development notes
-├── scripts/          # build and maintenance helpers
-├── tests/            # test suite, run with `npm test`
-└── src/
-    ├── common/       # shared code and styles
-    ├── background/   # export, AMO lookups, report and zip builders
-    ├── popup/        # the toolbar popup
-    ├── export/       # Add-ons Exporter page
-    ├── import/       # Add-ons Importer page and file readers
-    ├── settings/     # Settings page
-    └── confirmation/ # page shown after an export or import
-```
-
-Every file is described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+The repository layout and every file are described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ---
 
@@ -89,6 +72,10 @@ How files are read, and what gets rejected, is in [docs/FORMATS.md](docs/FORMATS
 | TXT | `.txt` | Yes | Plain text, with Enabled and Disabled sections and aligned columns. |
 
 Every format carries each add-on's id, and uses the short name when **Shorten add-on names** is on (the default). The exact layouts are in [docs/FORMATS.md](docs/FORMATS.md).
+
+> **Note about LibreWolf and other Firefox forks:** some Firefox forks report themselves to extensions as plain Firefox. When that happens, Add-ons Hub cannot tell them apart, so the exported file name and the source details in the file say **Firefox**, not the fork's name. The export itself works normally, and the source is only informational. If the fork reports its own name, Add-ons Hub uses it.
+>
+> **LibreWolf solution:** open `about:config`, search for `librewolf.getBrowserInfo.setToFirefoxDefaults`, and set it to `false`. Export again; the file name and source should then say **LibreWolf**. Setting it back to `true` restores LibreWolf's Firefox-style report. If you prefer not to change it, you can rename the downloaded file; do not edit the export by hand.
 
 ---
 
