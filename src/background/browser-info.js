@@ -1,11 +1,16 @@
-// Works out which browser is running, for the browser part of the "source"
-// block in every export (see SOURCE_KEYS in core.js).
+// Works out which browser is running and whether it is on a phone or a
+// computer, for the "source" block in every export (see SOURCE_KEYS in
+// core.js).
 //
 // Firefox and its forks report their own name and version through
 // browser.runtime.getBrowserInfo(). A fork that calls itself "Firefox" is
 // recorded as Firefox, there is nothing else to go on. Browsers without that
 // call (Chromium ones, Ladybird...) are recognised from the user agent, so a
 // Chromium browser that hides itself (Brave) shows up as Chrome.
+//
+// browser.runtime.getPlatformInfo().os is "android" for Firefox for Android;
+// every other value is a desktop computer. The user agent answers when that
+// call isn't there.
 
 // First match wins, so specific names come before the engines they also
 // contain (Edge's user agent says "Chrome" too).
@@ -47,12 +52,25 @@ function detectBrowserFromUserAgent(userAgent) {
   return null;
 }
 
+// "Phone" for an Android browser, "Computer" for a desktop one. The platform
+// API is exact when it is available; the user agent is the fallback.
+function deviceFromPlatform(platform, userAgent) {
+  const os = platform && typeof platform.os === 'string' ? platform.os : '';
+  if (os === 'android') return 'Phone';
+  if (os) return 'Computer';
+  const ua = typeof userAgent === 'string' ? userAgent : '';
+  if (/\b(?:Android|iPhone|iPad|Mobile)\b/i.test(ua)) return 'Phone';
+  if (/\b(?:Windows|Macintosh|Linux|CrOS|X11)\b/i.test(ua)) return 'Computer';
+  return 'Unknown';
+}
+
 // The browser part of the export source. Anything it can't find becomes
 // "Unknown" / "unknown", and it never throws.
 async function getExportSource() {
   let name = '';
   let version = '';
   let basedOn = '';
+  let platform = null;
   try {
     if (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.getBrowserInfo === 'function') {
       const info = await browser.runtime.getBrowserInfo();
@@ -68,9 +86,15 @@ async function getExportSource() {
       basedOn = browserBase(name);
     }
   }
+  try {
+    if (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.getPlatformInfo === 'function') {
+      platform = await browser.runtime.getPlatformInfo();
+    }
+  } catch { /* fall back to the user agent */ }
+  const device = deviceFromPlatform(platform, typeof navigator !== 'undefined' ? navigator.userAgent : '');
   let extensionVersion = '';
   try {
     extensionVersion = browser.runtime.getManifest().version;
   } catch { /* leave it unknown */ }
-  return makeBrowserSource(name, version, extensionVersion, basedOn);
+  return makeBrowserSource(name, version, extensionVersion, basedOn, device);
 }

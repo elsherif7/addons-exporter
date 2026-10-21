@@ -3,12 +3,13 @@
 // Strict: a file must be exactly what the exporter writes. No page code.
 // Needs core.js (EXPORT_FORMAT_VERSION, parseType).
 
-// Format 1 files (add-ons only, version at the top level) and format 2 files
-// (with a "source") are both read, each against its own exact layout.
-// migrateAddonsData() handles any change in the add-ons themselves between
-// versions, so the two go together: bumping the format version without
-// updating it would pass old files through unmigrated. A tripwire test in
-// tests/import.test.js hardcodes today's version to fail when that happens.
+// Format 1 files (add-ons only, version at the top level), format 2 files
+// (with a "source"), and format 3 files (with a device in the source) are all
+// read, each against its own exact layout. migrateAddonsData() handles any
+// change in the add-ons themselves between versions, so the two go together:
+// bumping the format version without updating it would pass old files through
+// unmigrated. A tripwire test in tests/import.test.js hardcodes today's version
+// to fail when that happens.
 const SUPPORTED_FORMAT_VERSION = EXPORT_FORMAT_VERSION;
 
 // The two ways a format version can be unusable: none at all (missing,
@@ -17,8 +18,9 @@ const SUPPORTED_FORMAT_VERSION = EXPORT_FORMAT_VERSION;
 const NO_VERSION_ERROR = 'This file is missing its export format version and can\'t be imported.';
 const NEWER_VERSION_ERROR = 'This file was exported by a newer version of Add-ons Exporter. Please update the extension and try again.';
 
-// No-op for versions 1 and 2 (version 2 only added the source). Update this
-// and the tripwire test before bumping EXPORT_FORMAT_VERSION again.
+// No-op for versions 1, 2 and 3 (version 2 added the source, version 3 added
+// the device to it). Update this and the tripwire test before bumping
+// EXPORT_FORMAT_VERSION again.
 function migrateAddonsData(addons, formatVersion) {
   return addons;
 }
@@ -46,8 +48,9 @@ function dedupeAddons(list) {
 //
 // Strict: exactly what the exporter writes, HTML reports from the release on
 // addons.mozilla.org included:
-//   format 2: { "source": { formatVersion, fileType, basedOn, browser, browserVersion, extensionVersion },
+//   format 3: { "source": { formatVersion, fileType, device, basedOn, browser, browserVersion, extensionVersion },
 //               "addons": [ { id, name, version, enabled, type, link, linkType }, ... ] }
+//   format 2: the same, without device in the source
 //   format 1: { "formatVersion": 1, "addons": [ ... ] }
 // Anything else (another key, a missing field, a wrong type) rejects the whole
 // file and names the first problem. Throws if jsonText isn't valid JSON, so
@@ -140,7 +143,7 @@ function stripCsvFormulaGuard(s) {
 
 const CSV_HEADER = ['name', 'version', 'type', 'enabled', 'link', 'linkType', 'id'];
 
-// Reads the header of a CSV or TXT export: the format-2 source comments or
+// Reads the header of a CSV or TXT export: the format-2/3 source comments or
 // the format-1 version comment. `formatError` is the format's own error
 // builder. Returns { ok: true, formatVersion, source, start } (`start` is the
 // first body line) or { ok: false, error }.
@@ -152,9 +155,10 @@ function readFormatHeader(lines, fileType, formatError) {
     // refused before the rest of the source is read, so a "0" isn't blamed on the comments
     if (formatVersion < 1) return { ok: false, error: NO_VERSION_ERROR };
     if (formatVersion > SUPPORTED_FORMAT_VERSION) return { ok: false, error: NEWER_VERSION_ERROR };
-    const source = parseSourceCommentLines(lines.slice(0, SOURCE_KEYS.length), fileType);
-    if (!source) return formatError('the file must start with the source comments, "# addons-hub-source-formatVersion: ..." and the five more');
-    return { ok: true, formatVersion, source, start: SOURCE_KEYS.length };
+    const sourceKeys = sourceKeysFor(formatVersion);
+    const source = parseSourceCommentLines(lines.slice(0, sourceKeys.length), fileType);
+    if (!source) return formatError(`the file must start with the source comments, "# addons-hub-source-formatVersion: ..." and the other ${sourceKeys.length - 1}`);
+    return { ok: true, formatVersion, source, start: sourceKeys.length };
   }
   const versionMatch = first.match(/^# addons-hub-format-version: (\d+)$/);
   if (!versionMatch) return { ok: false, error: 'This file doesn\'t look like an Add-ons Exporter file (no format-version comment found)' };
@@ -167,8 +171,8 @@ function readFormatHeader(lines, fileType, formatError) {
 const csvError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter CSV format (${detail}).` });
 
 // Accepts only what buildCsvExport() writes:
-//   line 1 (format 2): # addons-hub-source-formatVersion: <n>
-//   lines 2-6 (format 2): the rest of the source, one comment per field
+//   line 1 (format 2/3): # addons-hub-source-formatVersion: <n>
+//   the next lines (format 2/3): the rest of the source, one comment per field
 //   line 1 (format 1): # addons-hub-format-version: <n>, no source
 //   next: name,version,type,enabled,link,linkType,id (this exact header)
 //   then: one row per add-on, exactly seven fields, no blank lines
@@ -295,8 +299,8 @@ function readTxtCell(text) {
 const txtError = (detail) => ({ ok: false, error: `This file doesn't match the Add-ons Exporter TXT format (${detail}).` });
 
 // Accepts only what buildTxtExport() writes:
-//   line 1 (format 2): # addons-hub-source-formatVersion: <n>
-//   lines 2-6 (format 2): the rest of the source, one comment per field
+//   line 1 (format 2/3): # addons-hub-source-formatVersion: <n>
+//   the next lines (format 2/3): the rest of the source, one comment per field
 //   line 1 (format 1): # addons-hub-format-version: <n>, no source
 //   then the title, section headings and underlines (any line without " | "
 //   is skipped)

@@ -25,15 +25,22 @@ const {
 // top-level const, so it isn't on the sandbox object. read it from the context.
 const EXPORT_FORMAT_VERSION = evalInContext(sandbox, 'EXPORT_FORMAT_VERSION');
 // most hand-built files here are format 1 (still read, strict layout).
-// format 2 has its own tests at the end.
+// formats 2 and 3 have their own tests at the end.
 const V1 = 1;
 
 function payload(addons, formatVersion = V1) {
   return JSON.stringify({ formatVersion, addons });
 }
-// format 2: source first (formatVersion, fileType), then addons, no top-level
-// formatVersion. SOURCE is what getExportSource() returns.
-function payloadV2(addons, source = { formatVersion: 2, fileType: 'html', ...SOURCE }) {
+// Format 3: source first (formatVersion, fileType, device), then addons, no
+// top-level formatVersion. SOURCE is what getExportSource() returns.
+function payloadV3(addons, source = { formatVersion: 3, fileType: 'html', ...SOURCE }) {
+  return JSON.stringify({ source, addons });
+}
+// Format 2 sources are the older six-key shape, without device. Still read.
+function sourceV2(source = SOURCE) {
+  return { basedOn: source.basedOn, browser: source.browser, browserVersion: source.browserVersion, extensionVersion: source.extensionVersion };
+}
+function payloadV2(addons, source = { formatVersion: 2, fileType: 'html', ...sourceV2(SOURCE) }) {
   return JSON.stringify({ source, addons });
 }
 
@@ -140,10 +147,11 @@ test('parseAddonsPayload: formatVersion newer than supported is rejected', () =>
   assert.match(result.error, /newer version of Add-ons Exporter/);
 });
 
-test('parseAddonsPayload: the newest supported format version succeeds, and so does the one before it', () => {
-  assert.strictEqual(EXPORT_FORMAT_VERSION, 2);
+test('parseAddonsPayload: the newest supported format version succeeds, and so do the older ones', () => {
+  assert.strictEqual(EXPORT_FORMAT_VERSION, 3);
   assert.strictEqual(parseAddonsPayload(payload([entry()], V1)).ok, true);
   assert.strictEqual(parseAddonsPayload(payloadV2([entry()])).ok, true);
+  assert.strictEqual(parseAddonsPayload(payloadV3([entry()])).ok, true);
 });
 
 test('parseAddonsPayload: valid file succeeds and returns the parsed addons', () => {
@@ -210,7 +218,7 @@ test('migrateAddonsData: currently a no-op, returns the list unchanged', () => {
 // gets looked at instead of keeping the old no-op by accident.
 test('migrateAddonsData: bumping the format version requires updating this test and migrateAddonsData', () => {
   assert.strictEqual(
-    EXPORT_FORMAT_VERSION, 2,
+    EXPORT_FORMAT_VERSION, 3,
     'EXPORT_FORMAT_VERSION changed - implement real migration logic in migrateAddonsData for the new format, then update this test to match.'
   );
   const list = [{ name: 'X' }];
@@ -1306,15 +1314,16 @@ test('JSON export: each add-on lists name first and the id last', () => {
 test('TXT export: a title, Enabled and Disabled sections, and lined-up columns', () => {
   const txt = sandbox.buildTxtExport(readableSample, false, SOURCE);
   const lines = txt.split('\r\n');
-  assert.deepStrictEqual(lines.slice(0, 6), [
-    '# addons-hub-source-formatVersion: 2',
+  assert.deepStrictEqual(lines.slice(0, 7), [
+    '# addons-hub-source-formatVersion: 3',
     '# addons-hub-source-fileType: txt',
+    '# addons-hub-source-device: Computer',
     '# addons-hub-source-basedOn: Gecko',
     '# addons-hub-source-browser: Firefox',
     '# addons-hub-source-browserVersion: 128.0',
     '# addons-hub-source-extensionVersion: 1.2.0',
   ]);
-  assert.strictEqual(lines[7], 'Firefox Add-ons - 4 in total (2 enabled, 2 disabled)');
+  assert.strictEqual(lines[8], 'Firefox Add-ons - 4 in total (2 enabled, 2 disabled)');
   assert.ok(lines.includes('Enabled (2)') && lines.includes('Disabled (2)'));
   const rows = lines.filter((l) => l.includes(' | '));
   assert.strictEqual(rows.length, 4);

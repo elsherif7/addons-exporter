@@ -58,6 +58,7 @@ test('buildSettingsExport: produces valid JSON with the source and settings', ()
   assert.deepStrictEqual(parsed.source, SETTINGS_SOURCE);
   assert.strictEqual(parsed.source.formatVersion, SETTINGS_FILE_FORMAT_VERSION);
   assert.strictEqual(parsed.source.fileType, 'settings');
+  assert.ok(!('device' in parsed.source), 'the settings file keeps the format 1 source shape');
   assert.strictEqual(parsed.settings[THEME_STORAGE_KEY], 'dark');
   assert.strictEqual(parsed.settings[EXPORT_FORMAT_STORAGE_KEY], 'json');
 });
@@ -79,9 +80,17 @@ test('buildSettingsExport: output is valid JSON', () => {
   assert.doesNotThrow(() => JSON.parse(buildSettingsExport({ [THEME_STORAGE_KEY]: 'light' })));
 });
 
-// a valid source as the exporter records it: browser part
-// (background/browser-info.js) plus the file's own version and type
-const SETTINGS_SOURCE = { formatVersion: SETTINGS_FILE_FORMAT_VERSION, fileType: 'settings', ...SETTINGS_BROWSER };
+// A valid source as the exporter records it: browser part
+// (background/browser-info.js) plus the file's own version and type. The
+// settings file keeps its own format 1 source shape, which has no device.
+const SETTINGS_SOURCE = {
+  formatVersion: SETTINGS_FILE_FORMAT_VERSION,
+  fileType: 'settings',
+  basedOn: SETTINGS_BROWSER.basedOn,
+  browser: SETTINGS_BROWSER.browser,
+  browserVersion: SETTINGS_BROWSER.browserVersion,
+  extensionVersion: SETTINGS_BROWSER.extensionVersion,
+};
 function makeSettingsFile(settings, formatVersion = SETTINGS_FILE_FORMAT_VERSION, source = SETTINGS_SOURCE) {
   return JSON.stringify({ source: { ...source, formatVersion }, settings });
 }

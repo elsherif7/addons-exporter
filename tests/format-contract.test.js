@@ -14,9 +14,11 @@ const path = require('path');
 const { test, evalInContext, readCommon, readReportBuilders, readImport, htmlData, stubDocument, makeSandbox, FIREFOX_SOURCE: SOURCE } = require('./helpers');
 
 const CONTRACT = {
-  exportFormatVersion: 2,
-  // format 1 (the AMO release) had no source block, the Importer still reads it
-  sourceKeys: ['formatVersion', 'fileType', 'basedOn', 'browser', 'browserVersion', 'extensionVersion'],
+  exportFormatVersion: 3,
+  // format 1 (the AMO release) had no source block, the Importer still reads it.
+  // Format 2 sources have the same keys without device, and are still read.
+  sourceKeys: ['formatVersion', 'fileType', 'device', 'basedOn', 'browser', 'browserVersion', 'extensionVersion'],
+  sourceKeysV2: ['formatVersion', 'fileType', 'basedOn', 'browser', 'browserVersion', 'extensionVersion'],
   htmlTopV1: ['formatVersion', 'addons'],
   htmlTop: ['source', 'addons'],
   htmlEntry: ['id', 'name', 'version', 'enabled', 'type', 'link', 'linkType'],
@@ -30,6 +32,7 @@ const CONTRACT = {
 const sourceLines = (fileType, version) => [
   `# addons-hub-source-formatVersion: ${version}`,
   `# addons-hub-source-fileType: ${fileType}`,
+  '# addons-hub-source-device: Computer',
   '# addons-hub-source-basedOn: Gecko',
   '# addons-hub-source-browser: Firefox',
   '# addons-hub-source-browserVersion: 128.0',
@@ -112,4 +115,17 @@ test('contract: the Importer reads exactly what each export writes (the contract
   assert.deepStrictEqual(ids(importSb.parseJsonPayload(importSb.buildJsonExport(list, false, SOURCE))), ['a@x', 'n@x']);
   assert.deepStrictEqual(ids(importSb.parseCsvPayload(importSb.buildCsvExport(list, false, SOURCE))), ['a@x', 'n@x']);
   assert.deepStrictEqual(ids(importSb.parseTxtPayload(importSb.buildTxtExport(list, false, SOURCE))), ['a@x', 'n@x']);
+});
+
+test('contract: a format 2 source (no device) still imports, and a format 3 source without one does not', () => {
+  const importSb = makeSandbox({ URL, document: stubDocument() }, readCommon(), readReportBuilders(), readImport());
+  const v2Source = { formatVersion: 2, fileType: 'json', basedOn: 'Gecko', browser: 'Firefox', browserVersion: '128.0', extensionVersion: '1.2.0' };
+  const payload = (source) => JSON.stringify({ source, addons: [{ name: 'Alpha', version: '1.0', type: 'extension', enabled: true, link: AMO + 'a/', linkType: 'amo-exact', id: 'a@x' }] });
+  const old = importSb.parseJsonPayload(payload(v2Source));
+  assert.strictEqual(old.ok, true, old.error);
+  assert.deepStrictEqual(keys(old.source), CONTRACT.sourceKeysV2);
+  const missingDevice = { ...v2Source, formatVersion: 3 };
+  const bad = importSb.parseJsonPayload(payload(missingDevice));
+  assert.strictEqual(bad.ok, false);
+  assert.match(bad.error, /not exactly formatVersion, fileType, device, basedOn, browser, browserVersion, extensionVersion/);
 });

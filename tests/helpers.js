@@ -54,7 +54,7 @@ function htmlData(html) {
   return JSON.parse(html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/)[1].replace(/<\\\//g, '</'));
 }
 
-const FIREFOX_SOURCE = { basedOn: 'Gecko', browser: 'Firefox', browserVersion: '128.0', extensionVersion: '1.2.0' };
+const FIREFOX_SOURCE = { device: 'Computer', basedOn: 'Gecko', browser: 'Firefox', browserVersion: '128.0', extensionVersion: '1.2.0' };
 
 // just enough element for a page script's top-level wiring to run. use makeFakeDom for anything that renders
 function stubElement() {

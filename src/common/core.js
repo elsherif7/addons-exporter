@@ -4,17 +4,27 @@
 // Bump this if the shape of the exported data changes.
 //   1: just the add-ons
 //   2: also a "source" (format version, file type, browser info)
-const EXPORT_FORMAT_VERSION = 2;
+//   3: also the device (phone or computer) the export came from
+const EXPORT_FORMAT_VERSION = 3;
 
 // What every export file says about itself, in this exact order. The Importer
 // checks the order strictly. The browser is free text so a new browser never
 // needs a new format version.
-const SOURCE_KEYS = ['formatVersion', 'fileType', 'basedOn', 'browser', 'browserVersion', 'extensionVersion'];
+// Version 2 sources have no device; they are still read.
+const SOURCE_KEYS_V2 = ['formatVersion', 'fileType', 'basedOn', 'browser', 'browserVersion', 'extensionVersion'];
+const SOURCE_KEYS = ['formatVersion', 'fileType', 'device', 'basedOn', 'browser', 'browserVersion', 'extensionVersion'];
 const FILE_TYPES = ['html', 'json', 'csv', 'txt', 'settings'];
 const BROWSER_KEYS = ['basedOn', 'browser', 'browserVersion', 'extensionVersion'];
-const UNKNOWN_BROWSER = Object.freeze({ basedOn: 'Unknown', browser: 'Unknown', browserVersion: 'unknown', extensionVersion: 'unknown' });
+const DEVICE_VALUES = ['Phone', 'Computer', 'Unknown'];
+const UNKNOWN_BROWSER = Object.freeze({ device: 'Unknown', basedOn: 'Unknown', browser: 'Unknown', browserVersion: 'unknown', extensionVersion: 'unknown' });
 // Plain characters only, so the value reads the same in JSON, CSV, TXT and HTML.
 const SOURCE_TEXT_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9 ._+-]{0,62}[A-Za-z0-9._+-])?$/;
+
+// The source keys for a given source format version. Format 2 had no device;
+// format 3 and later do. (Settings files still use their own version 1 shape.)
+function sourceKeysFor(formatVersion) {
+  return formatVersion >= 3 ? SOURCE_KEYS : SOURCE_KEYS_V2;
+}
 
 function cleanSourceText(value, fallback) {
   const text = String(value == null ? '' : value).replace(/[^A-Za-z0-9 ._+-]/g, '').replace(/ +/g, ' ').trim().slice(0, 64).trim();
@@ -22,29 +32,34 @@ function cleanSourceText(value, fallback) {
 }
 
 // Anything missing or unusable becomes "Unknown", so a file is always written.
-function makeBrowserSource(browserName, browserVersion, extensionVersion, basedOn) {
+function makeBrowserSource(browserName, browserVersion, extensionVersion, basedOn, device) {
   return {
     basedOn: cleanSourceText(basedOn, UNKNOWN_BROWSER.basedOn),
     browser: cleanSourceText(browserName, UNKNOWN_BROWSER.browser),
     browserVersion: cleanSourceText(browserVersion, UNKNOWN_BROWSER.browserVersion),
     extensionVersion: cleanSourceText(extensionVersion, UNKNOWN_BROWSER.extensionVersion),
+    device: DEVICE_VALUES.includes(device) ? device : UNKNOWN_BROWSER.device,
   };
 }
 function normalizeBrowserSource(source) {
   const s = source && typeof source === 'object' ? source : {};
-  return makeBrowserSource(s.browser, s.browserVersion, s.extensionVersion, s.basedOn);
+  return makeBrowserSource(s.browser, s.browserVersion, s.extensionVersion, s.basedOn, s.device);
 }
 
 function makeSource(fileType, formatVersion, browserSource) {
   const b = normalizeBrowserSource(browserSource);
-  return {
+  const values = {
     formatVersion,
     fileType,
+    device: b.device,
     basedOn: b.basedOn,
     browser: b.browser,
     browserVersion: b.browserVersion,
     extensionVersion: b.extensionVersion,
   };
+  const out = {};
+  for (const key of sourceKeysFor(formatVersion)) out[key] = values[key];
+  return out;
 }
 
 // Exactly these keys in exactly this order (JSON.parse keeps the file's order).
@@ -58,8 +73,9 @@ function hasExactKeys(obj, keys) {
 // If fileType is given, the source must be for exactly that file type.
 function sourceProblem(source, fileType) {
   if (!source || typeof source !== 'object' || Array.isArray(source)) return 'it is not an object';
-  if (!hasExactKeys(source, SOURCE_KEYS)) {
-    return 'its fields are not exactly ' + SOURCE_KEYS.join(', ') + ', in that order';
+  const keys = sourceKeysFor(source.formatVersion);
+  if (!hasExactKeys(source, keys)) {
+    return 'its fields are not exactly ' + keys.join(', ') + ', in that order';
   }
   if (!Number.isInteger(source.formatVersion) || source.formatVersion < 1) return 'its format version is not a positive whole number';
   if (!FILE_TYPES.includes(source.fileType)) return 'its file type is not one of ' + FILE_TYPES.join(', ');
@@ -67,25 +83,36 @@ function sourceProblem(source, fileType) {
   for (const k of BROWSER_KEYS) {
     if (typeof source[k] !== 'string' || !SOURCE_TEXT_PATTERN.test(source[k])) return `${k} is not plain text`;
   }
+  if (source.formatVersion >= 3 && !DEVICE_VALUES.includes(source.device)) {
+    return 'device is not one of ' + DEVICE_VALUES.join(', ');
+  }
   return null;
 }
 
 // CSV and TXT carry the source as one comment line per field at the top.
+// Format 2 sources have one line fewer (no device).
 function sourceCommentLines(source) {
-  return SOURCE_KEYS.map((key) => `# addons-hub-source-${key}: ${source[key]}`);
+  return sourceKeysFor(source.formatVersion).map((key) => `# addons-hub-source-${key}: ${source[key]}`);
 }
-// The reverse: the source, or null unless it is exactly the six lines above.
+// The reverse: the source, or null unless it is exactly the source lines for
+// its format version.
 function parseSourceCommentLines(lines, fileType) {
-  if (!Array.isArray(lines) || lines.length !== SOURCE_KEYS.length) return null;
+  if (!Array.isArray(lines) || lines.length === 0) return null;
+  const first = typeof lines[0] === 'string' && lines[0].match(/^# addons-hub-source-formatVersion: (\d+)$/);
+  if (!first) return null;
+  const formatVersion = parseInt(first[1], 10);
+  const keys = sourceKeysFor(formatVersion);
+  if (lines.length !== keys.length) return null;
   const raw = {};
-  for (let i = 0; i < SOURCE_KEYS.length; i++) {
+  for (let i = 0; i < keys.length; i++) {
     const m = typeof lines[i] === 'string' && lines[i].match(/^# addons-hub-source-([A-Za-z]+): (.*)$/);
-    if (!m || m[1] !== SOURCE_KEYS[i]) return null;
-    raw[SOURCE_KEYS[i]] = m[2];
+    if (!m || m[1] !== keys[i]) return null;
+    raw[keys[i]] = m[2];
   }
   const source = {
-    formatVersion: /^\d+$/.test(raw.formatVersion) ? parseInt(raw.formatVersion, 10) : raw.formatVersion,
+    formatVersion,
     fileType: raw.fileType,
+    ...(formatVersion >= 3 ? { device: raw.device } : {}),
     basedOn: raw.basedOn,
     browser: raw.browser,
     browserVersion: raw.browserVersion,

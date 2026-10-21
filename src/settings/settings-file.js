@@ -9,8 +9,9 @@ const KNOWN_SETTINGS_KEYS = SETTINGS_STORAGE_KEYS;
 
 // `settings` is a plain object of the stored values (exportFormat is one
 // format, or an array when several are chosen). `source` is the browser part;
-// the format version and file type ("settings") are added here, so the file
-// has the same source shape as an export.
+// the format version and file type ("settings") are added here. This file keeps
+// its own format version 1, so its source is the format 1 shape and has no
+// device (unlike an add-on export, which is format 3).
 function buildSettingsExport(settings, source = UNKNOWN_BROWSER) {
   const out = {};
   for (const key of KNOWN_SETTINGS_KEYS) {

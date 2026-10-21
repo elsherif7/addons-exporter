@@ -13,29 +13,36 @@ How the Exporter writes files and how the Importer reads them. Every export list
 
 Names are shortened when **Shorten add-on names** is on (the default). The id is always written.
 
+Export files are named after the browser that made them, for example `Zen Add-ons (2026-10-21_14-05-09).html` or `LibreWolf Add-ons (...).csv`. When the browser cannot be identified, the prefix is left off: `Add-ons (...).html`. A download with several formats keeps that same base name for its `.zip`.
+
 **CSV formula guard.** A name starting with `=`, `+`, `-` or `@` would be read as a formula by a spreadsheet, so it gets a leading apostrophe. The Importer strips exactly one back off, so the name round-trips unchanged.
 
 **TXT escaping.** A backslash, a pipe or a line break in a name is escaped with a backslash (a line break is written as `\n`, and a space at the very start or end as `\s`), so every add-on stays on one line and the Importer restores the name exactly.
 
-## Format version 2 and the source
+## Format version 3 and the source
 
-Every export starts with a `source`: the file's own format version and type, then where it came from (what the browser is based on, its name and version, and the Add-ons Hub version). For example: LibreWolf 128.0, based on Gecko, with Add-ons Hub 1.2.0.
+Every export starts with a `source`: the file's own format version and type, whether it came from a phone or a computer, then where it came from (what the browser is based on, its name and version, and the Add-ons Hub version). For example: a report made on a phone in Firefox 128.0, based on Gecko, with Add-ons Hub 1.2.0.
 
-- JSON and the HTML report's data hold it as a `source` object before `addons`, with `fileType` `json` or `html`.
-- CSV and TXT hold it as one comment line per field at the very top, in this order, with `fileType` `csv` or `txt`:
+`device` is `Phone` on Android, `Computer` on Windows, macOS, Linux, ChromeOS and the other desktop platforms, and `Unknown` when neither the platform API nor the user agent can say. It describes the device that made the export, not the browser.
+
+- JSON and the HTML report's data hold it as a `source` object before `addons`, with `fileType` `json` or `html`, in this order: `formatVersion`, `fileType`, `device`, `basedOn`, `browser`, `browserVersion`, `extensionVersion`.
+- CSV and TXT hold it as one comment line per field at the very top, in the same order, with `fileType` `csv` or `txt`:
   ```
   # addons-hub-source-formatVersion: ...
   # addons-hub-source-fileType: ...
+  # addons-hub-source-device: ...
   # addons-hub-source-basedOn: ...
   # addons-hub-source-browser: ...
   # addons-hub-source-browserVersion: ...
   # addons-hub-source-extensionVersion: ...
   ```
-- The Settings file records the same source with `fileType` `settings`.
+- The Settings file records the format 1 source shape (no `device`) with `fileType` `settings`, because settings files still use their own format version 1.
 
 The browser name comes from Firefox itself, so forks such as LibreWolf or Waterfox are named as they report themselves, and anything with that call is recorded as based on Gecko (a fork that reports itself as Firefox shows as Firefox). Where that call doesn't exist (a future Chrome or Ladybird build) the user agent is used: Edge, Opera, Vivaldi and Chrome are based on Chromium, Safari on WebKit. Anything unknown is written as `Unknown`.
 
-The Importer still reads format 1 files (which have no source). Every other layout rule stays strict.
+The device comes from `runtime.getPlatformInfo()` (`os` is `android` for a phone, anything else is a computer), falling back to the user agent when that call isn't available.
+
+The Importer still reads format 2 files (the same source without `device`) and format 1 files (which have no source). Every other layout rule stays strict.
 
 ## How the Importer reads files
 
@@ -68,6 +75,6 @@ The Importer still reads format 1 files (which have no source). Every other layo
 
 ## The settings file
 
-**Export Settings** writes a small JSON file named `Add-ons Hub Settings (<timestamp>).json` with the same `source` as the add-on exports and exactly three settings, in this order: `theme`, `exportFormat` (a single value, or a list when several are ticked) and `shortenNames`.
+**Export Settings** writes a small JSON file named `Add-ons Hub Settings (<timestamp>).json` with the format 1 source shape (no `device`) and exactly three settings, in this order: `theme`, `exportFormat` (a single value, or a list when several are ticked) and `shortenNames`.
 
 **Import Settings** is strict in the same way. The file must hold exactly those three settings in that order, each with a valid value, otherwise it's rejected with the problem named and nothing is changed.

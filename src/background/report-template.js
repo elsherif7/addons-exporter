@@ -19,7 +19,7 @@ function safeJsonForScriptTag(value) {
 
 // The data block in #addons-exporter-data is what the Importer reads, and it
 // has to stay exactly what the release on addons.mozilla.org wrote:
-//   { "source": { formatVersion, fileType, basedOn, browser, browserVersion, extensionVersion },
+//   { "source": { formatVersion, fileType, device, basedOn, browser, browserVersion, extensionVersion },
 //     "addons": [ { id, name, version, enabled, type, link, linkType }, ... ] }
 // in that order, with full names (never shortened). The page around it can
 // change freely. Format version 1 had no "source" and kept the version at the

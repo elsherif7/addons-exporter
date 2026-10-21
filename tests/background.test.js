@@ -426,6 +426,31 @@ testAsync('doExport: defaults to .html when storage.local.get throws for exportF
   assert.match(content, /<!DOCTYPE html>/);
 });
 
+testAsync('doExport: names the export file after the browser that produced it', async () => {
+  const bgSandbox = makeSandbox({
+    URL, AbortController, setTimeout, clearTimeout,
+    console: { warn() {}, debug() {}, log() {}, error() {} },
+    fetch: async () => ({ ok: false, status: 404, json: async () => ({}) }),
+    browser: {
+      runtime: {
+        onMessage: { addListener() {} },
+        getBrowserInfo: async () => ({ name: 'Zen', version: '1.0' }),
+        getManifest: () => ({ version: '1.3.0' }),
+        sendMessage: async () => {},
+      },
+      management: { getAll: async () => [baseAddon] },
+      storage: { local: { get: async () => ({}) } },
+    },
+  }, commonSrc, reportTemplateSrc, backgroundSrc);
+  const { files: [{ filename }] } = await bgSandbox.doExport([baseAddon.id]);
+  assert.match(filename, /^Zen Add-ons \(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\)\.html$/);
+});
+
+testAsync('doExport: leaves the browser prefix off when the browser is unknown', async () => {
+  const { filename } = await runDoExportForFormat(async () => ({}));
+  assert.match(filename, /^Add-ons \(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\)\.html$/);
+});
+
 testAsync('export message: on desktop with JSON format, the result reports format=json', async () => {
   const { result } = await captureExportMessageResult(async () => ({ exportFormat: 'json' }));
   assert.deepStrictEqual(Array.from(result.formats), ['json']);

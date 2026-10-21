@@ -220,13 +220,18 @@ async function doExport(ids, {
   // One file per chosen format, all from the same list, so the slow AMO
   // lookups run once however many formats are ticked.
   const timestamp = formatFilenameTimestamp(new Date());
+  // Name the file after the browser actually running ("Zen", "Waterfox"...),
+  // not always Firefox. The source's browser field is already plain text, so
+  // it is safe in a filename; when it is unknown, leave the prefix off rather
+  // than writing "Unknown Add-ons".
+  const browserPrefix = source.browser === UNKNOWN_BROWSER.browser ? '' : `${source.browser} `;
   const files = exportFormats.map((fmt) => {
     let content;
     if (fmt === 'json') content = buildJsonExport(list, shorten, source);
     else if (fmt === 'csv') content = buildCsvExport(list, shorten, source);
     else if (fmt === 'txt') content = buildTxtExport(list, shorten, source);
     else content = buildHtmlReport(list, theme, shorten, source);
-    return { content, filename: `Firefox Add-ons (${timestamp}).${getExportFormat(fmt).extension}`, format: fmt };
+    return { content, filename: `${browserPrefix}Add-ons (${timestamp}).${getExportFormat(fmt).extension}`, format: fmt };
   });
 
   return {
