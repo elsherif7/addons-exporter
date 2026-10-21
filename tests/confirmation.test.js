@@ -41,6 +41,12 @@ test('export, several formats saved as one .zip: names them all and says they ar
   assert.match(text, /saved together in one \.zip file/);
 });
 
+test('export, several formats saved as one .zip: tells the user to pick the .zip as it is, not to unzip it', () => {
+  const { elements } = loadConfirmation('?from=export&format=html,json&zip=1');
+  assert.doesNotMatch(elements.message.textContent, /Unzip it first/);
+  assert.match(elements.message.textContent, /select the \.zip as it is, no need to unzip it/);
+});
+
 test('export, several formats without zip=1: lists them but does not claim a .zip', () => {
   const { elements } = loadConfirmation('?from=export&format=html,json');
   assert.match(elements.message.textContent, /HTML report and JSON file/);

@@ -5,9 +5,13 @@
 
 // Add-on names are attacker-controlled, so a "</script>" in one must not
 // close the data tag early. "</" becomes "<\/", and U+2028/2029 are escaped
-// for older parsers. JSON.parse reads it back the same.
+// for older parsers. "<!--" is escaped too: followed by "<script" it puts the
+// HTML parser in a state where the real closing tag no longer ends the data
+// block, which swallows the page script and breaks the data. JSON.parse reads
+// it all back the same.
 function safeJsonForScriptTag(value) {
   return JSON.stringify(value)
+    .replace(/<!--/g, '\\u003c!--')
     .replace(/<\//g, '<\\/')
     .replace(/\u2028/g, '\\u2028')
     .replace(/\u2029/g, '\\u2029');

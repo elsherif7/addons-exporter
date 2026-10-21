@@ -102,6 +102,16 @@ test('safeJsonForScriptTag: escapes "</" so an add-on name can\'t close the scri
   assert.deepStrictEqual(JSON.parse(json), { addons: [{ name: 'x</script><script>alert(1)</script>' }] });
 });
 
+test('safeJsonForScriptTag: escapes "<!--" so "<!--<script>" in a name can\'t keep the real closing tag from ending the data block', () => {
+  const json = safeJsonForScriptTag({ addons: [{ name: 'a<!--<script>b' }] });
+  assert.ok(!json.includes('<!--'), '"<!--" must not appear in the output');
+  assert.deepStrictEqual(JSON.parse(json), { addons: [{ name: 'a<!--<script>b' }] });
+  const html = buildHtmlReport([{ id: 'x@x', name: '<!--<script>', version: '1', enabled: true, type: 'extension', link: 'https://example.com/', linkType: 'homepage' }], 'light', false);
+  const data = html.match(/<script type="application\/json" id="addons-exporter-data">([\s\S]*?)<\/script>/)[1];
+  assert.ok(!data.includes('<!--'));
+  assert.strictEqual(JSON.parse(data).addons[0].name, '<!--<script>');
+});
+
 test('safeJsonForScriptTag: escapes U+2028 and U+2029 line separators for safe inlining', () => {
   const json = safeJsonForScriptTag({ addons: [{ name: 'line\u2028sep\u2029test' }] });
   assert.ok(!json.includes('\u2028'), 'U+2028 must be escaped');

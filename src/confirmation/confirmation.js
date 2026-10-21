@@ -24,7 +24,7 @@ function buildExportMessage(container) {
   );
   appendFormatLabels(container, formats);
   if (zipped) {
-    container.append(', saved together in one .zip file. Unzip it first; ', importerStrong, ' reads the files inside, such as the HTML or JSON one.');
+    container.append(', saved together in one .zip file. On another browser, choose ', importerStrong, ' and select the .zip as it is, no need to unzip it.');
     return;
   }
   container.append('. On another browser, choose ', importerStrong, ' to select which ones to install.');
